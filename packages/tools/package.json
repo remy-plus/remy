@@ -1,0 +1,18 @@
+{
+  "name": "@remy/tools",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "description": "Built-in tools, ScopedFs, ScopedFetch, secret redaction.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "@remy/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@remy/core": "workspace:*"
+  }
+}

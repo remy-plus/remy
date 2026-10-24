@@ -1,0 +1,21 @@
+{
+  "name": "@remy/evals",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "description": "Eval case format, mock world, graders, eval runner, compare.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "@remy/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@remy/core": "workspace:*",
+    "@remy/models": "workspace:*",
+    "@remy/tools": "workspace:*",
+    "@remy/store": "workspace:*"
+  }
+}
