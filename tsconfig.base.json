@@ -11,6 +11,7 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "verbatimModuleSyntax": true,
+    "rewriteRelativeImportExtensions": true,
     "isolatedModules": true,
     "erasableSyntaxOnly": true,
     "declaration": true,
