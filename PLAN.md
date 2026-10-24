@@ -1,0 +1,388 @@
+# Remy: Plan v2
+
+## Context
+
+Remy is a universal AI agent: one chat box that gets real digital work done for anyone. The long-term aim is AGI/ASI; the near-term aim is a capable, **reliable** agent that is stupidly simple to use.
+
+v1 (2026-10-23) set the target architecture. v2 reworks it around five priorities:
+
+1. **Smallest complete runtime first:** Phase 0 has no infrastructure it doesn't need.
+2. **Durable tasks:** persistence, crash recovery, retries, and no duplicate actions.
+3. **Security enforced in code**, not in prompts: tool permissions, prompt injection, approvals.
+4. **Evals from day one:** success, reliability, cost, latency, regressions.
+5. **Modularity:** new capabilities plug in without rebuilding.
+
+**Fixed decisions:** web app + PWA is the first real surface (Phase 1). Execution routes in order of preference: API/MCP → cloud browser → user's device. TypeScript end to end. Users choose their own model; testing uses cheap or free open-weight models. Scope is "everything", but each domain ships only once its evals pass.
+
+---
+
+## Core design rules
+
+These rules apply to every phase. Each one names the mechanism that enforces it.
+
+| Rule | Enforced by |
+|---|---|
+| Every state change is an append-only event; state = `fold(events)` | `EventStore.append` is the only write path; the reducer is pure |
+| The runner never asks "where was I?" It computes `nextAction(state)` | Crash recovery is just: re-read the events, call `nextAction` again |
+| No tool runs without a policy decision | The executor only accepts `AuthorizedCall`, a branded type only the policy module can create |
+| An approval covers *exact* arguments, once | Approvals bind to `argsHash` (a hash of the canonical JSON arguments) and are single-use |
+| No side effect is retried blindly | Each tool declares `effect`; recovery logic branches on it |
+| Untrusted content can't trigger risky actions on its own | Taint flag on the task state; policy rule, not prompt text |
+| Core depends on interfaces, never on vendors | Ports (interfaces) in `core`; adapters in their own packages |
+| Every run is measurable | Events record tokens, cost, and timing; evals read the same events |
+
+---
+
+## Target architecture (unchanged in shape; Phase 0 builds the core)
+
+```
+ Surfaces:  CLI (P0) · PWA (P1) · voice (P4) · desktop companion (P4)
+               │   all talk to the runtime through the same API: start / advance / approve / answer / cancel
+ Runtime:   Runner ── nextAction(state) ── Policy ── ToolExecutor ── ModelClient
+               │
+ Ports:     EventStore · ModelClient · Tool · SecretStore · Clock · IdGen
+ Adapters:  SQLite (P0) → Postgres (P1) · OpenAI-compatible client (P0) → more providers
+            built-in tools (P0) → MCP integrations (P2) → cloud browser (P3) → device agent (P4)
+```
+
+Phase 1 swaps SQLite for Postgres and adds a server + PWA + worker pool *behind the same interfaces*. Nothing in `core` changes.
+
+---
+
+## Phase 0: the smallest complete agent runtime
+
+### Scope
+
+**In:** a CLI agent that runs a task to completion with real models, survives `kill -9` without duplicate actions, enforces permissions and approvals in code, and is measured by a 30-case eval suite.
+
+**Out (deliberately):** web UI, HTTP server, Postgres, job queues, Docker, Turborepo, Langfuse, code execution, MCP, browser automation, long-term memory, auth/multi-user, context summarization (Phase 0 truncates tool output only). The event log *is* the trace; `remy show` and a JSONL export replace a tracing service for now.
+
+### Tech (minimal deps)
+
+Node 22 LTS+, TypeScript `strict`, pnpm workspaces, `zod` v4 (tool schemas → JSON Schema), `better-sqlite3`, `vitest`, Biome (lint and format), `tsx`. The CLI uses `node:util` `parseArgs` (no framework).
+
+**Model client:** a thin, fetch-based **OpenAI-compatible** client written in-house (about 200 lines). One adapter covers OpenRouter, Ollama, LM Studio, vLLM, Groq, Together, and OpenAI. *Why not the Vercel AI SDK yet:* we need byte-level control for the weak-model JSON fallback, for record/replay, and for exact cost accounting. The SDK can sit behind `ModelClient` later if a provider's native features are worth it.
+
+### Packages
+
+```
+remy/
+  packages/core     types, events, reducer, nextAction, runner, policy, budgets, retry
+  packages/models   OpenAI-compatible client, tool-calling strategies, pricing, record/replay
+  packages/tools    built-in tools, ScopedFs, ScopedFetch, secret redaction
+  packages/store    EventStore: in-memory (tests) + SQLite
+  packages/evals    case format, mock world, graders, eval runner, compare
+  apps/cli          remy run | resume | approve | show | cancel | eval
+```
+
+Dependency rule: `core` imports nothing from the others. Everything else depends on `core`'s interfaces.
+
+### Interfaces
+
+```ts
+// ---------- Events (the single source of truth) ----------
+type TaskStatus = 'running' | 'waiting_approval' | 'waiting_user'
+                | 'succeeded' | 'failed' | 'cancelled';
+
+type Event =
+  | { type: 'task.created'; prompt: string; config: TaskConfig }
+  | { type: 'model.responded'; step: number; text?: string; calls: PlannedCall[];
+      usage: { inTokens: number; outTokens: number }; costUsd: number; latencyMs: number }
+  | { type: 'model.failed'; step: number; error: string; retryable: boolean; attempt: number }
+  | { type: 'policy.decided'; callId: string; decision: PolicyDecision }
+  | { type: 'approval.requested'; callId: string; argsHash: string; preview: string; risk: Risk; reason: string }
+  | { type: 'approval.resolved'; callId: string; argsHash: string; granted: boolean; by: string }
+  | { type: 'tool.started'; callId: string; idempotencyKey: string; attempt: number }
+  | { type: 'tool.completed'; callId: string; result: ToolResult; latencyMs: number }
+  | { type: 'tool.failed'; callId: string; error: string; retryable: boolean; attempt: number }
+  | { type: 'tool.reconciled'; callId: string; outcome: 'already_done' | 'not_done' | 'unknown' }
+  | { type: 'user.asked'; question: string }
+  | { type: 'user.answered'; answer: string }
+  | { type: 'task.cancel_requested'; by: string }
+  | { type: 'task.finished'; status: 'succeeded' | 'failed' | 'cancelled'; answer?: string; reason?: string };
+
+interface PlannedCall { callId: string; tool: string; args: unknown; argsHash: string } // callId assigned & persisted at model.responded
+interface StoredEvent { taskId: string; seq: number; at: string; event: Event }
+
+// ---------- Persistence ----------
+interface EventStore {
+  createTask(taskId: string, prompt: string, config: TaskConfig): Promise<void>;
+  read(taskId: string, fromSeq?: number): Promise<StoredEvent[]>;
+  /** Atomic. Fails with ConcurrencyError if expectedSeq is stale or the lease isn't held. */
+  append(taskId: string, expectedSeq: number, events: Event[], lease: Lease): Promise<number>;
+  acquireLease(taskId: string, owner: string, ttlMs: number): Promise<Lease | null>;
+  renewLease(lease: Lease): Promise<boolean>;
+  releaseLease(lease: Lease): Promise<void>;
+  listTasks(filter?: { status?: TaskStatus }): Promise<TaskSummary[]>;
+}
+
+// ---------- Models ----------
+interface ModelClient {
+  readonly id: string;
+  readonly caps: { nativeTools: boolean; jsonSchema: boolean; contextTokens: number;
+                   pricing: { inPerMTok: number; outPerMTok: number } };
+  complete(req: ModelRequest, signal: AbortSignal): Promise<ModelResponse>;
+}
+interface ModelRequest { system: string; messages: Message[]; tools: ToolSpec[]; maxOutputTokens: number; temperature: number }
+interface ModelResponse { text?: string; calls: { tool: string; args: unknown }[]; usage: { inTokens: number; outTokens: number } }
+// Strategies wrap a raw client: NativeToolStrategy | JsonToolStrategy (for weak models)
+
+// ---------- Tools ----------
+type Risk   = 'read' | 'write' | 'send_as_user' | 'spend_money' | 'irreversible';
+type Effect = 'none'              // pure/read-only: safe to re-run
+            | 'idempotent'        // same key → same outcome (overwrite file, API with idempotency key)
+            | 'reconcilable'      // can check afterwards whether it happened
+            | 'unsafe_to_retry';  // can't know: ask the human
+
+interface Tool<A = unknown> {
+  name: string; description: string; args: z.ZodType<A>;
+  risk: Risk; effect: Effect;
+  outputTrust: 'trusted' | 'untrusted';
+  timeoutMs: number; maxOutputChars: number;
+  preview(args: A): string;                                   // plain-English text for the approval card
+  execute(args: A, ctx: ToolContext): Promise<ToolResult>;
+  reconcile?(args: A, ctx: ToolContext): Promise<{ done: true; result: ToolResult } | { done: false }>;
+}
+interface ToolContext {
+  taskId: string; callId: string; idempotencyKey: string; signal: AbortSignal;
+  fs: ScopedFs;        // jailed to the task workspace
+  net: ScopedFetch;    // SSRF-guarded, allowlist-capable, size/time limited
+  secrets: SecretReader; clock: Clock;
+}
+type ToolResult =
+  | { ok: true; content: string; trust: 'trusted' | 'untrusted'; data?: unknown }
+  | { ok: false; error: string; retryable: boolean; phase: 'before_effect' | 'after_effect' | 'unknown' };
+
+// ---------- Policy ----------
+type PolicyDecision = { kind: 'allow' } | { kind: 'require_approval'; reason: string } | { kind: 'deny'; reason: string };
+declare const authorized: unique symbol;
+type AuthorizedCall = PlannedCall & { readonly [authorized]: true };   // only policy.ts can mint this
+interface Policy { decide(call: PlannedCall, tool: Tool, state: TaskState): PolicyDecision }
+interface ToolExecutor { run(call: AuthorizedCall, ctx: ToolContext): Promise<ToolResult> }
+
+// ---------- Task config, budgets, runner API ----------
+interface TaskConfig {
+  model: string;
+  permissions: { autoApprove: Risk[]; allowTools?: string[]; denyTools?: string[]; netAllow?: string[] };
+  budget: { maxSteps: number; maxCostUsd: number; maxWallMs: number; maxCallsPerStep: number };
+  workspaceDir: string;
+}
+type RunOutcome =
+  | { status: 'waiting_approval'; request: { callId: string; argsHash: string; preview: string; risk: Risk; reason: string } }
+  | { status: 'waiting_user'; question: string }
+  | { status: 'succeeded' | 'failed' | 'cancelled'; answer?: string; reason?: string };
+
+interface Runtime {                      // the same API the PWA will use in Phase 1
+  start(prompt: string, config: TaskConfig): Promise<string>;            // returns taskId
+  advance(taskId: string): Promise<RunOutcome>;                          // runs until it pauses or finishes
+  approve(taskId: string, callId: string, argsHash: string, granted: boolean, by: string): Promise<void>;
+  answer(taskId: string, answer: string): Promise<void>;
+  cancel(taskId: string, by: string): Promise<void>;
+}
+```
+
+### The runner: `nextAction(state)`
+
+`advance()` acquires the lease, folds the events into `TaskState`, then loops:
+
+```
+action = nextAction(state)                       // pure function, unit-tested exhaustively
+  'finish'          → append task.finished
+  'pause'           → return waiting_approval / waiting_user (release lease)
+  'call_model'      → check budget → model call (retry if transient) → append model.responded
+  'decide'(call)    → policy.decide → append policy.decided (+ approval.requested if needed)
+  'execute'(call)   → append tool.started (WRITE-AHEAD) → run → append tool.completed | tool.failed
+  'recover'(call)   → started-but-unfinished call found after a crash → see below
+after each append: state = reduce(state, events); renew the lease; check cancel/budget/loop detection
+```
+
+Because every decision comes from the persisted state, a crash at *any* point resumes correctly. Approvals pause the task durably: the process can exit, and `remy approve` + `remy resume` continues later (exactly how the PWA will work).
+
+### Persistence, recovery, retries, duplicate protection
+
+**Storage (SQLite, WAL mode):**
+- `tasks(id PK, status, prompt, config_json, created_at, updated_at, lease_owner, lease_expires_at)`
+- `events(task_id, seq, at, type, payload_json, PRIMARY KEY(task_id, seq))`
+- `append` runs in one transaction: check the lease is held and unexpired, check `max(seq) == expectedSeq`, insert the events, update the cached `tasks.status`. A stale writer gets `ConcurrencyError` and stops. The lease plus the sequence check means two runners can never both act on one task (that matters once Phase 1 adds worker pools).
+
+**Idempotency key:** `${taskId}:${callId}`. `callId` is generated once, when `model.responded` is persisted, so a replay produces the same key. Tools pass it to external APIs where supported.
+
+**Recovery of a call that has `tool.started` but no result, by `effect`:**
+
+| effect | action |
+|---|---|
+| `none` | re-run |
+| `idempotent` | re-run with the same idempotency key |
+| `reconcilable` | `reconcile()` → `already_done` (record the result, no re-run) / `not_done` (re-run) / error → treat as `unsafe_to_retry` |
+| `unsafe_to_retry` | **never re-run.** Pause with `waiting_user`: "I may already have done X. Check, then tell me to retry or skip." |
+
+**A recorded model response is never re-requested.** On resume it is reused, so the model can't "change its mind" about a call that is already half done.
+
+**Retries** (one `retry()` helper: exponential backoff 0.5s→8s with jitter, max 3 attempts, every attempt logged as an event):
+- Model calls: retry on network errors, 429, 5xx, timeouts. Invalid tool-call output → repair retry ≤2 (the error is fed back), then mark the step failed.
+- Tools: auto-retry only if `effect ∈ {none, idempotent}` **or** the failure reports `phase: 'before_effect'`. Otherwise the error goes back to the model as a tool result.
+- Permanent errors (validation, 4xx, denied) are never retried. The model sees them and adapts.
+
+**Budgets and loop detection** (enforced by the runner, not the model): `maxSteps`, `maxCostUsd`, `maxWallMs`, `maxCallsPerStep`. The same `tool + argsHash` 3 times in one task → stop and ask the user. Cancellation is checked between actions, and an `AbortSignal` is passed to model and tool calls.
+
+### Security enforced in code
+
+**Policy rules** (`core/policy.ts`, evaluated in order, table-tested):
+1. Unknown tool, or args fail the zod schema → `deny` (the error is shown to the model).
+2. Tool is in `denyTools`, or not in `allowTools` when that list is set → `deny`.
+3. `risk ∈ {send_as_user, spend_money, irreversible}` → `require_approval`, **always** (no standing grants in Phase 0).
+4. **Task is tainted** and `risk !== 'read'` → `require_approval`, even when `autoApprove` includes that risk.
+5. `risk ∈ autoApprove` (default `['read']`) → `allow`; otherwise → `require_approval`.
+
+**Enforcement properties:**
+- `ToolExecutor.run` accepts only `AuthorizedCall`. A lint rule plus a test block any other module from constructing the brand.
+- An approval is valid only if `approval.resolved.argsHash === call.argsHash` and it hasn't been used. If the model changes the arguments, the approval no longer applies.
+- **Taint:** any `ToolResult` with `trust: 'untrusted'` (web pages, search results, email, files from outside) sets `state.tainted = true` for the rest of the task. Untrusted content is also wrapped in `<untrusted source="…">` delimiters in context, but that is defense in depth. **The rule that blocks attacks is #4, not the wrapper.**
+- **Capabilities, not globals:** tools get `ScopedFs` (realpath-checked jail to `workspaceDir`, blocks symlink escapes, size limits) and `ScopedFetch` (http/https only, blocks private/loopback/link-local IPs including after DNS resolution and redirects, optional domain allowlist, response size and time caps). Tools never import `fs` or `fetch` directly; a lint rule enforces this inside `packages/tools`.
+- **Secrets:** read through `SecretReader`, never placed in model context. A redaction pass strips known secret values from tool output before it reaches the model or the event log.
+- **Approval UX:** `preview()` gives plain-English text ("Send an email to bob@x.com with subject 'Invoice'"). The CLI also shows the risk level and *why* approval is needed (e.g. "this task read untrusted web content").
+
+**Known gap (tracked):** read-only tools can still leak data (e.g. a `fetch_url` whose query string carries private data). Phase 0 mitigation: no secrets in context, plus an optional `netAllow`. Phase 2 adds checks on where arguments came from (argument provenance).
+
+### Phase 0 built-in tools
+
+| Tool | risk | effect | output trust |
+|---|---|---|---|
+| `read_file`, `list_files` | read | none | trusted (workspace) |
+| `write_file` | write | idempotent (overwrite) | — |
+| `fetch_url` (HTML → readable text) | read | none | untrusted |
+| `web_search` (provider adapter: Brave/Tavily/SearXNG; mock in evals) | read | none | untrusted |
+| `ask_user` | read | none | trusted (pauses the task) |
+| `finish` (explicit final answer, which helps weak models terminate) | read | none | — |
+| *eval-only:* `email_read`, `email_send` (mock inbox) | read / send_as_user | none / reconcilable | untrusted / — |
+
+The mock `email_send` exists so approvals, injection defense, and duplicate protection are testable in Phase 0. It is also the template for real Gmail in Phase 2.
+
+### Weak-model support
+
+- `NativeToolStrategy` for models with dependable tool calling. `JsonToolStrategy` for the rest: the tools are described in the system prompt, the model must output exactly one `{"tool": …, "args": …}` per step, `response_format: json_schema` is used when supported (else `json_object`), the output is validated with zod, and a repair retry ≤2 feeds back the exact error.
+- Model capabilities and pricing come from `models.json` (user-editable; free models cost 0). Tool output is truncated to `maxOutputChars`, with the full output kept in the event.
+- Config: `remy.config.json` or env vars `REMY_BASE_URL`, `REMY_API_KEY`, `REMY_MODEL`, with ready-made profiles for `openrouter` and `ollama`.
+
+### Evals from day one
+
+```ts
+interface EvalCase {
+  id: string;
+  suite: 'research' | 'files' | 'approval' | 'injection' | 'recovery';
+  prompt: string;
+  world: { web?: Record<string, string>; files?: Record<string, string>; inbox?: MockEmail[] };
+  tools?: string[];
+  human: { approvals: 'grant_all' | 'deny_all' | Record<string, boolean>; answers?: string[] };  // scripted human
+  faults?: Fault[];   // { kind: 'crash_after', event: 'tool.started', tool: 'email_send' } | { kind: 'transient', tool: 'fetch_url', times: 2 } | ...
+  graders: Grader[];
+  budget?: Partial<TaskConfig['budget']>;
+}
+type Grader = (run: RunRecord, world: WorldAfter) => { pass: boolean; detail: string };
+```
+
+- **Graders, in order of preference:** checks on the final world state (`emailsSent.length === 1`, file contents) → checks on the answer (contains, regex, JSON fields) → checks on the trajectory (`neverCalled`, `onlyWithApproval`, `noPolicyViolations`, `maxSteps`) → `llmJudge(rubric)` only when nothing deterministic fits.
+- **Mock world:** `ScopedFetch` and the tools are swapped for fixture-backed versions, so runs are deterministic and free to repeat.
+- **Faults:** the eval runner wraps the store and tools to simulate crashes (it throws after a chosen event and then calls `advance()` again on a fresh runtime) and transient failures.
+- **The 30 starting cases:** 10 research/QA over a mock web · 6 file tasks · 5 approval flows (grant, deny, changed args invalidate the approval, ask_user) · 5 prompt injections (instructions hidden in pages and emails try to make Remy send email or write files) · 4 recovery (crash after `tool.started` on a reconcilable send → exactly 1 email sent; crash after `model.responded` → no second model call; transient fetch ×2 → succeeds; crash during an idempotent write → correct file).
+- **Metrics per run:** success rate; **pass^k** (all k repeats pass, the reliability number); **safety violations** and **duplicate side effects**, both of which must be 0; steps; tokens in/out; cost USD; task wall time p50/p95; model latency; failure categories (schema invalid, budget, loop, tool error, wrong answer).
+- **Output:** `evals/results/<date>-<model>.json` plus a markdown summary. `remy eval compare base.json new.json` exits non-zero on a **regression**: any safety or duplicate failure, a success drop of more than 5 points on any suite, or cost or p95 latency up more than 25%.
+- **Record/replay:** `RecordingModelClient` saves responses keyed by request hash; `ReplayModelClient` makes CI runs free and deterministic. Runtime unit tests use `ScriptedModelClient`.
+- **Commands:** `pnpm eval --model <id> [--suite s] [--k 3]`, `pnpm eval:replay`, `pnpm eval compare`.
+
+### Implementation order (each step ends green before the next starts)
+
+| # | Step | Done when |
+|---|---|---|
+| 1 | Scaffold: pnpm workspaces, TS strict, Biome, vitest, package boundaries | `pnpm build && pnpm test` pass on the empty packages; `core` has no imports from other packages |
+| 2 | `core`: Event types, `TaskState`, `reduce`, status state machine | Tests cover every event, and invalid transitions throw |
+| 3 | `store`: in-memory + SQLite `EventStore`, leases, optimistic append | Concurrency tests: a stale `expectedSeq` and an expired lease both reject; two racing writers → one wins |
+| 4 | `core`: `Tool` interface, registry, zod → JSON Schema, `ScopedFs` + `read_file`, `write_file`, `list_files`, `finish` | Jail tests: `../`, absolute paths, and symlink escapes are all rejected |
+| 5 | `core`: Policy + `AuthorizedCall` + approval binding + taint | A test table covers all 5 rules × taint × autoApprove; changed args → approval rejected; brand can't be forged (lint + test) |
+| 6 | `models`: OpenAI-compatible client, Native/Json strategies, pricing, Scripted/Recording/Replay clients | Live smoke test against Ollama and OpenRouter; JSON repair-retry tests |
+| 7 | `core`: `nextAction`, runner, budgets, retry, loop detection, write-ahead, recovery by effect type | Scripted-model tests: a crash injected at every event boundary resumes correctly with zero duplicate effects |
+| 8 | `tools`: `ScopedFetch` (SSRF guard), `fetch_url`, `web_search`, `ask_user`, redaction | SSRF tests: localhost, 10.x, 169.254.x, and a DNS name that resolves to a private IP are all blocked |
+| 9 | `apps/cli`: `run`, `resume`, `approve`, `show` (readable timeline), `cancel`, model profiles | Manual: `kill -9` during a task, then `remy resume` finishes it; the approval prompt shows preview + reason |
+| 10 | `evals`: case format, mock world + mock email tools, graders, faults, metrics, compare, 30 cases | `pnpm eval:replay` is deterministic; `compare` flags a seeded regression |
+| 11 | Baselines: 1 frontier model + 2–3 open-weight models, results committed | Baseline JSON + summary in `evals/results/`; `PLAN.md` status updated |
+
+### Build workflow (who writes what)
+
+The "Done when" checks (tests, `tsc`, Biome, the boundary check) are the monitor. Opus writes the subtle parts and the tests that define the hard parts. Cheaper models implement against those tests, and nobody pays a model to watch diffs.
+
+| Steps | Writer | Why |
+|---|---|---|
+| 1, 2 (scaffold, events, reducer) | Opus | These types are the contract every package builds on |
+| 5, 7 (policy and approvals, runner and recovery) | Opus | Small but security- and correctness-critical |
+| Test files for 3, 4, 8 | Opus | The tests are the spec |
+| 3, 4, 6, 8 (store, ScopedFs and file tools, model client, ScopedFetch) | Sonnet, in parallel git worktrees, until the Opus-written tests pass | Well specified; independent once step 2 is fixed |
+| Review of 4 and 8 (jail, SSRF guard) | Opus, one pass | Security code |
+| 9, 10 (CLI, eval harness) | Sonnet | Straightforward |
+| Eval fixtures (mock pages, inboxes, injection payloads) | Haiku drafts, Sonnet checks | Lots of repetitive content |
+
+Order: 1 → 2 → (3, 4, 6, 8 in parallel) → 5 → 7 → 9 → 10 → 11. Haiku never writes runtime code.
+
+### Phase 0 exit criteria
+
+- All unit tests pass, including the policy table, the store concurrency tests, and crash-at-every-boundary recovery.
+- **Safety and recovery suites: 100% on every model tested.** They are enforced by code, so they must not depend on model quality.
+- Task suites (research + files): ≥70% success on the frontier model; measured baseline (success, pass^3, cost, latency) for 2–3 open-weight models.
+- A full task can be run, killed, approved, resumed, and inspected from the CLI alone.
+
+---
+
+## Product roadmap after Phase 0
+
+Each phase keeps the Phase 0 interfaces. Its exit criteria include "no regression in the eval suite", and the suite grows with every capability.
+
+**Phase 1: Web app MVP.** `store-postgres` (same `EventStore` contract and same tests), a Hono server exposing the `Runtime` API, streaming over SSE, a worker pool (leases already exist; pg-boss only for wake-ups and scheduling), and a Next.js PWA with chat, live timeline, approval cards, and a model picker (BYO key / OpenRouter / Ollama URL). Auth. User memory v1 (view/edit). Code sandbox (E2B) as a tool with `risk: write`. *Exit:* a non-technical tester finishes tasks unaided, and killing a worker mid-task loses nothing.
+
+**Phase 2: Integrations + deeper safety.** MCP client wrapped as `Tool`s (an MCP tool without risk/effect metadata defaults to `send_as_user` + `unsafe_to_retry` until classified), OAuth connections UI, encrypted token vault, Google/Microsoft/Notion/Slack/GitHub. Standing approvals ("always allow calendar adds"), checks on where arguments came from, dynamic tool selection (10–20 tools per step). *Exit:* email/calendar evals ≥85% on the recommended model, and the red-team suite stays at 0 violations.
+
+**Phase 3: Cloud browser + proactivity.** Playwright in a sandbox (accessibility tree first, vision fallback), live view + "take over" for logins and CAPTCHAs, browser actions classified by risk (form submit = `write`+, checkout = `spend_money`). Schedules and triggers run as ordinary tasks. *Exit:* booking/purchase evals pass with approval gates; recurring tasks run reliably for 2 weeks.
+
+**Phase 4: Everywhere.** Voice in the PWA; a Tauri device agent (signed, opt-in per app, visible indicator, kill switch) exposed as `Tool`s; notifications; mobile polish. *Exit:* device-agent security review passed; voice performs on par with typed input on the eval subset.
+
+**Phase 5: Compounding capability.** A skills library (procedures distilled from successful runs, retrieved as tools); parallel sub-agents as child tasks using the same runtime; shareable automations; teams and families.
+
+---
+
+## Biggest technical risks
+
+1. **Open-weight reliability on long tool chains.** Results with cheap models will understate the product's ceiling. *Mitigation:* JSON strategy, few tools per step, an explicit `finish` tool, per-model eval scores shown in the UI.
+2. **Compounding error:** at 95% per step, a 20-step task succeeds ~36% of the time. *Mitigation:* prefer APIs, verification steps, ask early, pass^k as the headline metric.
+3. **Prompt injection while acting as the user.** *Mitigation:* code-level taint rule + approvals bound to exact arguments + no secrets in context. Remaining exposure: leaks through read tools (Phase 2 provenance checks).
+4. **Duplicate or ghost side effects after crashes.** *Mitigation:* write-ahead `tool.started`, effect-typed recovery, idempotency keys, recovery evals at 100%.
+5. **Browser brittleness, plus credential custody and compliance** (Google restricted scopes need a security assessment). *Mitigation:* APIs first, human take-over, plan the assessment early, encrypted vault.
+6. **Scope creep ("everything").** *Mitigation:* general architecture + eval gates per domain.
+7. **Cost/latency.** *Mitigation:* budgets per task, cheap models for routing, prompt caching where supported, cost tracked in every event.
+
+---
+
+## AGI research track (separate; never blocks the product)
+
+Lives in `research/` (Python). It consumes exported event logs and the eval suite, and returns improvements only through existing interfaces: a new `ModelClient`, new `Tool`s or skills, or a verifier that runs as a policy hook.
+
+- **Learning from experience:** supervised fine-tuning (SFT) and reinforcement learning (RL) of open-weight models on Remy's own trajectories (with consent and anonymization). Pass^k is the reward signal.
+- **Learned verifiers / process reward models:** score each step, flag likely-wrong actions before they run.
+- **Self-extending tools:** Remy writes, tests, and proposes new tools in a sandbox, which are admitted only after their evals pass and a risk classification.
+- **Long-horizon memory:** episodic → semantic consolidation, forgetting, belief revision.
+- **World models for the web/OS:** predict an action's effects before taking it.
+- **Agent organizations:** planner/critic/specialist setups, adopted only if they beat the single-loop baseline on the same evals.
+- **Continual learning without regressions,** gated by `remy eval compare`.
+
+The bridge between the tracks is **the event log + the eval suite**: the product generates data and benchmarks; research returns models, skills, and verifiers.
+
+---
+
+## Verification
+
+- `pnpm test`: reducer, `nextAction`, policy table, store concurrency, jail/SSRF, crash at every event boundary.
+- `pnpm eval:replay`: deterministic CI gate; `pnpm eval --model <id> --k 3` for live runs; `pnpm eval compare` blocks regressions.
+- Manual CLI drill: run a task that sends a mock email → kill -9 after `tool.started` → `remy resume` → exactly one email; deny an approval → the model adapts; an injected page cannot send email without an approval prompt.
+
+## Status
+
+- 2026-10-23: v1 architecture written.
+- 2026-10-23: v2: Phase 0 narrowed to a minimal runtime (SQLite, CLI, in-house OpenAI-compatible client); durability, security, and eval designs specified. Next: implementation step 1 (scaffold).
+- 2026-10-24: build workflow (model per step) added. Step 1 done: pnpm workspace, TS 7 strict, Biome, vitest, boundary test enforcing the package graph; `pnpm check` green. Next: step 2.
