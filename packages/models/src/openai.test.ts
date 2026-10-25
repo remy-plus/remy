@@ -1,6 +1,6 @@
 import { type ModelCaps, ModelError } from '@remy/core';
 import { describe, expect, it } from 'vitest';
-import { createOpenAIClient } from './openai.ts';
+import { createOpenAIClient, REASONING_MIN_OUTPUT_TOKENS } from './openai.ts';
 import type { RawRequest } from './types.ts';
 
 const caps: ModelCaps = {
@@ -83,11 +83,21 @@ describe('createOpenAIClient', () => {
       const { client, seen } = make(() => json({ choices: [{ message: { content: 'x' } }] }), id);
       await client.complete(req, sig());
       const body = JSON.parse(seen[0]?.init.body as string);
-      expect(body.max_completion_tokens).toBe(100);
+      expect(body.max_completion_tokens).toBe(REASONING_MIN_OUTPUT_TOKENS);
       expect(body).not.toHaveProperty('max_tokens');
       expect(body).not.toHaveProperty('temperature');
     },
   );
+
+  it('reports an empty reply cut off by the output limit as retryable', async () => {
+    const { client } = make(() =>
+      json({ choices: [{ message: { content: '' }, finish_reason: 'length' }] }),
+    );
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err.retryable).toBe(true);
+    expect(err.message).toMatch(/output limit/);
+  });
 
   it('keeps max_tokens and temperature for ordinary models', async () => {
     const { client, seen } = make(

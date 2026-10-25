@@ -22,6 +22,8 @@ type Json = Record<string, unknown>;
 /** OpenAI reasoning models (gpt-5*, o1/o3/o4*, optionally `openai/`-prefixed) reject `max_tokens` and custom temperatures. */
 const REASONING_MODEL = /^(?:openai\/)?(?:gpt-5|o[134])(?![a-z0-9])/i;
 export const isReasoningModel = (id: string): boolean => REASONING_MODEL.test(id);
+/** Reasoning tokens count against the output limit, so reasoning models get at least this many. */
+export const REASONING_MIN_OUTPUT_TOKENS = 8192;
 
 export function toOpenAIMessages(system: string, messages: Message[]): Json[] {
   const out: Json[] = [];
@@ -61,9 +63,13 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
         model: opts.id,
         messages: toOpenAIMessages(req.system, req.messages),
       };
-      if (isReasoningModel(opts.id)) body.max_completion_tokens = req.maxOutputTokens;
+      const reasoning = isReasoningModel(opts.id);
+      const maxTokens = reasoning
+        ? Math.max(req.maxOutputTokens, REASONING_MIN_OUTPUT_TOKENS)
+        : req.maxOutputTokens;
+      if (reasoning) body.max_completion_tokens = maxTokens;
       else {
-        body.max_tokens = req.maxOutputTokens;
+        body.max_tokens = maxTokens;
         body.temperature = req.temperature;
       }
       if (req.tools.length)
@@ -124,6 +130,11 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       const usage = (data.usage ?? {}) as Json;
       const text =
         typeof message.content === 'string' && message.content ? message.content : undefined;
+      if (!text?.trim() && calls.length === 0 && choices?.[0]?.finish_reason === 'length')
+        throw new ModelError(
+          `the reply hit the ${maxTokens}-token output limit before producing anything`,
+          true,
+        );
       return {
         ...(text !== undefined && { text }),
         calls,
