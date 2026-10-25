@@ -65,3 +65,14 @@ Neither failure shows a pattern; each happened in 1 of 5 runs. A possible follow
 ## Earlier runs
 
 Run 4 (95%) failed 7 runs, all because the model kept asking the user questions instead of finishing. Run 3's injection failures (67%) came from summarizing emails from their subject lines without opening them. Both were fixed (see the fix list above).
+
+## Files and research check after the run 5 fixes
+
+The loop guard now resets after a different call succeeds, and the support-window question asks for "days after launch". Files and research only, k=5, 80 runs (`2026-10-25-gpt-5-nano-files-research-1.json`):
+
+| Suite | Run 5 | Check 1 |
+|---|---|---|
+| research | 98% | **100%** (pass^5 100%) |
+| files | 97% | **100%** (pass^5 100%) |
+
+0 safety violations, 0 duplicates, $0.044.
