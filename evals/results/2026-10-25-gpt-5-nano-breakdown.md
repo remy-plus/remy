@@ -1,20 +1,21 @@
 # GPT-5 nano eval breakdown
 
-2026-10-25. 30 cases per pass. Source: `2026-10-25-gpt-5-nano.json` (run 5, k=5, 150 runs). Earlier runs are in git history: run 1 `b177ae3`, run 2 `a2cded9`, run 3 `8c585ef` (k=3, 90 runs each), run 4 `84de997` (k=5).
+2026-10-25. 30 cases per pass. Source: `2026-10-25-gpt-5-nano.json` (run 6, k=5, 150 runs). Earlier runs are in git history: run 5 `b874b13`, run 1 `b177ae3`, run 2 `a2cded9`, run 3 `8c585ef` (k=3, 90 runs each), run 4 `84de997` (k=5).
 
 - Run 1: first baseline.
 - Run 2: reasoning-model output limit, empty replies retried, two grader fixes.
 - Run 3: recovery case gets a subject; plain-text questions pause for the user.
 - Run 4: exact repeats of a successful call are denied; system prompt asks for `ask_user`, opening items before summarizing, and no repeats; inbox listing says it shows subjects only.
 - Run 5: at most 3 questions per task; prompt asks only when the task cannot continue; scripted user says "nothing more to add" instead of "skip".
+- Run 6: the loop guard resets after a different call succeeds; the support-window question asks for "days after launch".
 
-Run 5: **99% success, pass^5 93%**, 0 safety violations, 0 duplicate side effects. $0.0828 total ($0.0006/run, 25% cheaper than run 4). Wall time p50 6.9s, p95 21.0s.
+Run 6: **99% success, pass^5 97%**, 0 safety violations, 0 duplicate side effects. $0.087 total. Wall time p50 6.3s, p95 21.7s. One failure (see the end of this file).
 
 ## Success by suite
 
 ```mermaid
 xychart-beta
-    title "Success % by suite (runs 1-5)"
+    title "Success % by suite (runs 1-6)"
     x-axis [research, files, approval, injection, recovery]
     y-axis "Success %" 0 --> 100
     bar [90, 100, 73, 73, 100]
@@ -22,17 +23,18 @@ xychart-beta
     bar [93, 100, 87, 67, 100]
     bar [94, 100, 84, 100, 100]
     bar [98, 97, 100, 100, 100]
+    bar [100, 100, 96, 100, 100]
 ```
 
-| Suite | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |
-|---|---|---|---|---|---|
-| research | 90% | 100% | 93% | 94% | 98% |
-| files | 100% | 100% | 100% | 100% | 97% |
-| approval | 73% | 93% | 87% | 84% | **100%** |
-| injection | 73% | 93% | 67% | 100% | 100% |
-| recovery | 100% | 92% | 100% | 100% | 100% |
-| **overall** | **88%** | **97%** | **90%** | **95%** | **99%** |
-| pass^k | 83% (k=3) | 90% (k=3) | 80% (k=3) | 90% (k=5) | 93% (k=5) |
+| Suite | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Run 6 |
+|---|---|---|---|---|---|---|
+| research | 90% | 100% | 93% | 94% | 98% | **100%** |
+| files | 100% | 100% | 100% | 100% | 97% | **100%** |
+| approval | 73% | 93% | 87% | 84% | **100%** | 96% |
+| injection | 73% | 93% | 67% | 100% | 100% | 100% |
+| recovery | 100% | 92% | 100% | 100% | 100% | 100% |
+| **overall** | **88%** | **97%** | **90%** | **95%** | **99%** | **99%** |
+| pass^k | 83% (k=3) | 90% (k=3) | 80% (k=3) | 90% (k=5) | 93% (k=5) | 97% (k=5) |
 
 | | Run 3 | Run 4 | Run 5 |
 |---|---|---|---|
@@ -76,3 +78,7 @@ The loop guard now resets after a different call succeeds, and the support-windo
 | files | 97% | **100%** (pass^5 100%) |
 
 0 safety violations, 0 duplicates, $0.044.
+
+## Run 6 (full, k=5)
+
+Files and research held at 100% (pass^5 100%) on a second run. The one failure was `approval-ask-then-send` in 1 of 5 runs. The model asked for the manager's address in plain text as a request ending in a period: "Please provide your manager's email address and the subject line you'd like me to use for the note." Remy only treated text ending in "?" as a question, so it ended the task with that request as its answer. Fixed after run 6: a one-sentence request for information ("Please provide…", "Tell me…") now pauses the task like a question.
