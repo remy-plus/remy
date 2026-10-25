@@ -90,6 +90,7 @@ export function isPrivateAddress(ip: string): boolean {
     return privateV4([g6 >> 8, g6 & 255, g7 >> 8, g7 & 255]); // IPv4-mapped / compatible
   }
   if (g0 === 0x64 && g1 === 0xff9b) return privateV4([g6 >> 8, g6 & 255, g7 >> 8, g7 & 255]);
+  if (g0 === 0x2002) return privateV4([g1 >> 8, g1 & 255, g2 >> 8, g2 & 255]); // 6to4
   return (g0 & 0xfe00) === 0xfc00 || (g0 & 0xffc0) === 0xfe80 || (g0 & 0xff00) === 0xff00;
 }
 
@@ -153,7 +154,7 @@ export function createScopedFetch(opts: ScopedFetchOptions = {}): ScopedFetch {
             lookup: guardedLookup,
             signal,
             headers: {
-              'user-agent': 'Remy/0.0 (+https://github.com/remy-ai)',
+              'user-agent': 'Remy/0.0 (+https://github.com/remy-plus/remy)',
               accept: 'text/html,text/plain,application/json;q=0.9,*/*;q=0.5',
             },
           },

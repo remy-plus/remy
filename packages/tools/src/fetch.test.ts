@@ -74,6 +74,7 @@ describe('isPrivateAddress', () => {
     'fe80::1',
     '::ffff:10.0.0.1',
     '::ffff:127.0.0.1',
+    '2002:a00:1::1',
   ])('blocks %s', (ip) => expect(isPrivateAddress(ip)).toBe(true));
 
   it.each(['93.184.216.34', '8.8.8.8', '172.32.0.1', '2606:4700::1111'])('allows %s', (ip) =>
