@@ -1,3 +1,4 @@
+export * from './compare.ts';
 export * from './faults.ts';
 export * from './graders.ts';
 export * from './metrics.ts';
