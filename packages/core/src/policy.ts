@@ -23,13 +23,26 @@ export class PolicyError extends Error {
 export function decide(
   call: PlannedCall,
   tool: Tool | undefined,
-  state: Pick<TaskState, 'config' | 'tainted'>,
+  state: Pick<TaskState, 'config' | 'tainted'> & Partial<Pick<TaskState, 'calls'>>,
 ): PolicyDecision {
   // 1. Unknown tool or invalid arguments.
   if (!tool) return { kind: 'deny', reason: `there is no tool named "${call.tool}"` };
   const parsed = tool.args.safeParse(call.args);
   if (!parsed.success)
     return { kind: 'deny', reason: `invalid arguments: ${z.prettifyError(parsed.error)}` };
+  // 1b. An exact repeat of a call that already succeeded adds nothing; a failed one may be retried.
+  const done = Object.values(state.calls ?? {}).find(
+    (c) =>
+      c.callId !== call.callId &&
+      c.tool === call.tool &&
+      c.argsHash === call.argsHash &&
+      c.result?.ok,
+  );
+  if (done)
+    return {
+      kind: 'deny',
+      reason: `you already made this exact ${call.tool} call and it succeeded. Use that result, or do something different`,
+    };
   // 2. Task-level tool lists.
   const { allowTools, denyTools, autoApprove } = state.config.permissions;
   if (denyTools?.includes(tool.name)) return { kind: 'deny', reason: `${tool.name} is blocked` };

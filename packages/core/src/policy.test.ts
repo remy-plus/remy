@@ -79,6 +79,33 @@ describe('decide', () => {
     expect(kind(risk, s)).toBe(expected);
   });
 
+  it('denies an exact repeat of a call that succeeded, but allows retrying a failure', () => {
+    const prior = (ok: boolean) => ({
+      calls: {
+        c0: {
+          ...planned('t_read'),
+          callId: 'c0',
+          step: 1,
+          attempts: 1,
+          inFlight: false,
+          result: ok
+            ? ({ ok: true, content: 'x', trust: 'trusted' } as const)
+            : ({ ok: false, error: 'e', retryable: true, phase: 'before_effect' } as const),
+        },
+      },
+    });
+    expect(decide(planned('t_read'), mk('read'), { ...state(), ...prior(true) })).toMatchObject({
+      kind: 'deny',
+      reason: expect.stringContaining('already made this exact'),
+    });
+    expect(decide(planned('t_read'), mk('read'), { ...state(), ...prior(false) }).kind).toBe(
+      'allow',
+    );
+    expect(
+      decide(planned('t_read', { n: 2 }), mk('read'), { ...state(), ...prior(true) }).kind,
+    ).toBe('allow');
+  });
+
   it('defaults allow reads only', () => {
     expect(kind('read', state())).toBe('allow');
     expect(kind('write', state())).toBe('require_approval');
