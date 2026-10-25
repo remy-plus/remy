@@ -19,6 +19,10 @@ export interface OpenAIClientOptions {
 
 type Json = Record<string, unknown>;
 
+/** OpenAI reasoning models (gpt-5*, o1/o3/o4*, optionally `openai/`-prefixed) reject `max_tokens` and custom temperatures. */
+const REASONING_MODEL = /^(?:openai\/)?(?:gpt-5|o[134])(?![a-z0-9])/i;
+export const isReasoningModel = (id: string): boolean => REASONING_MODEL.test(id);
+
 export function toOpenAIMessages(system: string, messages: Message[]): Json[] {
   const out: Json[] = [];
   if (system) out.push({ role: 'system', content: system });
@@ -56,9 +60,12 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       const body: Json = {
         model: opts.id,
         messages: toOpenAIMessages(req.system, req.messages),
-        max_tokens: req.maxOutputTokens,
-        temperature: req.temperature,
       };
+      if (isReasoningModel(opts.id)) body.max_completion_tokens = req.maxOutputTokens;
+      else {
+        body.max_tokens = req.maxOutputTokens;
+        body.temperature = req.temperature;
+      }
       if (req.tools.length)
         body.tools = req.tools.map((t) => ({
           type: 'function',

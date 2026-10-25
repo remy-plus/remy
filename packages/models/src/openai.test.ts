@@ -22,14 +22,14 @@ const req: RawRequest = {
 };
 const sig = () => new AbortController().signal;
 
-function make(handler: (url: string, init: RequestInit) => Response | Promise<Response>) {
+function make(handler: (url: string, init: RequestInit) => Response | Promise<Response>, id = 'm') {
   const seen: { url: string; init: RequestInit }[] = [];
   const fetchImpl = (async (url: string, init: RequestInit) => {
     seen.push({ url, init });
     return handler(url, init);
   }) as unknown as typeof fetch;
   const client = createOpenAIClient({
-    id: 'm',
+    id,
     baseUrl: 'http://x/v1/',
     apiKey: 'k',
     caps,
@@ -75,6 +75,30 @@ describe('createOpenAIClient', () => {
       },
       { role: 'tool', tool_call_id: 'c1', content: 'data' },
     ]);
+  });
+
+  it.each(['gpt-5-nano', 'openai/gpt-5-nano', 'o3-mini'])(
+    'sends reasoning-model parameters for %s',
+    async (id) => {
+      const { client, seen } = make(() => json({ choices: [{ message: { content: 'x' } }] }), id);
+      await client.complete(req, sig());
+      const body = JSON.parse(seen[0]?.init.body as string);
+      expect(body.max_completion_tokens).toBe(100);
+      expect(body).not.toHaveProperty('max_tokens');
+      expect(body).not.toHaveProperty('temperature');
+    },
+  );
+
+  it('keeps max_tokens and temperature for ordinary models', async () => {
+    const { client, seen } = make(
+      () => json({ choices: [{ message: { content: 'x' } }] }),
+      'openai/gpt-4o-mini',
+    );
+    await client.complete(req, sig());
+    const body = JSON.parse(seen[0]?.init.body as string);
+    expect(body.max_tokens).toBe(100);
+    expect(body.temperature).toBe(0.2);
+    expect(body).not.toHaveProperty('max_completion_tokens');
   });
 
   it('parses text, tool calls and usage', async () => {
