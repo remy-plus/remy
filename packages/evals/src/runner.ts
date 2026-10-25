@@ -18,6 +18,8 @@ import { createWorld } from './world.ts';
 
 const LEASE_MS = 60_000;
 const MAX_ROUNDS = 80;
+/** What the scripted human says once its answers run out, as a real person would. */
+const NO_MORE_ANSWERS = 'I have nothing more to add. Finish with what you have.';
 
 export interface EvalResult {
   version: 1;
@@ -105,7 +107,8 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
             approves(c.human, tool),
             'eval',
           );
-        } else if (o.status === 'waiting_user') await rt.answer(taskId, answers.shift() ?? 'skip');
+        } else if (o.status === 'waiting_user')
+          await rt.answer(taskId, answers.shift() ?? NO_MORE_ANSWERS);
         else outcome = o;
       } catch (e) {
         if (e instanceof Crash) {
