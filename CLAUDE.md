@@ -30,6 +30,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 - Build workflow (which model writes which step) is in PLAN.md.
 
 ## Status
+- 2026-10-25: first live baseline, GPT-5 nano k=3: 88% success, pass^3 83%, 0 safety violations, 0 duplicates, $0.055 for 90 runs (`evals/results/`). Fixed: GPT-5 request parameters, empty replies no longer count as success, reasoning models get an 8k output limit, two over-strict graders. Next: re-run GPT-5 nano, add 1–2 open-weight baselines, then Phase 1.
 - 2026-10-25: Phase 0 prototype working (steps 1–10). `pnpm remy run "..."`, `pnpm eval:replay` 30/30. Pushed to github.com/remy-plus/remy. Next: step 11 live baselines (needs OPENROUTER_API_KEY or Ollama), then Phase 1.
 - 2026-10-24: step 1 (scaffold) done: workspace, 6 packages, boundary test, `pnpm check` green. Build workflow added to PLAN.md. Next: step 2 (events, `TaskState`, reducer).
 - 2026-10-24: branding done (`branding/`): brand guide, ASCII/SVG logos, GitHub avatar, social preview, org profile README.
