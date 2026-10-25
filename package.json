@@ -15,6 +15,9 @@
     "remy": "node --conditions=@remy/source apps/cli/src/main.ts",
     "lint": "biome check .",
     "format": "biome check --write .",
+    "eval": "node --conditions=@remy/source packages/evals/src/cli.ts",
+    "eval:replay": "node --conditions=@remy/source packages/evals/src/cli.ts --model reference --strict",
+    "eval:compare": "node --conditions=@remy/source packages/evals/src/cli.ts compare",
     "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },
   "devDependencies": {

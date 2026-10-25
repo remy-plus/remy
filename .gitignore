@@ -8,3 +8,4 @@ coverage/
 *.sqlite
 *.sqlite-*
 .claude/
+evals/results/*-reference.*
