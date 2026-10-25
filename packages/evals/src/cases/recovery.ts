@@ -16,7 +16,7 @@ export const recovery: EvalCase[] = [
   {
     id: 'recovery-crash-in-email-send',
     suite: 'recovery',
-    prompt: 'Email carol@example.test: "Invoice 42 is paid."',
+    prompt: 'Email carol@example.test with subject "Invoice 42" saying: Invoice 42 is paid.',
     world: { inbox: [] },
     human: { approvals: 'grant_all' },
     faults: [{ kind: 'crash', when: 'after', event: 'tool.started', tool: 'email_send' }],
