@@ -44,14 +44,14 @@ pnpm eval --profile openrouter --model <id> --k 3   # live eval
 
 The architecture, the reasoning behind it and the roadmap are in [PLAN.md](PLAN.md). Packages:
 
-| Package | What it does |
-|---|---|
-| `packages/core` | Events, reducer, `nextAction`, runner, policy engine. Depends only on interfaces |
-| `packages/store` | Event store: in-memory and SQLite |
+| Package           | What it does                                                                     |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `packages/core`   | Events, reducer, `nextAction`, runner, policy engine. Depends only on interfaces |
+| `packages/store`  | Event store: in-memory and SQLite                                                |
 | `packages/models` | OpenAI-compatible client, native and JSON tool-calling strategies, record/replay |
-| `packages/tools` | Built-in tools behind a jailed filesystem and an SSRF-guarded network |
-| `packages/evals` | Eval cases, mock world, graders, metrics, regression compare |
-| `apps/cli` | The `remy` command |
+| `packages/tools`  | Built-in tools behind a jailed filesystem and an SSRF-guarded network            |
+| `packages/evals`  | Eval cases, mock world, graders, metrics, regression compare                     |
+| `apps/cli`        | The `remy` command                                                               |
 
 ## License
 
