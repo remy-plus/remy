@@ -16,6 +16,7 @@
     "@remy/core": "workspace:*",
     "@remy/models": "workspace:*",
     "@remy/tools": "workspace:*",
-    "@remy/store": "workspace:*"
+    "@remy/store": "workspace:*",
+    "zod": "^4.6.7"
   }
 }
