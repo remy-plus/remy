@@ -387,6 +387,15 @@ describe('runtime', () => {
     });
   });
 
+  it('pauses on a plain-text question and continues with the answer', async () => {
+    const { rt, model } = setup(['Which color?', finish('blue')]);
+    const id = await rt.start('paint', config());
+    expect(await rt.advance(id)).toEqual({ status: 'waiting_user', question: 'Which color?' });
+    await rt.answer(id, 'blue');
+    expect(await drive(rt, id)).toEqual({ status: 'succeeded', answer: 'blue' });
+    expect(model.requests[1]?.messages.at(-1)).toEqual({ role: 'user', content: 'blue' });
+  });
+
   it('cancels a waiting task', async () => {
     const { rt } = setup([[{ tool: 'pay', args: { amount: 1 } }]]);
     const id = await rt.start('pay', config());

@@ -338,6 +338,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             await commit([{ type: 'user.asked', callId: c.callId, question: String(q) }]);
             break;
           }
+          case 'ask':
+            await commit([{ type: 'user.asked', question: a.question }]);
+            break;
           case 'answer_call':
             if (!c) break;
             await commit([

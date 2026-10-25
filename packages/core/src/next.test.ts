@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash } from './hash.ts';
-import { nextAction } from './next.ts';
+import { isQuestion, nextAction } from './next.ts';
 import { fold } from './state.ts';
 import { DEFAULT_BUDGET, type Event } from './types.ts';
 
@@ -158,6 +158,25 @@ describe('nextAction', () => {
     expect(next(...same('a', 1), ...same('b', 2), ...same('c', 3))).toMatchObject({
       reason: expect.stringContaining('repeated'),
     });
+  });
+
+  it('asks the user when a text-only reply is just a question, then calls the model', () => {
+    const q = { ...(resp(1) as object), text: 'Which folder?' } as Event;
+    expect(next(q)).toEqual({ kind: 'ask', question: 'Which folder?' });
+    expect(
+      next(
+        q,
+        { type: 'user.asked', question: 'Which folder?' },
+        { type: 'user.answered', answer: 'Downloads' },
+      ),
+    ).toEqual({ kind: 'call_model' });
+  });
+
+  it('only treats one short sentence ending in ? as a question', () => {
+    expect(isQuestion("What is your manager's email address?")).toBe(true);
+    expect(isQuestion('The page has no phone number. Want me to search for it?')).toBe(false);
+    expect(isQuestion('Done.\nAnything else?')).toBe(false);
+    expect(isQuestion('All set.')).toBe(false);
   });
 
   it('is done after the task finishes', () => {

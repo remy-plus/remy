@@ -12,6 +12,8 @@ export type Action =
   | { kind: 'request_approval'; callId: string }
   | { kind: 'execute'; callId: string }
   | { kind: 'ask_user'; callId: string }
+  /** The model asked a question in plain text instead of calling ask_user. */
+  | { kind: 'ask'; question: string }
   | { kind: 'answer_call'; callId: string }
   | { kind: 'recover'; callId: string }
   | { kind: 'resolve_uncertain'; callId: string };
@@ -49,9 +51,13 @@ export function nextAction(s: TaskState, now: number): Action {
   // Every call of the current step is resolved.
   const done = calls.find((c) => c.tool === 'finish' && c.result?.ok);
   if (done?.result?.ok) return { kind: 'finish', status: 'succeeded', answer: done.result.content };
-  if (s.step > 0 && calls.length === 0) {
-    const last = s.log.findLast((l) => l.kind === 'model');
-    return { kind: 'finish', status: 'succeeded', answer: last?.kind === 'model' ? last.text : '' };
+  // A text-only reply is the answer, unless it is just a question. Once the user has answered,
+  // the last entry is theirs and the model goes again.
+  const last = s.log.at(-1);
+  if (s.step > 0 && calls.length === 0 && last?.kind === 'model') {
+    const text = last.text?.trim() ?? '';
+    if (isQuestion(text)) return { kind: 'ask', question: text };
+    return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
 
   const seen = new Map<string, number>();
@@ -68,5 +74,9 @@ export function nextAction(s: TaskState, now: number): Action {
     return fail(`Stopped: reached the cost limit of $${maxCostUsd.toFixed(2)}.`);
   return { kind: 'call_model' };
 }
+
+/** One short sentence ending in "?". Longer replies that end with an offer are answers. */
+export const isQuestion = (text: string) =>
+  text.length <= 300 && text.endsWith('?') && !/[.!?]\s|\n/.test(text.slice(0, -1));
 
 const fail = (reason: string): Action => ({ kind: 'finish', status: 'failed', reason });
