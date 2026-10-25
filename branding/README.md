@@ -88,3 +88,7 @@ node build.cjs     # ASCII + SVGs
 ```
 
 Colors, sizes and the tagline live at the top of `scripts/build.cjs`.
+
+## Use of the name and logo
+
+The code is Apache-2.0. The Remy name and logo are not licensed with it. You may use them to refer to the project (for example, "built with Remy" or a link to this repo). Don't use them in a way that suggests your product, fork or service is Remy or is endorsed by the project.
