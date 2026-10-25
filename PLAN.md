@@ -59,7 +59,7 @@ Phase 1 swaps SQLite for Postgres and adds a server + PWA + worker pool *behind 
 
 ### Tech (minimal deps)
 
-Node 22 LTS+, TypeScript `strict`, pnpm workspaces, `zod` v4 (tool schemas → JSON Schema), `better-sqlite3`, `vitest`, Biome (lint and format), `tsx`. The CLI uses `node:util` `parseArgs` (no framework).
+Node 22.18+, TypeScript `strict`, pnpm workspaces, `zod` v4 (tool schemas → JSON Schema), built-in `node:sqlite` (no native deps), `vitest`, Biome (lint and format). Node runs the TypeScript sources directly (type stripping, `--conditions=@remy/source`), so there is no `tsx`. The CLI uses `node:util` `parseArgs` (no framework).
 
 **Model client:** a thin, fetch-based **OpenAI-compatible** client written in-house (about 200 lines). One adapter covers OpenRouter, Ollama, LM Studio, vLLM, Groq, Together, and OpenAI. *Why not the Vercel AI SDK yet:* we need byte-level control for the weak-model JSON fallback, for record/replay, and for exact cost accounting. The SDK can sit behind `ModelClient` later if a provider's native features are worth it.
 
@@ -200,7 +200,7 @@ Because every decision comes from the persisted state, a crash at *any* point re
 
 ### Persistence, recovery, retries, duplicate protection
 
-**Storage (SQLite, WAL mode):**
+**Storage (SQLite via `node:sqlite`, WAL mode):** leases are 15s and renewed by a heartbeat during long calls, so a killed runner's task frees up quickly.
 - `tasks(id PK, status, prompt, config_json, created_at, updated_at, lease_owner, lease_expires_at)`
 - `events(task_id, seq, at, type, payload_json, PRIMARY KEY(task_id, seq))`
 - `append` runs in one transaction: check the lease is held and unexpired, check `max(seq) == expectedSeq`, insert the events, update the cached `tasks.status`. A stale writer gets `ConcurrencyError` and stops. The lease plus the sequence check means two runners can never both act on one task (that matters once Phase 1 adds worker pools).
@@ -223,7 +223,7 @@ Because every decision comes from the persisted state, a crash at *any* point re
 - Tools: auto-retry only if `effect ∈ {none, idempotent}` **or** the failure reports `phase: 'before_effect'`. Otherwise the error goes back to the model as a tool result.
 - Permanent errors (validation, 4xx, denied) are never retried. The model sees them and adapts.
 
-**Budgets and loop detection** (enforced by the runner, not the model): `maxSteps`, `maxCostUsd`, `maxWallMs`, `maxCallsPerStep`. The same `tool + argsHash` 3 times in one task → stop and ask the user. Cancellation is checked between actions, and an `AbortSignal` is passed to model and tool calls.
+**Budgets and loop detection** (enforced by the runner, not the model): `maxSteps`, `maxCostUsd`, `maxWallMs`, `maxCallsPerStep`. The same `tool + argsHash` 3 times in one task → stop (the task fails with a plain reason). Cancellation is checked between actions, and an `AbortSignal` is passed to model and tool calls.
 
 ### Security enforced in code
 
@@ -386,3 +386,4 @@ The bridge between the tracks is **the event log + the eval suite**: the product
 - 2026-10-23: v1 architecture written.
 - 2026-10-23: v2: Phase 0 narrowed to a minimal runtime (SQLite, CLI, in-house OpenAI-compatible client); durability, security, and eval designs specified. Next: implementation step 1 (scaffold).
 - 2026-10-24: build workflow (model per step) added. Step 1 done: pnpm workspace, TS 7 strict, Biome, vitest, boundary test enforcing the package graph; `pnpm check` green. Next: step 2.
+- 2026-10-25: steps 2–10 done. Core contracts, reducer, policy, runner (Opus); store, tools, models, CLI, evals (Sonnet, parallel worktrees); Opus security pass on the jail and SSRF guard (two fixes). 310 tests green; reference model 30/30 evals, 0 safety violations, 0 duplicates; manual `kill -9` → `remy resume` drill passes. CI added. Deviations: `node:sqlite` instead of better-sqlite3; loop detection fails the task instead of asking; eval fixtures written by Sonnet directly (no Haiku pass). **Open:** step 11 baselines need model credentials (none on the build machine): set `OPENROUTER_API_KEY` or run Ollama, then `pnpm eval -- --profile openrouter --model <id> --k 3`.

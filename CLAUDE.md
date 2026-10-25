@@ -7,7 +7,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 ## Decisions so far
 - **Surface:** web app + PWA first (Next.js). Voice and desktop come later.
 - **Execution:** all routes, most reliable first: API/MCP integrations → cloud browser (DOM first, vision fallback) → device agent on the user's machine (Phase 4).
-- **Stack:** TypeScript end to end, pnpm workspaces. Phase 0: CLI + SQLite (better-sqlite3) + zod + vitest + Biome, no server/queue/Docker. Phase 1 adds Postgres (same `EventStore` interface), Hono, Next.js PWA, worker pool. Python only for the future `research/` track.
+- **Stack:** TypeScript end to end, pnpm workspaces. Phase 0: CLI + SQLite (built-in `node:sqlite`) + zod + vitest + Biome, no server/queue/Docker. Phase 1 adds Postgres (same `EventStore` interface), Hono, Next.js PWA, worker pool. Python only for the future `research/` track.
 - **Models:** users pick their own. Phase 0 uses a thin in-house OpenAI-compatible client behind `ModelClient` (covers OpenRouter, Ollama, vLLM, Groq, OpenAI); Vercel AI SDK optional later. Testing uses cheap or free open-weight models, so the weak-model adapter (constrained JSON tool calls, few tools per step) matters.
 - **Scope:** "everything" (J.A.R.V.I.S.). The architecture is general; each domain ships only once its eval suite passes.
 - **Core principles (enforced in code, see PLAN.md "Core design rules"):**
@@ -23,12 +23,14 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 
 ## Dev
 - pnpm 12 via corepack (shim in `~/.local/bin`). TypeScript 7 (native `tsc`), vitest 5, Biome 2.
+- Run the CLI from source: `pnpm remy ...`; evals: `pnpm eval:replay` (CI gate), `pnpm eval -- --profile <p> --model <id>`.
 - `pnpm check` = lint + typecheck (src and tests) + `tsc -b` build + tests. Every step must end green on it.
 - Packages export `src/` under the custom condition `@remy/source` (TS) and a vitest alias, `dist/` otherwise. Tests are colocated `*.test.ts` and excluded from the build.
 - `test/boundaries.test.ts` enforces the package dependency graph. Adding an edge means editing `ALLOWED` there on purpose.
 - Build workflow (which model writes which step) is in PLAN.md.
 
 ## Status
+- 2026-10-25: Phase 0 prototype working (steps 1–10). `pnpm remy run "..."`, `pnpm eval:replay` 30/30. Pushed to github.com/remy-plus/remy. Next: step 11 live baselines (needs OPENROUTER_API_KEY or Ollama), then Phase 1.
 - 2026-10-24: step 1 (scaffold) done: workspace, 6 packages, boundary test, `pnpm check` green. Build workflow added to PLAN.md. Next: step 2 (events, `TaskState`, reducer).
 - 2026-10-24: branding done (`branding/`): brand guide, ASCII/SVG logos, GitHub avatar, social preview, org profile README.
 - 2026-10-23: PLAN.md v2: Phase 0 narrowed and fully specified (interfaces, 11-step implementation order, exit criteria). Next: step 1 scaffold.
