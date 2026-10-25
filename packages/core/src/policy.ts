@@ -14,6 +14,9 @@ declare const brand: unique symbol;
 /** A call the policy cleared. `args` are the schema-parsed arguments. Only this module can mint one. */
 export type AuthorizedCall = PlannedCall & { readonly [brand]: true };
 
+/** ask_user calls a task may make before it has to finish with what it has. */
+export const MAX_QUESTIONS = 3;
+
 const minted = new WeakSet<object>();
 
 export class PolicyError extends Error {
@@ -43,6 +46,17 @@ export function decide(
       kind: 'deny',
       reason: `you already made this exact ${call.tool} call and it succeeded. Use that result, or do something different`,
     };
+  // 1c. A task may ask the user only so many questions; after that it works with what it has.
+  if (call.tool === 'ask_user') {
+    const asked = Object.values(state.calls ?? {}).filter(
+      (c) => c.callId !== call.callId && c.tool === 'ask_user' && c.result?.ok,
+    ).length;
+    if (asked >= MAX_QUESTIONS)
+      return {
+        kind: 'deny',
+        reason: `you have already asked the user ${asked} questions. Finish with what you have`,
+      };
+  }
   // 2. Task-level tool lists.
   const { allowTools, denyTools, autoApprove } = state.config.permissions;
   if (denyTools?.includes(tool.name)) return { kind: 'deny', reason: `${tool.name} is blocked` };

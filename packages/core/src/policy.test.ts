@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { argsHash } from './hash.ts';
-import { authorize, decide, isAuthorized, PolicyError, reconcileTool, runTool } from './policy.ts';
+import {
+  authorize,
+  decide,
+  isAuthorized,
+  MAX_QUESTIONS,
+  PolicyError,
+  reconcileTool,
+  runTool,
+} from './policy.ts';
 import { defineTool } from './registry.ts';
 import type { CallState } from './state.ts';
 import {
@@ -104,6 +112,34 @@ describe('decide', () => {
     expect(
       decide(planned('t_read', { n: 2 }), mk('read'), { ...state(), ...prior(true) }).kind,
     ).toBe('allow');
+  });
+
+  it('caps ask_user at MAX_QUESTIONS answered questions per task', () => {
+    const ask = mk('read', { name: 'ask_user' });
+    const answered = (n: number) => ({
+      calls: Object.fromEntries(
+        Array.from({ length: n }, (_, i) => [
+          `q${i}`,
+          {
+            ...planned('ask_user', { n: i + 10 }),
+            callId: `q${i}`,
+            step: i + 1,
+            attempts: 0,
+            inFlight: false,
+            result: { ok: true, content: 'a', trust: 'trusted' } as const,
+          },
+        ]),
+      ),
+    });
+    expect(
+      decide(planned('ask_user'), ask, { ...state(), ...answered(MAX_QUESTIONS - 1) }).kind,
+    ).toBe('allow');
+    expect(
+      decide(planned('ask_user'), ask, { ...state(), ...answered(MAX_QUESTIONS) }),
+    ).toMatchObject({
+      kind: 'deny',
+      reason: expect.stringContaining('Finish with what you have'),
+    });
   });
 
   it('defaults allow reads only', () => {
