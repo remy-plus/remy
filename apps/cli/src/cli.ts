@@ -13,6 +13,7 @@ import {
   RISKS,
   type Risk,
   type RunOutcome,
+  TaskBusyError,
   type TaskConfig,
   type TaskStatus,
   ToolRegistry,
@@ -281,10 +282,23 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return o.status === 'failed' ? 1 : 0;
   }
 
+  // A run that died without cleaning up holds the lease until it expires (15s).
+  async function advanceWhenFree(rt: Rt, id: string) {
+    for (let waited = 0; ; waited += 1000) {
+      try {
+        return await rt.advance(id);
+      } catch (e) {
+        if (!(e instanceof TaskBusyError) || waited >= 20_000) throw e;
+        if (waited === 0) out(st.dim('Another run holds this task. Waiting for it to free up.'));
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
   async function drive(rt: Rt, id: string): Promise<number> {
     active = id;
     for (;;) {
-      const o = await rt.advance(id);
+      const o = await advanceWhenFree(rt, id);
       if (o.status === 'waiting_approval' || o.status === 'waiting_user') {
         if (!deps.isTTY || !deps.ask) {
           followUp(id, o);
