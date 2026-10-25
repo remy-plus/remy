@@ -26,7 +26,7 @@ pnpm install
 
 # Pick a model. Free models on OpenRouter work:
 export REMY_PROFILE=openrouter OPENROUTER_API_KEY=sk-or-...
-export REMY_MODEL=meta-llama/llama-3.3-70b-instruct:free
+export REMY_MODEL=google/gemma-4-26b-a4b-it:free
 # Or a local model:  export REMY_PROFILE=ollama REMY_MODEL=qwen2.5:7b
 
 pnpm remy run "Summarize https://example.com in three bullet points"
