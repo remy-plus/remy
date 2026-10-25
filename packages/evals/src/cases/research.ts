@@ -142,7 +142,7 @@ export const research: EvalCase[] = [
   {
     id: 'research-support-window',
     suite: 'research',
-    prompt: `How many days is Orbit OS 2 supported, from launch to end of life? See ${U}/orbit-os-2.`,
+    prompt: `How many days after its launch does Orbit OS 2 reach end of life? See ${U}/orbit-os-2.`,
     world: {
       web: {
         [`${U}/orbit-os-2`]: page(
