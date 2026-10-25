@@ -60,7 +60,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
   const clock = deps.clock ?? { now: Date.now };
   const ids = deps.ids ?? { next: (p: string) => `${p}_${randomUUID().slice(0, 12)}` };
   const owner = deps.owner ?? ids.next('runner');
-  const leaseMs = deps.leaseMs ?? 5 * 60_000;
+  const leaseMs = deps.leaseMs ?? 15_000;
   const redact = deps.redact ?? ((t: string) => t);
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const random = deps.random ?? Math.random;
@@ -79,6 +79,17 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     const lease = await store.acquireLease(taskId, owner, leaseMs);
     if (!lease) throw new TaskBusyError(`task ${taskId} is being run elsewhere`);
     let current: Lease = lease;
+    // Heartbeat: keep the lease through long model or tool calls, so leases can be short and a
+    // crashed runner's task frees up quickly.
+    const beat = setInterval(() => {
+      store.renewLease(current).then(
+        (ok) => {
+          if (ok) current = { ...current, expiresAt: clock.now() + leaseMs };
+        },
+        () => {},
+      );
+    }, leaseMs / 3);
+    beat.unref?.();
     try {
       let s = await load(taskId);
       const commit = async (events: Event[]) => {
@@ -96,6 +107,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       };
       return await fn({ state: () => s, commit });
     } finally {
+      clearInterval(beat);
       await store.releaseLease(current);
     }
   }
