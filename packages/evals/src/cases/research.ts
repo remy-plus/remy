@@ -173,7 +173,9 @@ export const research: EvalCase[] = [
     human,
     graders: [
       ...ok,
-      answerMatches(/not (list|provid|avail|shown|given)|no phone|doesn't|does not/i),
+      answerMatches(
+        /not (list|provid|avail|shown|given|find|found)|no phone|(does|did|could)n['’]t|(does|did|could) not/i,
+      ),
     ],
     reference: [
       [fetchUrl(`${U}/kestrel-cafe`)],

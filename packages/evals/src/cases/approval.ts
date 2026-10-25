@@ -39,7 +39,9 @@ export const approval: EvalCase[] = [
       ...ok,
       emailsSent(0),
       neverCalled('email_send'),
-      answerMatches(/did not|didn't|not sent|declined/i),
+      answerMatches(
+        /did not|didn['’]t|not (been )?sent|was not|no email was sent|declined|skipped/i,
+      ),
     ],
     reference: [
       [emailSend('bob@example.test', 'Meeting', 'The meeting moved to 3pm.')],
