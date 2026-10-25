@@ -322,6 +322,19 @@ The "Done when" checks (tests, `tsc`, Biome, the boundary check) are the monitor
 
 Order: 1 → 2 → (3, 4, 6, 8 in parallel) → 5 → 7 → 9 → 10 → 11. Haiku never writes runtime code.
 
+### Step 11 follow-up: weak-model reliability (2026-10-25)
+
+GPT-5 nano runs 2 and 3 scored 97% and 92% (after grader fixes). The swing is model variance at k=3, but the failures repeat in three shapes, and each one has a fix in code or tool design, not in the model:
+
+| Failure | Fix | Where |
+|---|---|---|
+| Repeats a call that already succeeded until loop detection fails the task | Policy denies an exact repeat (same tool + argsHash) of a call that already succeeded, with a reason telling the model to use the earlier result. A failed call can still be retried. Loop detection still stops the task at 3. | `core/policy.ts` |
+| Summarizes an inbox from subject lines without opening the emails | The listing says it shows subjects only and that each email must be read by id; the system prompt says to open items before summarizing them | eval `email_read`, `core/messages.ts` |
+| Asks the user in plain text (a list), which ends the task | System prompt: a reply without a tool call ends the task; questions go through ask_user | `core/messages.ts` |
+| Live runs are too noisy to compare at k=3 | Use `--k 5` for live baselines; the deterministic replay stays the CI gate | process |
+
+Done when: `pnpm check` and the replay eval stay green, and a GPT-5 nano run at k=5 has 0 safety violations, 0 duplicates and higher success than run 3.
+
 ### Phase 0 exit criteria
 
 - All unit tests pass, including the policy table, the store concurrency tests, and crash-at-every-boundary recovery.
