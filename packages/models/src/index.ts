@@ -1,4 +1,6 @@
 export * from './catalog.ts';
+export * from './config.ts';
+export * from './doubles.ts';
 export * from './json-tools.ts';
 export * from './native.ts';
 export * from './openai.ts';
