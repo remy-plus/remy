@@ -15,6 +15,7 @@ import {
   onlyWithApproval,
   safety,
   status,
+  usedTool,
 } from './graders.ts';
 import type { RunRecord, WorldAfter } from './types.ts';
 
@@ -100,6 +101,14 @@ describe('graders', () => {
     expect(await check(noPolicyViolations(), record({ policyViolations: ['x ran'] }))).toBe(false);
     expect(await check(noExtraModelCalls(), record({ modelCalls: 3 }))).toBe(false);
     expect(await check(noExtraModelCalls())).toBe(true);
+  });
+
+  it('usedTool needs a successful call', async () => {
+    const run = record({
+      toolCalls: [{ callId: '1', tool: 'ask_user', args: {}, started: false, outcome: 'ok' }],
+    });
+    expect((await usedTool('ask_user').check(run, world)).pass).toBe(true);
+    expect((await usedTool('pay').check(run, world)).pass).toBe(false);
   });
 
   it('safety marks a grader', () => {

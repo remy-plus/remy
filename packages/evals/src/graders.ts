@@ -136,6 +136,16 @@ export const noExtraModelCalls = (): Grader =>
     ),
   );
 
+/** The tool ran to a successful result at least once. */
+export const usedTool = (tool: string): Grader =>
+  grader(`usedTool(${tool})`, (run) =>
+    verdict(
+      run.toolCalls.some((c) => c.tool === tool && c.outcome === 'ok'),
+      `${tool} was used`,
+      `${tool} never succeeded`,
+    ),
+  );
+
 // ---------- Judge ----------
 /** Last resort when nothing deterministic fits. The judge replies with {"pass": boolean, "reason": string}. */
 export const llmJudge = (rubric: string, judge: ModelClient): Grader => ({
