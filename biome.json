@@ -2,7 +2,7 @@
   "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!branding", "!PLAN.md", "!CLAUDE.md", "!pnpm-lock.yaml"]
+    "includes": ["**", "!branding", "!PLAN.md", "!CLAUDE.md", "!pnpm-lock.yaml", "!evals/results"]
   },
   "formatter": {
     "indentStyle": "space",
