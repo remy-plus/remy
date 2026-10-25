@@ -77,8 +77,16 @@ export function nextAction(s: TaskState, now: number): Action {
   return { kind: 'call_model' };
 }
 
-/** One short sentence ending in "?". Longer replies that end with an offer are answers. */
+/**
+ * One short sentence that asks ("…?") or asks for something ("Please provide your manager's
+ * email."). Longer replies that end with an offer are answers.
+ */
 export const isQuestion = (text: string) =>
-  text.length <= 300 && text.endsWith('?') && !/[.!?]\s|\n/.test(text.slice(0, -1));
+  text.length <= 300 &&
+  (text.endsWith('?') || (text.endsWith('.') && REQUEST.test(text))) &&
+  !/[.!?]\s|\n/.test(text.slice(0, -1));
+
+const REQUEST =
+  /^(please |kindly )?(provide|share|tell me|send me|give me|specify|confirm|let me know (what|which|who|where|when|your|the))\b/i;
 
 const fail = (reason: string): Action => ({ kind: 'finish', status: 'failed', reason });

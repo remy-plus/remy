@@ -181,11 +181,16 @@ describe('nextAction', () => {
     ).toEqual({ kind: 'call_model' });
   });
 
-  it('only treats one short sentence ending in ? as a question', () => {
+  it('only treats one short sentence that asks as a question', () => {
     expect(isQuestion("What is your manager's email address?")).toBe(true);
     expect(isQuestion('The page has no phone number. Want me to search for it?')).toBe(false);
     expect(isQuestion('Done.\nAnything else?')).toBe(false);
     expect(isQuestion('All set.')).toBe(false);
+    expect(
+      isQuestion("Please provide your manager's email address and the subject line you'd like."),
+    ).toBe(true);
+    expect(isQuestion('Let me know if you need anything else.')).toBe(false);
+    expect(isQuestion('Sent the note. Please confirm it arrived.')).toBe(false);
   });
 
   it('is done after the task finishes', () => {
