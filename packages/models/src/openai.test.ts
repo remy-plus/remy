@@ -1,0 +1,156 @@
+import { type ModelCaps, ModelError } from '@remy/core';
+import { describe, expect, it } from 'vitest';
+import { createOpenAIClient } from './openai.ts';
+import type { RawRequest } from './types.ts';
+
+const caps: ModelCaps = {
+  nativeTools: true,
+  jsonSchema: false,
+  contextTokens: 8000,
+  pricing: { inPerMTok: 0, outPerMTok: 0 },
+};
+const req: RawRequest = {
+  system: 'sys',
+  messages: [
+    { role: 'user', content: 'hi' },
+    { role: 'assistant', content: 'ok', calls: [{ callId: 'c1', tool: 'read', args: { p: 1 } }] },
+    { role: 'tool', callId: 'c1', tool: 'read', content: 'data' },
+  ],
+  tools: [{ name: 'read', description: 'd', parameters: { type: 'object' } }],
+  maxOutputTokens: 100,
+  temperature: 0.2,
+};
+const sig = () => new AbortController().signal;
+
+function make(handler: (url: string, init: RequestInit) => Response | Promise<Response>) {
+  const seen: { url: string; init: RequestInit }[] = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    seen.push({ url, init });
+    return handler(url, init);
+  }) as unknown as typeof fetch;
+  const client = createOpenAIClient({
+    id: 'm',
+    baseUrl: 'http://x/v1/',
+    apiKey: 'k',
+    caps,
+    headers: { 'x-a': 'b' },
+    fetchImpl,
+  });
+  return { client, seen };
+}
+const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+const hangUntilAbort = ((_u: string, init: RequestInit) =>
+  new Promise((_r, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+  })) as unknown as typeof fetch;
+
+describe('createOpenAIClient', () => {
+  it('maps the request to OpenAI format', async () => {
+    const { client, seen } = make(() => json({ choices: [{ message: { content: 'x' } }] }));
+    const withFormat: RawRequest = { ...req, responseFormat: { type: 'json_object' } };
+    await client.complete(withFormat, sig());
+    const s = seen[0];
+    expect(s?.url).toBe('http://x/v1/chat/completions');
+    const headers = s?.init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer k');
+    expect(headers['x-a']).toBe('b');
+    const body = JSON.parse(s?.init.body as string);
+    expect(body.model).toBe('m');
+    expect(body.max_tokens).toBe(100);
+    expect(body.temperature).toBe(0.2);
+    expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.tools[0]).toEqual({
+      type: 'function',
+      function: { name: 'read', description: 'd', parameters: { type: 'object' } },
+    });
+    expect(body.messages).toEqual([
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: 'ok',
+        tool_calls: [
+          { id: 'c1', type: 'function', function: { name: 'read', arguments: '{"p":1}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'c1', content: 'data' },
+    ]);
+  });
+
+  it('parses text, tool calls and usage', async () => {
+    const { client } = make(() =>
+      json({
+        choices: [
+          {
+            message: {
+              content: 'hello',
+              tool_calls: [
+                { id: 'a', function: { name: 'read', arguments: '{"p":"f"}' } },
+                { id: 'b', function: { name: 'read', arguments: '{oops' } },
+              ],
+            },
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      }),
+    );
+    const r = await client.complete(req, sig());
+    expect(r.text).toBe('hello');
+    expect(r.calls).toEqual([
+      { tool: 'read', args: { p: 'f' } },
+      { tool: 'read', args: '{oops' },
+    ]);
+    expect(r.usage).toEqual({ inTokens: 10, outTokens: 5 });
+  });
+
+  it.each([
+    [429, true],
+    [500, true],
+    [503, true],
+    [400, false],
+    [401, false],
+    [404, false],
+  ])('HTTP %i -> retryable=%s', async (status, retryable) => {
+    const { client } = make(() => new Response('nope', { status }));
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err.retryable).toBe(retryable);
+  });
+
+  it('network errors are retryable', async () => {
+    const { client } = make(() => {
+      throw new TypeError('fetch failed');
+    });
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err.retryable).toBe(true);
+  });
+
+  it('times out as retryable', async () => {
+    const client = createOpenAIClient({
+      id: 'm',
+      baseUrl: 'http://x',
+      caps,
+      timeoutMs: 10,
+      fetchImpl: hangUntilAbort,
+    });
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err.retryable).toBe(true);
+    expect(err.message).toMatch(/timed out/);
+  });
+
+  it('honors the abort signal as non-retryable', async () => {
+    const ac = new AbortController();
+    const client = createOpenAIClient({
+      id: 'm',
+      baseUrl: 'http://x',
+      caps,
+      fetchImpl: hangUntilAbort,
+    });
+    const p = client.complete(req, ac.signal);
+    ac.abort();
+    const err = await p.catch((e) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err.retryable).toBe(false);
+  });
+});
