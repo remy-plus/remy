@@ -158,6 +158,15 @@ describe('nextAction', () => {
     expect(next(...same('a', 1), ...same('b', 2), ...same('c', 3))).toMatchObject({
       reason: expect.stringContaining('repeated'),
     });
+    const other = [
+      resp(3, call('w', 'write_file', { p: 'out' })),
+      allow('w'),
+      started('w'),
+      done('w'),
+    ];
+    expect(next(...same('a', 1), ...same('b', 2), ...other, ...same('c', 4))).toMatchObject({
+      kind: 'call_model',
+    });
   });
 
   it('asks the user when a text-only reply is just a question, then calls the model', () => {

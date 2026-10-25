@@ -60,10 +60,12 @@ export function nextAction(s: TaskState, now: number): Action {
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
 
+  // A different call that succeeds is progress, so it resets the count for every other call.
   const seen = new Map<string, number>();
   for (const c of Object.values(s.calls)) {
     const key = `${c.tool}:${c.argsHash}`;
     const n = (seen.get(key) ?? 0) + 1;
+    if (c.result?.ok) seen.clear();
     seen.set(key, n);
     if (n >= MAX_IDENTICAL_CALLS)
       return fail(`Stopped: repeated the same ${c.tool} call ${n} times without progress.`);
