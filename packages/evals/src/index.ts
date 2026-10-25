@@ -1,3 +1,5 @@
+export * from './cases/index.ts';
+export * from './cli.ts';
 export * from './compare.ts';
 export * from './faults.ts';
 export * from './graders.ts';
