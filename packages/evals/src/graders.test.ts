@@ -1,0 +1,120 @@
+import { ScriptedModelClient } from '@remy/models';
+import { describe, expect, it } from 'vitest';
+import {
+  answerContains,
+  answerMatches,
+  emailsSent,
+  fileAbsent,
+  fileContains,
+  fileEquals,
+  llmJudge,
+  maxSteps,
+  neverCalled,
+  noExtraModelCalls,
+  noPolicyViolations,
+  onlyWithApproval,
+  safety,
+  status,
+} from './graders.ts';
+import type { RunRecord, WorldAfter } from './types.ts';
+
+export const record = (over: Partial<RunRecord> = {}): RunRecord => ({
+  caseId: 'c',
+  suite: 'files',
+  run: 0,
+  status: 'succeeded',
+  answer: 'The bridge opened in 1974.',
+  steps: 2,
+  modelCalls: 2,
+  tokens: { in: 10, out: 5 },
+  costUsd: 0,
+  wallMs: 1,
+  modelLatencyMs: 0,
+  toolCalls: [],
+  approvals: [],
+  crashes: 0,
+  policyViolations: [],
+  duplicateEffects: 0,
+  grades: [],
+  pass: true,
+  safetyViolations: 0,
+  ...over,
+});
+
+const world: WorldAfter = {
+  files: { 'a.txt': 'Hello World\n' },
+  emails: [
+    { key: 'k1', to: 'bob@x.test', subject: 'Invoice', body: 'Paid' },
+    { key: 'k2', to: 'amy@x.test', subject: 'Hi', body: 'Yo' },
+  ],
+};
+
+const check = async (g: ReturnType<typeof answerContains>, r = record(), w = world) =>
+  (await g.check(r, w)).pass;
+
+describe('graders', () => {
+  it('answer graders', async () => {
+    expect(await check(answerContains('1974'))).toBe(true);
+    expect(await check(answerContains(['BRIDGE', '1974']))).toBe(true);
+    expect(await check(answerContains(['1974', '1975']))).toBe(false);
+    expect(await check(answerMatches(/opened in \d{4}/))).toBe(true);
+    expect(await check(answerMatches(/closed/))).toBe(false);
+    expect(await check(answerContains('x'), record({ answer: undefined }))).toBe(false);
+  });
+
+  it('file graders', async () => {
+    expect(await check(fileEquals('a.txt', 'Hello World'))).toBe(true);
+    expect(await check(fileEquals('a.txt', 'hello'))).toBe(false);
+    expect(await check(fileEquals('nope.txt', 'x'))).toBe(false);
+    expect(await check(fileContains('a.txt', 'hello'))).toBe(true);
+    expect(await check(fileAbsent('b.txt'))).toBe(true);
+    expect(await check(fileAbsent('a.txt'))).toBe(false);
+  });
+
+  it('emailsSent counts with and without a filter', async () => {
+    expect(await check(emailsSent(2))).toBe(true);
+    expect(await check(emailsSent(1, { to: 'bob@x.test' }))).toBe(true);
+    expect(await check(emailsSent(1, { to: 'bob@x.test', subjectIncludes: 'invoice' }))).toBe(true);
+    expect(await check(emailsSent(0, { bodyIncludes: 'paid' }))).toBe(false);
+    expect(await check(emailsSent(0), record(), { files: {}, emails: [] })).toBe(true);
+  });
+
+  it('trajectory graders', async () => {
+    const run = record({
+      steps: 3,
+      toolCalls: [
+        { callId: '1', tool: 'email_send', args: {}, started: true, approved: true, outcome: 'ok' },
+        { callId: '2', tool: 'write_file', args: {}, started: true, outcome: 'ok' },
+        { callId: '3', tool: 'pay', args: {}, started: false, outcome: 'declined' },
+      ],
+    });
+    expect(await check(neverCalled('pay'), run)).toBe(true);
+    expect(await check(neverCalled('write_file'), run)).toBe(false);
+    expect(await check(onlyWithApproval('email_send'), run)).toBe(true);
+    expect(await check(onlyWithApproval('write_file'), run)).toBe(false);
+    expect(await check(maxSteps(3), run)).toBe(true);
+    expect(await check(maxSteps(2), run)).toBe(false);
+    expect(await check(status('succeeded'), run)).toBe(true);
+    expect(await check(status('failed'), run)).toBe(false);
+    expect(await check(noPolicyViolations(), run)).toBe(true);
+    expect(await check(noPolicyViolations(), record({ policyViolations: ['x ran'] }))).toBe(false);
+    expect(await check(noExtraModelCalls(), record({ modelCalls: 3 }))).toBe(false);
+    expect(await check(noExtraModelCalls())).toBe(true);
+  });
+
+  it('safety marks a grader', () => {
+    expect(safety(emailsSent(0)).safety).toBe(true);
+    expect(emailsSent(0).safety).toBeUndefined();
+  });
+
+  it('llmJudge reads the verdict', async () => {
+    const judge = (text: string) =>
+      new ScriptedModelClient([{ text, calls: [], usage: { inTokens: 1, outTokens: 1 } }]);
+    const pass = llmJudge('mentions 1974', judge('{"pass": true, "reason": "yes"}'));
+    expect(await check(pass)).toBe(true);
+    const fail = llmJudge('r', judge('Sure! {"pass": false, "reason": "no"}'));
+    expect(await check(fail)).toBe(false);
+    const junk = llmJudge('r', judge('maybe'));
+    expect((await junk.check(record(), world)).detail).toMatch(/no verdict/);
+  });
+});
