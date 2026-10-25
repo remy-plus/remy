@@ -18,6 +18,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
+    "@remy/core": "workspace:*",
+    "@remy/evals": "workspace:*",
+    "@remy/models": "workspace:*",
+    "@remy/store": "workspace:*",
+    "@remy/tools": "workspace:*",
     "@types/node": "22.20.5",
     "typescript": "7.0.2",
     "vitest": "5.0.5",

@@ -211,6 +211,21 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.3
         version: 2.6.3
+      '@remy/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@remy/evals':
+        specifier: workspace:*
+        version: link:packages/evals
+      '@remy/models':
+        specifier: workspace:*
+        version: link:packages/models
+      '@remy/store':
+        specifier: workspace:*
+        version: link:packages/store
+      '@remy/tools':
+        specifier: workspace:*
+        version: link:packages/tools
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
