@@ -33,7 +33,42 @@ export const BUILTIN_CATALOG: Catalog = {
     pricing: { inPerMTok: 2.5, outPerMTok: 10 },
   },
   // Free OpenRouter tier: price is 0.
-  'meta-llama/llama-3.3-70b-instruct:free': { contextTokens: 65536 },
+  'google/gemma-4-26b-a4b-it:free': {
+    jsonSchema: true,
+    contextTokens: 262144,
+    pricing: { inPerMTok: 0, outPerMTok: 0 },
+  },
+  'nvidia/nemotron-3-super-120b-a12b:free': {
+    jsonSchema: true,
+    contextTokens: 262144,
+    pricing: { inPerMTok: 0, outPerMTok: 0 },
+  },
+  'liquid/lfm-2.5-2.6b:free': {
+    jsonSchema: true,
+    contextTokens: 65536,
+    pricing: { inPerMTok: 0, outPerMTok: 0 },
+  },
+  // Paid OpenRouter and OpenAI models (USD per million tokens, from the OpenRouter listing).
+  'qwen/qwen-2.5-7b-instruct': {
+    jsonSchema: true,
+    contextTokens: 32768,
+    pricing: { inPerMTok: 0.1, outPerMTok: 0.2 },
+  },
+  'meta-llama/llama-3.3-70b-instruct': {
+    jsonSchema: true,
+    contextTokens: 131072,
+    pricing: { inPerMTok: 0.1, outPerMTok: 0.32 },
+  },
+  'openai/gpt-5-nano': {
+    jsonSchema: true,
+    contextTokens: 400000,
+    pricing: { inPerMTok: 0.05, outPerMTok: 0.4 },
+  },
+  'gpt-5-nano': {
+    jsonSchema: true,
+    contextTokens: 400000,
+    pricing: { inPerMTok: 0.05, outPerMTok: 0.4 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768 },
   'llama3.2': { contextTokens: 32768 },
