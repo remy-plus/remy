@@ -94,3 +94,18 @@ describe('package boundaries', () => {
     }
   });
 });
+
+describe('tools use capabilities, not globals', () => {
+  // Only the capability implementations may touch the filesystem or the network directly.
+  const EXEMPT = ['scoped-fs.ts', 'scoped-fetch.ts', 'search-providers.ts'];
+  const files = sourceFiles(join(ROOT, 'packages/tools/src')).filter(
+    (f) => !f.endsWith('.test.ts') && !EXEMPT.some((e) => f.endsWith(e)),
+  );
+  for (const file of files) {
+    it(relative(ROOT, file), () => {
+      const src = readFileSync(file, 'utf8');
+      expect(src).not.toMatch(/from ['"](node:)?(fs|fs\/promises|http|https|net|dns)['"]/);
+      expect(src).not.toMatch(/\bfetch\(/);
+    });
+  }
+});
