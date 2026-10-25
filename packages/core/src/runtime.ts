@@ -162,6 +162,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             },
             signal,
           );
+          // Nothing to act on or report: a glitch, not an answer.
+          if (!res.text?.trim() && res.calls.length === 0)
+            throw new ModelError('the model returned an empty reply', true);
         } catch (e) {
           const retryable = e instanceof ModelError && e.retryable;
           const attempt = s.modelAttempts + 1;

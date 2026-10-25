@@ -321,6 +321,16 @@ describe('runtime', () => {
     });
   });
 
+  it('retries an empty reply and fails if it stays empty, never succeeding with no answer', async () => {
+    const { rt, model } = setup(['']);
+    const id = await rt.start('go', config());
+    expect(await drive(rt, id)).toMatchObject({
+      status: 'failed',
+      reason: expect.stringContaining('empty reply'),
+    });
+    expect(model.calls).toBe(3);
+  });
+
   it('enforces the step budget', async () => {
     const { rt } = setup([
       [{ tool: 'read_web', args: { url: '1' } }],
