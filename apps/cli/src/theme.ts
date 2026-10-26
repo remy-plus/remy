@@ -11,7 +11,10 @@ export const PALETTE = {
 /** `none` prints no color codes at all; `basic` uses the 16 terminal colors. */
 export type ColorLevel = 'none' | 'basic' | 'truecolor';
 
-export type Role = 'text' | 'muted' | 'accent';
+export type Role = 'text' | 'muted' | 'accent' | 'error' | 'diffAdd' | 'diffDel';
+
+/** Functional colours outside the brand palette: a soft clay for errors and removed lines. */
+const CLAY = '#D08A78';
 
 export const SYMBOLS = {
   prompt: '›',
@@ -66,13 +69,28 @@ const mix = (a: string, b: string, t: number) => {
 // The wordmark ramps from a dimmed paper up to paper.
 const RAMP_TOP = '#B9B6AF';
 
+const BASIC: Record<Exclude<Role, 'text'>, string> = {
+  muted: 'gray',
+  accent: 'green',
+  diffAdd: 'green',
+  diffDel: 'red',
+  error: 'red',
+};
+const TRUE: Record<Exclude<Role, 'text'>, string> = {
+  muted: PALETTE.stone,
+  accent: PALETTE.signal,
+  diffAdd: PALETTE.signal,
+  diffDel: CLAY,
+  error: CLAY,
+};
+
 export function createTheme(level: ColorLevel): Theme {
   return {
     level,
     color: (role) => {
       if (level === 'none' || role === 'text') return undefined;
-      if (level === 'basic') return role === 'muted' ? 'gray' : 'green';
-      return role === 'muted' ? PALETTE.stone : PALETTE.signal;
+      if (level === 'basic') return BASIC[role];
+      return TRUE[role];
     },
     ramp: (row, rows) =>
       level === 'truecolor'
@@ -88,7 +106,8 @@ export function ansi(level: ColorLevel, role: Role | 'bold'): string {
   if (level === 'none') return '';
   if (role === 'bold') return '\x1b[1m';
   if (role === 'text') return '';
-  if (level === 'basic') return role === 'muted' ? '\x1b[90m' : '\x1b[32m';
-  const [r, g, b] = rgb(role === 'muted' ? PALETTE.stone : PALETTE.signal);
+  if (level === 'basic')
+    return `\x1b[${role === 'muted' ? 90 : role === 'error' || role === 'diffDel' ? 31 : 32}m`;
+  const [r, g, b] = rgb(TRUE[role]);
   return `\x1b[38;2;${r};${g};${b}m`;
 }

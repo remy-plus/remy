@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { styler } from './format.ts';
-import { createTheme, detectColor } from './theme.ts';
+import { ansi, createTheme, detectColor } from './theme.ts';
 import { WORDMARK } from './wordmark.ts';
 
 describe('detectColor', () => {
@@ -24,6 +24,17 @@ describe('theme', () => {
     expect(t.ramp(0, 6)).toBe('#b9b6af');
     expect(t.ramp(5, 6)).toBe('#edebe6');
     expect(createTheme('basic').ramp(0, 6)).toBeUndefined();
+  });
+  it('has error and diff roles: clay in truecolor, red or green in basic, none without color', () => {
+    const t = createTheme('truecolor');
+    expect(t.color('diffAdd')).toBe('#A8C49A');
+    expect(t.color('diffDel')).toBe(t.color('error'));
+    expect(t.color('error')).not.toBe(t.color('accent'));
+    expect(createTheme('basic').color('diffDel')).toBe('red');
+    expect(createTheme('basic').color('diffAdd')).toBe('green');
+    expect(createTheme('none').color('error')).toBeUndefined();
+    expect(ansi('none', 'error')).toBe('');
+    expect(ansi('basic', 'error')).toBe('\x1b[31m');
   });
   it('maps roles per level', () => {
     expect(createTheme('truecolor').color('accent')).toBe('#A8C49A');
