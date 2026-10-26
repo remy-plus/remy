@@ -79,7 +79,9 @@ Usage
   remy                            Open the chat (in a terminal)
   remy run "<prompt>" [options]   Start a task and run it
   remy resume <id>                Continue a task that stopped
-  remy approve <id> [--deny]      Answer a pending approval, then continue
+  remy approve <id> [--deny [--note "<why>"]]
+                                  Answer a pending approval, then continue; a note
+                                  goes to the model with the denial
   remy answer <id> "<text>"       Answer a pending question, then continue
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
@@ -127,6 +129,7 @@ const OPTIONS = {
   debug: { type: 'boolean' },
   'reduced-motion': { type: 'boolean' },
   deny: { type: 'boolean' },
+  note: { type: 'string' },
   version: { type: 'boolean', short: 'v' },
   help: { type: 'boolean', short: 'h' },
 } as const;
@@ -320,7 +323,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ...(opts.hooks?.onText && { onText: opts.hooks.onText }),
       ...(opts.hooks?.onModelStart && { onModelStart: opts.hooks.onModelStart }),
     });
-    return { runtime, timeline };
+    return { runtime, timeline, tools };
   }
   type Rt = ReturnType<typeof makeRuntime>['runtime'];
 
@@ -451,8 +454,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       : join(home, 'workspaces', `chat_${randomUUID().replaceAll('-', '').slice(0, 12)}`);
     taskConfig(file, model.id, workspace); // fail on bad flags before the screen opens
     mkdirSync(workspace, { recursive: true });
+    let registry: ToolRegistry | undefined;
     const chat = createChat({
-      runtime: (hooks) => makeRuntime(file, { model, hooks }).runtime,
+      runtime: (hooks) => {
+        const made = makeRuntime(file, { model, hooks });
+        registry = made.tools;
+        return made.runtime;
+      },
+      effectOf: (tool) => registry?.get(tool)?.effect,
       config: (context) => taskConfig(file, model.id, workspace, context),
       release: releaseLease(store, owner),
       contextWindow: model.caps.contextWindow,
@@ -494,13 +503,20 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         return await resumeFlow(rest[0] as string);
 
       case 'approve': {
-        need(1, 'remy approve <id> [--deny]');
+        need(1, 'remy approve <id> [--deny [--note "<why>"]]');
         const id = rest[0] as string;
+        const note = flags.note?.trim();
+        if (note && !flags.deny)
+          throw new Error('--note goes with --deny: say why you are denying.');
         return await resumeFlow(id, async (rt) => {
           const p = (await rt.state(id)).pendingApproval;
           if (!p) throw new Error(`Task ${id} has no approval waiting.`);
-          await rt.approve(id, p.callId, p.argsHash, !flags.deny, 'user');
-          out(st.dim(`${flags.deny ? 'Denied' : 'Approved'}: ${p.preview}`));
+          await rt.approve(id, p.callId, p.argsHash, !flags.deny, 'user', note);
+          out(
+            st.dim(
+              `${flags.deny ? 'Denied' : 'Approved'}: ${p.preview}${note ? ` (${note})` : ''}`,
+            ),
+          );
         });
       }
 

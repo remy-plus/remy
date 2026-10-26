@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ModelResponse } from '@remy/core';
+import { fold, type ModelResponse } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -102,6 +102,29 @@ describe('remy run', () => {
     const r = await h.run('run', 'write a file');
     expect(r.out).toContain('denied write_file');
     expect(r.out).toContain('Skipped the file.');
+  });
+
+  it('approve --deny --note records the note with the denial', async () => {
+    const model = new ScriptedModelClient([write, call('finish', { answer: 'Skipped it.' })]);
+    const h = harness({ model });
+    const id = taskIdOf((await h.run('run', 'write a file')).out);
+    const r = await h.run('approve', id, '--deny', '--note', 'use b.txt instead');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('Skipped it.');
+    const stored = await h.store.read(id);
+    const resolved = stored.map((e) => e.event).find((e) => e.type === 'approval.resolved');
+    expect(resolved).toMatchObject({ granted: false, note: 'use b.txt instead' });
+    // The model reads the note as the result of the denied call.
+    const result = Object.values(fold(stored).calls).find((c) => c.tool === 'write_file')?.result;
+    expect(JSON.stringify(result)).toContain('declined this action and said: use b.txt instead');
+  });
+
+  it('refuses --note without --deny', async () => {
+    const h = harness({ model: new ScriptedModelClient([write, done]) });
+    const id = taskIdOf((await h.run('run', 'write a file')).out);
+    const r = await h.run('approve', id, '--note', 'hm');
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('--note goes with --deny');
   });
 
   it('answers questions through remy answer', async () => {
