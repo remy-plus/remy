@@ -45,6 +45,7 @@ def main() -> int:
     ap.add_argument("--term", default="xterm-256color", help="TERM for the chat (try dumb)")
     ap.add_argument("--no-reply", action="store_true", help="do not answer the terminal probe")
     ap.add_argument("--unfocus", action="store_true", help="send a focus-out report, then expect a bell at approval")
+    ap.add_argument("--editing", action="store_true", help="also try a multi-line message, a bracketed paste and the Ctrl+O view")
     ap.add_argument("--raw", help="write the raw bytes to this file")
     ap.add_argument("--env-file", help="a file with KEY=<openai key>, used when OPENAI_API_KEY is unset")
     args = ap.parse_args()
@@ -134,6 +135,36 @@ def main() -> int:
         pump(0.3)
         if "needs approval" in last_line():
             approval_screens.append([l.rstrip() for l in screen.display if l.strip()])
+    editing_shots: dict[str, list[str]] = {}
+    editing_turns: list[str] = []
+    if args.editing and ok:
+        def shot() -> list[str]:
+            return [l.rstrip() for l in screen.display if l.strip()]
+
+        # A message of two lines: Ctrl+J is not needed, backslash then Enter is the portable way.
+        for part in ("Reply with one word, ok.\\", "\r", "Second line of the same message."):
+            os.write(master, part.encode())
+            pump(0.2)
+        editing_shots["typing"] = shot()
+        os.write(master, b"\r")
+        pump(1.5)
+        ok = wait_for("ready", args.timeout) and ok
+        editing_turns.append("Second line of the same message.")
+        # A bracketed paste of nine lines: one marker, the real text goes to the model.
+        body = "\n".join(["Pasted block, reply with one word ok."] + [f"filler row {i}" for i in range(8)])
+        os.write(master, b"\x1b[200~" + body.encode() + b"\x1b[201~")
+        pump(0.5)
+        editing_shots["paste"] = shot()
+        os.write(master, b"\r")
+        pump(1.5)
+        ok = wait_for("ready", args.timeout) and ok
+        # The full view, then everything to scrollback.
+        os.write(master, b"\x0f")
+        pump(0.6)
+        editing_shots["view"] = shot()
+        os.write(master, b"[")
+        pump(0.8)
+        editing_shots["after"] = shot()
     if "needs approval" in last_line():
         # Letters typed now would be approval keys; stop the task first.
         os.write(master, b"\x03")
@@ -162,6 +193,9 @@ def main() -> int:
     for n, shot in enumerate(approval_screens, 1):
         print(f"\n--- approval screen {n} ---")
         print("\n".join(shot))
+    for name, rows_ in editing_shots.items():
+        print(f"\n--- editing screen: {name} ---")
+        print("\n".join(rows_))
     print("\n--- checks ---")
 
     failures = []
@@ -170,8 +204,10 @@ def main() -> int:
             continue
         n = sum(1 for l in lines if re.fullmatch(r"\s*› " + re.escape(t), l))
         print(f"user line {t[:30]!r}: {n}")
-        if n != 1:
-            failures.append(f"user message {t!r} appears {n} times")
+        # `[` in the Ctrl+O view writes the whole conversation to scrollback a second time.
+        want = 2 if args.editing else 1
+        if n != want:
+            failures.append(f"user message {t!r} appears {n} times (expected {want})")
     tool_lines = [l.strip() for l in lines if re.match(r"\s*[✓✗–] ", l)]
     dupes = {l for l in tool_lines if tool_lines.count(l) > 1 and "×" not in l}
     print(f"tool lines: {len(tool_lines)}, repeated: {len(dupes)}")
@@ -216,6 +252,25 @@ def main() -> int:
     print(f"approval cards left in scrollback: {left}")
     if left:
         failures.append("approval card left in scrollback")
+    if args.editing:
+        joined = "\n".join(lines)
+        if not any("Reply with one word, ok." in l for l in editing_shots.get("typing", [])) or not any(
+            "Second line of the same message." in l for l in editing_shots.get("typing", [])
+        ):
+            failures.append("multi-line message not shown on two rows while typing")
+        if not any("[Pasted 9 lines]" in l for l in editing_shots.get("paste", [])):
+            failures.append("paste marker missing")
+        if any("filler row 3" in l for l in editing_shots.get("paste", [])):
+            failures.append("pasted text shown in the prompt")
+        if not any("q back" in l for l in editing_shots.get("view", [])):
+            failures.append("Ctrl+O view did not open")
+        if len(editing_shots.get("view", [])) > args.rows - 1:
+            failures.append("the view is as tall as the screen")
+        if any("q back" in l for l in editing_shots.get("after", [])):
+            failures.append("the view stayed open after [")
+        if "Pasted block" not in joined or "[Pasted 9 lines]" in joined and "filler row 7" not in joined:
+            print("note: the pasted block is in the transcript as its marker or its text")
+        print(f"editing checks done ({len(editing_turns)} multi-line turn)")
     for f in failures:
         print("FAIL:", f)
     print("clean" if not failures and ok else "NOT CLEAN")
