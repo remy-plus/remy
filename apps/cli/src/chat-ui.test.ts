@@ -435,6 +435,10 @@ describe('multi-line input and paste', () => {
     app.stdin.write('\r');
     await until(() => app.chat.history().length === 1);
     expect(app.chat.history()[0]).toBe(bigPaste);
+    await until(() => app.chat.getState().phase === 'idle');
+    // The scrollback shows the head of it; Ctrl+O has the rest.
+    expect(frame(app)).toContain('5 more lines');
+    expect(frame(app)).not.toContain('pasted row 7');
     app.unmount();
   });
 

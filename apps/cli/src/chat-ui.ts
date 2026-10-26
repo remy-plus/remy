@@ -260,17 +260,28 @@ function PlanList(p: { steps: PlanStep[]; theme: Theme; max: number; title?: str
   );
 }
 
+/** A long message of yours is cut to this many lines in the scrollback; Ctrl+O has the rest. */
+const USER_LINES = 4;
+
 function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
   const { item, theme } = p;
   const muted = mutedProps(theme);
   const body = Math.max(12, p.columns - theme.space.indent - 3);
   const md = (text: string) => h(Rich, { lines: renderMarkdown(text, body), theme });
+  const userLines = item.kind === 'user' ? item.text.split('\n') : [];
+  const shown = userLines.length > USER_LINES + 2 ? userLines.slice(0, USER_LINES) : userLines;
+  const more = userLines.length - shown.length;
   switch (item.kind) {
     case 'user':
       return h(
         Row,
         { theme, marginTop: 1, lead: h(Text, muted, theme.symbols.prompt) },
-        h(Text, { bold: true }, item.text),
+        h(
+          Box,
+          { flexDirection: 'column' },
+          h(Text, { bold: true }, shown.join('\n')),
+          more ? h(Text, muted, `... ${more} more lines (Ctrl+O shows all)`) : null,
+        ),
       );
     case 'reply':
     case 'text':
