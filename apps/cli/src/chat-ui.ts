@@ -59,6 +59,8 @@ export interface ChatAppProps {
   onClear?: () => void;
   /** Rings when Remy waits and the window is not focused. */
   notifier?: Notifier;
+  /** Overrides `APPROVAL_SETTLE_MS` (tests use 0). */
+  approvalSettleMs?: number;
 }
 
 export interface RunOptions extends Omit<ChatAppProps, 'onClear' | 'compactHeader' | 'notifier'> {
@@ -138,6 +140,9 @@ function Row(p: { theme: Theme; lead?: ReactNode; marginTop?: number; children?:
     h(Box, { flexDirection: 'column', flexGrow: 1, flexShrink: 1 }, p.children),
   );
 }
+
+/** How long a new approval card ignores y / n / e / v, so type-ahead cannot answer it. */
+export const APPROVAL_SETTLE_MS = 500;
 
 const home = process.env.HOME;
 const shortPath = (p: string) => {
@@ -575,6 +580,14 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       notifier?.attention(state.phase);
   }, [state.phase, notifier]);
 
+  // Keys typed just before a card appears must not answer it, so the card ignores
+  // approval keys until it has been on screen for a moment.
+  const cardSince = useRef(0);
+  const card = state.phase === 'waiting_approval' ? state.approvalView : undefined;
+  useEffect(() => {
+    if (card) cardSince.current = Date.now();
+  }, [card]);
+
   useInput((ch, key) => {
     // Focus reports are for the notifier, not the editor.
     if (isFocusReport(ch)) return;
@@ -601,6 +614,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
         return setInput((cur) => editInput(cur, ch, key));
       }
       // Single keys only, and never Enter: a pasted or stray character cannot approve.
+      if (Date.now() - cardSince.current < (props.approvalSettleMs ?? APPROVAL_SETTLE_MS)) return;
       if (/^y$/i.test(ch)) void chat.approve(true);
       else if (/^n$/i.test(ch)) void chat.approve(false);
       else if (/^e$/i.test(ch)) {

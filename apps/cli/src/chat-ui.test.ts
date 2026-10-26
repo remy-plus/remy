@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read']) {
+function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'], settle = 0) {
   const store = new MemoryEventStore();
   const chat = createChat({
     runtime: (hooks) =>
@@ -57,12 +57,18 @@ function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'])
     release: releaseLease(store, 'ui-test'),
   });
   const app = render(
-    h(ChatApp, { chat, theme: createTheme('none'), reducedMotion: true, subtitle: 'test-model' }),
+    h(ChatApp, {
+      chat,
+      theme: createTheme('none'),
+      reducedMotion: true,
+      subtitle: 'test-model',
+      approvalSettleMs: settle,
+    }),
   );
   return { chat, ...app };
 }
-const scripted = (steps: ModelResponse[], auto?: ('read' | 'write')[]) =>
-  mount(new ScriptedModelClient(steps), auto);
+const scripted = (steps: ModelResponse[], auto?: ('read' | 'write')[], settle?: number) =>
+  mount(new ScriptedModelClient(steps), auto, settle);
 type Mounted = ReturnType<typeof mount>;
 
 const until = async (fn: () => boolean) => {
@@ -247,11 +253,12 @@ describe('chat screen', () => {
     app.unmount();
   });
 
-  const askToDelete = () =>
-    scripted([
-      call('delete_file', { path: 'a.txt' }),
-      call('finish', { answer: 'Left a.txt alone.' }),
-    ]);
+  const askToDelete = (settle?: number) =>
+    scripted(
+      [call('delete_file', { path: 'a.txt' }), call('finish', { answer: 'Left a.txt alone.' })],
+      undefined,
+      settle,
+    );
 
   it('shows the approval card with the short hash, reversibility and the three keys', async () => {
     const app = askToDelete();
@@ -279,6 +286,20 @@ describe('chat screen', () => {
       await new Promise((r) => setTimeout(r, 20));
     }
     expect(app.chat.getState().phase).toBe('waiting_approval');
+    app.unmount();
+  });
+
+  it('ignores approval keys typed in the first moment a card is up', async () => {
+    const app = askToDelete(200);
+    await type(app, 'delete it');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    app.stdin.write('y');
+    await new Promise((r) => setTimeout(r, 40));
+    expect(app.chat.getState().phase).toBe('waiting_approval');
+    await new Promise((r) => setTimeout(r, 220));
+    app.stdin.write('n');
+    await until(() => app.chat.getState().phase === 'idle');
+    expect(frame(app)).toContain('you said no');
     app.unmount();
   });
 
