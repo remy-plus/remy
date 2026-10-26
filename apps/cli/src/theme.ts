@@ -33,8 +33,13 @@ export const SYMBOLS = {
 /** Spaces and rows. */
 export const SPACE = { indent: 2, gap: 1 } as const;
 
+export type Background = 'dark' | 'light';
+
 export interface Theme {
   level: ColorLevel;
+  background: Background;
+  /** The same theme tuned for a light or dark terminal background. */
+  withBackground(bg: Background): Theme;
   /** A color for Ink's `color` prop, or undefined to leave the terminal default. */
   color(role: Role): string | undefined;
   /** Wordmark row color: a soft brightness ramp from the top row to the bottom one. */
@@ -76,26 +81,42 @@ const BASIC: Record<Exclude<Role, 'text'>, string> = {
   diffDel: 'red',
   error: 'red',
 };
-const TRUE: Record<Exclude<Role, 'text'>, string> = {
-  muted: PALETTE.stone,
-  accent: PALETTE.signal,
-  diffAdd: PALETTE.signal,
-  diffDel: CLAY,
-  error: CLAY,
+const TRUE: Record<Background, Record<Exclude<Role, 'text'>, string>> = {
+  dark: {
+    muted: PALETTE.stone,
+    accent: PALETTE.signal,
+    diffAdd: PALETTE.signal,
+    diffDel: CLAY,
+    error: CLAY,
+  },
+  // Darker shades of the same hues, so they keep their contrast on paper.
+  light: {
+    muted: '#6B6964',
+    accent: '#4A7A3C',
+    diffAdd: '#4A7A3C',
+    diffDel: '#A8503E',
+    error: '#A8503E',
+  },
 };
+// On a light background the wordmark ramps from a lifted ink down to ink.
+const RAMP_TOP_LIGHT = '#5A5854';
+const RAMP_END_LIGHT = PALETTE.ink;
 
-export function createTheme(level: ColorLevel): Theme {
+export function createTheme(level: ColorLevel, background: Background = 'dark'): Theme {
+  const truecolor = TRUE[background];
+  const [from, to] =
+    background === 'light' ? [RAMP_TOP_LIGHT, RAMP_END_LIGHT] : [RAMP_TOP, PALETTE.paper];
   return {
     level,
+    background,
+    withBackground: (bg) => createTheme(level, bg),
     color: (role) => {
       if (level === 'none' || role === 'text') return undefined;
       if (level === 'basic') return BASIC[role];
-      return TRUE[role];
+      return truecolor[role];
     },
     ramp: (row, rows) =>
-      level === 'truecolor'
-        ? mix(RAMP_TOP, PALETTE.paper, rows > 1 ? row / (rows - 1) : 1)
-        : undefined,
+      level === 'truecolor' ? mix(from, to, rows > 1 ? row / (rows - 1) : 1) : undefined,
     symbols: SYMBOLS,
     space: SPACE,
   };
@@ -108,6 +129,6 @@ export function ansi(level: ColorLevel, role: Role | 'bold'): string {
   if (role === 'text') return '';
   if (level === 'basic')
     return `\x1b[${role === 'muted' ? 90 : role === 'error' || role === 'diffDel' ? 31 : 32}m`;
-  const [r, g, b] = rgb(TRUE[role]);
+  const [r, g, b] = rgb(TRUE.dark[role]);
   return `\x1b[38;2;${r};${g};${b}m`;
 }
