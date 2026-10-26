@@ -284,8 +284,28 @@ section {
   padding-block: var(--pad);
   scroll-margin-top: calc(1.5rem - var(--pad));
 }
+/* The first screen is exactly one screen: the hero fills what the header leaves, so the
+   next section never peeks in, and its content is spread across that height, not stacked
+   at the top. */
 .hero {
-  padding-block: clamp(1rem, 4vw, 4rem) clamp(3.5rem, 2rem + 6vw, 8rem);
+  --hero-h: calc(100vh - 4.5rem);
+  min-height: var(--hero-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: clamp(1.5rem, 5vh, 4rem);
+  padding-block: clamp(1rem, 3vh, 2.5rem);
+}
+@supports (height: 100svh) {
+  .hero {
+    --hero-h: calc(100svh - 4.5rem);
+  }
+}
+.hero > * {
+  min-width: 0; /* a flex column would otherwise let the wordmark's width widen everything */
+}
+.hero .word {
+  margin: 0;
 }
 
 /* Logo. The wordmark is 48 columns of mono; size it from its container. */
@@ -298,7 +318,7 @@ section {
 }
 @supports (width: 1cqi) {
   .word {
-    font-size: clamp(9.2px, 3.05cqi, 56px);
+    font-size: clamp(9.2px, min(3.05cqi, 2.6svh), 56px);
   }
 }
 .word span {
