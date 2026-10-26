@@ -2,7 +2,7 @@
 // the model sees them truncated, with untrusted content fenced.
 import type { ToolRegistry } from './registry.ts';
 import type { TaskState } from './state.ts';
-import type { Message, ToolResult } from './types.ts';
+import type { ConversationTurn, Message, ToolResult } from './types.ts';
 
 export const SYSTEM_PROMPT = `You are Remy, an agent that completes digital tasks for the user.
 
@@ -28,7 +28,30 @@ export function renderResult(result: ToolResult, tool: string, maxChars: number)
     : text;
 }
 
+/** Prior turns kept as context: the newest ones that fit, never more than this many or this many characters. */
+export const MAX_CONTEXT_TURNS = 10;
+export const MAX_CONTEXT_CHARS = 8000;
+
+/** Earlier answers are the agent's own words, so they are trusted. Oldest turns drop first. */
+export function renderContext(turns: ConversationTurn[] | undefined): Message[] {
+  const kept: ConversationTurn[] = [];
+  let chars = 0;
+  for (const t of (turns ?? []).slice(-MAX_CONTEXT_TURNS).reverse()) {
+    chars += t.prompt.length + t.answer.length;
+    if (chars > MAX_CONTEXT_CHARS) break;
+    kept.unshift(t);
+  }
+  return kept.flatMap((t): Message[] => [
+    { role: 'user', content: t.prompt },
+    { role: 'assistant', content: t.answer },
+  ]);
+}
+
 export function buildMessages(s: TaskState, tools: ToolRegistry): Message[] {
+  return [...renderContext(s.config.context), ...buildLogMessages(s, tools)];
+}
+
+function buildLogMessages(s: TaskState, tools: ToolRegistry): Message[] {
   return s.log.map((entry): Message => {
     if (entry.kind === 'user') return { role: 'user', content: entry.text };
     if (entry.kind === 'model') {

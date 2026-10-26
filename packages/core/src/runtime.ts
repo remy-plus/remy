@@ -41,6 +41,14 @@ export interface RuntimeDeps {
   systemPrompt?: string;
   maxOutputTokens?: number;
   onEvent?: (e: StoredEvent) => void;
+  /**
+   * Assistant text as it streams in. Deltas are never persisted; the final reply is
+   * still stored in `model.responded`. A model call can be retried, so a UI should
+   * reset its streaming buffer on every `onModelStart`.
+   */
+  onText?: (delta: string) => void;
+  /** Called before each model call, including retries. */
+  onModelStart?: () => void;
 }
 
 export class TaskBusyError extends Error {
@@ -152,6 +160,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         const t0 = clock.now();
         let res: Awaited<ReturnType<ModelClient['complete']>>;
         try {
+          deps.onModelStart?.();
           res = await model.complete(
             {
               system: deps.systemPrompt ?? SYSTEM_PROMPT,
@@ -161,6 +170,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
               temperature: 0,
             },
             signal,
+            deps.onText,
           );
           // Nothing to act on or report: a glitch, not an answer.
           if (!res.text?.trim() && res.calls.length === 0)

@@ -50,6 +50,13 @@ export interface TaskConfig {
   permissions: Permissions;
   budget: Budget;
   workspaceDir: string;
+  /** Earlier turns of the same conversation, oldest first. Rendered as prior messages; see `buildMessages`. */
+  context?: ConversationTurn[];
+}
+
+export interface ConversationTurn {
+  prompt: string;
+  answer: string;
 }
 
 export const DEFAULT_BUDGET: Budget = {
@@ -196,7 +203,12 @@ export interface ModelResponse {
 export interface ModelClient {
   readonly id: string;
   readonly caps: ModelCaps;
-  complete(req: ModelRequest, signal: AbortSignal): Promise<ModelResponse>;
+  /** `onText` receives assistant text as it arrives. The returned response is the same either way. */
+  complete(
+    req: ModelRequest,
+    signal: AbortSignal,
+    onText?: (delta: string) => void,
+  ): Promise<ModelResponse>;
 }
 
 /** Thrown by model clients. `retryable` covers network errors, 429, 5xx and timeouts. */
