@@ -40,6 +40,17 @@ pnpm remy run "Summarize https://example.com in three bullet points"
 
 Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Web search is enabled when `BRAVE_API_KEY`, `TAVILY_API_KEY` or `SEARXNG_URL` is set.
 
+## Install
+
+Build and install the `remy` command from a clone (Node 22.18 or newer):
+
+```sh
+pnpm install && pnpm bundle
+npm install -g ./apps/cli
+```
+
+See [CAPABILITIES.md](CAPABILITIES.md) for what Remy can and cannot do yet.
+
 ## Development
 
 ```sh
