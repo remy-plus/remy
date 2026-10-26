@@ -30,6 +30,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 - Build workflow (which model writes which step) is in PLAN.md.
 
 ## Status
+- 2026-10-25: V1 work package 3 (Ink chat UI) done: plain `remy` opens a multi-turn chat (`apps/cli/src/chat.ts` controller, `chat-ui.ts` components, `theme.ts`, `--debug`). No JSX; components use `createElement`.
 - 2026-10-26: GPT-5 nano run 7 (k=5): 100% on all 30 cases, pass^5 100%, 0 safety violations, 0 duplicates, $0.079 for 150 runs. V1 (terminal) work under way, tracked in `V1.md`.
 - 2026-10-25: GPT-5 nano run 6 (k=5): 99% success, pass^5 97%, files and research 100% twice in a row, 0 safety violations, 0 duplicates, $0.087 for 150 runs. Fixes since the baseline: question cap, loop guard resets on progress, plain-text requests pause the task. Next: 1–2 open-weight baselines, then Phase 1.
 - 2026-10-25: first live baseline, GPT-5 nano k=3: 88% success, pass^3 83%, 0 safety violations, 0 duplicates, $0.055 for 90 runs (`evals/results/`). Fixed: GPT-5 request parameters, empty replies no longer count as success, reasoning models get an 8k output limit, two over-strict graders. Next: re-run GPT-5 nano, add 1–2 open-weight baselines, then Phase 1.

@@ -29,10 +29,16 @@ export REMY_PROFILE=openrouter OPENROUTER_API_KEY=sk-or-...
 export REMY_MODEL=google/gemma-4-26b-a4b-it:free
 # Or a local model:  export REMY_PROFILE=ollama REMY_MODEL=qwen2.5:7b
 
+pnpm remy
+```
+
+Plain `remy` in a terminal opens the chat: type a message, and each one carries the earlier ones as context. Replies stream in, tool calls show as they run, and Remy asks for a `y` or `n` before anything that needs approval. Ctrl+C stops a running task (resume it with `remy resume <id>`), Ctrl+D quits, `/help` lists the rest. Use `--reduced-motion` to turn off animation and `NO_COLOR=1` to turn off color. For scripts, run one task directly:
+
+```sh
 pnpm remy run "Summarize https://example.com in three bullet points"
 ```
 
-Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Web search is enabled when `BRAVE_API_KEY`, `TAVILY_API_KEY` or `SEARXNG_URL` is set.
+Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Web search is enabled when `BRAVE_API_KEY`, `TAVILY_API_KEY` or `SEARXNG_URL` is set.
 
 ## Development
 
