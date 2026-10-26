@@ -1,5 +1,6 @@
 // Plain-text rendering: colors, one-line event summaries, the readable timeline.
 import type { StoredEvent, TaskState } from '@remy/core';
+import { ansi, type ColorLevel } from './theme.ts';
 
 export interface Styler {
   dim: (s: string) => string;
@@ -7,13 +8,12 @@ export interface Styler {
   bold: (s: string) => string;
 }
 
-export function styler(enabled: boolean): Styler {
-  const wrap = (code: string) => (s: string) => (enabled ? `\x1b[${code}m${s}\x1b[0m` : s);
-  return {
-    dim: wrap('38;2;140;138;133'), // stone #8C8A85
-    accent: wrap('38;2;168;196;154'), // signal #A8C49A
-    bold: wrap('1'),
-  };
+/** `true` means full color; pass a level from `detectColor` to honor NO_COLOR and 16-color terminals. */
+export function styler(level: boolean | ColorLevel): Styler {
+  const l: ColorLevel = level === true ? 'truecolor' : level === false ? 'none' : level;
+  const wrap = (role: Parameters<typeof ansi>[1]) => (s: string) =>
+    l === 'none' ? s : `${ansi(l, role)}${s}\x1b[0m`;
+  return { dim: wrap('muted'), accent: wrap('accent'), bold: wrap('bold') };
 }
 
 export const truncate = (s: string, max: number) => {

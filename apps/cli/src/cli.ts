@@ -44,6 +44,7 @@ import {
 } from '@remy/tools';
 import { type FileConfig, loadConfig } from './config.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
+import { detectColor } from './theme.ts';
 
 export interface CliDeps {
   env: Record<string, string | undefined>;
@@ -169,7 +170,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     throw new Error(`Unknown command "${command}". Run remy help.`);
 
   const home = env.REMY_HOME || join(homedir(), '.remy');
-  const st = styler(deps.isTTY && !env.NO_COLOR);
+  const st = styler(detectColor(env, deps.isTTY));
   const owner = `cli-${randomUUID().slice(0, 8)}`;
   if (!deps.store) mkdirSync(home, { recursive: true });
   const ownStore = deps.store ? undefined : new SqliteEventStore(join(home, 'remy.sqlite'));

@@ -130,7 +130,10 @@ describe('remy run', () => {
         ask: async () => null,
         model: new ScriptedModelClient([write]),
       });
-    expect((await mk({}).run('run', 'x')).out).toContain('\x1b[38;2;140;138;133m');
+    expect((await mk({ COLORTERM: 'truecolor' }).run('run', 'x')).out).toContain(
+      '\x1b[38;2;140;138;133m',
+    );
+    expect((await mk({}).run('run', 'x')).out).toContain('\x1b[90m');
     expect((await mk({ NO_COLOR: '1' }).run('run', 'x')).out).not.toContain('\x1b[');
   });
 
