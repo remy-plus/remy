@@ -66,6 +66,14 @@ const replies = (chat: Chat) =>
   chat.getState().items.flatMap((i) => (i.kind === 'reply' ? [i.text] : []));
 
 describe('chat controller', () => {
+  it('tracks task spend, the budget and how full the context is', async () => {
+    const { chat } = harness(new ScriptedModelClient([done('Four.')]));
+    await chat.submit('what is 2+2');
+    const st = chat.getState();
+    expect(st.budgetUsd).toBe(DEFAULT_BUDGET.maxCostUsd);
+    expect(st.contextTokens).toBe(10);
+    expect(st.taskCostUsd).toBeCloseTo(st.costUsd);
+  });
   it('carries earlier turns into the next task as context', async () => {
     const model = new ScriptedModelClient([done('Four.'), done('Eight.')]);
     const { chat, store, contexts } = harness(model);

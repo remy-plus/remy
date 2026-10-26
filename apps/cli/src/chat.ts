@@ -64,6 +64,13 @@ export interface ChatState {
   costUsd: number;
   /** Tokens (in and out) used by this conversation. */
   tokens: number;
+  /** Prompt size of the latest model call: how full the context is. */
+  contextTokens: number;
+  /** The model's context window, when known. */
+  contextWindow?: number;
+  /** Spend of the current (or last) task, and the budget it may spend. */
+  taskCostUsd: number;
+  budgetUsd?: number;
   /** Set while a failed model call waits to be retried. */
   retrying?: string;
   /** The user asked to quit with /exit. */
@@ -85,6 +92,8 @@ export interface ChatDeps {
   config: (context: ConversationTurn[]) => TaskConfig;
   /** Lets go of a task's lease so `remy resume` can take it. */
   release: (taskId: string) => Promise<void>;
+  /** The model's context window in tokens, when it is known. */
+  contextWindow?: number;
 }
 
 export interface Chat {
@@ -161,6 +170,8 @@ const initial = (): ChatState => ({
   queue: [],
   costUsd: 0,
   tokens: 0,
+  contextTokens: 0,
+  taskCostUsd: 0,
   clears: 0,
 });
 
@@ -168,7 +179,7 @@ const initial = (): ChatState => ({
 const MAX_LIVE_DONE = 4;
 
 export function createChat(deps: ChatDeps): Chat {
-  let s = initial();
+  let s: ChatState = { ...initial(), contextWindow: deps.contextWindow };
   let turns: ConversationTurn[] = [];
   const sent: string[] = [];
   const listeners = new Set<() => void>();
@@ -238,6 +249,8 @@ export function createChat(deps: ChatDeps): Chat {
           streaming: '',
           costUsd: s.costUsd + ev.costUsd,
           tokens: s.tokens + ev.usage.inTokens + ev.usage.outTokens,
+          taskCostUsd: s.taskCostUsd + ev.costUsd,
+          contextTokens: ev.usage.inTokens,
           items: [...s.items, ...toCommit],
           tools: [...s.tools, ...added],
           ...(plan && { plan }),
@@ -403,9 +416,12 @@ export function createChat(deps: ChatDeps): Chat {
       plan: undefined,
       step: 0,
       turnStartedAt: Date.now(),
+      taskCostUsd: 0,
     });
     try {
-      const id = await runtime.start(text, deps.config(turns));
+      const config = deps.config(turns);
+      set({ budgetUsd: config.budget.maxCostUsd });
+      const id = await runtime.start(text, config);
       current = { id, prompt: text };
       set({ taskId: id });
       await drive(id, my);

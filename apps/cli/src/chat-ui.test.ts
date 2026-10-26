@@ -15,7 +15,7 @@ import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createChat, releaseLease } from './chat.ts';
-import { ChatApp } from './chat-ui.ts';
+import { ChatApp, contextPart, costPart } from './chat-ui.ts';
 import { createTheme } from './theme.ts';
 
 const usage = { inTokens: 10, outTokens: 5 };
@@ -222,6 +222,31 @@ describe('chat screen', () => {
     app.unmount();
   });
 
+  it('narrates on one row, with no duplicate lines, and shows the footer meters', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let n = 0;
+    const model: ModelClient = {
+      id: 'narrator',
+      caps: DEFAULT_CAPS,
+      complete: async () => {
+        if (n++ === 0) await gate;
+        return call('finish', { answer: 'Fine.' });
+      },
+    };
+    const app = mount(model);
+    await type(app, 'hello');
+    await until(() => frame(app).includes('Thinking'));
+    expect(count(frame(app), 'Thinking')).toBe(1);
+    expect(frame(app)).toContain('$0 of $1.00');
+    release();
+    await until(() => app.chat.getState().phase === 'idle');
+    expect(frame(app)).not.toContain('Thinking');
+    app.unmount();
+  });
+
   it('Esc clears the input and Up brings back the last message', async () => {
     const app = scripted([call('finish', { answer: 'Ok.' })]);
     app.stdin.write('draft');
@@ -235,5 +260,19 @@ describe('chat screen', () => {
     await until(() => frame(app).split('first').length > 2);
     expect(frame(app).split('first').length).toBeGreaterThan(2);
     app.unmount();
+  });
+});
+
+describe('footer meters', () => {
+  it('shows context only when the window is known', () => {
+    expect(contextPart({ contextTokens: 14000, contextWindow: 100000 })).toBe('14% context');
+    expect(contextPart({ contextTokens: 14000, contextWindow: undefined })).toBe('');
+    expect(contextPart({ contextTokens: 0, contextWindow: 100000 })).toBe('');
+    expect(contextPart({ contextTokens: 500000, contextWindow: 100000 })).toBe('100% context');
+  });
+  it('shows task spend against its budget', () => {
+    expect(costPart({ taskCostUsd: 0.04, budgetUsd: 0.5 })).toBe('$0.04 of $0.50');
+    expect(costPart({ taskCostUsd: 0.0004, budgetUsd: 1 })).toBe('<$0.01 of $1.00');
+    expect(costPart({ taskCostUsd: 0, budgetUsd: undefined })).toBe('');
   });
 });

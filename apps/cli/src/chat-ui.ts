@@ -19,13 +19,14 @@ import {
   useSyncExternalStore,
 } from 'react';
 import type { Chat, ChatState, Item } from './chat.ts';
-import { fmtCost, fmtMs, fmtTokens } from './format.ts';
+import { fmtMs } from './format.ts';
 import { EMPTY_INPUT, editInput, type InputState, withText } from './input.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
 import type { Theme } from './theme.ts';
 import {
   type ApprovalView,
   approvalHeight,
+  narrate,
   type PlanStep,
   streamBudget,
   type ToolLine,
@@ -58,6 +59,24 @@ function useFrame(active: boolean, frames: number): number {
     return () => clearInterval(t);
   }, [active, frames]);
   return active ? frame : 0;
+}
+
+/** `value`, but a change shows at most once per `ms`; the first value shows at once. */
+export function useSettled(value: string, ms: number): string {
+  const [shown, setShown] = useState(value);
+  const last = useRef(Date.now());
+  useEffect(() => {
+    if (value === shown) return;
+    const wait = ms - (Date.now() - last.current);
+    const apply = () => {
+      last.current = Date.now();
+      setShown(value);
+    };
+    if (wait <= 0) return apply();
+    const t = setTimeout(apply, wait);
+    return () => clearTimeout(t);
+  }, [value, shown, ms]);
+  return shown;
 }
 
 /** Text props for a muted look that still works with colors off. */
@@ -302,14 +321,23 @@ export function hintsFor(phase: ChatState['phase'], hasInput: boolean): string {
   }
 }
 
+/** `14% context`, only when the model's window is known. */
+export function contextPart(s: Pick<ChatState, 'contextTokens' | 'contextWindow'>): string {
+  if (!s.contextWindow || s.contextTokens <= 0) return '';
+  return `${Math.min(100, Math.round((s.contextTokens / s.contextWindow) * 100))}% context`;
+}
+
+/** `$0.04 of $0.50`: this task's spend against its budget. */
+export function costPart(s: Pick<ChatState, 'taskCostUsd' | 'budgetUsd'>): string {
+  if (s.budgetUsd === undefined) return '';
+  const x = s.taskCostUsd;
+  const spent = x <= 0 ? '$0' : x < 0.01 ? '<$0.01' : `$${x.toFixed(2)}`;
+  return `${spent} of $${s.budgetUsd.toFixed(2)}`;
+}
+
 function Footer(p: { state: ChatState; theme: Theme; model?: string; hasInput: boolean }) {
   const { state } = p;
-  const left = [
-    p.model,
-    state.tokens ? `${fmtTokens(state.tokens)} tokens` : '',
-    state.costUsd > 0 ? fmtCost(state.costUsd) : '',
-    STATE_WORD[state.phase],
-  ]
+  const left = [p.model, contextPart(state), costPart(state), STATE_WORD[state.phase]]
     .filter(Boolean)
     .join(' · ');
   return h(
@@ -394,6 +422,10 @@ function Live(p: {
       )
     : [];
 
+  // One row, and it changes at most once a second so the live area does not flicker.
+  const secs = state.turnStartedAt ? Math.floor((Date.now() - state.turnStartedAt) / 1000) : 0;
+  const narration = useSettled(narrate({ ...state, secs: animate ? secs : undefined }), 1000);
+
   const kids: ReactNode[] = [];
   if (tail.length)
     kids.push(
@@ -416,22 +448,11 @@ function Live(p: {
       ),
     );
   if (busy) {
-    const secs = state.turnStartedAt ? Math.floor((Date.now() - state.turnStartedAt) / 1000) : 0;
-    const label = state.streaming
-      ? 'Writing'
-      : state.tools.some((t) => t.state === 'running')
-        ? 'Working'
-        : state.step
-          ? 'Thinking'
-          : 'Thinking';
-    const text = animate
-      ? `${label}${state.step ? ` · step ${state.step + 1}` : ''} · ${secs}s`
-      : `${label}...`;
     kids.push(
       h(
         Box,
         { key: 'spin', paddingLeft: theme.space.indent },
-        h(Text, { ...muted, wrap: 'truncate-end' }, `${glyph} ${text}`),
+        h(Text, { ...muted, wrap: 'truncate-end' }, `${glyph} ${narration}`),
       ),
     );
   }

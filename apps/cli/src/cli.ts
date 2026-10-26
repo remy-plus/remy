@@ -455,6 +455,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       runtime: (hooks) => makeRuntime(file, { model, hooks }).runtime,
       config: (context) => taskConfig(file, model.id, workspace, context),
       release: releaseLease(store, owner),
+      contextWindow: model.caps.contextWindow,
     });
     const { runChat } = await import('./chat-ui.ts');
     await runChat({

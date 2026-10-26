@@ -32,6 +32,7 @@ except ImportError:
     sys.exit("pyte is missing: pip install pyte")
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+APPROVAL_KEYS = ("y", "n", "e", "v")
 DEFAULT_TURNS = ["hello", "Research what happened to the Golden Hind in 3 bullets"]
 
 
@@ -103,7 +104,9 @@ def main() -> int:
             os.write(master, ch.encode())
             pump(0.01)
         pump(0.1)
-        os.write(master, b"\r")
+        # Approval keys act on their own; Enter after them would only prove it does nothing.
+        if text not in APPROVAL_KEYS:
+            os.write(master, b"\r")
 
     ok = wait_for("ready", 30)
     if not ok:
@@ -144,7 +147,7 @@ def main() -> int:
 
     failures = []
     for t in turns:
-        if t in ("y", "n"):  # approval keys, not chat messages
+        if t in APPROVAL_KEYS:  # approval keys, not chat messages
             continue
         n = sum(1 for l in lines if re.fullmatch(r"\s*› " + re.escape(t), l))
         print(f"user line {t[:30]!r}: {n}")
@@ -160,6 +163,12 @@ def main() -> int:
     rep = {b for b in bullets if bullets.count(b) > 1}
     for b in sorted(rep):
         failures.append(f"line repeated: {b[:60]}")
+    # The narration row lives in the live area only; it must never reach scrollback.
+    narr = re.compile(r"^\s*[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏·] .+ · \d+s$")
+    stray = [l.strip() for l in history if narr.match(l)]
+    print(f"narration rows in scrollback: {len(stray)}")
+    for l in stray[:3]:
+        failures.append(f"narration in scrollback: {l}")
     plans = sum(1 for l in lines if re.match(r"\s*Plan \d+/\d+", l))
     print(f"plan headers: {plans}")
     for f in failures:
