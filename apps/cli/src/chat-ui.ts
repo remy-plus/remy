@@ -7,7 +7,7 @@
 //   - The live area holds only the active turn and is kept shorter than the screen. A
 //     frame as tall as the terminal makes Ink clear and reprint everything, so the streaming
 //     text is cut to the tail that fits.
-import { Box, render, Static, Text, useApp, useInput, useWindowSize } from 'ink';
+import { Box, render, Static, Text, useApp, useInput, useStdout, useWindowSize } from 'ink';
 import {
   createElement as h,
   type ReactElement,
@@ -19,7 +19,6 @@ import {
   useSyncExternalStore,
 } from 'react';
 import type { Chat, ChatState, Item } from './chat.ts';
-import { fmtMs } from './format.ts';
 import { EMPTY_INPUT, editInput, type InputState, withText } from './input.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
 import {
@@ -40,8 +39,10 @@ import {
   streamBudget,
   type ToolLine,
   tailLines,
+  toolBits,
   windowPlan,
 } from './transcript.ts';
+import { TranscriptView } from './transcript-view.ts';
 import { TAGLINE, WORDMARK, WORDMARK_WIDTH } from './wordmark.ts';
 
 export interface ChatAppProps {
@@ -194,14 +195,7 @@ function ToolRow(p: { line: ToolLine; theme: Theme; spinner: string; now?: numbe
     running: [p.spinner, theme.color('muted')],
   };
   const [mark, color] = glyph[line.state];
-  const live =
-    line.state === 'running' && line.startedAt && p.now ? p.now - line.startedAt : undefined;
-  const bits = [
-    line.count > 1 ? `×${line.count}` : '',
-    line.state === 'waiting_approval' ? 'waiting for approval' : '',
-    line.reason ?? '',
-    line.ms !== undefined ? fmtMs(line.ms) : live !== undefined && live >= 1000 ? fmtMs(live) : '',
-  ].filter(Boolean);
+  const bits = toolBits(line, p.now);
   return h(
     Box,
     { paddingLeft: theme.space.indent },
@@ -549,6 +543,8 @@ export function ChatApp(props: ChatAppProps): ReactElement {
   const seenClears = useRef(state.clears);
   const [expanded, setExpanded] = useState(false);
   const [noting, setNoting] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const { write } = useStdout();
   const approvalId = state.approval?.callId;
 
   // Each approval starts collapsed, with no note under way.
@@ -588,10 +584,18 @@ export function ChatApp(props: ChatAppProps): ReactElement {
     if (card) cardSince.current = Date.now();
   }, [card]);
 
+  // The full view hides the live area, so it gives way when Remy needs an answer.
+  useEffect(() => {
+    if (state.phase === 'waiting_approval' || state.phase === 'waiting_user') setViewing(false);
+  }, [state.phase]);
+
   useInput((ch, key) => {
+    // The transcript view reads its own keys.
+    if (viewing) return;
     // Focus reports are for the notifier, not the editor.
     if (isFocusReport(ch)) return;
     if (key.ctrl && ch === 'd') return void quit();
+    if (key.ctrl && ch === 'o' && state.phase !== 'waiting_approval') return setViewing(true);
     if (key.ctrl && ch === 'c') {
       if (state.phase !== 'idle') return void chat.interrupt();
       if (input.text) return setInput(EMPTY_INPUT);
@@ -667,24 +671,40 @@ export function ChatApp(props: ChatAppProps): ReactElement {
               compact: props.compactHeader,
             }),
     }),
-    h(Live, {
-      state,
-      theme,
-      reducedMotion: props.reducedMotion,
-      columns,
-      rows,
-      below,
-      expanded,
-      noting,
-    }),
-    showPrompt ? h(Prompt, { value: input, theme }) : null,
-    h(Footer, {
-      state,
-      theme,
-      model: props.subtitle,
-      hasInput: input.text.length > 0,
-      noting,
-    }),
+    viewing
+      ? h(TranscriptView, {
+          items: state.items,
+          columns,
+          rows,
+          theme,
+          onClose: (dump) => {
+            if (dump) write(dump);
+            setViewing(false);
+          },
+        })
+      : null,
+    viewing
+      ? null
+      : h(Live, {
+          state,
+          theme,
+          reducedMotion: props.reducedMotion,
+          columns,
+          rows,
+          below,
+          expanded,
+          noting,
+        }),
+    showPrompt && !viewing ? h(Prompt, { value: input, theme }) : null,
+    viewing
+      ? null
+      : h(Footer, {
+          state,
+          theme,
+          model: props.subtitle,
+          hasInput: input.text.length > 0,
+          noting,
+        }),
   );
 }
 

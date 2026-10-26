@@ -393,3 +393,23 @@ describe('footer meters', () => {
     expect(costPart({ taskCostUsd: 0, budgetUsd: undefined })).toBe('');
   });
 });
+
+describe('full transcript view', () => {
+  it('Ctrl+O opens it over the prompt, q goes back', async () => {
+    const app = scripted(
+      [call('write_file', { path: 'a.txt', content: 'x' }), call('finish', { answer: 'Saved.' })],
+      ['read', 'write'],
+    );
+    await type(app, 'save a file');
+    await until(() => app.chat.getState().phase === 'idle' && app.chat.history().length === 1);
+    app.stdin.write('\x0f');
+    await until(() => frame(app).includes('q back'));
+    expect(frame(app)).toContain('j/k scroll');
+    expect(frame(app)).toContain('Saved.');
+    expect(frame(app)).not.toContain('/help');
+    app.stdin.write('q');
+    await until(() => !frame(app).includes('q back'));
+    expect(frame(app)).toContain('/help');
+    app.unmount();
+  });
+});

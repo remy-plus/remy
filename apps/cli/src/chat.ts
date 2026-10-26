@@ -22,6 +22,7 @@ import {
   summarizeTool,
   type ToolLine,
   type ToolState,
+  toolDetail,
 } from './transcript.ts';
 
 export type { ApprovalView, PlanStep, ToolLine, ToolState };
@@ -122,6 +123,7 @@ export const HELP_TEXT = [
   '  Enter     send; while Remy works, the message waits its turn',
   '  Up        bring back your last message',
   '  Esc       clear the input',
+  '  Ctrl+O    read the whole conversation, with details (q to go back)',
   '  Ctrl+C    stop the running task (resume it later); on an empty prompt, quit',
   '  Ctrl+D    quit',
   '  y / n     approve once or deny when Remy asks',
@@ -294,7 +296,10 @@ export function createChat(deps: ChatDeps): Chat {
         break;
       case 'tool.completed': {
         const r = ev.result;
+        const c = calls.get(ev.callId);
+        const detail = c ? toolDetail(c.tool, c.args, r) : undefined;
         setTool(ev.callId, {
+          ...(detail && { detail }),
           state: r.ok ? 'ok' : 'failed',
           ms: ev.latencyMs,
           ...(!r.ok && { reason: truncate(r.error, 80) }),

@@ -1,7 +1,7 @@
 // What the chat shows, as pure functions: tool summaries, approval cards, which tool lines
 // are done enough to leave the live area, and how tall the live area may be. No Ink here.
-import type { ApprovalRequest, Effect } from '@remy/core';
-import { truncate } from './format.ts';
+import type { ApprovalRequest, Effect, ToolResult } from '@remy/core';
+import { fmtMs, truncate } from './format.ts';
 
 export type ToolState = 'waiting_approval' | 'running' | 'ok' | 'failed' | 'denied';
 
@@ -19,6 +19,43 @@ export interface ToolLine {
   reason?: string;
   /** More than one when identical failures were collapsed. */
   count: number;
+  /** A few lines of what the tool returned, or the hunks of an edit. Shown in the full view. */
+  detail?: string[];
+}
+
+/** Lines of detail kept per tool call, and the width each is cut to. */
+export const DETAIL_LINES = 8;
+const DETAIL_WIDTH = 200;
+
+/** What a finished call has to show: edit hunks, or the first lines of its output. */
+export function toolDetail(tool: string, args: unknown, result: ToolResult): string[] | undefined {
+  const a = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+  const cut = (lines: string[], mark = '') => {
+    const kept = lines.slice(0, DETAIL_LINES).map((l) => truncate(`${mark}${l}`, DETAIL_WIDTH));
+    return lines.length > DETAIL_LINES
+      ? [...kept, `${mark}... ${lines.length - DETAIL_LINES} more lines`]
+      : kept;
+  };
+  if (!result.ok) return undefined;
+  if (tool === 'edit_file') {
+    const half = DETAIL_LINES / 2;
+    const old = str(a.old).split('\n');
+    const neu = str(a.new).split('\n');
+    return [...cut(old.slice(0, half), '- '), ...cut(neu.slice(0, half), '+ ')];
+  }
+  const lines = result.content.split('\n').filter((l) => l.trim());
+  return lines.length ? cut(lines) : undefined;
+}
+
+/** The muted tail of a tool row: repeat count, state, reason and, once it is known, time. */
+export function toolBits(line: ToolLine, now?: number): string[] {
+  const live = line.state === 'running' && line.startedAt && now ? now - line.startedAt : undefined;
+  return [
+    line.count > 1 ? `×${line.count}` : '',
+    line.state === 'waiting_approval' ? 'waiting for approval' : '',
+    line.reason ?? '',
+    line.ms !== undefined ? fmtMs(line.ms) : live !== undefined && live >= 1000 ? fmtMs(live) : '',
+  ].filter(Boolean);
 }
 
 export interface PlanStep {
