@@ -42,12 +42,13 @@ Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume
 
 ## Install
 
-Build and install the `remy` command from a clone (Node 22.18 or newer):
+Node 22.18 or newer:
 
 ```sh
-pnpm install && pnpm bundle
-npm install -g ./apps/cli
+npm install -g @koryei/remy
 ```
+
+From a clone instead: `pnpm install && pnpm bundle && npm install -g ./apps/cli`.
 
 See [CAPABILITIES.md](CAPABILITIES.md) for what Remy can and cannot do yet.
 
