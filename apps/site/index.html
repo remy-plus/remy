@@ -49,7 +49,7 @@
       <p class="tag"><i class="dot now" aria-hidden="true"></i>Terminal &middot; available now</p>
       <div class="cmd">
         <pre id="install"><span class="line"><span class="p">$ </span>git clone https://github.com/remy-plus/remy.git</span><span class="line"><span class="p">$ </span>cd remy</span><span class="line"><span class="p">$ </span>pnpm install &amp;&amp; pnpm bundle</span><span class="line"><span class="p">$ </span>npm install -g ./apps/cli</span></pre>
-        <button class="copy" type="button" data-copy="install">Copy</button>
+        <button class="copy" type="button" data-copy="install">Copy<span class="sr"> install commands</span></button>
       </div>
       <p class="note">Needs Node 22.18 or newer. Then run <code>remy</code> to open the chat. Model setup is <a href="#start">below</a>.</p>
     </div>
@@ -73,7 +73,7 @@
     </div>
 
     <figure class="flow rv" aria-labelledby="flow-cap">
-      <figcaption id="flow-cap"><b>One task, continued across surfaces.</b> <span>A preview of the intent. Only the terminal step exists today; the phone and voice steps are mockups.</span></figcaption>
+      <figcaption id="flow-cap"><b>One task, continued across surfaces.</b> <span>A preview of the intent. Only the terminal step exists today, and it stops at the saved draft. Sending needs an email integration that is not built yet, so the phone and voice steps are mockups.</span></figcaption>
       <ol>
         <li class="live">
           <p class="tag"><i class="dot now" aria-hidden="true"></i>Terminal &middot; works today</p>
@@ -81,7 +81,7 @@
             <span class="you">you  Compare the quotes in quotes/ and draft a reply to Dana</span>
             <span><span class="ok">&#10003;</span> read_file  quotes/*.md</span>
             <span><span class="ok">&#10003;</span> write_file  reply.md</span>
-            <span>Draft saved. Sending it as you needs a yes.</span>
+            <span>Draft saved to reply.md. Nothing is sent.</span>
           </div>
         </li>
         <li>
@@ -150,7 +150,7 @@
   <div class="results rv">
     <p class="big">99%</p>
     <div class="facts">
-      <div><b>169 of 170 runs</b><span>passed: the 34-case suite, five runs each, on GPT-5 nano</span></div>
+      <div><b>169 of 170 runs</b><span>passed: the 34-case suite, five runs each, on <span class="nw">GPT-5</span> nano</span></div>
       <div><b>0</b><span>safety violations and duplicate actions</span></div>
       <div><b>about $0.0008</b><span>per task</span></div>
     </div>
@@ -160,15 +160,20 @@
 
 <section id="start" class="start" aria-labelledby="start-h">
   <div class="wrap">
-    <h2 id="start-h" class="rv">Then pick a model and talk.</h2>
+    <h2 id="start-h" class="rv">Pick a model and talk.</h2>
     <ol class="steps rv">
-      <li><span>Pick a model</span><pre>export REMY_PROFILE=openrouter OPENROUTER_API_KEY=sk-or-...
+      <li><span>Pick a model</span><pre>export REMY_PROFILE=openrouter
+export OPENROUTER_API_KEY=sk-or-...
 export REMY_MODEL=google/gemma-4-26b-a4b-it:free
-# or local: REMY_PROFILE=ollama REMY_MODEL=qwen2.5:7b</pre></li>
+
+# or local
+# REMY_PROFILE=ollama REMY_MODEL=qwen2.5:7b</pre></li>
       <li><span>Open the chat</span><pre>remy
-remy run "summarize README.md"   # one task, for scripts</pre></li>
+
+# one task, for scripts
+remy run "summarize README.md"</pre></li>
     </ol>
-    <p class="note">The install steps are at the top of the page, under <a href="#get">Get Remy</a>.</p>
+    <p class="note">Not installed yet? The commands are under <a href="#get">Get Remy</a>, at the top of the page.</p>
   </div>
 </section>
 
