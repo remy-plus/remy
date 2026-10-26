@@ -1,6 +1,8 @@
 import type { ApprovalRequest } from '@remy/core';
 import { describe, expect, it } from 'vitest';
 import {
+  approvalHeight,
+  approvalRows,
   collapseFailure,
   describeApproval,
   flushTools,
@@ -114,6 +116,39 @@ describe('describeApproval', () => {
   });
   it('falls back to the tool preview', () => {
     expect(describeApproval('x', {}, req).title).toBe('p');
+  });
+  it('carries the call id and the first six characters of the hash', () => {
+    const v = describeApproval('x', {}, { ...req, argsHash: 'a41f9c0123456789' });
+    expect(v.callId).toBe('c');
+    expect(v.shortHash).toBe('a41f9c');
+  });
+  it('says whether the action can be taken back, from its risk and effect', () => {
+    const write = describeApproval('write_file', { path: 'a' }, req, 'idempotent');
+    expect(write.reversible).toBe(true);
+    expect(write.risk).toContain('Can usually be undone.');
+    const run = describeApproval('run_command', { program: 'ls' }, req, 'unsafe_to_retry');
+    expect(run.reversible).toBe(false);
+    expect(run.risk).toContain('Cannot be undone.');
+    const del = describeApproval(
+      'delete_file',
+      { path: 'a' },
+      { ...req, risk: 'irreversible' },
+      'idempotent',
+    );
+    expect(del.reversible).toBe(false);
+  });
+  it('keeps every row and counts what the collapsed card hides', () => {
+    const content = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n');
+    const v = describeApproval('write_file', { path: 'a', content }, req);
+    // One summary row plus ten lines.
+    expect(v.rows).toHaveLength(11);
+    expect(v.more).toBe(5);
+    const closed = approvalRows(v, false);
+    expect(closed.shown).toHaveLength(5);
+    expect(closed.hidden).toBe(6);
+    expect(approvalRows(v, true, 40)).toEqual({ shown: v.rows, hidden: 0 });
+    expect(approvalRows(v, true, 8).shown).toHaveLength(7);
+    expect(approvalHeight(v, false)).toBe(5 + 1 + 6);
   });
 });
 

@@ -3,6 +3,7 @@
 import {
   type ApprovalRequest,
   type ConversationTurn,
+  type Effect,
   type EventStore,
   ModelError,
   type RemyRuntime,
@@ -94,6 +95,8 @@ export interface ChatDeps {
   release: (taskId: string) => Promise<void>;
   /** The model's context window in tokens, when it is known. */
   contextWindow?: number;
+  /** A tool's effect, for telling whether an approval can be taken back. */
+  effectOf?: (tool: string) => Effect | undefined;
 }
 
 export interface Chat {
@@ -101,8 +104,8 @@ export interface Chat {
   subscribe(fn: () => void): () => void;
   /** A line from the user: a new message, an answer to a question, or a /command. */
   submit(text: string): Promise<void>;
-  /** Answers the pending approval. */
-  approve(granted: boolean): Promise<void>;
+  /** Answers the pending approval. A denial may carry a note the model reads. */
+  approve(granted: boolean, note?: string): Promise<void>;
   /** Stops the running task. It stays resumable. */
   interrupt(): Promise<void>;
   /** The messages the user has sent, oldest first, for recall. */
@@ -121,7 +124,9 @@ export const HELP_TEXT = [
   '  Esc       clear the input',
   '  Ctrl+C    stop the running task (resume it later); on an empty prompt, quit',
   '  Ctrl+D    quit',
-  '  y / n     approve or deny when Remy asks',
+  '  y / n     approve once or deny when Remy asks',
+  '  e         deny and say why; Remy reads your note',
+  '  v         show the whole action',
   '',
   'Commands',
   '  /help     this list',
@@ -272,7 +277,12 @@ export function createChat(deps: ChatDeps): Chat {
       case 'approval.resolved':
         setTool(
           ev.callId,
-          ev.granted ? { state: 'running' } : { state: 'denied', reason: 'you said no' },
+          ev.granted
+            ? { state: 'running' }
+            : {
+                state: 'denied',
+                reason: ev.note ? `you said: ${truncate(ev.note, 60)}` : 'you said no',
+              },
         );
         break;
       case 'policy.decided':
@@ -367,7 +377,12 @@ export function createChat(deps: ChatDeps): Chat {
             phase: 'waiting_approval',
             thinking: false,
             approval: o.request,
-            approvalView: describeApproval(c?.tool ?? '', c?.args, o.request),
+            approvalView: describeApproval(
+              c?.tool ?? '',
+              c?.args,
+              o.request,
+              deps.effectOf?.(c?.tool ?? ''),
+            ),
           });
           return;
         }
@@ -479,7 +494,7 @@ export function createChat(deps: ChatDeps): Chat {
       await start(text);
     },
 
-    async approve(granted) {
+    async approve(granted, note) {
       const a = s.approval;
       if (s.phase !== 'waiting_approval' || !a || !current) return;
       const my = gen;
@@ -487,7 +502,7 @@ export function createChat(deps: ChatDeps): Chat {
       set({ phase: 'running', approval: undefined, approvalView: undefined, thinking: true });
       running = true;
       try {
-        await runtime.approve(id, a.callId, a.argsHash, granted, 'user');
+        await runtime.approve(id, a.callId, a.argsHash, granted, 'user', note);
         await drive(id, my);
       } catch (e) {
         if (my !== gen) return;

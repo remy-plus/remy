@@ -24,8 +24,10 @@ import { EMPTY_INPUT, editInput, type InputState, withText } from './input.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
 import type { Theme } from './theme.ts';
 import {
+  APPROVAL_ROWS,
   type ApprovalView,
   approvalHeight,
+  approvalRows,
   narrate,
   type PlanStep,
   streamBudget,
@@ -257,11 +259,28 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
   }
 }
 
-function ApprovalCard(p: { view: ApprovalView; theme: Theme; columns: number }) {
+function ApprovalCard(p: {
+  view: ApprovalView;
+  theme: Theme;
+  columns: number;
+  expanded: boolean;
+  /** Rows the expanded card may take. */
+  room: number;
+  /** The user is typing a note for a denial. */
+  noting: boolean;
+}) {
   const { view, theme } = p;
   const inner = Math.max(10, p.columns - theme.space.indent * 2 - 4);
   const fit = (s: string) => clip(s, inner);
-  const colorOf = { add: theme.color('accent'), del: undefined, dim: undefined, plain: undefined };
+  const muted = mutedProps(theme);
+  const colorOf = {
+    add: theme.color('diffAdd'),
+    del: theme.color('diffDel'),
+    dim: undefined,
+    plain: undefined,
+  };
+  const { shown, hidden } = approvalRows(view, p.expanded, p.room);
+  const key = (k: string, label: string) => [h(Text, { key: k, bold: true }, k), ` ${label}`];
   return h(
     Box,
     { paddingLeft: theme.space.indent },
@@ -275,27 +294,49 @@ function ApprovalCard(p: { view: ApprovalView; theme: Theme; columns: number }) 
         flexGrow: 1,
       },
       h(Text, { bold: true, wrap: 'truncate-end' }, fit(view.title)),
-      ...view.rows.map((r, i) =>
+      ...shown.map((r, i) =>
         h(
           Text,
           {
             key: i,
             wrap: 'truncate-end',
             color: colorOf[r.kind],
-            ...(r.kind === 'dim' && mutedProps(theme)),
+            ...(r.kind === 'dim' && muted),
           },
           fit(r.text),
         ),
       ),
-      h(Text, { wrap: 'truncate-end', ...mutedProps(theme) }, fit(view.risk)),
+      hidden
+        ? h(
+            Text,
+            { wrap: 'truncate-end', ...muted },
+            fit(
+              `... ${hidden} more ${hidden === 1 ? 'row' : 'rows'}${p.expanded ? '' : ' (v shows all)'}`,
+            ),
+          )
+        : null,
+      h(Text, { wrap: 'truncate-end', ...muted }, fit(view.risk)),
       h(
         Text,
-        null,
-        h(Text, { bold: true }, 'y'),
-        ' approve   ',
-        h(Text, { bold: true }, 'n'),
-        ' deny',
+        { wrap: 'truncate-end', ...muted },
+        fit(`Approval covers exactly this call (${view.shortHash}).`),
       ),
+      p.noting
+        ? h(
+            Text,
+            { wrap: 'truncate-end' },
+            'Say why below. Enter sends it as a denial, Esc goes back.',
+          )
+        : h(
+            Text,
+            { wrap: 'truncate-end' },
+            ...key('y', 'approve once   '),
+            ...key('n', 'deny   '),
+            ...key('e', 'deny and say why'),
+            ...(view.more
+              ? [h(Text, { key: 'v', ...muted }, '   '), ...key('v', p.expanded ? 'fewer' : 'more')]
+              : []),
+          ),
     ),
   );
 }
@@ -308,12 +349,13 @@ const STATE_WORD: Record<ChatState['phase'], string> = {
 };
 
 /** Context-aware key hints for the footer. */
-export function hintsFor(phase: ChatState['phase'], hasInput: boolean): string {
+export function hintsFor(phase: ChatState['phase'], hasInput: boolean, noting = false): string {
+  if (noting) return 'Enter send note · Esc back · Ctrl+C stop';
   switch (phase) {
     case 'running':
       return 'Enter queue · Ctrl+C stop';
     case 'waiting_approval':
-      return 'y approve · n deny · Ctrl+C stop';
+      return 'y approve · n deny · e deny with note · Ctrl+C stop';
     case 'waiting_user':
       return 'Enter answer · Ctrl+C stop';
     default:
@@ -335,7 +377,13 @@ export function costPart(s: Pick<ChatState, 'taskCostUsd' | 'budgetUsd'>): strin
   return `${spent} of $${s.budgetUsd.toFixed(2)}`;
 }
 
-function Footer(p: { state: ChatState; theme: Theme; model?: string; hasInput: boolean }) {
+function Footer(p: {
+  state: ChatState;
+  theme: Theme;
+  model?: string;
+  hasInput: boolean;
+  noting: boolean;
+}) {
   const { state } = p;
   const left = [p.model, contextPart(state), costPart(state), STATE_WORD[state.phase]]
     .filter(Boolean)
@@ -346,7 +394,7 @@ function Footer(p: { state: ChatState; theme: Theme; model?: string; hasInput: b
     h(
       Text,
       { wrap: 'truncate-end', ...mutedProps(p.theme) },
-      `${left}   ${hintsFor(state.phase, p.hasInput)}`,
+      `${left}   ${hintsFor(state.phase, p.hasInput, p.noting)}`,
     ),
   );
 }
@@ -392,6 +440,8 @@ function Live(p: {
   rows: number;
   /** Rows taken below the live content: prompt and footer. */
   below: number;
+  expanded: boolean;
+  noting: boolean;
 }) {
   const { state, theme, columns } = p;
   const muted = mutedProps(theme);
@@ -406,14 +456,11 @@ function Live(p: {
     ? 1 + Math.min(state.plan.length, MAX_PLAN_ROWS) + (state.plan.length > MAX_PLAN_ROWS ? 1 : 0)
     : 0;
   const approval = state.phase === 'waiting_approval' ? state.approvalView : undefined;
-  const fixed =
-    p.below +
-    tools.length +
-    queued.length +
-    planRows +
-    (approval ? approvalHeight(approval) : 0) +
-    (busy ? 1 : 0) +
-    (state.retrying ? 1 : 0);
+  const fixedBase =
+    p.below + tools.length + queued.length + planRows + (busy ? 1 : 0) + (state.retrying ? 1 : 0);
+  // An expanded card may use what the screen has left, minus the card's own frame.
+  const cardRoom = Math.max(APPROVAL_ROWS, p.rows - 1 - fixedBase - 6);
+  const fixed = fixedBase + (approval ? approvalHeight(approval, p.expanded, cardRoom) : 0);
   const room = streamBudget(p.rows, fixed);
   const tail = state.streaming
     ? tailLines(
@@ -435,7 +482,18 @@ function Live(p: {
     kids.push(h(PlanList, { key: 'plan', steps: state.plan, theme, max: MAX_PLAN_ROWS }));
   for (const l of tools)
     kids.push(h(ToolRow, { key: l.callId, line: l, theme, spinner: glyph, now: Date.now() }));
-  if (approval) kids.push(h(ApprovalCard, { key: 'approval', view: approval, theme, columns }));
+  if (approval)
+    kids.push(
+      h(ApprovalCard, {
+        key: 'approval',
+        view: approval,
+        theme,
+        columns,
+        expanded: p.expanded,
+        room: cardRoom,
+        noting: p.noting,
+      }),
+    );
   if (state.retrying)
     kids.push(h(Text, { key: 'retry', wrap: 'truncate-end', ...muted }, `  ${state.retrying}`));
   for (const [i, q] of queued.entries())
@@ -467,6 +525,16 @@ export function ChatApp(props: ChatAppProps): ReactElement {
   const [input, setInput] = useState<InputState>(EMPTY_INPUT);
   const recall = useRef(-1);
   const seenClears = useRef(state.clears);
+  const [expanded, setExpanded] = useState(false);
+  const [noting, setNoting] = useState(false);
+  const approvalId = state.approval?.callId;
+
+  // Each approval starts collapsed, with no note under way.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the id is the trigger, not a value read
+  useEffect(() => {
+    setExpanded(false);
+    setNoting(false);
+  }, [approvalId]);
 
   const quit = useCallback(async () => {
     await chat.interrupt();
@@ -492,8 +560,28 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       return void quit();
     }
     if (state.phase === 'waiting_approval') {
+      if (noting) {
+        if (key.escape) {
+          setNoting(false);
+          return setInput(EMPTY_INPUT);
+        }
+        if (key.return) {
+          // An empty note does nothing: `n` is the plain denial.
+          const note = input.text.trim();
+          if (!note) return;
+          setNoting(false);
+          setInput(EMPTY_INPUT);
+          return void chat.approve(false, note);
+        }
+        return setInput((cur) => editInput(cur, ch, key));
+      }
+      // Single keys only, and never Enter: a pasted or stray character cannot approve.
       if (/^y$/i.test(ch)) void chat.approve(true);
       else if (/^n$/i.test(ch)) void chat.approve(false);
+      else if (/^e$/i.test(ch)) {
+        setInput(EMPTY_INPUT);
+        setNoting(true);
+      } else if (/^v$/i.test(ch)) setExpanded((x) => !x);
       return;
     }
     if (key.escape) {
@@ -515,7 +603,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
     setInput((cur) => editInput(cur, ch, key));
   });
 
-  const showPrompt = state.phase !== 'waiting_approval';
+  const showPrompt = state.phase !== 'waiting_approval' || noting;
   // Prompt (with its blank line above) and the footer.
   const below = (showPrompt ? 1 + promptRows(input.text, columns) : 0) + 1;
   const entries = [{ id: 'header' } as { id: string; item?: Item }].concat(
@@ -540,9 +628,24 @@ export function ChatApp(props: ChatAppProps): ReactElement {
               compact: props.compactHeader,
             }),
     }),
-    h(Live, { state, theme, reducedMotion: props.reducedMotion, columns, rows, below }),
+    h(Live, {
+      state,
+      theme,
+      reducedMotion: props.reducedMotion,
+      columns,
+      rows,
+      below,
+      expanded,
+      noting,
+    }),
     showPrompt ? h(Prompt, { value: input, theme }) : null,
-    h(Footer, { state, theme, model: props.subtitle, hasInput: input.text.length > 0 }),
+    h(Footer, {
+      state,
+      theme,
+      model: props.subtitle,
+      hasInput: input.text.length > 0,
+      noting,
+    }),
   );
 }
 

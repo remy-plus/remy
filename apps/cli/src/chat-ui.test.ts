@@ -10,7 +10,7 @@ import {
 } from '@remy/core';
 import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
-import { createScopedFetch, createScopedFs, finish, writeFile } from '@remy/tools';
+import { createScopedFetch, createScopedFs, deleteFile, finish, writeFile } from '@remy/tools';
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -38,7 +38,7 @@ function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'])
       createRuntime({
         store,
         model,
-        tools: new ToolRegistry([writeFile, finish]),
+        tools: new ToolRegistry([writeFile, deleteFile, finish]),
         owner: 'ui-test',
         capabilities: (c) => ({
           fs: createScopedFs(c.workspaceDir),
@@ -244,6 +244,102 @@ describe('chat screen', () => {
     release();
     await until(() => app.chat.getState().phase === 'idle');
     expect(frame(app)).not.toContain('Thinking');
+    app.unmount();
+  });
+
+  const askToDelete = () =>
+    scripted([
+      call('delete_file', { path: 'a.txt' }),
+      call('finish', { answer: 'Left a.txt alone.' }),
+    ]);
+
+  it('shows the approval card with the short hash, reversibility and the three keys', async () => {
+    const app = askToDelete();
+    await type(app, 'delete it');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    const view = app.chat.getState().approvalView;
+    expect(view?.shortHash).toHaveLength(6);
+    const f = frame(app);
+    expect(f).toContain('Delete a.txt');
+    expect(f).toContain(`Approval covers exactly this call (${view?.shortHash}).`);
+    expect(f).toContain('Cannot be undone.');
+    expect(f).toContain('y approve once');
+    expect(f).toContain('n deny');
+    expect(f).toContain('e deny and say why');
+    expect(count(f, 'Delete a.txt')).toBe(1);
+    app.unmount();
+  });
+
+  it('Enter and other keys never approve', async () => {
+    const app = askToDelete();
+    await type(app, 'delete it');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    for (const k of ['\r', ' ', 'x', 'yes', '\x1b']) {
+      app.stdin.write(k);
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(app.chat.getState().phase).toBe('waiting_approval');
+    app.unmount();
+  });
+
+  it('n denies without a note', async () => {
+    const app = askToDelete();
+    await type(app, 'delete it');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    app.stdin.write('n');
+    await until(() => app.chat.getState().phase === 'idle');
+    expect(frame(app)).toContain('Left a.txt alone.');
+    expect(frame(app)).toContain('you said no');
+    app.unmount();
+  });
+
+  it('e takes a note, Enter sends it as a denial, and the model reads it', async () => {
+    const seen: string[] = [];
+    let n = 0;
+    const model: ModelClient = {
+      id: 'noted',
+      caps: DEFAULT_CAPS,
+      complete: async (req) => {
+        seen.push(JSON.stringify(req.messages));
+        return n++ === 0
+          ? call('delete_file', { path: 'a.txt' })
+          : call('finish', { answer: 'Kept it.' });
+      },
+    };
+    const app = mount(model);
+    await type(app, 'delete it');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    app.stdin.write('e');
+    await until(() => frame(app).includes('Say why below'));
+    // An empty note does nothing.
+    app.stdin.write('\r');
+    await new Promise((r) => setTimeout(r, 30));
+    expect(app.chat.getState().phase).toBe('waiting_approval');
+    await type(app, 'keep it, I need it');
+    await until(() => app.chat.getState().phase === 'idle');
+    expect(seen[1]).toContain('declined this action and said: keep it, I need it');
+    expect(frame(app)).toContain('Kept it.');
+    expect(frame(app)).toContain('you said: keep it, I need it');
+    app.unmount();
+  });
+
+  it('Esc leaves the note without answering; v shows every row', async () => {
+    const content = Array.from({ length: 12 }, (_, i) => `row${i}`).join('\n');
+    const app = scripted([call('write_file', { path: 'a.txt', content }), call('finish', {})], []);
+    await type(app, 'write it');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    expect(frame(app)).toContain('row3');
+    expect(frame(app)).not.toContain('row11');
+    expect(frame(app)).toContain('v shows all');
+    app.stdin.write('v');
+    await until(() => frame(app).includes('row11'));
+    app.stdin.write('v');
+    await until(() => !frame(app).includes('row11'));
+    app.stdin.write('e');
+    await until(() => frame(app).includes('Say why below'));
+    app.stdin.write('\x1b');
+    await until(() => frame(app).includes('y approve once'));
+    expect(app.chat.getState().phase).toBe('waiting_approval');
     app.unmount();
   });
 

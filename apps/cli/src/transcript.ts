@@ -1,6 +1,6 @@
 // What the chat shows, as pure functions: tool summaries, approval cards, which tool lines
 // are done enough to leave the live area, and how tall the live area may be. No Ink here.
-import type { ApprovalRequest } from '@remy/core';
+import type { ApprovalRequest, Effect } from '@remy/core';
 import { truncate } from './format.ts';
 
 export type ToolState = 'waiting_approval' | 'running' | 'ok' | 'failed' | 'denied';
@@ -160,12 +160,24 @@ export function narrate(s: NarrateInput): string {
 
 export type ApprovalRow = { text: string; kind: 'plain' | 'add' | 'del' | 'dim' };
 export interface ApprovalView {
+  callId: string;
   title: string;
+  /** Every row of the action. The card shows the first few; `v` shows more. */
   rows: ApprovalRow[];
+  /** Risk and reason in plain words. */
   risk: string;
+  /** First six characters of the argsHash: the approval covers exactly this call. */
+  shortHash: string;
+  /** False when the tool's effect or risk means it cannot be taken back. */
+  reversible: boolean;
+  /** Rows hidden in the collapsed card. */
+  more: number;
 }
 
-const clipLines = (text: string, kind: 'add' | 'del' | 'dim', mark: string, max = 4) => {
+/** Rows the collapsed approval card shows. */
+export const APPROVAL_ROWS = 6;
+
+const clipLines = (text: string, kind: 'add' | 'del' | 'dim', mark: string, max = 200) => {
   const lines = text.split('\n');
   const rows: ApprovalRow[] = lines
     .slice(0, max)
@@ -176,9 +188,31 @@ const clipLines = (text: string, kind: 'add' | 'del' | 'dim', mark: string, max 
 };
 
 /** The approval card's content: what will happen, and the exact thing it will do. */
-export function describeApproval(tool: string, args: unknown, req: ApprovalRequest): ApprovalView {
+export function describeApproval(
+  tool: string,
+  args: unknown,
+  req: ApprovalRequest,
+  effect?: Effect,
+): ApprovalView {
+  const reversible = req.risk !== 'irreversible' && effect !== 'unsafe_to_retry';
+  const risk = `Risk: ${req.risk}. ${reversible ? 'Can usually be undone.' : 'Cannot be undone.'} ${req.reason}.`;
+  const v = rowsFor(tool, args, req, risk);
+  return {
+    ...v,
+    callId: req.callId,
+    shortHash: req.argsHash.slice(0, 6),
+    reversible,
+    more: Math.max(0, v.rows.length - APPROVAL_ROWS),
+  };
+}
+
+function rowsFor(
+  tool: string,
+  args: unknown,
+  req: ApprovalRequest,
+  risk: string,
+): { title: string; rows: ApprovalRow[]; risk: string } {
   const a = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
-  const risk = `Risk: ${req.risk}. ${req.reason}`;
   switch (tool) {
     case 'run_command': {
       const rest = Array.isArray(a.args) ? a.args.map(String) : [];
@@ -219,7 +253,22 @@ export function describeApproval(tool: string, args: unknown, req: ApprovalReque
   }
 }
 
-export const approvalHeight = (v: ApprovalView) => v.rows.length + 5;
+/** The rows to show: the first few, or as many as fit when expanded. */
+export function approvalRows(
+  v: ApprovalView,
+  expanded: boolean,
+  room = Number.POSITIVE_INFINITY,
+): { shown: ApprovalRow[]; hidden: number } {
+  const cap = expanded ? Math.max(APPROVAL_ROWS, room) : APPROVAL_ROWS;
+  const shown = v.rows.length > cap ? v.rows.slice(0, cap - 1) : v.rows;
+  return { shown, hidden: v.rows.length - shown.length };
+}
+
+/** Rows the card takes: border, title, action rows, a "more" line, risk, binding and keys. */
+export const approvalHeight = (v: ApprovalView, expanded = false, room?: number) => {
+  const { shown, hidden } = approvalRows(v, expanded, room);
+  return shown.length + (hidden ? 1 : 0) + 6;
+};
 
 /** The steps to show, at most `max`, always including the one in progress. */
 export function windowPlan(steps: PlanStep[], max: number): { shown: PlanStep[]; hidden: number } {
