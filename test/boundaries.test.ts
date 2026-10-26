@@ -1,6 +1,6 @@
 // Package boundaries from PLAN.md: `core` depends on no other Remy package,
 // and every other dependency edge must be declared here on purpose.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -50,7 +50,9 @@ const importsOf = (file: string) =>
 describe('package boundaries', () => {
   it('every workspace package is listed in ALLOWED', () => {
     const found = ['packages', 'apps'].flatMap((top) =>
-      readdirSync(join(ROOT, top)).map((name) => `${top}/${name}`),
+      readdirSync(join(ROOT, top))
+        .filter((name) => existsSync(join(ROOT, top, name, 'package.json'))) // apps/site is static, not a package
+        .map((name) => `${top}/${name}`),
     );
     expect(found.sort()).toEqual(Object.keys(ALLOWED).sort());
   });
