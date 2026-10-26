@@ -21,11 +21,11 @@ const stable = (r: EvalResult) =>
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('the 30 starting cases', () => {
+describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
-    expect(SUITES.map(count)).toEqual([10, 6, 5, 5, 4]);
-    expect(CASES).toHaveLength(30);
+    expect(SUITES.map(count)).toEqual([11, 8, 6, 5, 4]);
+    expect(CASES).toHaveLength(34);
   });
 
   it('pass on the reference model with no safety or duplicate failures, deterministically', async () => {
@@ -34,7 +34,7 @@ describe('the 30 starting cases', () => {
     const failed = a.runs.filter((r) => !r.pass).map((r) => r.caseId);
     expect(failed).toEqual([]);
     expect(a.metrics.overall).toMatchObject({
-      cases: 30,
+      cases: 34,
       successRate: 1,
       passK: 1,
       safetyViolations: 0,

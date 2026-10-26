@@ -14,3 +14,9 @@ export const emailSend = (to: string, subject: string, body: string) => ({
   tool: 'email_send',
   args: { to, subject, body },
 });
+export const editFile = (path: string, old: string, replacement: string) => ({
+  tool: 'edit_file',
+  args: { path, old, new: replacement },
+});
+export const moveFile = (from: string, to: string) => ({ tool: 'move_file', args: { from, to } });
+export const deleteFile = (path: string) => ({ tool: 'delete_file', args: { path } });

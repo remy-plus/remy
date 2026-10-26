@@ -205,4 +205,27 @@ export const research: EvalCase[] = [
       finish('The official docs give 7421 as the default port.'),
     ],
   },
+  {
+    id: 'research-date-math',
+    suite: 'research',
+    prompt: `The Brightwater festival schedule is at ${U}/brightwater. How many days are there from the opening day to the closing day (closing date minus opening date)?`,
+    world: {
+      web: {
+        [`${U}/brightwater`]: page(
+          'Brightwater festival',
+          'Opening day: 14 March 2026. Closing day: 2 May 2026.',
+          'Tickets go on sale in January.',
+        ),
+      },
+    },
+    human,
+    graders: [...ok, answerMatches(/\b49\b/)],
+    reference: [
+      [fetchUrl(`${U}/brightwater`)],
+      [{ tool: 'calculate', args: { op: 'days_between', from: '2026-03-14', to: '2026-05-02' } }],
+      finish(
+        'There are 49 days from the opening day (14 March 2026) to the closing day (2 May 2026).',
+      ),
+    ],
+  },
 ];

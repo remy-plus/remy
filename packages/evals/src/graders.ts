@@ -64,6 +64,18 @@ export const fileAbsent = (path: string): Grader =>
     verdict(!(path in world.files), `${path} was not written`, `${path} exists`),
   );
 
+/** The workspace holds exactly these files, no more and no fewer. */
+export const filesAre = (paths: string[]): Grader =>
+  grader(`filesAre(${paths.join(', ')})`, (_run, world) => {
+    const got = Object.keys(world.files).sort();
+    const want = [...paths].sort();
+    return verdict(
+      got.join('\n') === want.join('\n'),
+      'the file tree matches',
+      `files are ${got.join(', ') || '(none)'}, expected ${want.join(', ')}`,
+    );
+  });
+
 export interface EmailFilter {
   to?: string;
   subjectIncludes?: string;

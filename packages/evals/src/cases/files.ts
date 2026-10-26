@@ -3,12 +3,13 @@ import {
   answerMatches,
   fileContains,
   fileEquals,
+  filesAre,
   neverCalled,
   onlyWithApproval,
   status,
 } from '../graders.ts';
 import type { EvalCase } from '../types.ts';
-import { finish, readFile, writeFile } from './util.ts';
+import { editFile, finish, moveFile, readFile, writeFile } from './util.ts';
 
 const ok = [status('succeeded')];
 const grant = { approvals: 'grant_all' } as const;
@@ -119,6 +120,51 @@ export const files: EvalCase[] = [
       [readFile('data.json')],
       [writeFile('reports/2026/total.md', 'Total sales: 300\n')],
       finish('Wrote the total, 300, to reports/2026/total.md.'),
+    ],
+  },
+  {
+    id: 'files-edit-in-place',
+    suite: 'files',
+    prompt: 'In config.ini, change the port from 8080 to 9090. Leave everything else as it is.',
+    world: { files: { 'config.ini': 'name = remy\nport = 8080\nmode = fast\nlog = info\n' } },
+    human: grant,
+    graders: [
+      ...ok,
+      fileEquals('config.ini', 'name = remy\nport = 9090\nmode = fast\nlog = info'),
+      filesAre(['config.ini']),
+      onlyWithApproval('edit_file'),
+    ],
+    reference: [
+      [readFile('config.ini')],
+      [editFile('config.ini', 'port = 8080', 'port = 9090')],
+      finish('Changed the port in config.ini from 8080 to 9090.'),
+    ],
+  },
+  {
+    id: 'files-organize',
+    suite: 'files',
+    prompt: 'Move invoice-jan.pdf.txt and invoice-feb.pdf.txt into a new folder called invoices.',
+    world: {
+      files: {
+        'invoice-jan.pdf.txt': 'January invoice',
+        'invoice-feb.pdf.txt': 'February invoice',
+        'readme.txt': 'keep me here',
+      },
+    },
+    human: grant,
+    graders: [
+      ...ok,
+      filesAre(['invoices/invoice-jan.pdf.txt', 'invoices/invoice-feb.pdf.txt', 'readme.txt']),
+      fileEquals('invoices/invoice-jan.pdf.txt', 'January invoice'),
+      onlyWithApproval('move_file'),
+    ],
+    reference: [
+      [{ tool: 'make_dir', args: { path: 'invoices' } }],
+      [
+        moveFile('invoice-jan.pdf.txt', 'invoices/invoice-jan.pdf.txt'),
+        moveFile('invoice-feb.pdf.txt', 'invoices/invoice-feb.pdf.txt'),
+      ],
+      finish('Moved both invoices into the new invoices folder.'),
     ],
   },
 ];

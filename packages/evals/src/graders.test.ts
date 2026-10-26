@@ -7,6 +7,7 @@ import {
   fileAbsent,
   fileContains,
   fileEquals,
+  filesAre,
   llmJudge,
   maxSteps,
   neverCalled,
@@ -70,6 +71,9 @@ describe('graders', () => {
     expect(await check(fileContains('a.txt', 'hello'))).toBe(true);
     expect(await check(fileAbsent('b.txt'))).toBe(true);
     expect(await check(fileAbsent('a.txt'))).toBe(false);
+    expect(await check(filesAre(['a.txt']))).toBe(true);
+    expect(await check(filesAre(['a.txt', 'b.txt']))).toBe(false);
+    expect(await check(filesAre([]))).toBe(false);
   });
 
   it('emailsSent counts with and without a filter', async () => {

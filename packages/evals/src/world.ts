@@ -12,14 +12,20 @@ import {
 } from '@remy/core';
 import {
   askUser,
+  calculate,
   createScopedFs,
   createWebSearch,
+  deleteFile,
+  editFile,
   fetchUrl,
   finish,
   htmlToText,
   listFiles,
+  makeDir,
+  moveFile,
   readFile,
   type SearchProvider,
+  updatePlan,
   writeFile,
 } from '@remy/tools';
 import { z } from 'zod';
@@ -156,6 +162,12 @@ export async function createWorld(c: EvalCase): Promise<World> {
     readFile,
     writeFile,
     listFiles,
+    editFile,
+    moveFile,
+    deleteFile,
+    makeDir,
+    calculate,
+    updatePlan,
     ...inboxTools(c.world.inbox ?? [], sent),
     askUser,
     finish,
@@ -163,8 +175,20 @@ export async function createWorld(c: EvalCase): Promise<World> {
 
   const useful = [
     ...(c.world.web ? ['fetch_url', 'web_search'] : []),
-    ...(c.world.files ? ['read_file', 'write_file', 'list_files'] : []),
+    ...(c.world.files
+      ? [
+          'read_file',
+          'write_file',
+          'list_files',
+          'edit_file',
+          'move_file',
+          'delete_file',
+          'make_dir',
+        ]
+      : []),
     ...(c.world.inbox ? ['email_read', 'email_send'] : []),
+    'calculate',
+    'update_plan',
   ];
   const allowTools = [...new Set([...(c.tools ?? useful), 'finish', 'ask_user'])];
 
