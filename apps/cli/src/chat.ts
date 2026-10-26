@@ -31,6 +31,7 @@ export interface PlanStep {
 export type Item =
   | { kind: 'user'; text: string }
   | { kind: 'reply'; text: string }
+  | { kind: 'question'; text: string }
   | { kind: 'tools'; lines: ToolLine[] }
   | { kind: 'note'; text: string }
   | { kind: 'error'; text: string };
