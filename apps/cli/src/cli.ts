@@ -462,6 +462,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       theme: createTheme(level),
       reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
       subtitle: model.id,
+      workspace,
     });
     return 0;
   }

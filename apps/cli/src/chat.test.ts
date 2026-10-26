@@ -131,8 +131,8 @@ describe('chat controller', () => {
     const { chat } = harness(model, ['read']);
     await chat.submit('write a file');
     await chat.approve(false);
-    const tools = chat.getState().items.find((i) => i.kind === 'tools');
-    expect(tools).toMatchObject({ lines: [{ tool: 'write_file', state: 'denied' }] });
+    const tool = chat.getState().items.find((i) => i.kind === 'tool');
+    expect(tool).toMatchObject({ line: { tool: 'write_file', state: 'denied' } });
     expect(replies(chat)).toEqual(['Skipped the file.']);
   });
 
@@ -192,6 +192,96 @@ describe('chat controller', () => {
     expect(JSON.stringify(chat.getState().items.at(-1))).toContain('Unknown command /nope');
     await chat.submit('/exit');
     expect(chat.getState().wantsExit).toBe(true);
+  });
+});
+
+describe('transcript commits', () => {
+  it('commits each user message and each reply exactly once', async () => {
+    const model = new ScriptedModelClient([done('One.'), done('Two.')]);
+    const { chat } = harness(model);
+    await chat.submit('a');
+    await chat.submit('b');
+    const kinds = chat.getState().items.map((i) => i.kind);
+    expect(kinds).toEqual(['user', 'reply', 'user', 'reply']);
+  });
+
+  it('keeps narration that comes with a tool call, but not the words of the answer', async () => {
+    const model = new ScriptedModelClient([
+      call('write_file', { path: 'a.txt', content: 'x' }, 'Writing the file.'),
+      call('finish', { answer: 'Wrote it.' }, 'Wrote it.'),
+    ]);
+    const { chat } = harness(model);
+    await chat.submit('go');
+    const items = chat.getState().items;
+    expect(items.filter((i) => i.kind === 'text')).toEqual([
+      { kind: 'text', text: 'Writing the file.' },
+    ]);
+    expect(items.map((i) => i.kind)).toEqual(['user', 'text', 'tool', 'reply']);
+    expect(chat.getState().tools).toEqual([]);
+  });
+
+  it('queues messages sent while a task runs and starts them in order afterwards', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let n = 0;
+    const slow: ModelClient = {
+      id: 'slow',
+      caps: DEFAULT_CAPS,
+      complete: async () => {
+        if (n++ === 0) await gate;
+        return done(`Answer ${n}.`);
+      },
+    };
+    const { chat, store } = harness(slow);
+    const first = chat.submit('first');
+    await new Promise((r) => setTimeout(r, 20));
+    await chat.submit('second');
+    await chat.submit('third');
+    expect(chat.getState().queue).toEqual(['second', 'third']);
+    expect(chat.getState().items.filter((i) => i.kind === 'user')).toHaveLength(1);
+    release();
+    await first;
+    expect(chat.getState().queue).toEqual([]);
+    expect(replies(chat)).toEqual(['Answer 1.', 'Answer 2.', 'Answer 3.']);
+    expect(await store.listTasks()).toHaveLength(3);
+  });
+
+  it('drops the queue when the task is stopped, and says so', async () => {
+    const slow: ModelClient = {
+      id: 'slow',
+      caps: DEFAULT_CAPS,
+      complete: () => new Promise(() => {}),
+    };
+    const { chat } = harness(slow);
+    void chat.submit('first');
+    await new Promise((r) => setTimeout(r, 20));
+    await chat.submit('second');
+    await chat.interrupt();
+    expect(chat.getState().queue).toEqual([]);
+    expect(JSON.stringify(chat.getState().items.at(-1))).toContain('1 queued message was dropped');
+  });
+
+  it('/clear empties the transcript, starts over and counts the clear', async () => {
+    const model = new ScriptedModelClient([done('One.'), done('Two.')]);
+    const { chat, contexts } = harness(model);
+    await chat.submit('one');
+    await chat.submit('/clear');
+    expect(chat.getState().items).toEqual([]);
+    expect(chat.getState().clears).toBe(1);
+    await chat.submit('two');
+    expect(contexts).toEqual([0, 0]);
+  });
+
+  it('collapses repeated identical failures into one line with a count', async () => {
+    const bad = (id: string) => call('write_file', { path: '../x', content: id });
+    const model = new ScriptedModelClient([bad('1'), bad('1'), bad('1'), done('Gave up.')]);
+    const { chat } = harness(model);
+    await chat.submit('try');
+    const tools = chat.getState().items.filter((i) => i.kind === 'tool');
+    expect(tools).toHaveLength(1);
+    expect(tools[0]).toMatchObject({ line: { state: 'failed', count: 3 } });
   });
 });
 

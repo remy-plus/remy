@@ -1,8 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRuntime, DEFAULT_BUDGET, type ModelResponse, ToolRegistry } from '@remy/core';
-import { ScriptedModelClient } from '@remy/models';
+import {
+  createRuntime,
+  DEFAULT_BUDGET,
+  type ModelClient,
+  type ModelResponse,
+  ToolRegistry,
+} from '@remy/core';
+import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { createScopedFetch, createScopedFs, finish, writeFile } from '@remy/tools';
 import { render } from 'ink-testing-library';
@@ -13,7 +19,11 @@ import { ChatApp } from './chat-ui.ts';
 import { createTheme } from './theme.ts';
 
 const usage = { inTokens: 10, outTokens: 5 };
-const call = (tool: string, args: unknown): ModelResponse => ({ calls: [{ tool, args }], usage });
+const call = (tool: string, args: unknown, text?: string): ModelResponse => ({
+  calls: [{ tool, args }],
+  usage,
+  ...(text && { text }),
+});
 
 let dir: string;
 beforeEach(() => {
@@ -21,9 +31,8 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function mount(steps: ModelResponse[], autoApprove: ('read' | 'write')[] = ['read']) {
+function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read']) {
   const store = new MemoryEventStore();
-  const model = new ScriptedModelClient(steps);
   const chat = createChat({
     runtime: (hooks) =>
       createRuntime({
@@ -52,12 +61,15 @@ function mount(steps: ModelResponse[], autoApprove: ('read' | 'write')[] = ['rea
   );
   return { chat, ...app };
 }
+const scripted = (steps: ModelResponse[], auto?: ('read' | 'write')[]) =>
+  mount(new ScriptedModelClient(steps), auto);
 type Mounted = ReturnType<typeof mount>;
 
 const until = async (fn: () => boolean) => {
-  for (let i = 0; i < 100 && !fn(); i++) await new Promise((r) => setTimeout(r, 10));
+  for (let i = 0; i < 200 && !fn(); i++) await new Promise((r) => setTimeout(r, 10));
 };
 const frame = (app: Mounted) => app.lastFrame() ?? '';
+const count = (hay: string, needle: string) => hay.split(needle).length - 1;
 const type = async (app: Mounted, text: string) => {
   app.stdin.write(text);
   await new Promise((r) => setTimeout(r, 20));
@@ -66,9 +78,10 @@ const type = async (app: Mounted, text: string) => {
 
 describe('chat screen', () => {
   it('shows the wordmark, takes a message and prints the reply', async () => {
-    const app = mount([call('finish', { answer: 'Four.' })]);
+    const app = scripted([call('finish', { answer: 'Four.' })]);
     expect(frame(app)).toContain(':::::::..');
     expect(frame(app)).toContain('Real work, quietly done.');
+    expect(frame(app)).toContain('test-model');
     await type(app, 'what is 2+2');
     await until(() => app.chat.getState().items.some((i) => i.kind === 'reply'));
     expect(frame(app)).toContain('what is 2+2');
@@ -76,24 +89,141 @@ describe('chat screen', () => {
     app.unmount();
   });
 
+  it('prints a user message and a reply once, not once per frame', async () => {
+    const app = scripted([call('finish', { answer: 'Four, exactly.' })]);
+    await type(app, 'what is 2+2');
+    await until(() => app.chat.getState().phase === 'idle' && app.chat.history().length === 1);
+    await new Promise((r) => setTimeout(r, 50));
+    // In test mode Ink writes the whole screen each frame, so count in the last one.
+    expect(count(frame(app), '› what is 2+2')).toBe(1);
+    expect(app.chat.getState().items.filter((i) => i.kind === 'user')).toHaveLength(1);
+    expect(count(frame(app), 'Four, exactly.')).toBe(1);
+    app.unmount();
+  });
+
+  it('commits a long streamed reply once, however many chunks it came in', async () => {
+    const words = Array.from({ length: 40 }, (_, i) => `word${i}`);
+    const narration = words.join(' ');
+    let n = 0;
+    const model: ModelClient = {
+      id: 'chunky',
+      caps: DEFAULT_CAPS,
+      complete: async (_req, _signal, onText) => {
+        if (n++ === 0) {
+          for (const w of words) {
+            onText?.(`${w} `);
+            await new Promise((r) => setTimeout(r, 2));
+          }
+          return call('write_file', { path: 'a.txt', content: 'x' }, narration);
+        }
+        return call('finish', { answer: 'All done.' });
+      },
+    };
+    const app = mount(model, ['read', 'write']);
+    await type(app, 'go');
+    await until(() => app.chat.getState().phase === 'idle' && n >= 2);
+    await new Promise((r) => setTimeout(r, 60));
+    const state = app.chat.getState();
+    expect(state.items.filter((i) => i.kind === 'text')).toHaveLength(1);
+    expect(state.streaming).toBe('');
+    // The final screen holds the text once and the live area is empty of it.
+    expect(count(frame(app), 'word39')).toBe(1);
+    expect(count(frame(app), 'All done.')).toBe(1);
+    expect(count(frame(app), '› go')).toBe(1);
+    app.unmount();
+  });
+
+  it('queues Enter while a task runs and runs it after, in order', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let n = 0;
+    const model: ModelClient = {
+      id: 'slow',
+      caps: DEFAULT_CAPS,
+      complete: async () => {
+        n++;
+        if (n === 1) await gate;
+        return call('finish', { answer: n === 1 ? 'First answer.' : 'Second answer.' });
+      },
+    };
+    const app = mount(model);
+    await type(app, 'first');
+    await until(() => app.chat.getState().phase === 'running');
+    await type(app, 'second');
+    await until(() => app.chat.getState().queue.length === 1);
+    expect(app.chat.getState().queue).toEqual(['second']);
+    await until(() => frame(app).includes('second  queued'));
+    expect(frame(app)).toContain('second  queued');
+    // Not committed yet, and not started.
+    expect(app.chat.getState().items.filter((i) => i.kind === 'user')).toHaveLength(1);
+    release();
+    await until(() => app.chat.getState().items.filter((i) => i.kind === 'reply').length === 2);
+    const items = app.chat.getState().items;
+    expect(items.filter((i) => i.kind === 'user').map((i) => (i as { text: string }).text)).toEqual(
+      ['first', 'second'],
+    );
+    expect(app.chat.getState().queue).toEqual([]);
+    expect(count(frame(app), '› second')).toBe(1);
+    app.unmount();
+  });
+
+  it('shows no plan until it has steps, then shows it once in the live area', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let n = 0;
+    const model: ModelClient = {
+      id: 'planner',
+      caps: DEFAULT_CAPS,
+      complete: async () => {
+        if (n++ === 0)
+          return call('update_plan', {
+            steps: [
+              { text: 'Read the notes', status: 'doing' },
+              { text: 'Write summary', status: 'pending' },
+            ],
+          });
+        await gate;
+        return call('finish', { answer: 'Done here.' });
+      },
+    };
+    const app = mount(model);
+    await type(app, 'plan it');
+    await until(() => app.chat.getState().phase === 'running' && frame(app).includes('Thinking'));
+    expect(frame(app)).not.toContain('Plan');
+    await until(() => (app.chat.getState().plan?.length ?? 0) === 2);
+    await until(() => frame(app).includes('Plan 0/2'));
+    expect(count(frame(app), 'Plan 0/2')).toBe(1);
+    expect(frame(app)).toContain('Read the notes');
+    release();
+    await until(() => app.chat.getState().phase === 'idle');
+    // Unfinished plans are kept once in the transcript.
+    expect(app.chat.getState().items.filter((i) => i.kind === 'plan')).toHaveLength(1);
+    app.unmount();
+  });
+
   it('asks for approval inline and runs the tool after y', async () => {
-    const app = mount([
+    const app = scripted([
       call('write_file', { path: 'a.txt', content: 'x' }),
       call('finish', { answer: 'Wrote a.txt.' }),
     ]);
     await type(app, 'write a file');
     await until(() => app.chat.getState().phase === 'waiting_approval');
-    expect(frame(app)).toContain('Approval needed');
-    expect(frame(app)).toContain('write_file');
-    expect(frame(app)).toContain('[y/n]');
+    expect(frame(app)).toContain('Write a.txt');
+    expect(frame(app)).toContain('Risk: write');
+    expect(frame(app)).toContain('y approve');
     app.stdin.write('y');
     await until(() => app.chat.getState().phase === 'idle');
     expect(frame(app)).toContain('Wrote a.txt.');
+    expect(frame(app)).toContain('write a.txt');
     app.unmount();
   });
 
   it('Esc clears the input and Up brings back the last message', async () => {
-    const app = mount([call('finish', { answer: 'Ok.' })]);
+    const app = scripted([call('finish', { answer: 'Ok.' })]);
     app.stdin.write('draft');
     await until(() => frame(app).includes('draft'));
     app.stdin.write('\x1b');

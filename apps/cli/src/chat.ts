@@ -12,27 +12,29 @@ import {
   type TaskConfig,
 } from '@remy/core';
 import { truncate } from './format.ts';
+import {
+  type ApprovalView,
+  collapseFailure,
+  describeApproval,
+  flushTools,
+  type PlanStep,
+  summarizeTool,
+  type ToolLine,
+  type ToolState,
+} from './transcript.ts';
 
-export type ToolState = 'waiting_approval' | 'running' | 'ok' | 'failed' | 'denied';
+export type { ApprovalView, PlanStep, ToolLine, ToolState };
 
-export interface ToolLine {
-  callId: string;
-  tool: string;
-  args: string;
-  state: ToolState;
-}
-
-export interface PlanStep {
-  text: string;
-  status: 'pending' | 'doing' | 'done';
-}
-
-/** Things that stay on screen once they are said. */
+/** Things that stay on screen once they are said. Appended once; never changed. */
 export type Item =
   | { kind: 'user'; text: string }
+  /** The final answer of a task. */
   | { kind: 'reply'; text: string }
+  /** What the assistant said while working, one per model call. */
+  | { kind: 'text'; text: string }
   | { kind: 'question'; text: string }
-  | { kind: 'tools'; lines: ToolLine[] }
+  | { kind: 'tool'; line: ToolLine }
+  | { kind: 'plan'; steps: PlanStep[] }
   | { kind: 'note'; text: string }
   | { kind: 'error'; text: string };
 
@@ -40,23 +42,34 @@ export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
 export interface ChatState {
   phase: Phase;
+  /** The transcript so far. Every entry is committed exactly once. */
   items: Item[];
-  /** The assistant text streaming in right now. */
+  /** The assistant text of the model call in flight. */
   streaming: string;
   /** True from the start of a model call until its reply arrives. */
   thinking: boolean;
+  /** Tool lines of the active turn: running ones, and finished ones not yet committed. */
   tools: ToolLine[];
   plan?: PlanStep[];
   step: number;
   approval?: ApprovalRequest;
+  approvalView?: ApprovalView;
   question?: string;
   taskId?: string;
+  /** Messages typed while a task ran; they start in order once it ends. */
+  queue: string[];
+  /** When the active turn began (ms since epoch). */
+  turnStartedAt?: number;
   /** Total spend of this conversation. */
   costUsd: number;
+  /** Tokens (in and out) used by this conversation. */
+  tokens: number;
   /** Set while a failed model call waits to be retried. */
   retrying?: string;
   /** The user asked to quit with /exit. */
   wantsExit?: boolean;
+  /** Counts /clear, so the screen knows to start over. */
+  clears: number;
 }
 
 export interface RuntimeHooks {
@@ -94,7 +107,7 @@ export const HELP_TEXT = [
   'Type a message and press Enter. Remy answers, and asks before anything it should not do alone.',
   '',
   'Keys',
-  '  Enter     send',
+  '  Enter     send; while Remy works, the message waits its turn',
   '  Up        bring back your last message',
   '  Esc       clear the input',
   '  Ctrl+C    stop the running task (resume it later); on an empty prompt, quit',
@@ -104,6 +117,7 @@ export const HELP_TEXT = [
   'Commands',
   '  /help     this list',
   '  /new      start a fresh conversation',
+  '  /clear    clear the screen and start a fresh conversation',
   '  /exit     quit',
 ].join('\n');
 
@@ -127,17 +141,6 @@ export function parsePlan(args: unknown): PlanStep[] | undefined {
   return out.length ? out : undefined;
 }
 
-export function summarizeArgs(args: unknown): string {
-  if (args === null || typeof args !== 'object')
-    return args === undefined ? '' : truncate(String(args), 60);
-  return truncate(
-    Object.entries(args as Record<string, unknown>)
-      .map(([k, v]) => `${k}=${truncate(typeof v === 'string' ? v : JSON.stringify(v), 40)}`)
-      .join(' '),
-    80,
-  );
-}
-
 /** One calm line: what happened, then what to do next. */
 export function friendlyError(e: unknown): string {
   const msg = (e instanceof Error ? e.message : String(e)).trim().replace(/\s+/g, ' ');
@@ -155,8 +158,14 @@ const initial = (): ChatState => ({
   thinking: false,
   tools: [],
   step: 0,
+  queue: [],
   costUsd: 0,
+  tokens: 0,
+  clears: 0,
 });
+
+/** Finished tool lines beyond this many leave the live area at once. */
+const MAX_LIVE_DONE = 4;
 
 export function createChat(deps: ChatDeps): Chat {
   let s = initial();
@@ -174,10 +183,26 @@ export function createChat(deps: ChatDeps): Chat {
     s = { ...s, ...patch };
     for (const fn of listeners) fn();
   };
-  const push = (item: Item) => set({ items: [...s.items, item] });
-  const setTool = (callId: string, state: ToolState) => {
+  /** Moves things into the transcript. Each goes in once and is never touched again. */
+  const commit = (...items: Item[]) => {
+    if (items.length) set({ items: [...s.items, ...items] });
+  };
+  const setTool = (callId: string, patch: Partial<ToolLine>) => {
     if (!s.tools.some((t) => t.callId === callId)) return;
-    set({ tools: s.tools.map((t) => (t.callId === callId ? { ...t, state } : t)) });
+    set({ tools: s.tools.map((t) => (t.callId === callId ? { ...t, ...patch } : t)) });
+  };
+  /** Commits tool lines that are finished. `all` also commits a trailing failure. */
+  const flush = (all: boolean, overflowOnly = false) => {
+    const { commit: done, keep } = flushTools(s.tools, {
+      keepFailure: !all,
+      max: MAX_LIVE_DONE,
+      overflowOnly,
+    });
+    if (done.length)
+      set({
+        tools: keep,
+        items: [...s.items, ...done.map((line) => ({ kind: 'tool' as const, line }))],
+      });
   };
 
   function onEvent(e: StoredEvent) {
@@ -193,17 +218,27 @@ export function createChat(deps: ChatDeps): Chat {
             added.push({
               callId: c.callId,
               tool: c.tool,
-              args: summarizeArgs(c.args),
+              ...summarizeTool(c.tool, c.args),
               state: 'running',
+              count: 1,
             });
         }
+        // What the model said alongside its tool calls is kept as it goes. With `finish` the
+        // same words arrive as the answer, so they are not printed twice.
+        const said = (ev.text ?? s.streaming).trim();
+        // With no calls at all the words are the answer.
+        const toCommit: Item[] =
+          said && ev.calls.length > 0 && !ev.calls.some((c) => c.tool === 'finish')
+            ? [{ kind: 'text', text: said }]
+            : [];
         set({
           step: ev.step,
           thinking: false,
           retrying: undefined,
-          // Text that comes with tool calls is narration, not the answer.
           streaming: '',
           costUsd: s.costUsd + ev.costUsd,
+          tokens: s.tokens + ev.usage.inTokens + ev.usage.outTokens,
+          items: [...s.items, ...toCommit],
           tools: [...s.tools, ...added],
           ...(plan && { plan }),
         });
@@ -212,26 +247,39 @@ export function createChat(deps: ChatDeps): Chat {
       case 'model.failed':
         set({
           thinking: false,
+          streaming: '',
           retrying: ev.retryable
             ? `The model call failed (${truncate(ev.error, 80)}). Trying again.`
             : undefined,
         });
         break;
       case 'approval.requested':
-        setTool(ev.callId, 'waiting_approval');
+        setTool(ev.callId, { state: 'waiting_approval' });
         break;
       case 'approval.resolved':
-        setTool(ev.callId, ev.granted ? 'running' : 'denied');
+        setTool(
+          ev.callId,
+          ev.granted ? { state: 'running' } : { state: 'denied', reason: 'you said no' },
+        );
         break;
       case 'policy.decided':
-        if (ev.decision.kind === 'deny') setTool(ev.callId, 'denied');
+        if (ev.decision.kind === 'deny')
+          setTool(ev.callId, { state: 'denied', reason: truncate(ev.decision.reason, 80) });
         break;
       case 'tool.started':
-        setTool(ev.callId, 'running');
+        setTool(ev.callId, { state: 'running', startedAt: Date.now() });
         break;
-      case 'tool.completed':
-        setTool(ev.callId, ev.result.ok ? 'ok' : 'failed');
+      case 'tool.completed': {
+        const r = ev.result;
+        setTool(ev.callId, {
+          state: r.ok ? 'ok' : 'failed',
+          ms: ev.latencyMs,
+          ...(!r.ok && { reason: truncate(r.error, 80) }),
+        });
+        if (!r.ok) set({ tools: collapseFailure(s.tools, ev.callId) });
+        flush(false, true);
         break;
+      }
     }
   }
 
@@ -243,14 +291,27 @@ export function createChat(deps: ChatDeps): Chat {
       if (running) set({ streaming: s.streaming + delta });
     },
     onModelStart: () => {
-      if (running) set({ thinking: true, streaming: '', retrying: undefined });
+      if (!running) return;
+      // The last call's tool lines are done: they go to the transcript before anything new.
+      flush(false);
+      set({ thinking: true, streaming: '', retrying: undefined });
     },
   };
   const runtime = deps.runtime(hooks);
 
-  function settle(patch: Partial<ChatState>) {
-    // Keep what the task did on screen as history, then clear the live area.
-    const done = s.tools.length ? [{ kind: 'tools' as const, lines: s.tools }] : [];
+  /** Ends the turn: whatever is still live goes to the transcript, then the live area empties. */
+  function settle(succeeded = false) {
+    const out: Item[] = s.tools.map((l) => ({
+      kind: 'tool',
+      line:
+        l.state === 'running' || l.state === 'waiting_approval'
+          ? { ...l, state: 'denied', reason: 'stopped' }
+          : l,
+    }));
+    const plan = s.plan;
+    // A finished plan is covered by the answer. Anything else is worth keeping.
+    if (plan && plan.length > 1 && !(succeeded && plan.every((p) => p.status === 'done')))
+      out.push({ kind: 'plan', steps: plan });
     set({
       phase: 'idle',
       thinking: false,
@@ -259,11 +320,27 @@ export function createChat(deps: ChatDeps): Chat {
       plan: undefined,
       step: 0,
       approval: undefined,
+      approvalView: undefined,
       question: undefined,
       retrying: undefined,
-      items: [...s.items, ...done],
-      ...patch,
+      turnStartedAt: undefined,
+      items: [...s.items, ...out],
     });
+  }
+
+  /** Starts the next queued message, if any. */
+  async function drain() {
+    const next = s.queue[0];
+    if (next === undefined || s.phase !== 'idle') return;
+    set({ queue: s.queue.slice(1) });
+    await api.submit(next);
+  }
+
+  async function end(succeeded: boolean, ...items: Item[]) {
+    running = false;
+    settle(succeeded);
+    commit(...items);
+    await drain();
   }
 
   async function drive(id: string, my: number) {
@@ -272,10 +349,18 @@ export function createChat(deps: ChatDeps): Chat {
         const o: RunOutcome = await runtime.advance(id);
         if (my !== gen) return;
         if (o.status === 'waiting_approval') {
-          set({ phase: 'waiting_approval', thinking: false, approval: o.request });
+          const c = calls.get(o.request.callId);
+          set({
+            phase: 'waiting_approval',
+            thinking: false,
+            approval: o.request,
+            approvalView: describeApproval(c?.tool ?? '', c?.args, o.request),
+          });
           return;
         }
         if (o.status === 'waiting_user') {
+          flush(true);
+          commit({ kind: 'question', text: o.question });
           set({
             phase: 'waiting_user',
             thinking: false,
@@ -284,30 +369,22 @@ export function createChat(deps: ChatDeps): Chat {
           });
           return;
         }
-        running = false;
         const prompt = current?.prompt ?? '';
         if (o.status === 'succeeded') {
           const answer = o.answer?.trim() || 'Done.';
           turns = [...turns, { prompt, answer }].slice(-MAX_CONTEXT_TURNS);
-          settle({});
-          push({ kind: 'reply', text: answer });
-        } else if (o.status === 'failed') {
-          settle({});
-          push({
+          return await end(true, { kind: 'reply', text: answer });
+        }
+        if (o.status === 'failed')
+          return await end(false, {
             kind: 'error',
             text: `${(o.reason ?? 'The task could not finish').replace(/\.$/, '')}. Send your message again, or see what happened: remy show ${id}`,
           });
-        } else {
-          settle({});
-          push({ kind: 'note', text: `Cancelled. ${o.reason ?? ''}`.trim() });
-        }
-        return;
+        return await end(false, { kind: 'note', text: `Cancelled. ${o.reason ?? ''}`.trim() });
       }
     } catch (e) {
       if (my !== gen) return; // interrupted: the stopped run fails when it loses its lease
-      running = false;
-      settle({});
-      push({ kind: 'error', text: friendlyError(e) });
+      await end(false, { kind: 'error', text: friendlyError(e) });
     }
   }
 
@@ -317,8 +394,16 @@ export function createChat(deps: ChatDeps): Chat {
     running = true;
     calls.clear();
     current = undefined;
-    push({ kind: 'user', text });
-    set({ phase: 'running', thinking: true, streaming: '', tools: [], plan: undefined, step: 0 });
+    commit({ kind: 'user', text });
+    set({
+      phase: 'running',
+      thinking: true,
+      streaming: '',
+      tools: [],
+      plan: undefined,
+      step: 0,
+      turnStartedAt: Date.now(),
+    });
     try {
       const id = await runtime.start(text, deps.config(turns));
       current = { id, prompt: text };
@@ -326,24 +411,25 @@ export function createChat(deps: ChatDeps): Chat {
       await drive(id, my);
     } catch (e) {
       if (my !== gen) return;
-      running = false;
-      settle({});
-      push({ kind: 'error', text: friendlyError(e) });
+      await end(false, { kind: 'error', text: friendlyError(e) });
     }
   }
 
-  async function command(line: string) {
+  function command(line: string) {
     const [name] = line.slice(1).split(/\s+/);
-    if (name === 'help') push({ kind: 'note', text: HELP_TEXT });
+    if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
       turns = [];
-      push({ kind: 'note', text: 'Started a new conversation.' });
+      commit({ kind: 'note', text: 'Started a new conversation.' });
+    } else if (name === 'clear') {
+      turns = [];
+      // The screen wipes itself and prints the header again; the transcript starts empty.
+      set({ items: [], clears: s.clears + 1 });
     } else if (name === 'exit' || name === 'quit') set({ wantsExit: true });
-    else push({ kind: 'error', text: `Unknown command ${line.split(/\s+/)[0]}. Run /help.` });
-    set({});
+    else commit({ kind: 'error', text: `Unknown command ${line.split(/\s+/)[0]}. Run /help.` });
   }
 
-  return {
+  const api: Chat = {
     getState: () => s,
     subscribe(fn) {
       listeners.add(fn);
@@ -354,10 +440,12 @@ export function createChat(deps: ChatDeps): Chat {
     async submit(raw) {
       const text = raw.trim();
       if (!text) return;
+      if (/^\/(exit|quit)$/.test(text)) return void set({ wantsExit: true });
       if (s.phase === 'waiting_user' && current) {
         const my = gen;
         const id = current.id;
-        push({ kind: 'user', text });
+        sent.push(text);
+        commit({ kind: 'user', text });
         set({ phase: 'running', thinking: true, question: undefined });
         running = true;
         try {
@@ -365,13 +453,12 @@ export function createChat(deps: ChatDeps): Chat {
           await drive(id, my);
         } catch (e) {
           if (my !== gen) return;
-          running = false;
-          settle({});
-          push({ kind: 'error', text: friendlyError(e) });
+          await end(false, { kind: 'error', text: friendlyError(e) });
         }
         return;
       }
-      if (s.phase !== 'idle') return;
+      // A task is running: keep the message for after it, in order.
+      if (s.phase !== 'idle') return void set({ queue: [...s.queue, text] });
       if (text.startsWith('/')) return command(text);
       await start(text);
     },
@@ -381,32 +468,37 @@ export function createChat(deps: ChatDeps): Chat {
       if (s.phase !== 'waiting_approval' || !a || !current) return;
       const my = gen;
       const id = current.id;
-      set({ phase: 'running', approval: undefined, thinking: true });
+      set({ phase: 'running', approval: undefined, approvalView: undefined, thinking: true });
       running = true;
       try {
         await runtime.approve(id, a.callId, a.argsHash, granted, 'user');
         await drive(id, my);
       } catch (e) {
         if (my !== gen) return;
-        running = false;
-        settle({});
-        push({ kind: 'error', text: friendlyError(e) });
+        await end(false, { kind: 'error', text: friendlyError(e) });
       }
     },
 
     async interrupt() {
       if (s.phase === 'idle') return;
       const id = current?.id;
+      const dropped = s.queue.length;
       gen++;
       running = false;
-      settle({});
-      push({
+      settle();
+      commit({
         kind: 'note',
-        text: id ? `Stopped. Continue with: remy resume ${id}` : 'Stopped before the task began.',
+        text:
+          (id ? `Stopped. Continue with: remy resume ${id}` : 'Stopped before the task began.') +
+          (dropped
+            ? ` ${dropped} queued ${dropped === 1 ? 'message was' : 'messages were'} dropped.`
+            : ''),
       });
+      set({ queue: [] });
       if (id) await deps.release(id).catch(() => {});
     },
   };
+  return api;
 }
 
 /** Releases a lease on the store for a task: used by `deps.release`. */
