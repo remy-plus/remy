@@ -108,8 +108,13 @@ export function withJsonTools(raw: ModelClient): ModelClient {
   return {
     id: raw.id,
     caps: raw.caps,
-    async complete(req: ModelRequest, signal: AbortSignal): Promise<ModelResponse> {
-      if (!req.tools.length) return raw.complete(req, signal);
+    // The reply is a JSON tool call, not prose, so nothing streams while tools are in play.
+    async complete(
+      req: ModelRequest,
+      signal: AbortSignal,
+      onText?: (delta: string) => void,
+    ): Promise<ModelResponse> {
+      if (!req.tools.length) return raw.complete(req, signal, onText);
       const known = new Set(req.tools.map((t) => t.name));
       const responseFormat: Record<string, unknown> = raw.caps.jsonSchema
         ? {

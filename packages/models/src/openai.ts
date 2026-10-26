@@ -46,6 +46,76 @@ export function toOpenAIMessages(system: string, messages: Message[]): Json[] {
   return out;
 }
 
+interface Reply {
+  text: string;
+  calls: { name: string; args: string }[];
+  finishReason: unknown;
+  usage: Json;
+}
+
+/** Reads a chat-completions SSE stream into the same shape as a full response, forwarding text deltas. */
+async function readStream(
+  res: Response,
+  onText: (delta: string) => void,
+  signal: AbortSignal,
+  timeout: AbortSignal,
+  timeoutMs: number,
+): Promise<Reply> {
+  const reply: Reply = { text: '', calls: [], finishReason: undefined, usage: {} };
+  const handle = (line: string) => {
+    if (!line.startsWith('data:')) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') return;
+    let chunk: Json;
+    try {
+      chunk = JSON.parse(payload) as Json;
+    } catch {
+      throw new ModelError('invalid JSON in response stream', true);
+    }
+    if (chunk.error) throw new ModelError(`stream error: ${JSON.stringify(chunk.error)}`, true);
+    if (chunk.usage) reply.usage = chunk.usage as Json;
+    const choice = (chunk.choices as Json[] | undefined)?.[0];
+    if (!choice) return;
+    if (choice.finish_reason) reply.finishReason = choice.finish_reason;
+    const delta = (choice.delta ?? {}) as Json;
+    if (typeof delta.content === 'string' && delta.content) {
+      reply.text += delta.content;
+      onText(delta.content);
+    }
+    for (const c of (delta.tool_calls as Json[] | undefined) ?? []) {
+      const i = Number(c.index ?? 0);
+      const call = reply.calls[i] ?? { name: '', args: '' };
+      reply.calls[i] = call;
+      const fn = (c.function ?? {}) as Json;
+      if (typeof fn.name === 'string') call.name += fn.name;
+      if (typeof fn.arguments === 'string') call.args += fn.arguments;
+    }
+  };
+
+  if (!res.body) throw new ModelError('response has no body', true);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) handle(line.trimEnd());
+    }
+    handle((buffer + decoder.decode()).trimEnd());
+  } catch (e) {
+    if (e instanceof ModelError) throw e;
+    if (signal.aborted) throw new ModelError('request aborted', false);
+    if (timeout.aborted) throw new ModelError(`timed out after ${timeoutMs}ms`, true);
+    throw new ModelError(`network error: ${(e as Error).message}`, true);
+  }
+  reply.calls = reply.calls.filter(Boolean);
+  return reply;
+}
+
 /**
  * Raw client. A tool call whose arguments are not valid JSON comes back with
  * `args` set to the raw string, which the tool strategies treat as an error.
@@ -58,7 +128,11 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
   return {
     id: opts.id,
     caps: opts.caps,
-    async complete(req: RawRequest, signal: AbortSignal): Promise<ModelResponse> {
+    async complete(
+      req: RawRequest,
+      signal: AbortSignal,
+      onText?: (delta: string) => void,
+    ): Promise<ModelResponse> {
       const body: Json = {
         model: opts.id,
         messages: toOpenAIMessages(req.system, req.messages),
@@ -78,6 +152,10 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
           function: { name: t.name, description: t.description, parameters: t.parameters },
         }));
       if (req.responseFormat) body.response_format = req.responseFormat;
+      if (onText) {
+        body.stream = true;
+        body.stream_options = { include_usage: true };
+      }
 
       const headers: Record<string, string> = {
         'content-type': 'application/json',
@@ -106,31 +184,43 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
         throw new ModelError(`HTTP ${res.status}: ${detail}`, retryable);
       }
 
-      let data: Json;
-      try {
-        data = (await res.json()) as Json;
-      } catch {
-        throw new ModelError('invalid JSON in response body', true);
+      let reply: Reply;
+      if (onText) reply = await readStream(res, onText, signal, timeout, timeoutMs);
+      else {
+        let data: Json;
+        try {
+          data = (await res.json()) as Json;
+        } catch {
+          throw new ModelError('invalid JSON in response body', true);
+        }
+        const choice = (data.choices as Json[] | undefined)?.[0];
+        const message = choice?.message as Json | undefined;
+        if (!message) throw new ModelError('response has no choices', true);
+        reply = {
+          text: typeof message.content === 'string' ? message.content : '',
+          calls: ((message.tool_calls as Json[] | undefined) ?? []).map((c) => {
+            const fn = (c.function ?? {}) as Json;
+            return {
+              name: String(fn.name ?? ''),
+              args: typeof fn.arguments === 'string' ? fn.arguments : '',
+            };
+          }),
+          finishReason: choice?.finish_reason,
+          usage: (data.usage ?? {}) as Json,
+        };
       }
-      const choices = data.choices as Json[] | undefined;
-      const message = choices?.[0]?.message as Json | undefined;
-      if (!message) throw new ModelError('response has no choices', true);
-
-      const calls = ((message.tool_calls as Json[] | undefined) ?? []).map((c) => {
-        const fn = (c.function ?? {}) as Json;
-        const raw = typeof fn.arguments === 'string' ? fn.arguments : '';
+      const calls = reply.calls.map((c) => {
         let args: unknown;
         try {
-          args = raw.trim() ? JSON.parse(raw) : {};
+          args = c.args.trim() ? JSON.parse(c.args) : {};
         } catch {
-          args = raw;
+          args = c.args;
         }
-        return { tool: String(fn.name ?? ''), args };
+        return { tool: c.name, args };
       });
-      const usage = (data.usage ?? {}) as Json;
-      const text =
-        typeof message.content === 'string' && message.content ? message.content : undefined;
-      if (!text?.trim() && calls.length === 0 && choices?.[0]?.finish_reason === 'length')
+      const usage = reply.usage;
+      const text = reply.text || undefined;
+      if (!text?.trim() && calls.length === 0 && reply.finishReason === 'length')
         throw new ModelError(
           `the reply hit the ${maxTokens}-token output limit before producing anything`,
           true,

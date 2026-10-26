@@ -24,7 +24,11 @@ export class ScriptedModelClient implements ModelClient {
     this.caps = opts.caps ?? DEFAULT_CAPS;
   }
 
-  async complete(req: ModelRequest, _signal?: AbortSignal): Promise<ModelResponse> {
+  async complete(
+    req: ModelRequest,
+    _signal?: AbortSignal,
+    onText?: (delta: string) => void,
+  ): Promise<ModelResponse> {
     this.requests.push(req);
     const step = this.#steps.shift();
     if (step === undefined)
@@ -32,7 +36,9 @@ export class ScriptedModelClient implements ModelClient {
         `ScriptedModelClient exhausted: request #${this.requests.length} had no step`,
       );
     if (step instanceof Error) throw step;
-    return typeof step === 'function' ? step(req) : step;
+    const res = typeof step === 'function' ? step(req) : step;
+    if (res.text) onText?.(res.text);
+    return res;
   }
 }
 
@@ -49,8 +55,12 @@ export class RecordingModelClient implements ModelClient {
     this.caps = inner.caps;
   }
 
-  async complete(req: ModelRequest, signal: AbortSignal): Promise<ModelResponse> {
-    const res = await this.#inner.complete(req, signal);
+  async complete(
+    req: ModelRequest,
+    signal: AbortSignal,
+    onText?: (delta: string) => void,
+  ): Promise<ModelResponse> {
+    const res = await this.#inner.complete(req, signal, onText);
     this.cassette.set(argsHash(req), res);
     return res;
   }
@@ -67,12 +77,17 @@ export class ReplayModelClient implements ModelClient {
     this.caps = opts.caps ?? DEFAULT_CAPS;
   }
 
-  async complete(req: ModelRequest, _signal?: AbortSignal): Promise<ModelResponse> {
+  async complete(
+    req: ModelRequest,
+    _signal?: AbortSignal,
+    onText?: (delta: string) => void,
+  ): Promise<ModelResponse> {
     const hit = this.cassette.get(argsHash(req));
     if (!hit)
       throw new Error(
         `ReplayModelClient: no recorded response for request ${argsHash(req)} (re-record the cassette)`,
       );
+    if (hit.text) onText?.(hit.text);
     return hit;
   }
 }

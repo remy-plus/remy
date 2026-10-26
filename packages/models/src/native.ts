@@ -29,12 +29,21 @@ export function withNativeTools(raw: ModelClient): ModelClient {
   return {
     id: raw.id,
     caps: raw.caps,
-    async complete(req: ModelRequest, signal: AbortSignal): Promise<ModelResponse> {
+    async complete(
+      req: ModelRequest,
+      signal: AbortSignal,
+      onText?: (delta: string) => void,
+    ): Promise<ModelResponse> {
       const known = new Set(req.tools.map((t) => t.name));
       const messages: Message[] = [...req.messages];
       let usage = { inTokens: 0, outTokens: 0 };
       for (let attempt = 0; ; attempt++) {
-        const res = await raw.complete({ ...req, messages }, signal);
+        // Only the first attempt streams: a repair would append a second reply to the same buffer.
+        const res = await raw.complete(
+          { ...req, messages },
+          signal,
+          attempt === 0 ? onText : undefined,
+        );
         usage = addUsage(usage, res.usage);
         const problem = findProblem(res, known);
         if (!problem) return { ...res, usage };
