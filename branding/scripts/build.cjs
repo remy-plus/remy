@@ -15,7 +15,7 @@ const TEXT = loadFont('Medium');
 
 // Below 1.1 the brackets and underscores collide with the next row.
 const LINE_HEIGHT = 1.1;
-const TAGLINE = 'Real work, quietly done.';
+const TAGLINE = 'Your assistant, anywhere.';
 
 const C = {
   ink: '#0F0F10',

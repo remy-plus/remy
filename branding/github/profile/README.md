@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><b>Real work, quietly done.</b></p>
+<p align="center"><b>Your assistant, anywhere.</b></p>
 
 <br>
 

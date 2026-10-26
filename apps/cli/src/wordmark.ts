@@ -10,4 +10,4 @@ export const WORDMARK: readonly string[] = [
 ];
 
 export const WORDMARK_WIDTH = Math.max(...WORDMARK.map((l) => l.length));
-export const TAGLINE = 'Real work, quietly done.';
+export const TAGLINE = 'Your assistant, anywhere.';

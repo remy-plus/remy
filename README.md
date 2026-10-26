@@ -3,7 +3,7 @@
   <img alt="Remy" src="branding/logo/remy-wordmark-on-light.svg" width="360">
 </picture>
 
-**Real work, quietly done.**
+**Your assistant, anywhere.**
 
 Remy is an open-source AI agent that completes digital tasks through plain conversation. You say what you need, it does the work, and it asks before anything that sends as you, spends money, or can't be undone.
 

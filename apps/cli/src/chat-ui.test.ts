@@ -80,7 +80,7 @@ describe('chat screen', () => {
   it('shows the wordmark, takes a message and prints the reply', async () => {
     const app = scripted([call('finish', { answer: 'Four.' })]);
     expect(frame(app)).toContain(':::::::..');
-    expect(frame(app)).toContain('Real work, quietly done.');
+    expect(frame(app)).toContain('Your assistant, anywhere.');
     expect(frame(app)).toContain('test-model');
     await type(app, 'what is 2+2');
     await until(() => app.chat.getState().items.some((i) => i.kind === 'reply'));

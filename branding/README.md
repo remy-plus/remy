@@ -41,7 +41,7 @@ Remy doesn't need to tell people it's intelligent. It shows its value by getting
 
 ## Taglines
 
-- Primary: **Real work, quietly done.**
+- Primary: **Your assistant, anywhere.**
 - Manifesto line: **Quiet confidence. Extraordinary capability.**
 
 ## Logo
