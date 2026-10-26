@@ -11,6 +11,12 @@
     const say = (label, state, note) => {
       clearTimeout(timer);
       b.textContent = label;
+      if (label === 'Copy') {
+        const s = d.createElement('span');
+        s.className = 'sr';
+        s.textContent = ' install commands';
+        b.append(s);
+      }
       if (state) b.dataset.state = state;
       else delete b.dataset.state;
       if (status) status.textContent = note;
