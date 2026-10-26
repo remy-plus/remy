@@ -1,3 +1,4 @@
+export * from './calc-tools.ts';
 export * from './edit-tools.ts';
 export * from './file-tools.ts';
 export * from './html.ts';
