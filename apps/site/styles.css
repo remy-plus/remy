@@ -441,15 +441,12 @@ section {
   opacity: 1;
 }
 .cmd {
-  display: flex;
-  align-items: stretch;
+  position: relative;
   background: var(--field);
 }
 .cmd pre {
-  flex: 1;
-  min-width: 0;
   margin: 0;
-  padding: 1.1rem 1.25rem;
+  padding: 1.1rem 6rem 1.1rem 1.25rem; /* room on the right for Copy */
   font: 500 0.8125rem / 1.7 var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -464,35 +461,41 @@ section {
   color: var(--mute);
   user-select: none;
 }
+/* A quiet ghost button in the corner; it only fills on hover or once copied. */
 button.copy {
-  font: 500 0.875rem var(--mono);
-  background: var(--fg);
-  color: var(--bg);
-  align-self: flex-start;
-  border: 0;
-  padding: 0 1.25rem;
-  min-width: 6.5rem;
-  min-height: var(--hit);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font: 500 0.75rem var(--mono);
+  letter-spacing: 0.02em;
+  background: transparent;
+  color: var(--mute);
+  border: 1px solid color-mix(in oklab, var(--mute) 40%, transparent);
+  padding: 0 0.9rem;
+  min-height: 2.25rem;
   cursor: pointer;
   transition:
     transform 0.12s,
     background-color 0.2s,
-    color 0.2s;
+    color 0.2s,
+    border-color 0.2s;
+}
+button.copy::after {
+  /* keeps a 44px touch target around the smaller visual */
+  content: "";
+  position: absolute;
+  inset: -0.25rem;
+}
+button.copy:focus-visible {
+  color: var(--fg);
 }
 button.copy:active {
   transform: scale(0.97);
 }
 button.copy[data-state="copied"] {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--on-accent);
-}
-@container (max-width: 28rem) {
-  .cmd {
-    flex-direction: column;
-  }
-  button.copy {
-    align-self: stretch;
-  }
 }
 
 /* Terminal demo. Every line is laid out from the first paint (hidden, not
