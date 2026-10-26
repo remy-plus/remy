@@ -344,6 +344,43 @@ Done when: `pnpm check` and the replay eval stay green, and a GPT-5 nano run at 
 
 ---
 
+## V1: the terminal release (decided 2026-10-25)
+
+V1 is a polished terminal app, tracked item by item in `V1.md`. The web app and PWA move to after V1. Phase 1 infrastructure (Postgres, Hono, worker pool) stays on the roadmap and is not needed for V1.
+
+Work packages, in order. Sonnet writes the code, Opus reviews and merges, and `pnpm check` plus `pnpm eval:replay` must be green after each:
+
+1. **Tools** (`packages/tools`):
+   - `calculate`: arithmetic and date math.
+   - `edit_file`: exact replace.
+   - `move_file`, `delete_file`, `make_dir`.
+   - `update_plan`: a visible step list.
+   - `run_command`: an allowlisted program run with `execFile`, no shell, cwd in the workspace, scrubbed env, a timeout and an output cap. Its risk is `irreversible`, so it always needs approval.
+2. **Streaming and conversations** (`packages/models`, `packages/core`):
+   - `ModelClient.complete` takes an optional text-delta callback, and the OpenAI client parses SSE.
+   - The runtime forwards deltas without persisting them.
+   - A task can carry earlier turns (prompt and answer) as context, so a chat is a chain of tasks.
+3. **Ink UI** (`apps/cli`). Plain `remy` opens a chat with:
+   - the wordmark;
+   - streaming replies;
+   - a thinking indicator;
+   - live tool and plan status;
+   - inline approvals and questions;
+   - shortcuts (Ctrl+C interrupts, Ctrl+D quits, Esc clears);
+   - resize handling;
+   - reduced-motion and limited-color modes;
+   - a `--debug` log.
+
+   The existing subcommands stay for scripts.
+4. **Release**:
+   - a publishable `remy` bin;
+   - `CAPABILITIES.md` (what works and what does not);
+   - README;
+   - a live smoke test on real tasks (run by the user);
+   - version 0.1.0.
+
+   npm publish and the GitHub release need the user's go.
+
 ## Product roadmap after Phase 0
 
 Each phase keeps the Phase 0 interfaces. Its exit criteria include "no regression in the eval suite", and the suite grows with every capability.

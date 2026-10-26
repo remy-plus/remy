@@ -5,7 +5,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 **The full architecture and phased plan live in `PLAN.md`. Read it before starting work, and keep it updated when decisions change.**
 
 ## Decisions so far
-- **Surface:** web app + PWA first (Next.js). Voice and desktop come later.
+- **Surface:** V1 is a terminal app (Ink), tracked in `V1.md` (decided 2026-10-25). Web app + PWA (Next.js) come after V1; voice and desktop later.
 - **Execution:** all routes, most reliable first: API/MCP integrations → cloud browser (DOM first, vision fallback) → device agent on the user's machine (Phase 4).
 - **Stack:** TypeScript end to end, pnpm workspaces. Phase 0: CLI + SQLite (built-in `node:sqlite`) + zod + vitest + Biome, no server/queue/Docker. Phase 1 adds Postgres (same `EventStore` interface), Hono, Next.js PWA, worker pool. Python only for the future `research/` track.
 - **Models:** users pick their own. Phase 0 uses a thin in-house OpenAI-compatible client behind `ModelClient` (covers OpenRouter, Ollama, vLLM, Groq, OpenAI); Vercel AI SDK optional later. Testing uses cheap or free open-weight models, so the weak-model adapter (constrained JSON tool calls, few tools per step) matters.
