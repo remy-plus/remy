@@ -1,24 +1,34 @@
 {
   "name": "@remy/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "Apache-2.0",
   "private": true,
   "description": "The remy command line.",
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "bin": {
-    "remy": "./dist/main.js"
+    "remy": "./release/remy.js"
+  },
+  "files": [
+    "release"
+  ],
+  "scripts": {
+    "bundle": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=esm --conditions=@remy/source --external:ink --external:react --external:'react/*' --outfile=release/remy.js --log-level=warning"
   },
   "dependencies": {
+    "ink": "^8.0.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
     "@remy/core": "workspace:*",
     "@remy/evals": "workspace:*",
     "@remy/models": "workspace:*",
     "@remy/store": "workspace:*",
     "@remy/tools": "workspace:*",
-    "ink": "^8.0.0",
-    "react": "^19.3.1"
-  },
-  "devDependencies": {
     "@types/react": "^19.3.0",
+    "esbuild": "^0.28.2",
     "ink-testing-library": "^4.0.0"
   }
 }

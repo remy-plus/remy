@@ -9,3 +9,4 @@ coverage/
 *.sqlite-*
 .claude/
 evals/results/*-reference.*
+apps/cli/release/
