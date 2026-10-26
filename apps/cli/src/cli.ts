@@ -23,16 +23,23 @@ import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
   braveSearch,
+  calculate,
   createRedactor,
   createScopedFetch,
   createScopedFs,
   createWebSearch,
+  deleteFile,
+  editFile,
   fetchUrl,
   finish,
   listFiles,
+  makeDir,
+  moveFile,
   readFile,
+  runCommand,
   searxngSearch,
   tavilySearch,
+  updatePlan,
   writeFile,
 } from '@remy/tools';
 import { type FileConfig, loadConfig } from './config.ts';
@@ -214,7 +221,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             throw new Error('No model is needed for this command.');
           },
         };
-    const tools = new ToolRegistry([readFile, writeFile, listFiles, fetchUrl, askUser, finish]);
+    // Every task has a workspace, so the file tools and run_command are always available.
+    const tools = new ToolRegistry([
+      readFile,
+      writeFile,
+      editFile,
+      moveFile,
+      deleteFile,
+      makeDir,
+      listFiles,
+      runCommand,
+      calculate,
+      updatePlan,
+      fetchUrl,
+      askUser,
+      finish,
+    ]);
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
     else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
