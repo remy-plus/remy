@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   type ApprovalRequest,
+  type ConversationTurn,
   createRuntime,
   DEFAULT_BUDGET,
   type EventStore,
@@ -42,9 +43,11 @@ import {
   updatePlan,
   writeFile,
 } from '@remy/tools';
+import { createChat, type RuntimeHooks, releaseLease } from './chat.ts';
 import { type FileConfig, loadConfig } from './config.ts';
+import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
-import { detectColor } from './theme.ts';
+import { createTheme, detectColor } from './theme.ts';
 
 export interface CliDeps {
   env: Record<string, string | undefined>;
@@ -73,6 +76,7 @@ const STATUSES: TaskStatus[] = [
 const HELP = `remy: tell it what you need done.
 
 Usage
+  remy                            Open the chat (in a terminal)
   remy run "<prompt>" [options]   Start a task and run it
   remy resume <id>                Continue a task that stopped
   remy approve <id> [--deny]      Answer a pending approval, then continue
@@ -92,6 +96,16 @@ Options for run
   --max-cost <usd>      Cost budget (default ${DEFAULT_BUDGET.maxCostUsd})
   --net-allow <hosts>   Only allow these domains. Example: example.com,docs.example.com
 
+Options for every command
+  --debug               Log model requests, model responses and events as JSON lines.
+                        They go to stderr, or in the chat to REMY_HOME/debug-<time>.jsonl.
+                        REMY_DEBUG=1 does the same; REMY_DEBUG=<path> picks the file.
+  --reduced-motion      No animation in the chat (also REMY_REDUCED_MOTION=1)
+
+Chat
+  Type a message and press Enter. Ctrl+C stops a running task, Ctrl+D quits, /help lists keys.
+  NO_COLOR or FORCE_COLOR=0 turns color off; terminals without truecolor get 16 colors.
+
 Setup
   Set REMY_PROFILE and REMY_MODEL (and the profile's API key, such as OPENROUTER_API_KEY).
   Optional remy.config.json in the current folder or REMY_HOME. Flags beat env, env beats config.
@@ -110,6 +124,8 @@ const OPTIONS = {
   'net-allow': { type: 'string' },
   status: { type: 'string' },
   json: { type: 'boolean' },
+  debug: { type: 'boolean' },
+  'reduced-motion': { type: 'boolean' },
   deny: { type: 'boolean' },
   version: { type: 'boolean', short: 'v' },
   help: { type: 'boolean', short: 'h' },
@@ -162,15 +178,20 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     out(`remy ${version()}`);
     return 0;
   }
-  if (!command || command === 'help' || flags.help) {
+  const chatMode = !command && deps.isTTY && !flags.help;
+  if (!chatMode && (!command || command === 'help' || flags.help)) {
     deps.out(HELP);
     return 0;
   }
-  if (!['run', 'resume', 'approve', 'answer', 'cancel', 'list', 'show'].includes(command))
+  if (
+    command &&
+    !['run', 'resume', 'approve', 'answer', 'cancel', 'list', 'show'].includes(command)
+  )
     throw new Error(`Unknown command "${command}". Run remy help.`);
 
   const home = env.REMY_HOME || join(homedir(), '.remy');
-  const st = styler(detectColor(env, deps.isTTY));
+  const level = detectColor(env, deps.isTTY);
+  const st = styler(level);
   const owner = `cli-${randomUUID().slice(0, 8)}`;
   if (!deps.store) mkdirSync(home, { recursive: true });
   const ownStore = deps.store ? undefined : new SqliteEventStore(join(home, 'remy.sqlite'));
@@ -193,6 +214,20 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   const cfg = (): FileConfig => loadConfig(cwd, home);
 
+  const secrets: Record<string, string> = {};
+  for (const k of SECRET_ENV) if (env[k]) secrets[k] = env[k];
+  const redact = createRedactor(secrets);
+  const debug = openDebug({
+    flag: Boolean(flags.debug),
+    env: env.REMY_DEBUG,
+    home,
+    cwd,
+    chat: chatMode,
+    stderr: deps.err,
+    redact,
+  });
+  if (debug && debug.target !== 'stderr') deps.err(`Debug log: ${debug.target}\n`);
+
   function modelFor(file: FileConfig): ModelClient {
     if (deps.model) return deps.model;
     const e: Record<string, string | undefined> = {
@@ -212,9 +247,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return modelFromEnv(e);
   }
 
-  function makeRuntime(file: FileConfig, opts: { model: boolean; taskId?: string }) {
-    const model: ModelClient = opts.model
-      ? modelFor(file)
+  function makeRuntime(
+    file: FileConfig,
+    opts: { model: boolean | ModelClient; taskId?: string; hooks?: Partial<RuntimeHooks> },
+  ) {
+    const base: ModelClient = opts.model
+      ? typeof opts.model === 'object'
+        ? opts.model
+        : modelFor(file)
       : {
           id: 'none',
           caps: DEFAULT_CAPS,
@@ -222,6 +262,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             throw new Error('No model is needed for this command.');
           },
         };
+    const model = debug ? debugModel(base, debug) : base;
     // Every task has a workspace, so the file tools and run_command are always available.
     const tools = new ToolRegistry([
       readFile,
@@ -241,8 +282,6 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
     else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
-    const secrets: Record<string, string> = {};
-    for (const k of SECRET_ENV) if (env[k]) secrets[k] = env[k];
     const timeline = createTimeline(st, { live: true });
     let pre = opts.taskId;
     const runtime = createRuntime({
@@ -250,7 +289,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       model,
       tools,
       owner,
-      redact: createRedactor(secrets),
+      redact,
       ids: {
         next: (p) => {
           if (p === 'task' && pre) {
@@ -272,9 +311,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         };
       },
       onEvent: (e) => {
+        debug?.write('event', e);
+        opts.hooks?.onEvent?.(e);
+        if (opts.hooks) return;
         const line = timeline.line(e);
         if (line) out(line);
       },
+      ...(opts.hooks?.onText && { onText: opts.hooks.onText }),
+      ...(opts.hooks?.onModelStart && { onModelStart: opts.hooks.onModelStart }),
     });
     return { runtime, timeline };
   }
@@ -362,7 +406,68 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return drive(runtime, id);
   }
 
+  /** The task config shared by `run` and the chat: flags beat the config file, which beats defaults. */
+  function taskConfig(
+    file: FileConfig,
+    modelId: string,
+    workspaceDir: string,
+    context?: ConversationTurn[],
+  ): TaskConfig {
+    const auto = flags.auto !== undefined ? list(flags.auto) : file.autoApprove;
+    const autoApprove = (auto ?? ['read']).map((r) => {
+      if (!RISKS.includes(r as Risk))
+        throw new Error(`Unknown risk "${r}" in --auto. Choose from ${RISKS.join(', ')}.`);
+      return r as Risk;
+    });
+    const num = (v: string | undefined, name: string) => {
+      if (v === undefined) return undefined;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number.`);
+      return n;
+    };
+    const maxSteps = num(flags['max-steps'], '--max-steps');
+    const maxCostUsd = num(flags['max-cost'], '--max-cost');
+    const netAllow = list(flags['net-allow']) ?? file.netAllow;
+    return {
+      model: modelId,
+      permissions: { autoApprove, ...(netAllow && { netAllow }) },
+      budget: {
+        ...DEFAULT_BUDGET,
+        ...file.budget,
+        ...(maxSteps && { maxSteps }),
+        ...(maxCostUsd && { maxCostUsd }),
+      },
+      workspaceDir,
+      ...(context?.length && { context }),
+    };
+  }
+
+  async function chatFlow(): Promise<number> {
+    const file = cfg();
+    const model = deps.model ?? modelFor(file);
+    // One workspace for the whole conversation, so files made in one turn are there in the next.
+    const workspace = flags.workspace
+      ? resolve(cwd, flags.workspace)
+      : join(home, 'workspaces', `chat_${randomUUID().replaceAll('-', '').slice(0, 12)}`);
+    taskConfig(file, model.id, workspace); // fail on bad flags before the screen opens
+    mkdirSync(workspace, { recursive: true });
+    const chat = createChat({
+      runtime: (hooks) => makeRuntime(file, { model, hooks }).runtime,
+      config: (context) => taskConfig(file, model.id, workspace, context),
+      release: releaseLease(store, owner),
+    });
+    const { runChat } = await import('./chat-ui.ts');
+    await runChat({
+      chat,
+      theme: createTheme(level),
+      reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
+      subtitle: model.id,
+    });
+    return 0;
+  }
+
   try {
+    if (chatMode) return await chatFlow();
     switch (command) {
       case 'run': {
         const prompt = rest.join(' ').trim();
@@ -370,35 +475,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const file = cfg();
         const id = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
         const { runtime } = makeRuntime(file, { model: true, taskId: id });
-        const auto = flags.auto !== undefined ? list(flags.auto) : file.autoApprove;
-        const autoApprove = (auto ?? ['read']).map((r) => {
-          if (!RISKS.includes(r as Risk))
-            throw new Error(`Unknown risk "${r}" in --auto. Choose from ${RISKS.join(', ')}.`);
-          return r as Risk;
-        });
-        const num = (v: string | undefined, name: string) => {
-          if (v === undefined) return undefined;
-          const n = Number(v);
-          if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number.`);
-          return n;
-        };
-        const maxSteps = num(flags['max-steps'], '--max-steps');
-        const maxCostUsd = num(flags['max-cost'], '--max-cost');
-        const netAllow = list(flags['net-allow']) ?? file.netAllow;
         const model = deps.model ?? modelFor(file);
-        const config: TaskConfig = {
-          model: model.id,
-          permissions: { autoApprove, ...(netAllow && { netAllow }) },
-          budget: {
-            ...DEFAULT_BUDGET,
-            ...file.budget,
-            ...(maxSteps && { maxSteps }),
-            ...(maxCostUsd && { maxCostUsd }),
-          },
-          workspaceDir: flags.workspace
-            ? resolve(cwd, flags.workspace)
-            : join(home, 'workspaces', id),
-        };
+        const config = taskConfig(
+          file,
+          model.id,
+          flags.workspace ? resolve(cwd, flags.workspace) : join(home, 'workspaces', id),
+        );
         mkdirSync(config.workspaceDir, { recursive: true });
         await runtime.start(prompt, config);
         out(st.dim(`Task ${id}. Workspace ${config.workspaceDir}`));

@@ -239,3 +239,34 @@ describe('misc', () => {
     expect(r.err).toContain('Unknown command');
   });
 });
+
+describe('--debug', () => {
+  it('writes model calls and events as JSON lines to stderr, and leaves stdout alone', async () => {
+    const plain = await harness({ model: new ScriptedModelClient([done]) }).run('run', 'x');
+    const r = await harness({ model: new ScriptedModelClient([done]) }).run('run', 'x', '--debug');
+    const kinds = r.err
+      .trim()
+      .split('\n')
+      .map((l) => (JSON.parse(l) as { kind: string }).kind);
+    expect(kinds).toEqual(expect.arrayContaining(['model.request', 'model.response', 'event']));
+    const norm = (t: string) => t.replace(/task_\w+/g, 'T').replace(/\d+ms/g, 'Nms');
+    expect(norm(r.out)).toBe(norm(plain.out));
+  });
+
+  it('REMY_DEBUG=<path> writes to that file instead', async () => {
+    const path = join(home, 'trace.jsonl');
+    const h = harness({
+      env: { REMY_HOME: home, REMY_DEBUG: path },
+      model: new ScriptedModelClient([done]),
+    });
+    const r = await h.run('run', 'x');
+    expect(r.err).toBe(`Debug log: ${path}\n`);
+    expect(readFileSync(path, 'utf8')).toContain('"kind":"model.request"');
+  });
+
+  it('prints help instead of opening the chat when not on a terminal', async () => {
+    const r = await harness({ isTTY: false }).run();
+    expect(r.out).toContain('Open the chat');
+    expect(r.out).toContain('--debug');
+  });
+});
