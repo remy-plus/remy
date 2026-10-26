@@ -142,6 +142,32 @@ describe('reducer', () => {
       expect(s.calls.c1?.result).toMatchObject({ ok: false });
     });
 
+    it("puts the user's note in a decline result for the model to read", () => {
+      const s = fold(
+        log(...base, {
+          type: 'approval.resolved',
+          callId: 'c1',
+          argsHash: c.argsHash,
+          granted: false,
+          by: 'u',
+          note: 'send it to b instead',
+        }),
+      );
+      const r = s.calls.c1?.result;
+      expect(r).toMatchObject({ ok: false, retryable: false });
+      expect(r && !r.ok && r.error).toContain('send it to b instead');
+    });
+
+    it('keeps the argsHash binding when a note is present', () =>
+      expectInvalid(...base, {
+        type: 'approval.resolved',
+        callId: 'c1',
+        argsHash: argsHash({ to: 'b' }),
+        granted: false,
+        by: 'u',
+        note: 'no',
+      }));
+
     it('rejects an approval for different arguments', () =>
       expectInvalid(...base, {
         type: 'approval.resolved',

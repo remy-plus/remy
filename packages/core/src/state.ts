@@ -209,7 +209,9 @@ function on(s: TaskState, e: Event) {
       if (!e.granted) {
         setResult(s, call, {
           ok: false,
-          error: 'The user declined this action.',
+          error: e.note
+            ? `The user declined this action and said: ${e.note}`
+            : 'The user declined this action.',
           retryable: false,
           phase: 'before_effect',
         });

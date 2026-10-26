@@ -412,12 +412,22 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       return taskId;
     },
 
-    async approve(taskId, callId, hash, granted, by) {
+    async approve(taskId, callId, hash, granted, by, note) {
       await withLease(taskId, async ({ state, commit }) => {
         const p = state().pendingApproval;
         if (p?.callId !== callId) throw new Error(`no pending approval for ${callId}`);
         if (p.argsHash !== hash) throw new Error('approval is for different arguments');
-        await commit([{ type: 'approval.resolved', callId, argsHash: hash, granted, by }]);
+        const said = !granted && note?.trim() ? note.trim() : undefined;
+        await commit([
+          {
+            type: 'approval.resolved',
+            callId,
+            argsHash: hash,
+            granted,
+            by,
+            ...(said && { note: said }),
+          },
+        ]);
       });
     },
 

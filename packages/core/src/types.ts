@@ -109,7 +109,15 @@ export type Event =
       risk: Risk;
       reason: string;
     }
-  | { type: 'approval.resolved'; callId: string; argsHash: string; granted: boolean; by: string }
+  | {
+      type: 'approval.resolved';
+      callId: string;
+      argsHash: string;
+      granted: boolean;
+      by: string;
+      /** Why a call was denied, in the user's words. The model sees it as the tool result. */
+      note?: string;
+    }
   | { type: 'tool.started'; callId: string; idempotencyKey: string; attempt: number }
   | { type: 'tool.completed'; callId: string; result: ToolResult; latencyMs: number }
   /** One attempt failed and will be retried. The final outcome is always `tool.completed`. */
@@ -304,6 +312,8 @@ export interface Runtime {
     argsHash: string,
     granted: boolean,
     by: string,
+    /** With a denial: guidance the model reads as the tool result. Ignored when granted. */
+    note?: string,
   ): Promise<void>;
   answer(taskId: string, answer: string): Promise<void>;
   cancel(taskId: string, by: string): Promise<void>;
