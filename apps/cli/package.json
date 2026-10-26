@@ -1,9 +1,22 @@
 {
-  "name": "@remy/cli",
+  "name": "@koryei/remy",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "private": true,
-  "description": "The remy command line.",
+  "description": "Remy: one calm assistant for real digital work, in your terminal.",
+  "homepage": "https://remy.plus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/remy-plus/remy.git",
+    "directory": "apps/cli"
+  },
+  "bugs": "https://github.com/remy-plus/remy/issues",
+  "keywords": [
+    "agent",
+    "ai",
+    "assistant",
+    "cli",
+    "terminal"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.18"
@@ -30,5 +43,8 @@
     "@types/react": "^19.3.0",
     "esbuild": "^0.28.2",
     "ink-testing-library": "^4.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

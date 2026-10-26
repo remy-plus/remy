@@ -18,7 +18,7 @@
     "eval": "node --conditions=@remy/source packages/evals/src/cli.ts",
     "eval:replay": "node --conditions=@remy/source packages/evals/src/cli.ts --model reference --strict",
     "eval:compare": "node --conditions=@remy/source packages/evals/src/cli.ts compare",
-    "bundle": "pnpm --filter @remy/cli bundle",
+    "bundle": "pnpm --filter @koryei/remy bundle",
     "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm test"
   },
   "devDependencies": {
