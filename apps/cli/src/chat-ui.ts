@@ -22,6 +22,13 @@ import type { Chat, ChatState, Item } from './chat.ts';
 import { fmtMs } from './format.ts';
 import { EMPTY_INPUT, editInput, type InputState, withText } from './input.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
+import {
+  captureStray,
+  createNotifier,
+  gateSync,
+  isFocusReport,
+  type Notifier,
+} from './terminal.ts';
 import type { Theme } from './theme.ts';
 import {
   APPROVAL_ROWS,
@@ -50,6 +57,16 @@ export interface ChatAppProps {
   compactHeader?: boolean;
   /** Called after /clear: the host wipes the screen and mounts the app again. */
   onClear?: () => void;
+  /** Rings when Remy waits and the window is not focused. */
+  notifier?: Notifier;
+}
+
+export interface RunOptions extends Omit<ChatAppProps, 'onClear' | 'compactHeader' | 'notifier'> {
+  /** The terminal answered the synchronized-output query; without it frames are not wrapped. */
+  sync?: boolean;
+  /** Stray console and stderr writes while the screen is up: they go here, not onto the screen. */
+  onStray?: (stream: 'stdout' | 'stderr', text: string) => void;
+  env?: Record<string, string | undefined>;
 }
 
 /** The next frame index, ticking while `active`. Always 0 when motion is reduced. */
@@ -552,7 +569,15 @@ export function ChatApp(props: ChatAppProps): ReactElement {
     props.onClear?.();
   }, [state.clears, props.onClear]);
 
+  const { notifier } = props;
+  useEffect(() => {
+    if (state.phase === 'waiting_approval' || state.phase === 'waiting_user')
+      notifier?.attention(state.phase);
+  }, [state.phase, notifier]);
+
   useInput((ch, key) => {
+    // Focus reports are for the notifier, not the editor.
+    if (isFocusReport(ch)) return;
     if (key.ctrl && ch === 'd') return void quit();
     if (key.ctrl && ch === 'c') {
       if (state.phase !== 'idle') return void chat.interrupt();
@@ -652,27 +677,40 @@ export function ChatApp(props: ChatAppProps): ReactElement {
 const CLEAR_SCREEN = '\x1b[2J\x1b[3J\x1b[H';
 
 /** Opens the chat on the terminal and resolves when the user quits. */
-export async function runChat(
-  props: Omit<ChatAppProps, 'onClear' | 'compactHeader'>,
-): Promise<void> {
-  let compact = false;
-  for (;;) {
-    let restart = false;
-    const app = render(
-      h(ChatApp, {
-        ...props,
-        compactHeader: compact,
-        onClear: () => {
-          restart = true;
-          // Unmount after this render finishes; the next mount prints the header again.
-          setImmediate(() => app.unmount());
-        },
-      }),
-      { exitOnCtrlC: false, patchConsole: false },
-    );
-    await app.waitUntilExit();
-    if (!restart) return;
-    process.stdout.write(CLEAR_SCREEN);
-    compact = true;
+export async function runChat(props: RunOptions): Promise<void> {
+  const { sync = false, onStray, env = process.env, ...appProps } = props;
+  const stdout = gateSync(process.stdout, sync);
+  const notifier = createNotifier(env, process.stdin, process.stdout);
+  // Without --debug the writes are kept and shown on the real stderr once the screen is gone.
+  const kept: string[] = [];
+  const restoreStray = captureStray(
+    onStray ?? ((stream, text) => void kept.push(stream === 'stderr' ? text : `${text}\n`)),
+  );
+  try {
+    let compact = false;
+    for (;;) {
+      let restart = false;
+      const app = render(
+        h(ChatApp, {
+          ...appProps,
+          notifier,
+          compactHeader: compact,
+          onClear: () => {
+            restart = true;
+            // Unmount after this render finishes; the next mount prints the header again.
+            setImmediate(() => app.unmount());
+          },
+        }),
+        { stdout, exitOnCtrlC: false, patchConsole: false },
+      );
+      await app.waitUntilExit();
+      if (!restart) return;
+      process.stdout.write(CLEAR_SCREEN);
+      compact = true;
+    }
+  } finally {
+    notifier.stop();
+    restoreStray();
+    if (kept.length) process.stderr.write(kept.join(''));
   }
 }

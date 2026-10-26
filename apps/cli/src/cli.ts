@@ -467,9 +467,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       contextWindow: model.caps.contextWindow,
     });
     const { runChat } = await import('./chat-ui.ts');
+    const { probeTerminal } = await import('./terminal.ts');
+    // One quick question to the terminal before the screen opens: frame sync and light or dark.
+    const probe = await probeTerminal(env, process.stdin, process.stdout);
     await runChat({
       chat,
-      theme: createTheme(level),
+      sync: probe.sync,
+      env,
+      onStray: debug ? (stream, text) => debug.write('stray', { stream, text }) : undefined,
+      theme: createTheme(level, probe.background),
       reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
       subtitle: model.id,
       workspace,
