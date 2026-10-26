@@ -113,6 +113,51 @@ export function flushTools(
   return { commit: lines.slice(0, n), keep: lines.slice(n) };
 }
 
+const GERUND: Record<string, string> = {
+  fetch: 'Fetching',
+  search: 'Searching',
+  read: 'Reading',
+  write: 'Writing',
+  edit: 'Editing',
+  list: 'Listing',
+  move: 'Moving',
+  delete: 'Deleting',
+  'create folder': 'Creating folder',
+  run: 'Running',
+  calculate: 'Calculating',
+};
+
+/** What the status line says: what is happening now, and where the plan stands. */
+export interface NarrateInput {
+  streaming: string;
+  tools: ToolLine[];
+  plan?: PlanStep[];
+  /** Seconds since the turn began; omitted when motion is reduced. */
+  secs?: number;
+}
+
+/** One calm row: the running tool, else the plan step in progress, else writing or thinking. */
+export function narrate(s: NarrateInput): string {
+  const running = s.tools.filter((t) => t.state === 'running');
+  const first = running[0];
+  const doing = s.plan?.find((p) => p.status === 'doing');
+  let head: string;
+  if (first) {
+    const verb = GERUND[first.verb] ?? first.verb;
+    head = `${verb}${first.target ? ` ${first.target}` : ''}`;
+    if (running.length > 1) head += ` +${running.length - 1} more`;
+  } else if (doing) head = doing.text;
+  else head = s.streaming ? 'Writing' : 'Thinking';
+  if (s.secs === undefined) return `${head}...`;
+  const parts = [head];
+  if (s.plan && s.plan.length > 1) {
+    const at = s.plan.filter((p) => p.status === 'done').length + 1;
+    parts.push(`step ${Math.min(at, s.plan.length)} of ${s.plan.length}`);
+  }
+  parts.push(`${s.secs}s`);
+  return parts.join(' · ');
+}
+
 export type ApprovalRow = { text: string; kind: 'plain' | 'add' | 'del' | 'dim' };
 export interface ApprovalView {
   title: string;

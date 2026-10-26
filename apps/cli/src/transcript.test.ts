@@ -4,6 +4,7 @@ import {
   collapseFailure,
   describeApproval,
   flushTools,
+  narrate,
   streamBudget,
   summarizeTool,
   type ToolLine,
@@ -113,5 +114,39 @@ describe('describeApproval', () => {
   });
   it('falls back to the tool preview', () => {
     expect(describeApproval('x', {}, req).title).toBe('p');
+  });
+});
+
+describe('narrate', () => {
+  const base = { streaming: '', tools: [] as ToolLine[] };
+  const plan = [
+    { text: 'Read the notes', status: 'done' as const },
+    { text: 'Group files by type', status: 'doing' as const },
+    { text: 'Write summary', status: 'pending' as const },
+  ];
+  it('says thinking when nothing else is happening', () => {
+    expect(narrate({ ...base, secs: 3 })).toBe('Thinking · 3s');
+    expect(narrate(base)).toBe('Thinking...');
+  });
+  it('says writing while the answer streams', () => {
+    expect(narrate({ ...base, streaming: 'Hel', secs: 1 })).toBe('Writing · 1s');
+  });
+  it('names the running tool and its target', () => {
+    const t = line('a', { state: 'running', verb: 'read', target: 'notes.md' });
+    expect(narrate({ ...base, tools: [t], secs: 12 })).toBe('Reading notes.md · 12s');
+    const two = [t, line('b', { state: 'running', verb: 'fetch', target: 'x.org' })];
+    expect(narrate({ ...base, tools: two })).toBe('Reading notes.md +1 more...');
+  });
+  it('ignores finished tools and falls back to the plan step in progress', () => {
+    const done = line('a', { state: 'ok' });
+    expect(narrate({ ...base, tools: [done], plan, secs: 5 })).toBe(
+      'Group files by type · step 2 of 3 · 5s',
+    );
+  });
+  it('prefers the running tool over the plan step', () => {
+    const t = line('a', { state: 'running', verb: 'run', target: 'ls -la' });
+    expect(narrate({ ...base, tools: [t], plan, secs: 0 })).toBe(
+      'Running ls -la · step 2 of 3 · 0s',
+    );
   });
 });
