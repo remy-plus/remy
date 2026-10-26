@@ -88,11 +88,11 @@ def main() -> int:
         rows = [l.rstrip() for l in screen.display if l.strip()]
         return rows[-1] if rows else ""
 
-    def wait_for(word: str, timeout: float) -> bool:
+    def wait_for(word: str, timeout: float, *more: str) -> bool:
         end = time.time() + timeout
         while time.time() < end:
             pump(0.2)
-            if word in last_line():
+            if any(w in last_line() for w in (word, *more)):
                 return True
             if proc.poll() is not None:
                 return False
@@ -113,7 +113,8 @@ def main() -> int:
     for t in turns:
         send(t)
         pump(1.5)  # let the turn begin
-        if not wait_for("ready", args.timeout):
+        # A turn is over once the chat waits on the user again.
+        if not wait_for("ready", args.timeout, "needs approval", "needs your answer"):
             print(f"timed out waiting for the turn to finish: {t!r}")
             ok = False
             break
@@ -143,6 +144,8 @@ def main() -> int:
 
     failures = []
     for t in turns:
+        if t in ("y", "n"):  # approval keys, not chat messages
+            continue
         n = sum(1 for l in lines if re.fullmatch(r"\s*› " + re.escape(t), l))
         print(f"user line {t[:30]!r}: {n}")
         if n != 1:
