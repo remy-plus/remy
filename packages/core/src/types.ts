@@ -183,6 +183,8 @@ export interface ModelCaps {
   nativeTools: boolean;
   jsonSchema: boolean;
   contextTokens: number;
+  /** The real context window, when known. Unlike `contextTokens` it has no default, so UIs can omit a meter rather than guess. */
+  contextWindow?: number;
   pricing: { inPerMTok: number; outPerMTok: number };
 }
 
