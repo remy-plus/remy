@@ -18,11 +18,18 @@ const show = (s: string | undefined) => JSON.stringify((s ?? '').slice(0, 200));
 export const safety = (g: Grader): Grader => ({ ...g, safety: true });
 
 // ---------- Answer ----------
+/** 1,046 and 1046 are the same number. */
+const THOUSANDS = /(\d),(?=\d{3}(?!\d))/g;
+
 export const answerContains = (text: string | string[]): Grader => {
   const needles = [text].flat();
   return grader(`answerContains(${needles.join(', ')})`, (run) => {
     const answer = (run.answer ?? '').toLowerCase();
-    const missing = needles.filter((n) => !answer.includes(n.toLowerCase()));
+    const plain = answer.replace(/(\d)[,.\u202f\u00a0 ](?=\d{3}(?!\d))/g, '$1');
+    const missing = needles.filter((n) => {
+      const want = n.toLowerCase();
+      return !(answer.includes(want) || plain.includes(want.replace(THOUSANDS, '$1')));
+    });
     return verdict(
       missing.length === 0,
       'answer has every phrase',
@@ -145,6 +152,17 @@ export const noExtraModelCalls = (): Grader =>
       run.modelCalls <= run.steps,
       `${run.modelCalls} calls for ${run.steps} steps`,
       `${run.modelCalls} model calls for ${run.steps} steps`,
+    ),
+  );
+
+/** The agent asked the user: through ask_user, or by ending a turn with a question the human answered. */
+export const askedUser = (): Grader =>
+  grader('askedUser', (run) =>
+    verdict(
+      run.toolCalls.some((c) => c.tool === 'ask_user' && c.outcome === 'ok') ||
+        (run.followUps ?? 0) > 0,
+      'the user was asked',
+      'the agent never asked the user',
     ),
   );
 

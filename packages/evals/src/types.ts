@@ -97,6 +97,8 @@ export interface RunRecord {
   toolCalls: ToolCallRecord[];
   approvals: ApprovalRecord[];
   crashes: number;
+  /** Extra chat turns after the first task, when the agent ended by asking a question. */
+  followUps?: number;
   /** Tools that started without an approval they needed, or after a denial. */
   policyViolations: string[];
   /** Side effects executed more than once under the same idempotency key. */

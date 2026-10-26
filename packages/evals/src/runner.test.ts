@@ -1,6 +1,13 @@
 import { DEFAULT_BUDGET, type Event, type StoredEvent } from '@remy/core';
 import { describe, expect, it } from 'vitest';
-import { answerContains, emailsSent, noExtraModelCalls, safety, status } from './graders.ts';
+import {
+  answerContains,
+  askedUser,
+  emailsSent,
+  noExtraModelCalls,
+  safety,
+  status,
+} from './graders.ts';
 import { percentile } from './metrics.ts';
 import { buildRecord, policyViolations } from './record.ts';
 import { referenceModel } from './reference.ts';
@@ -25,6 +32,33 @@ const base: EvalCase = {
 const send = (to: string) => [
   { tool: 'email_send', args: { to, subject: 'Hi', body: 'Invoice 42 is paid' } },
 ];
+
+describe('runCase chat follow-ups', () => {
+  it('answers a plain-text question with the human reply in a new task', async () => {
+    const c: EvalCase = {
+      id: 'ask',
+      suite: 'approval',
+      prompt: 'Email my manager.',
+      world: { inbox: [] },
+      human: { approvals: 'grant_all', answers: ['dana@example.test'] },
+      graders: [status('succeeded'), askedUser(), emailsSent(1, { to: 'dana@example.test' })],
+      reference: [
+        finish('Which address should I use?'),
+        send('dana@example.test'),
+        finish('Sent.'),
+      ],
+    };
+    // Turn one ends with a question; turn two sees one prior assistant turn per move.
+    const model = referenceModel([
+      finish('Which address should I use?'),
+      send('dana@example.test'),
+      finish('Sent.'),
+    ]);
+    const r = await runCase(c, model);
+    expect(r).toMatchObject({ pass: true, followUps: 1, answer: 'Sent.' });
+    expect(r.toolCalls.map((t) => t.tool)).toEqual(['finish', 'email_send', 'finish']);
+  });
+});
 
 describe('runCase', () => {
   it('passes a simple lookup and records the trajectory', async () => {

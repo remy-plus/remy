@@ -1,5 +1,6 @@
 // Runs cases against a model and records what happened, from the event log.
 import {
+  type ConversationTurn,
   createRuntime,
   DEFAULT_BUDGET,
   type ModelClient,
@@ -18,6 +19,7 @@ import { createWorld } from './world.ts';
 
 const LEASE_MS = 60_000;
 const MAX_ROUNDS = 80;
+const MAX_FOLLOW_UPS = 2;
 /** What the scripted human says once its answers run out, as a real person would. */
 const NO_MORE_ANSWERS = 'I have nothing more to add. Finish with what you have.';
 
@@ -84,55 +86,94 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
         random: () => 0,
       });
 
-    const config: TaskConfig = {
+    const base: TaskConfig = {
       model: model.id,
       permissions: { autoApprove: ['read'], allowTools: world.allowTools },
       budget: { ...DEFAULT_BUDGET, ...c.budget },
       workspaceDir: world.dir,
     };
     let rt = make();
-    const taskId = await rt.start(c.prompt, config);
     const answers = [...(c.human.answers ?? [])];
     let error: string | undefined;
-    let outcome: RunOutcome | undefined;
-    for (let i = 0; i < MAX_ROUNDS && !outcome; i++) {
-      try {
-        const o = await rt.advance(taskId);
-        if (o.status === 'waiting_approval') {
-          const tool = (await rt.state(taskId)).calls[o.request.callId]?.tool ?? '';
-          await rt.approve(
-            taskId,
-            o.request.callId,
-            o.request.argsHash,
-            approves(c.human, tool),
-            'eval',
-          );
-        } else if (o.status === 'waiting_user')
-          await rt.answer(taskId, answers.shift() ?? NO_MORE_ANSWERS);
-        else outcome = o;
-      } catch (e) {
-        if (e instanceof Crash) {
-          offset += LEASE_MS + 1;
-          faulty.revive();
-          rt = make();
-        } else {
-          error = e instanceof Error ? e.message : String(e);
-          break;
+
+    /** Drives one task to a finished outcome, answering approvals and questions as the human would. */
+    const drive = async (taskId: string): Promise<RunOutcome | undefined> => {
+      for (let i = 0; i < MAX_ROUNDS; i++) {
+        try {
+          const o = await rt.advance(taskId);
+          if (o.status === 'waiting_approval') {
+            const tool = (await rt.state(taskId)).calls[o.request.callId]?.tool ?? '';
+            await rt.approve(
+              taskId,
+              o.request.callId,
+              o.request.argsHash,
+              approves(c.human, tool),
+              'eval',
+            );
+          } else if (o.status === 'waiting_user')
+            await rt.answer(taskId, answers.shift() ?? NO_MORE_ANSWERS);
+          else return o;
+        } catch (e) {
+          if (e instanceof Crash) {
+            offset += LEASE_MS + 1;
+            faulty.revive();
+            rt = make();
+          } else {
+            error = e instanceof Error ? e.message : String(e);
+            return undefined;
+          }
         }
       }
+      error = `did not finish in ${MAX_ROUNDS} rounds`;
+      return undefined;
+    };
+
+    // A chat: when the agent ends by asking in plain text, the human replies and a new task
+    // carries the earlier turns as context.
+    const taskIds: string[] = [];
+    const context: ConversationTurn[] = [];
+    let prompt = c.prompt;
+    for (let turn = 0; ; turn++) {
+      const taskId = await rt.start(prompt, {
+        ...base,
+        ...(context.length && { context: [...context] }),
+      });
+      taskIds.push(taskId);
+      const outcome = await drive(taskId);
+      const answer = outcome?.status === 'succeeded' ? (outcome.answer ?? '') : '';
+      if (!answer.trim().endsWith('?') || turn >= MAX_FOLLOW_UPS) break;
+      context.push({ prompt, answer });
+      prompt = answers.shift() ?? NO_MORE_ANSWERS;
     }
-    if (!outcome && !error) error = `did not finish in ${MAX_ROUNDS} rounds`;
 
     const after = await world.after();
-    const events = await inner.read(taskId);
-    const { record, state } = buildRecord(events, {
-      c,
-      run,
-      modelCalls: counted.calls,
-      wallMs: 0,
-      crashes: faulty.crashes(),
-      emails: after.emails,
-    });
+    const records = [];
+    for (const id of taskIds) {
+      records.push(
+        buildRecord(await inner.read(id), {
+          c,
+          run,
+          modelCalls: counted.calls,
+          wallMs: 0,
+          crashes: faulty.crashes(),
+          emails: after.emails,
+        }),
+      );
+    }
+    const last = records[records.length - 1];
+    if (!last) throw new Error('no task ran');
+    const { record, state } = last;
+    for (const r of records.slice(0, -1).map((x) => x.record)) {
+      record.steps += r.steps;
+      record.tokens.in += r.tokens.in;
+      record.tokens.out += r.tokens.out;
+      record.costUsd += r.costUsd;
+      record.modelLatencyMs += r.modelLatencyMs;
+      record.toolCalls.unshift(...r.toolCalls);
+      record.approvals.unshift(...r.approvals);
+      record.policyViolations.unshift(...r.policyViolations);
+    }
+    if (taskIds.length > 1) record.followUps = taskIds.length - 1;
 
     const graders = [safety(noPolicyViolations()), ...c.graders];
     const grades: Grade[] = [];

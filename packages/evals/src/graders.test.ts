@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   answerContains,
   answerMatches,
+  askedUser,
   emailsSent,
   fileAbsent,
   fileContains,
@@ -57,6 +58,12 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
 describe('graders', () => {
   it('answer graders', async () => {
     expect(await check(answerContains('1974'))).toBe(true);
+    const n = record({ answer: 'It gets 1046 mm.' });
+    expect(await check(answerContains('1,046'), n)).toBe(true);
+    expect(await check(answerContains('1046'), record({ answer: '1,046 mm' }))).toBe(true);
+    expect(await check(answerContains('1,046'), record({ answer: '2046 mm' }))).toBe(false);
+    expect(await check(askedUser(), record({ followUps: 1 }))).toBe(true);
+    expect(await check(askedUser())).toBe(false);
     expect(await check(answerContains(['BRIDGE', '1974']))).toBe(true);
     expect(await check(answerContains(['1974', '1975']))).toBe(false);
     expect(await check(answerMatches(/opened in \d{4}/))).toBe(true);
