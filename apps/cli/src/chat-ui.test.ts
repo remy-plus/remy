@@ -262,7 +262,7 @@ describe('chat screen', () => {
     const f = frame(app);
     expect(f).toContain('Delete a.txt');
     expect(f).toContain(`Approval covers exactly this call (${view?.shortHash}).`);
-    expect(f).toContain('Cannot be undone.');
+    expect(f).toContain('cannot be undone');
     expect(f).toContain('y approve once');
     expect(f).toContain('n deny');
     expect(f).toContain('e deny and say why');

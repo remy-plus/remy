@@ -195,7 +195,11 @@ export function describeApproval(
   effect?: Effect,
 ): ApprovalView {
   const reversible = req.risk !== 'irreversible' && effect !== 'unsafe_to_retry';
-  const risk = `Risk: ${req.risk}. ${reversible ? 'Can usually be undone.' : 'Cannot be undone.'} ${req.reason}.`;
+  // Say it once: some reasons already speak of undoing.
+  const undo = /undone/i.test(req.reason)
+    ? ''
+    : `${reversible ? 'Can usually be undone.' : 'Cannot be undone.'} `;
+  const risk = `Risk: ${req.risk}. ${undo}${req.reason}.`;
   const v = rowsFor(tool, args, req, risk);
   return {
     ...v,

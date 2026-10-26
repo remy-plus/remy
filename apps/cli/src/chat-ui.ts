@@ -355,7 +355,7 @@ export function hintsFor(phase: ChatState['phase'], hasInput: boolean, noting = 
     case 'running':
       return 'Enter queue · Ctrl+C stop';
     case 'waiting_approval':
-      return 'y approve · n deny · e deny with note · Ctrl+C stop';
+      return 'y approve · n deny · e say why';
     case 'waiting_user':
       return 'Enter answer · Ctrl+C stop';
     default:
