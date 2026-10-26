@@ -15,7 +15,7 @@ import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createChat, releaseLease } from './chat.ts';
-import { ChatApp, contextPart, costPart } from './chat-ui.ts';
+import { ChatApp, contextPart, costPart, promptRows } from './chat-ui.ts';
 import { createTheme } from './theme.ts';
 
 const usage = { inTokens: 10, outTokens: 5 };
@@ -31,7 +31,12 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'], settle = 0) {
+function mount(
+  model: ModelClient,
+  autoApprove: ('read' | 'write')[] = ['read'],
+  settle = 0,
+  inputMode?: 'single' | 'multi',
+) {
   const store = new MemoryEventStore();
   const chat = createChat({
     runtime: (hooks) =>
@@ -63,6 +68,7 @@ function mount(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'],
       reducedMotion: true,
       subtitle: 'test-model',
       approvalSettleMs: settle,
+      inputMode,
     }),
   );
   return { chat, ...app };
@@ -391,6 +397,79 @@ describe('footer meters', () => {
     expect(costPart({ taskCostUsd: 0.04, budgetUsd: 0.5 })).toBe('$0.04 of $0.50');
     expect(costPart({ taskCostUsd: 0.0004, budgetUsd: 1 })).toBe('<$0.01 of $1.00');
     expect(costPart({ taskCostUsd: 0, budgetUsd: undefined })).toBe('');
+  });
+});
+
+describe('multi-line input and paste', () => {
+  const say = (text: string) => [call('finish', { answer: text })];
+  const pause = () => new Promise((r) => setTimeout(r, 30));
+  const bigPaste = Array.from({ length: 9 }, (_, i) => `pasted row ${i}`).join('\n');
+
+  it('Ctrl+J and backslash then Enter add lines; Enter sends them together', async () => {
+    const app = scripted(say('ok'));
+    app.stdin.write('first');
+    await pause();
+    app.stdin.write('\n');
+    await pause();
+    app.stdin.write('second\\');
+    await pause();
+    app.stdin.write('\r');
+    await pause();
+    app.stdin.write('third');
+    await pause();
+    expect(frame(app)).toContain('first');
+    expect(frame(app)).toContain('second');
+    expect(app.chat.history()).toHaveLength(0);
+    app.stdin.write('\r');
+    await until(() => app.chat.history().length === 1);
+    expect(app.chat.history()[0]).toBe('first\nsecond\nthird');
+    app.unmount();
+  });
+
+  it('shows a big bracketed paste as a marker and sends the real text', async () => {
+    const app = scripted(say('ok'));
+    app.stdin.write(`\x1b[200~${bigPaste}\x1b[201~`);
+    await pause();
+    expect(frame(app)).toContain('[Pasted 9 lines]');
+    expect(frame(app)).not.toContain('pasted row 3');
+    app.stdin.write('\r');
+    await until(() => app.chat.history().length === 1);
+    expect(app.chat.history()[0]).toBe(bigPaste);
+    app.unmount();
+  });
+
+  it('counts a row per line, and at most a window of them', () => {
+    expect(promptRows('one', 80)).toBe(1);
+    expect(promptRows('one\ntwo\nthree', 80)).toBe(3);
+    expect(promptRows(Array(20).fill('x').join('\n'), 80)).toBe(6);
+    expect(promptRows('x'.repeat(170), 80)).toBe(3);
+  });
+
+  it('a paste cannot answer an approval card', async () => {
+    const app = scripted(
+      [call('write_file', { path: 'a.txt', content: 'x' }), call('finish', { answer: 'ok' })],
+      ['read'],
+    );
+    await type(app, 'save');
+    await until(() => app.chat.getState().phase === 'waiting_approval');
+    app.stdin.write('\x1b[200~y\x1b[201~');
+    await pause();
+    expect(app.chat.getState().phase).toBe('waiting_approval');
+    app.unmount();
+  });
+
+  it('REMY_INPUT=single keeps the old editor: newlines flatten, pastes stay inline', async () => {
+    const app = mount(new ScriptedModelClient(say('ok')), ['read'], 0, 'single');
+    app.stdin.write('a');
+    await pause();
+    app.stdin.write('\n');
+    await pause();
+    app.stdin.write('b');
+    await pause();
+    app.stdin.write('\r');
+    await until(() => app.chat.history().length === 1);
+    expect(app.chat.history()[0]).toBe('a b');
+    app.unmount();
   });
 });
 

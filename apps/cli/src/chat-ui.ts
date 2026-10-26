@@ -7,7 +7,17 @@
 //   - The live area holds only the active turn and is kept shorter than the screen. A
 //     frame as tall as the terminal makes Ink clear and reprint everything, so the streaming
 //     text is cut to the tail that fits.
-import { Box, render, Static, Text, useApp, useInput, useStdout, useWindowSize } from 'ink';
+import {
+  Box,
+  render,
+  Static,
+  Text,
+  useApp,
+  useInput,
+  usePaste,
+  useStdout,
+  useWindowSize,
+} from 'ink';
 import {
   createElement as h,
   type ReactElement,
@@ -19,7 +29,16 @@ import {
   useSyncExternalStore,
 } from 'react';
 import type { Chat, ChatState, Item } from './chat.ts';
-import { EMPTY_INPUT, editInput, type InputState, withText } from './input.ts';
+import {
+  EMPTY_INPUT,
+  editInput,
+  type InputMode,
+  type InputState,
+  moveLine,
+  pasteInput,
+  pressEnter,
+  recallInput,
+} from './input.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
 import {
   captureStray,
@@ -60,6 +79,8 @@ export interface ChatAppProps {
   onClear?: () => void;
   /** Rings when Remy waits and the window is not focused. */
   notifier?: Notifier;
+  /** `single` is the old one-line editor (REMY_INPUT=single). Default `multi`. */
+  inputMode?: InputMode;
   /** Overrides `APPROVAL_SETTLE_MS` (tests use 0). */
   approvalSettleMs?: number;
 }
@@ -415,34 +436,62 @@ function Footer(p: {
   );
 }
 
+/** Lines of a long input shown at once, around the cursor. */
+export const MAX_PROMPT_LINES = 6;
+
+/** The lines of the input to show: all of them, or a window that holds the cursor line. */
+export function promptWindow(text: string, cursor: number) {
+  const lines = text.split('\n');
+  const at = text.slice(0, cursor).split('\n').length - 1;
+  const start = Math.max(0, Math.min(at - MAX_PROMPT_LINES + 1, lines.length - MAX_PROMPT_LINES));
+  return { lines: lines.slice(start, start + MAX_PROMPT_LINES), from: start, at };
+}
+
 function Prompt(p: { value: InputState; theme: Theme }) {
   const { text, cursor } = p.value;
   const { theme } = p;
-  const before = text.slice(0, cursor);
-  const at = text.slice(cursor, cursor + 1);
-  const after = text.slice(cursor + 1);
+  const { lines, from, at } = promptWindow(text, cursor);
+  const col = cursor - (text.split('\n').slice(0, at).join('\n').length + (at ? 1 : 0));
   return h(
     Box,
-    { paddingLeft: theme.space.indent, marginTop: 1 },
-    h(Box, { width: 2, flexShrink: 0 }, h(Text, mutedProps(theme), theme.symbols.prompt)),
-    h(
-      Text,
-      null,
-      before,
-      // The cursor is the one place the accent colour sits on the input.
-      h(
-        Text,
-        { color: theme.color('accent'), inverse: theme.level === 'none' },
-        at || theme.symbols.cursor,
-      ),
-      after,
-    ),
+    { flexDirection: 'column', paddingLeft: theme.space.indent, marginTop: 1 },
+    ...lines.map((line, i) => {
+      const here = from + i === at;
+      const before = here ? line.slice(0, col) : line;
+      const sym = h(
+        Box,
+        { width: 2, flexShrink: 0 },
+        h(Text, mutedProps(theme), from + i === 0 ? theme.symbols.prompt : ' '),
+      );
+      return h(
+        Box,
+        { key: i },
+        sym,
+        here
+          ? h(
+              Text,
+              null,
+              before,
+              // The cursor is the one place the accent colour sits on the input.
+              h(
+                Text,
+                { color: theme.color('accent'), inverse: theme.level === 'none' },
+                line.slice(col, col + 1) || theme.symbols.cursor,
+              ),
+              line.slice(col + 1),
+            )
+          : h(Text, null, line || ' '),
+      );
+    }),
   );
 }
 
-/** How many rows the prompt takes at this width. */
-export const promptRows = (text: string, columns: number) =>
-  1 + Math.floor(strWidth(text) / Math.max(1, columns - 5));
+/** How many rows the prompt takes at this width: each shown line, wrapped. */
+export const promptRows = (text: string, columns: number, cursor = text.length) =>
+  promptWindow(text, cursor).lines.reduce(
+    (n, l) => n + 1 + Math.floor(strWidth(l) / Math.max(1, columns - 5)),
+    0,
+  );
 
 const MAX_TOOL_ROWS = 8;
 const MAX_QUEUE_ROWS = 3;
@@ -539,6 +588,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
   const { exit } = useApp();
   const { columns, rows } = useWindowSize();
   const [input, setInput] = useState<InputState>(EMPTY_INPUT);
+  const mode = props.inputMode ?? 'multi';
   const recall = useRef(-1);
   const seenClears = useRef(state.clears);
   const [expanded, setExpanded] = useState(false);
@@ -609,13 +659,15 @@ export function ChatApp(props: ChatAppProps): ReactElement {
         }
         if (key.return) {
           // An empty note does nothing: `n` is the plain denial.
-          const note = input.text.trim();
+          const sent = mode === 'multi' ? pressEnter(input) : { send: input.text };
+          if ('state' in sent) return setInput(sent.state);
+          const note = sent.send.trim();
           if (!note) return;
           setNoting(false);
           setInput(EMPTY_INPUT);
           return void chat.approve(false, note);
         }
-        return setInput((cur) => editInput(cur, ch, key));
+        return setInput((cur) => editInput(cur, ch, key, mode));
       }
       // Single keys only, and never Enter: a pasted or stray character cannot approve.
       if (Date.now() - cardSince.current < (props.approvalSettleMs ?? APPROVAL_SETTLE_MS)) return;
@@ -632,23 +684,37 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       return setInput(EMPTY_INPUT);
     }
     if (key.return) {
-      const text = input.text;
+      const sent = mode === 'multi' ? pressEnter(input) : { send: input.text };
+      if ('state' in sent) return setInput(sent.state);
       recall.current = -1;
       setInput(EMPTY_INPUT);
-      return void chat.submit(text);
+      return void chat.submit(sent.send);
     }
     if (key.upArrow || key.downArrow) {
+      // In a several-line message the arrows move between lines; history is for the ends.
+      const moved = mode === 'multi' ? moveLine(input, key.upArrow ? -1 : 1) : undefined;
+      if (moved) return setInput(moved);
       const past = chat.history();
       const next = Math.min(past.length - 1, Math.max(-1, recall.current + (key.upArrow ? 1 : -1)));
       recall.current = next;
-      return setInput(next < 0 ? EMPTY_INPUT : withText(past[past.length - 1 - next] as string));
+      return setInput(next < 0 ? EMPTY_INPUT : recallInput(past[past.length - 1 - next] as string));
     }
-    setInput((cur) => editInput(cur, ch, key));
+    setInput((cur) => editInput(cur, ch, key, mode));
   });
+
+  // Bracketed paste: a big paste becomes one marker. Only the prompt takes it; an approval
+  // card or the full view swallows it, so pasted text can never answer a question.
+  usePaste(
+    (text) => {
+      if (viewing || (state.phase === 'waiting_approval' && !noting)) return;
+      setInput((cur) => pasteInput(cur, text));
+    },
+    { isActive: mode === 'multi' },
+  );
 
   const showPrompt = state.phase !== 'waiting_approval' || noting;
   // Prompt (with its blank line above) and the footer.
-  const below = (showPrompt ? 1 + promptRows(input.text, columns) : 0) + 1;
+  const below = (showPrompt ? 1 + promptRows(input.text, columns, input.cursor) : 0) + 1;
   const entries = [{ id: 'header' } as { id: string; item?: Item }].concat(
     state.items.map((item, i) => ({ id: `i${i}`, item })),
   );
@@ -713,6 +779,7 @@ const CLEAR_SCREEN = '\x1b[2J\x1b[3J\x1b[H';
 /** Opens the chat on the terminal and resolves when the user quits. */
 export async function runChat(props: RunOptions): Promise<void> {
   const { sync = false, onStray, env = process.env, ...appProps } = props;
+  appProps.inputMode ??= env.REMY_INPUT === 'single' ? 'single' : 'multi';
   const stdout = gateSync(process.stdout, sync);
   const notifier = createNotifier(env, process.stdin, process.stdout);
   // Without --debug the writes are kept and shown on the real stderr once the screen is gone.

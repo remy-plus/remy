@@ -121,6 +121,8 @@ export const HELP_TEXT = [
   '',
   'Keys',
   '  Enter     send; while Remy works, the message waits its turn',
+  '  Ctrl+J    new line (or type \\ then Enter); a big paste shows as [Pasted N lines]',
+  '  Ctrl+W    delete a word; Ctrl+K delete to the end of the line',
   '  Up        bring back your last message',
   '  Esc       clear the input',
   '  Ctrl+O    read the whole conversation, with details (q to go back)',
