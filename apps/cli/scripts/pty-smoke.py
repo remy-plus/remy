@@ -108,6 +108,7 @@ def main() -> int:
         if text not in APPROVAL_KEYS:
             os.write(master, b"\r")
 
+    approval_screens: list[list[str]] = []
     ok = wait_for("ready", 30)
     if not ok:
         print("the chat did not become ready; screen:\n" + "\n".join(screen.display))
@@ -122,6 +123,12 @@ def main() -> int:
             ok = False
             break
         pump(0.3)
+        if "needs approval" in last_line():
+            approval_screens.append([l.rstrip() for l in screen.display if l.strip()])
+    if "needs approval" in last_line():
+        # Letters typed now would be approval keys; stop the task first.
+        os.write(master, b"\x03")
+        pump(1.0)
     send("/exit")
     pump(2.0)
     if proc.poll() is None:
@@ -143,11 +150,14 @@ def main() -> int:
     while lines and not lines[-1]:
         lines.pop()
     print("\n".join(lines))
+    for n, shot in enumerate(approval_screens, 1):
+        print(f"\n--- approval screen {n} ---")
+        print("\n".join(shot))
     print("\n--- checks ---")
 
     failures = []
-    for t in turns:
-        if t in APPROVAL_KEYS:  # approval keys, not chat messages
+    for i, t in enumerate(turns):
+        if t in APPROVAL_KEYS or (i and turns[i - 1] == "e"):  # keys and notes, not chat messages
             continue
         n = sum(1 for l in lines if re.fullmatch(r"\s*› " + re.escape(t), l))
         print(f"user line {t[:30]!r}: {n}")
@@ -171,6 +181,16 @@ def main() -> int:
         failures.append(f"narration in scrollback: {l}")
     plans = sum(1 for l in lines if re.match(r"\s*Plan \d+/\d+", l))
     print(f"plan headers: {plans}")
+    # The card lives in the live area: once per approval screen, and never left in scrollback.
+    for n, shot in enumerate(approval_screens, 1):
+        shown = sum(1 for l in shot if "Approval covers exactly this call" in l)
+        print(f"approval screen {n}: card shown {shown} time(s)")
+        if shown != 1:
+            failures.append(f"approval card shown {shown} times on screen {n}")
+    left = sum(1 for l in lines if "Approval covers exactly this call" in l)
+    print(f"approval cards left in scrollback: {left}")
+    if left:
+        failures.append("approval card left in scrollback")
     for f in failures:
         print("FAIL:", f)
     print("clean" if not failures and ok else "NOT CLEAN")
