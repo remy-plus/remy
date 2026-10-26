@@ -42,6 +42,9 @@ def main() -> int:
     ap.add_argument("--rows", type=int, default=30)
     ap.add_argument("--timeout", type=int, default=180, help="seconds to wait per turn")
     ap.add_argument("--turn", action="append", help="a message to send (repeatable)")
+    ap.add_argument("--term", default="xterm-256color", help="TERM for the chat (try dumb)")
+    ap.add_argument("--no-reply", action="store_true", help="do not answer the terminal probe")
+    ap.add_argument("--unfocus", action="store_true", help="send a focus-out report, then expect a bell at approval")
     ap.add_argument("--raw", help="write the raw bytes to this file")
     ap.add_argument("--env-file", help="a file with KEY=<openai key>, used when OPENAI_API_KEY is unset")
     args = ap.parse_args()
@@ -57,7 +60,7 @@ def main() -> int:
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", args.rows, args.cols, 0, 0))
     home = tempfile.mkdtemp(prefix="remy-smoke-")
-    env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor", REMY_HOME=home)
+    env = dict(os.environ, TERM=args.term, COLORTERM="truecolor", REMY_HOME=home)
     env.setdefault("REMY_PROFILE", "openai")
     env.setdefault("REMY_MODEL", "gpt-5-nano")
     proc = subprocess.Popen(
@@ -84,6 +87,9 @@ def main() -> int:
                 return
             raw.extend(data)
             stream.feed(data)
+            # Answer the probe like a capable terminal: sync supported, dark background.
+            if b"\x1b[?2026$p" in data and not args.no_reply:
+                os.write(master, b"\x1b[?2026;2$y\x1b]11;rgb:0f0f/0f0f/1010\x07\x1b[?64c")
 
     def last_line() -> str:
         rows = [l.rstrip() for l in screen.display if l.strip()]
@@ -114,6 +120,9 @@ def main() -> int:
         print("the chat did not become ready; screen:\n" + "\n".join(screen.display))
         proc.kill()
         return 1
+    if args.unfocus:
+        os.write(master, b"\x1b[O")
+        pump(0.3)
     for t in turns:
         send(t)
         pump(1.5)  # let the turn begin
@@ -157,7 +166,7 @@ def main() -> int:
 
     failures = []
     for i, t in enumerate(turns):
-        if t in APPROVAL_KEYS or (i and turns[i - 1] == "e"):  # keys and notes, not chat messages
+        if t in APPROVAL_KEYS or t.startswith("/") or (i and turns[i - 1] == "e"):  # keys and notes, not chat messages
             continue
         n = sum(1 for l in lines if re.fullmatch(r"\s*› " + re.escape(t), l))
         print(f"user line {t[:30]!r}: {n}")
@@ -181,6 +190,22 @@ def main() -> int:
         failures.append(f"narration in scrollback: {l}")
     plans = sum(1 for l in lines if re.match(r"\s*Plan \d+/\d+", l))
     print(f"plan headers: {plans}")
+    # Terminal manners: frames are wrapped only when the terminal answered the probe.
+    begins, ends = raw.count(b"\x1b[?2026h"), raw.count(b"\x1b[?2026l")
+    capable = args.term != "dumb" and not args.no_reply
+    print(f"sync markers: {begins} begin, {ends} end (expected {'some' if capable else 'none'})")
+    if capable and (begins == 0 or abs(begins - ends) > 1):
+        failures.append("synchronized output markers missing or unbalanced")
+    # Ink brackets some frames itself; our probe's own mode set must not leak when gated off.
+    if not capable and (begins or ends):
+        failures.append("synchronized output markers sent to a terminal that did not confirm")
+    if args.term == "dumb" and (b"\x1b[?1004h" in raw or b"\x1b[?2026$p" in raw):
+        failures.append("queries sent to a dumb terminal")
+    if args.unfocus:
+        rings = raw.count(b"\x07")
+        print(f"bells while unfocused: {rings}")
+        if approval_screens and rings == 0:
+            failures.append("no bell at approval while unfocused")
     # The card lives in the live area: once per approval screen, and never left in scrollback.
     for n, shot in enumerate(approval_screens, 1):
         shown = sum(1 for l in shot if "Approval covers exactly this call" in l)
