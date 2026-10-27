@@ -137,7 +137,9 @@ function spanProps(sp: Span, theme: Theme) {
     ...(sp.bold && { bold: true }),
     ...(sp.italic && { italic: true }),
     ...(sp.dim && mutedProps(theme)),
-    ...(sp.code && { color: theme.color('accent') }),
+    ...(sp.faint && theme.props('faint')),
+    // Without colours, inline code is set apart by weight.
+    ...(sp.code && (theme.level === 'none' ? { bold: true } : theme.props('code'))),
   };
 }
 
