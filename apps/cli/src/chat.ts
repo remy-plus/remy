@@ -5,6 +5,7 @@ import {
   type ConversationTurn,
   type Effect,
   type EventStore,
+  fencePasted,
   ModelError,
   type RemyRuntime,
   type RunOutcome,
@@ -104,7 +105,7 @@ export interface Chat {
   getState(): ChatState;
   subscribe(fn: () => void): () => void;
   /** A line from the user: a new message, an answer to a question, or a /command. */
-  submit(text: string): Promise<void>;
+  submit(text: string, pasted?: string[]): Promise<void>;
   /** Answers the pending approval. A denial may carry a note the model reads. */
   approve(granted: boolean, note?: string): Promise<void>;
   /** Stops the running task. It stays resumable. */
@@ -194,7 +195,9 @@ export function createChat(deps: ChatDeps): Chat {
   const listeners = new Set<() => void>();
   /** Bumped by interrupt and /new, so a stopped run's late callbacks are ignored. */
   let gen = 0;
-  let current: { id: string; prompt: string } | undefined;
+  let current: { id: string; prompt: string; pasted?: string[] } | undefined;
+  /** Pasted segments of messages still waiting in the queue, by text. */
+  const pastedFor = new Map<string, string[]>();
   /** True while a run is live; false once it was interrupted, so late callbacks are ignored. */
   let running = false;
   const calls = new Map<string, { tool: string; args: unknown }>();
@@ -407,7 +410,10 @@ export function createChat(deps: ChatDeps): Chat {
         const prompt = current?.prompt ?? '';
         if (o.status === 'succeeded') {
           const answer = o.answer?.trim() || 'Done.';
-          turns = [...turns, { prompt, answer }].slice(-MAX_CONTEXT_TURNS);
+          turns = [
+            ...turns,
+            { prompt, answer, ...(current?.pasted?.length && { pasted: current.pasted }) },
+          ].slice(-MAX_CONTEXT_TURNS);
           return await end(true, { kind: 'reply', text: answer });
         }
         if (o.status === 'failed')
@@ -441,10 +447,13 @@ export function createChat(deps: ChatDeps): Chat {
       taskCostUsd: 0,
     });
     try {
-      const config = deps.config(turns);
+      const pasted = pastedFor.get(text);
+      pastedFor.delete(text);
+      const base = deps.config(turns);
+      const config = pasted?.length ? { ...base, pasted } : base;
       set({ budgetUsd: config.budget.maxCostUsd });
       const id = await runtime.start(text, config);
-      current = { id, prompt: text };
+      current = { id, prompt: text, ...(pasted?.length && { pasted }) };
       set({ taskId: id });
       await drive(id, my);
     } catch (e) {
@@ -475,9 +484,12 @@ export function createChat(deps: ChatDeps): Chat {
     },
     history: () => sent,
 
-    async submit(raw) {
+    async submit(raw, pasted) {
       const text = raw.trim();
       if (!text) return;
+      // Pasted text is untrusted: the task starts tainted and the model sees it fenced.
+      const segs = (pasted ?? []).map((p) => p.trim()).filter((p) => p && text.includes(p));
+      if (segs.length) pastedFor.set(text, segs);
       if (/^\/(exit|quit)$/.test(text)) return void set({ wantsExit: true });
       if (s.phase === 'waiting_user' && current) {
         const my = gen;
@@ -487,7 +499,7 @@ export function createChat(deps: ChatDeps): Chat {
         set({ phase: 'running', thinking: true, question: undefined });
         running = true;
         try {
-          await runtime.answer(id, text);
+          await runtime.answer(id, fencePasted(text, segs));
           await drive(id, my);
         } catch (e) {
           if (my !== gen) return;

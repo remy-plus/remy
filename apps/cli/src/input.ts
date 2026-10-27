@@ -69,6 +69,17 @@ export function expandPastes(st: InputState): string {
   return st.text.replace(MARKER, (m, _n, id) => st.pastes[id ? Number(id) : 1] ?? m);
 }
 
+/** The pasted texts a message holds, for the ones whose markers are still in it. */
+export function pastedSegments(st: InputState): string[] {
+  const out: string[] = [];
+  st.text.replace(MARKER, (m, _n, id) => {
+    const seg = st.pastes[id ? Number(id) : 1];
+    if (seg !== undefined) out.push(seg);
+    return m;
+  });
+  return out;
+}
+
 /** The marker that ends exactly at `at`, or the one that starts there. */
 function markerAt(
   text: string,
@@ -123,10 +134,12 @@ export function moveLine(st: InputState, dir: -1 | 1): InputState | undefined {
 }
 
 /** What Enter does: a trailing backslash turns it into a newline, otherwise it sends. */
-export function pressEnter(st: InputState): { send: string } | { state: InputState } {
+export function pressEnter(
+  st: InputState,
+): { send: string; pasted: string[] } | { state: InputState } {
   if (st.text[st.cursor - 1] === '\\')
     return { state: insert(cut(st, st.cursor - 1, st.cursor), '\n') };
-  return { send: expandPastes(st) };
+  return { send: expandPastes(st), pasted: pastedSegments(st) };
 }
 
 /** Applies one key press. Returns the same state when the key does nothing. */

@@ -44,7 +44,7 @@ describe('several lines', () => {
     expect(editInput(at('ab', 1), 'j', { ctrl: true }).text).toBe('a\nb');
     const r = pressEnter(withText('line one\\'));
     expect(r).toMatchObject({ state: { text: 'line one\n', cursor: 9 } });
-    expect(pressEnter(withText('plain'))).toEqual({ send: 'plain' });
+    expect(pressEnter(withText('plain'))).toEqual({ send: 'plain', pasted: [] });
   });
 
   it('Home, End and Ctrl+U work on the current line', () => {

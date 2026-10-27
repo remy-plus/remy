@@ -695,11 +695,11 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       return setInput(EMPTY_INPUT);
     }
     if (key.return) {
-      const sent = mode === 'multi' ? pressEnter(input) : { send: input.text };
+      const sent = mode === 'multi' ? pressEnter(input) : { send: input.text, pasted: [] };
       if ('state' in sent) return setInput(sent.state);
       recall.current = -1;
       setInput(EMPTY_INPUT);
-      return void chat.submit(sent.send);
+      return void chat.submit(sent.send, sent.pasted);
     }
     if (key.upArrow || key.downArrow) {
       // In a several-line message the arrows move between lines; history is for the ends.
