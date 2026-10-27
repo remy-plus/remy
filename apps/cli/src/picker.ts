@@ -106,13 +106,17 @@ export function Menu(p: {
           { width: theme.space.lead, flexShrink: 0 },
           h(Text, on && accent ? { color: accent } : muted, on ? theme.symbols.prompt : ' '),
         ),
+        // A fixed column: a long detail on one row must not squeeze the titles.
         h(
-          Text,
-          { wrap: 'truncate-end', ...(on ? { bold: true } : {}) },
-          ...matchSpans(it.title, p.query ?? '').map(([text, hit], n) =>
-            h(Text, { key: n, ...(hit && { underline: true }) }, text),
+          Box,
+          { width: wide, flexShrink: 0 },
+          h(
+            Text,
+            { wrap: 'truncate-end', ...(on ? { bold: true } : {}) },
+            ...matchSpans(it.title, p.query ?? '').map(([text, hit], n) =>
+              h(Text, { key: n, ...(hit && { underline: true }) }, text),
+            ),
           ),
-          ' '.repeat(Math.max(0, wide - it.title.length)),
         ),
         it.detail ? h(Text, { wrap: 'truncate-end', ...muted }, `  ${it.detail}`) : null,
       );
