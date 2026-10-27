@@ -381,6 +381,12 @@ Work packages, in order. Sonnet writes the code, Opus reviews and merges, and `p
 
    npm publish and the GitHub release need the user's go.
 
+## 0.3: connect to almost any model (decided 2026-10-27)
+
+1. **`remy login`**: a picker to choose a provider, paste a key (masked), check it with one request, and save it to the macOS Keychain (else a 0600 file in REMY_HOME). Order: flags > env > saved login > config. Keys never reach logs, events or the model.
+2. **More providers**: one adapter over a unified LLM library (Pi's `pi-ai` or the Vercel AI SDK, chosen on native Anthropic and Gemini support, tools, streaming, size and license) for APIs that are not OpenAI-compatible. The thin OpenAI-compatible client stays for the rest.
+3. **Subscription sign-in** (Claude, ChatGPT, Copilot, Gemini) only where the provider's terms allow third-party apps. Research in `design/research/subscription-login.md` decides; nothing is built that would put users' accounts at risk.
+
 ## Product roadmap after Phase 0
 
 Each phase keeps the Phase 0 interfaces. Its exit criteria include "no regression in the eval suite", and the suite grows with every capability.
