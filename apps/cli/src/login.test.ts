@@ -173,7 +173,7 @@ describe('where the key and model come from', () => {
     // A model that echoes its credentials would be redacted; the request itself carries no key.
     const r = await harness({ env: { REMY_HOME: home, REMY_DEBUG: log } }).run(
       'run',
-      'my key is ' + SECRET,
+      `my key is ${SECRET}`,
     );
     expect(r.code).toBe(0);
     const text = readFileSync(log, 'utf8');
