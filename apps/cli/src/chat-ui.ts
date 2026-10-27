@@ -248,7 +248,7 @@ function PlanList(p: { steps: PlanStep[]; theme: Theme; max: number; title?: str
   };
   return h(
     Box,
-    { flexDirection: 'column', paddingLeft: theme.space.indent },
+    { flexDirection: 'column', paddingLeft: theme.space.indent, marginTop: theme.space.turn },
     h(Text, mutedProps(theme), `${p.title ?? 'Plan'} ${done}/${p.steps.length}`),
     ...shown.map((s, i) =>
       h(
@@ -271,8 +271,9 @@ const USER_LINES = 4;
 
 function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
   const { item, theme } = p;
+  const turn = theme.space.turn;
   const muted = mutedProps(theme);
-  const body = Math.max(12, p.columns - theme.space.indent - 3);
+  const body = Math.max(12, p.columns - theme.space.indent - theme.space.lead - 1);
   const md = (text: string) => h(Rich, { lines: renderMarkdown(text, body), theme });
   const userLines = item.kind === 'user' ? item.text.split('\n') : [];
   const shown = userLines.length > USER_LINES + 2 ? userLines.slice(0, USER_LINES) : userLines;
@@ -281,7 +282,7 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
     case 'user':
       return h(
         Row,
-        { theme, marginTop: 1, lead: h(Text, muted, theme.symbols.prompt) },
+        { theme, marginTop: turn, lead: h(Text, muted, theme.symbols.prompt) },
         h(
           Box,
           { flexDirection: 'column' },
@@ -291,11 +292,11 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
       );
     case 'reply':
     case 'text':
-      return h(Row, { theme, marginTop: 1 }, md(item.text));
+      return h(Row, { theme, marginTop: turn }, md(item.text));
     case 'question':
       return h(
         Row,
-        { theme, marginTop: 1, lead: h(Text, muted, theme.symbols.waiting) },
+        { theme, marginTop: turn, lead: h(Text, muted, theme.symbols.waiting) },
         md(item.text),
       );
     case 'tool':
@@ -309,7 +310,7 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
         h(Text, { bold: true }, item.text),
       );
     case 'note':
-      return h(Row, { theme, marginTop: 1 }, h(Text, muted, item.text));
+      return h(Row, { theme, marginTop: turn }, h(Text, muted, item.text));
   }
 }
 
@@ -581,13 +582,17 @@ function Live(p: {
     busy && state.showThinking && state.reasoning && !state.streaming
       ? tailLines(state.reasoning.split('\n').filter(Boolean), 3)
       : [];
+  // A run of tools that follows earlier tool rows (already in the transcript) shares their block.
+  const continuesTools = state.items.at(-1)?.kind === 'tool' && !state.streaming;
   const fixedBase =
     p.below +
     tools.length +
     queued.length +
     planRows +
     detail.length +
-    (busy ? 1 : 0) +
+    (busy ? 1 + theme.space.turn : 0) +
+    (tools.length && !continuesTools ? theme.space.turn : 0) +
+    (state.plan?.length ? theme.space.turn : 0) +
     (state.retrying ? 1 : 0);
   // An expanded card may use what the screen has left, minus the card's own frame.
   const cardRoom = Math.max(APPROVAL_ROWS, p.rows - 1 - fixedBase - 6);
@@ -639,7 +644,7 @@ function Live(p: {
       h(
         Box,
         { key: `q${i}`, paddingLeft: theme.space.indent },
-        h(Box, { width: 2, flexShrink: 0 }, h(Text, muted, theme.symbols.prompt)),
+        h(Box, { width: theme.space.lead, flexShrink: 0 }, h(Text, muted, theme.symbols.prompt)),
         h(Text, { wrap: 'truncate-end', ...muted }, `${q}  queued`),
       ),
     );
