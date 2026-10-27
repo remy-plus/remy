@@ -75,6 +75,21 @@ function hardSplit(word: string, width: number): string[] {
   return out;
 }
 
+/** Breaks a line at spaces to fit `width`, keeping its own spacing; a word too long is cut. */
+export function wrapPlain(line: string, width: number): string[] {
+  const out: string[] = [];
+  let rest = line;
+  while (strWidth(rest) > width) {
+    const head = hardSplit(rest, width)[0] as string;
+    const space = head.lastIndexOf(' ');
+    const cut = rest[head.length] === ' ' || space <= 0 ? head.length : space;
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^ /, '');
+  }
+  out.push(rest);
+  return out;
+}
+
 const INLINE =
   /\*\*(.+?)\*\*|`([^`\n]+)`|\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)|(?<![*\w])\*([^*\s](?:[^*\n]*[^*\s])?)\*(?![*\w])/g;
 

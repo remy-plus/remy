@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inline, lineWidth, type MdLine, renderMarkdown, strWidth } from './markdown.ts';
+import { inline, lineWidth, type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
 
 const plain = (lines: MdLine[]) => lines.map((l) => l.map((s) => s.text).join(''));
 
@@ -92,5 +92,14 @@ describe('renderMarkdown', () => {
   it('counts wide characters as two columns', () => {
     expect(strWidth('日本')).toBe(4);
     expect(strWidth('abc')).toBe(3);
+  });
+});
+
+describe('wrapPlain', () => {
+  it('breaks at spaces, keeps indentation and cuts a word that is too long', () => {
+    expect(wrapPlain('one two three', 7)).toEqual(['one two', 'three']);
+    expect(wrapPlain('    indented code', 40)).toEqual(['    indented code']);
+    expect(wrapPlain('abcdefghij', 4)).toEqual(['abcd', 'efgh', 'ij']);
+    expect(wrapPlain('', 5)).toEqual(['']);
   });
 });

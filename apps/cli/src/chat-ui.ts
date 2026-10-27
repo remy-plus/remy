@@ -43,7 +43,7 @@ import {
   withText,
 } from './input.ts';
 import { LoginFlow } from './login-ui.ts';
-import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
+import { clip, type MdLine, renderMarkdown, type Span, strWidth, wrapPlain } from './markdown.ts';
 import { applyMention, atToken } from './mentions.ts';
 import { Menu, menuRows, Picker, type PickItem } from './picker.ts';
 import { SessionPicker } from './session-picker.ts';
@@ -349,7 +349,7 @@ function TranscriptItem(p: { item: Item; prev?: Item; theme: Theme; columns: num
         h(
           Box,
           { flexDirection: 'column' },
-          h(Text, null, shown.join('\n')),
+          h(Text, null, shown.flatMap((l) => wrapPlain(l, body)).join('\n')),
           more ? h(Text, muted, `... ${more} more lines (Ctrl+O shows all)`) : null,
         ),
       );
