@@ -12,7 +12,14 @@ import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { askUser, createScopedFetch, createScopedFs, finish, writeFile } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Chat, createChat, friendlyError, parsePlan, releaseLease } from './chat.ts';
+import {
+  type Chat,
+  createChat,
+  friendlyError,
+  parsePlan,
+  releaseLease,
+  resumeBanner,
+} from './chat.ts';
 
 const usage = { inTokens: 10, outTokens: 5 };
 const call = (tool: string, args: unknown, text?: string): ModelResponse => ({
@@ -67,6 +74,8 @@ function harness(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'
         context,
       };
     },
+    listTasks: () => store.listTasks(),
+    readEvents: (id) => store.read(id),
     release: releaseLease(store, 'chat-test'),
   });
   return { chat, store, contexts };
@@ -354,5 +363,85 @@ describe('helpers', () => {
 
   it('turns errors into a sentence with a next step', () => {
     expect(friendlyError(new Error('boom'))).toBe('boom. Send your message again, or run /help.');
+  });
+});
+
+describe('resume', () => {
+  const steps = [
+    { text: 'read notes', status: 'done' },
+    { text: 'sort files', status: 'done' },
+    { text: 'move files', status: 'doing' },
+    { text: 'summarize', status: 'pending' },
+  ];
+  const plan = call('update_plan', { steps });
+
+  it('words the banner from the plan, or plainly without one', () => {
+    expect(resumeBanner('task_7c2e1a', parsePlan({ steps }))).toBe(
+      'Resuming 7c2e: 2 of 4 steps done. Next: move files.',
+    );
+    expect(resumeBanner('task_7c2e1a', undefined)).toBe('Resuming 7c2e.');
+  });
+
+  it('lists unfinished tasks, resumes one after a restart and finishes it', async () => {
+    const first = harness(new ScriptedModelClient([plan, write]), ['read']);
+    await first.chat.submit('tidy my notes');
+    expect(first.chat.getState().phase).toBe('waiting_approval');
+    await first.chat.interrupt();
+
+    // A new process: same store, new controller, new model.
+    const model = new ScriptedModelClient([done('Moved the files.')]);
+    const store = first.store;
+    const second = createChat({
+      runtime: (hooks) =>
+        createRuntime({
+          store,
+          model,
+          tools: new ToolRegistry([writeFile, askUser, finish]),
+          owner: 'chat-test-2',
+          capabilities: (config) => ({
+            fs: createScopedFs(config.workspaceDir),
+            net: createScopedFetch({}),
+            secrets: { get: () => undefined },
+          }),
+          sleep: async () => {},
+          ...hooks,
+        }),
+      config: (context) => ({
+        model: model.id,
+        permissions: { autoApprove: ['read'] },
+        budget: DEFAULT_BUDGET,
+        workspaceDir: dir,
+        context,
+      }),
+      listTasks: () => store.listTasks(),
+      readEvents: (id) => store.read(id),
+      release: releaseLease(store, 'chat-test-2'),
+    });
+    await second.submit('/resume');
+    const rows = second.getState().picker;
+    expect(rows).toHaveLength(1);
+    expect(rows?.[0]).toMatchObject({ title: 'tidy my notes', status: 'waiting_approval' });
+    const id = rows?.[0]?.taskId ?? '';
+    await second.resume(id);
+    const s = second.getState();
+    expect(s.picker).toBeUndefined();
+    expect(s.phase).toBe('waiting_approval');
+    expect(s.approval?.risk).toBe('write');
+    const notes = s.items.flatMap((i) => (i.kind === 'note' ? [i.text] : []));
+    expect(notes).toContain(
+      `Resuming ${id.replace('task_', '').slice(0, 4)}: 2 of 4 steps done. Next: move files.`,
+    );
+    await second.approve(true);
+    expect(second.getState().phase).toBe('idle');
+    // A finished task is no longer offered.
+    await second.submit('/resume');
+    expect(second.getState().picker).toBeUndefined();
+  });
+
+  it('says so when nothing is waiting', async () => {
+    const { chat } = harness(new ScriptedModelClient([]));
+    await chat.submit('/resume');
+    expect(chat.getState().picker).toBeUndefined();
+    expect(chat.getState().items.at(-1)).toMatchObject({ kind: 'note' });
   });
 });

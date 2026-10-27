@@ -6,12 +6,15 @@ import {
   type Effect,
   type EventStore,
   fencePasted,
+  fold,
   ModelError,
   type RemyRuntime,
   type RunOutcome,
   type StoredEvent,
   TaskBusyError,
   type TaskConfig,
+  type TaskStatus,
+  type TaskSummary,
 } from '@remy/core';
 import { truncate } from './format.ts';
 import {
@@ -40,6 +43,29 @@ export type Item =
   | { kind: 'plan'; steps: PlanStep[] }
   | { kind: 'note'; text: string }
   | { kind: 'error'; text: string };
+
+/** One resumable task in the `/resume` picker. */
+export interface SessionRow {
+  taskId: string;
+  /** From the first prompt. */
+  title: string;
+  status: TaskStatus;
+  /** ISO time of the last event. */
+  updatedAt: string;
+}
+
+/** The first four characters of a task's id, as shown in banners. */
+export const shortId = (taskId: string) => taskId.replace(/^task_/, '').slice(0, 4);
+
+/** `Resuming 7c2e: 2 of 4 steps done. Next: move files.` or, with no plan, a plain line. */
+export function resumeBanner(taskId: string, plan: PlanStep[] | undefined): string {
+  const head = `Resuming ${shortId(taskId)}`;
+  if (!plan?.length) return `${head}.`;
+  const done = plan.filter((p) => p.status === 'done').length;
+  const next = plan.find((p) => p.status === 'doing') ?? plan.find((p) => p.status === 'pending');
+  const n = plan.length;
+  return `${head}: ${done} of ${n} ${n === 1 ? 'step' : 'steps'} done.${next ? ` Next: ${next.text}.` : ''}`;
+}
 
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
@@ -82,6 +108,8 @@ export interface ChatState {
   reasoning: string;
   /** /thinking: show the summary text under the status row. */
   showThinking: boolean;
+  /** The `/resume` picker, open while it holds rows. */
+  picker?: SessionRow[];
   /** Counts /clear, so the screen knows to start over. */
   clears: number;
 }
@@ -98,6 +126,10 @@ export interface ChatDeps {
   runtime: (hooks: RuntimeHooks) => RemyRuntime;
   /** The config for a new task; `context` carries the earlier turns. */
   config: (context: ConversationTurn[]) => TaskConfig;
+  /** Tasks in the store, newest first, for `/resume`. */
+  listTasks?: () => Promise<TaskSummary[]>;
+  /** A task's events, to rebuild what it was doing. */
+  readEvents?: (taskId: string) => Promise<StoredEvent[]>;
   /** Lets go of a task's lease so `remy resume` can take it. */
   release: (taskId: string) => Promise<void>;
   /** The model's context window in tokens, when it is known. */
@@ -111,6 +143,10 @@ export interface Chat {
   subscribe(fn: () => void): () => void;
   /** A line from the user: a new message, an answer to a question, or a /command. */
   submit(text: string, pasted?: string[]): Promise<void>;
+  /** Closes the `/resume` picker. */
+  closePicker(): void;
+  /** Picks up an unfinished task from the store and carries on with it. */
+  resume(taskId: string): Promise<void>;
   /** Answers the pending approval. A denial may carry a note the model reads. */
   approve(granted: boolean, note?: string): Promise<void>;
   /** Stops the running task. It stays resumable. */
@@ -141,6 +177,7 @@ export const HELP_TEXT = [
   'Commands',
   '  /help     this list',
   "  /thinking show or hide the model's reasoning summary, when it shares one",
+  '  /resume   pick up an unfinished task',
   '  /new      start a fresh conversation',
   '  /clear    clear the screen and start a fresh conversation',
   '  /exit     quit',
@@ -197,6 +234,8 @@ const initial = (): ChatState => ({
 const MAX_LIVE_DONE = 4;
 /** Reasoning kept for display only; the newest characters win. */
 const MAX_REASONING_CHARS = 2000;
+/** The picker shows this many tasks, newest first. */
+const MAX_PICKER_ROWS = 8;
 
 export function createChat(deps: ChatDeps): Chat {
   let s: ChatState = { ...initial(), contextWindow: deps.contextWindow };
@@ -475,6 +514,66 @@ export function createChat(deps: ChatDeps): Chat {
     }
   }
 
+  const RESUMABLE: TaskStatus[] = ['running', 'waiting_approval', 'waiting_user'];
+
+  async function openPicker() {
+    const all = (await deps.listTasks?.()) ?? [];
+    const rows = all
+      .filter((t) => RESUMABLE.includes(t.status) && t.taskId !== current?.id)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, MAX_PICKER_ROWS)
+      .map((t) => ({
+        taskId: t.taskId,
+        title: truncate(t.prompt.replace(/\s+/g, ' ').trim(), 80),
+        status: t.status,
+        updatedAt: t.updatedAt,
+      }));
+    if (!rows.length)
+      return commit({ kind: 'note', text: 'Nothing to resume. Unfinished tasks show up here.' });
+    set({ picker: rows });
+  }
+
+  async function resumeTask(id: string) {
+    set({ picker: undefined });
+    const my = ++gen;
+    try {
+      const events = (await deps.readEvents?.(id)) ?? [];
+      if (!events.length) return commit({ kind: 'error', text: `There is no task ${id}.` });
+      const st = fold(events);
+      if (!RESUMABLE.includes(st.status))
+        return commit({ kind: 'note', text: `Task ${shortId(id)} already ${st.status}.` });
+      let plan: PlanStep[] | undefined;
+      calls.clear();
+      for (const c of Object.values(st.calls).sort((a, b) => a.step - b.step)) {
+        calls.set(c.callId, { tool: c.tool, args: c.args });
+        if (c.tool === 'update_plan') plan = parsePlan(c.args) ?? plan;
+      }
+      running = true;
+      current = {
+        id,
+        prompt: st.prompt,
+        ...(st.config.pasted?.length && { pasted: st.config.pasted }),
+      };
+      commit({ kind: 'user', text: st.prompt }, { kind: 'note', text: resumeBanner(id, plan) });
+      set({
+        phase: 'running',
+        thinking: true,
+        streaming: '',
+        tools: [],
+        plan,
+        taskId: id,
+        step: 0,
+        turnStartedAt: Date.now(),
+        taskCostUsd: st.costUsd,
+        budgetUsd: st.config.budget.maxCostUsd,
+      });
+      await drive(id, my);
+    } catch (e) {
+      if (my !== gen) return;
+      await end(false, { kind: 'error', text: friendlyError(e) });
+    }
+  }
+
   function command(line: string) {
     const [name] = line.slice(1).split(/\s+/);
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
@@ -485,6 +584,8 @@ export function createChat(deps: ChatDeps): Chat {
       turns = [];
       // The screen wipes itself and prints the header again; the transcript starts empty.
       set({ items: [], clears: s.clears + 1 });
+    } else if (name === 'resume') {
+      void openPicker();
     } else if (name === 'thinking') {
       const on = !s.showThinking;
       set({ showThinking: on });
@@ -532,6 +633,9 @@ export function createChat(deps: ChatDeps): Chat {
       if (text.startsWith('/')) return command(text);
       await start(text);
     },
+
+    closePicker: () => set({ picker: undefined }),
+    resume: resumeTask,
 
     async approve(granted, note) {
       const a = s.approval;

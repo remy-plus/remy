@@ -464,6 +464,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       },
       effectOf: (tool) => registry?.get(tool)?.effect,
       config: (context) => taskConfig(file, model.id, workspace, context),
+      listTasks: () => store.listTasks(),
+      readEvents: (id) => store.read(id),
       release: releaseLease(store, owner),
       contextWindow: model.caps.contextWindow,
     });

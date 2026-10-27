@@ -40,6 +40,7 @@ import {
   recallInput,
 } from './input.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
+import { SessionPicker } from './session-picker.ts';
 import {
   captureStray,
   createNotifier,
@@ -677,8 +678,8 @@ export function ChatApp(props: ChatAppProps): ReactElement {
   }, [state.phase]);
 
   useInput((ch, key) => {
-    // The transcript view reads its own keys.
-    if (viewing) return;
+    // The transcript view and the session picker read their own keys.
+    if (viewing || state.picker) return;
     // Focus reports are for the notifier, not the editor.
     if (isFocusReport(ch)) return;
     if (key.ctrl && ch === 'd') return void quit();
@@ -786,6 +787,14 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           },
         })
       : null,
+    state.picker
+      ? h(SessionPicker, {
+          rows: state.picker,
+          theme,
+          onPick: (id) => void chat.resume(id),
+          onCancel: () => chat.closePicker(),
+        })
+      : null,
     viewing
       ? null
       : h(Live, {
@@ -798,7 +807,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           expanded,
           noting,
         }),
-    showPrompt && !viewing ? h(Prompt, { value: input, theme }) : null,
+    showPrompt && !viewing && !state.picker ? h(Prompt, { value: input, theme }) : null,
     viewing
       ? null
       : h(Footer, {
