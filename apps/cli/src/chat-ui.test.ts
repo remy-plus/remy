@@ -230,7 +230,7 @@ describe('chat screen', () => {
     app.stdin.write('y');
     await until(() => app.chat.getState().phase === 'idle');
     expect(frame(app)).toContain('Wrote a.txt.');
-    expect(frame(app)).toContain('write a.txt');
+    expect(frame(app)).toMatch(/write\s+a\.txt/);
     app.unmount();
   });
 

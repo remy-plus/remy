@@ -213,27 +213,47 @@ function Header(p: {
 
 function ToolRow(p: { line: ToolLine; theme: Theme; spinner: string; now?: number }) {
   const { line, theme } = p;
+  const { indent, lead, verb, column, turn } = theme.space;
   const sym = theme.symbols;
+  const failed = theme.color('error');
   const glyph: Record<ToolLine['state'], [string, string | undefined]> = {
     ok: [sym.ok, theme.color('accent')],
-    failed: [sym.failed, undefined],
+    failed: [sym.failed, failed],
     denied: [sym.denied, theme.color('muted')],
     waiting_approval: [sym.waiting, undefined],
     running: [p.spinner, theme.color('muted')],
   };
   const [mark, color] = glyph[line.state];
   const bits = toolBits(line, p.now);
+  // The time is the last bit once it is known; it sits at the right edge, the rest trails the target.
+  const timed = line.ms !== undefined || (line.state === 'running' && bits.length > 0);
+  const right = timed ? bits.at(-1) : undefined;
+  const near = timed ? bits.slice(0, -1) : bits;
+  const rest = near.length ? `  ${near.join(` ${sym.dot} `)}` : '';
+  const strike = line.state === 'denied' ? { strikethrough: true } : {};
   return h(
     Box,
-    { paddingLeft: theme.space.indent },
-    h(Box, { width: 2, flexShrink: 0 }, h(Text, { color }, mark)),
+    {
+      paddingLeft: indent,
+      paddingRight: indent,
+      marginTop: p.first ? turn : 0,
+      width: Math.min(p.columns, MEASURE),
+    },
+    h(Box, { width: lead, flexShrink: 0 }, h(Text, { color }, mark)),
     h(
-      Text,
-      { wrap: 'truncate-end' },
-      h(Text, null, `${line.verb} `),
-      h(Text, mutedProps(theme), line.target),
-      bits.length ? h(Text, mutedProps(theme), `  ${bits.join(' · ')}`) : null,
+      Box,
+      { flexGrow: 1, flexShrink: 1 },
+      h(
+        Text,
+        { wrap: 'truncate-end' },
+        h(Text, strike, line.verb.padEnd(verb)),
+        h(Text, { ...mutedProps(theme), ...strike }, line.target),
+        rest
+          ? h(Text, line.state === 'failed' && failed ? { color: failed } : mutedProps(theme), rest)
+          : null,
+      ),
     ),
+    right ? h(Box, { flexShrink: 0, marginLeft: column }, h(Text, mutedProps(theme), right)) : null,
   );
 }
 
@@ -269,7 +289,7 @@ function PlanList(p: { steps: PlanStep[]; theme: Theme; max: number; title?: str
 /** A long message of yours is cut to this many lines in the scrollback; Ctrl+O has the rest. */
 const USER_LINES = 4;
 
-function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
+function TranscriptItem(p: { item: Item; prev?: Item; theme: Theme; columns: number }) {
   const { item, theme } = p;
   const turn = theme.space.turn;
   const muted = mutedProps(theme);
@@ -300,7 +320,13 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
         md(item.text),
       );
     case 'tool':
-      return h(ToolRow, { line: item.line, theme, spinner: theme.symbols.running });
+      return h(ToolRow, {
+        line: item.line,
+        theme,
+        spinner: theme.symbols.running,
+        columns: p.columns,
+        first: p.prev?.kind !== 'tool',
+      });
     case 'plan':
       return h(PlanList, { steps: item.steps, theme, max: 8 });
     case 'error':
@@ -627,8 +653,18 @@ function Live(p: {
     );
   if (state.plan?.length)
     kids.push(h(PlanList, { key: 'plan', steps: state.plan, theme, max: MAX_PLAN_ROWS }));
-  for (const l of tools)
-    kids.push(h(ToolRow, { key: l.callId, line: l, theme, spinner: glyph, now: Date.now() }));
+  for (const [i, l] of tools.entries())
+    kids.push(
+      h(ToolRow, {
+        key: l.callId,
+        line: l,
+        theme,
+        spinner: glyph,
+        columns,
+        now: Date.now(),
+        first: i === 0 && !continuesTools,
+      }),
+    );
   if (approval)
     kids.push(
       h(ApprovalCard, {
@@ -953,9 +989,15 @@ export function ChatApp(props: ChatAppProps): ReactElement {
     h(Static<{ id: string; item?: Item }>, {
       items: entries,
       // biome-ignore lint/correctness/noChildrenProp: createElement's types only accept Static's render function as a prop
-      children: (entry) =>
+      children: (entry, n) =>
         entry.item
-          ? h(TranscriptItem, { key: entry.id, item: entry.item, theme, columns })
+          ? h(TranscriptItem, {
+              key: entry.id,
+              item: entry.item,
+              prev: entries[n - 1]?.item,
+              theme,
+              columns,
+            })
           : h(Header, {
               key: entry.id,
               theme,
