@@ -1081,7 +1081,13 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       ? h(Prompt, { value: input, theme, columns })
       : null,
     menu && !viewing && !state.picker && !state.overlay
-      ? h(Menu, { items: menuItems, at, theme, indent: theme.space.indent + 2 })
+      ? h(Menu, {
+          items: menuItems,
+          at,
+          theme,
+          indent: theme.space.indent + theme.space.lead,
+          query: slashQuery ?? atQuery ?? '',
+        })
       : null,
     viewing
       ? null
