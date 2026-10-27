@@ -30,6 +30,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 - Build workflow (which model writes which step) is in PLAN.md.
 
 ## Status
+- 2026-10-26: chat ease-of-use pass (`design/research/engineering/opencode-ease.md`): first run opens the login panel, `/model`, `/login`, `/sessions`, Ctrl+P palette, `/` autocomplete, `@file` references, errors that end with the next step. Not pushed yet.
 - 2026-10-26: **V1 shipped (v0.1.0).** npm `@koryei/remy` (publish needs the owner's 2FA, so they run `npm publish` in apps/cli), GitHub release v0.1.0, site live on https://remy.plus (Vercel project remy-plus, deploy with `vercel deploy --prod` in apps/site; DNS on Cloudflare, DNS only). Next: 0.2 = `design/research/terminal-plan.md` + an open-weight baseline.
 - 2026-10-26: chat rendering rebuilt (finished items in Ink `<Static>`, short live region, queued input, markdown replies); verified live with `apps/cli/scripts/pty-smoke.py` (needs pyte). Site in `apps/site` (static, Vercel root `apps/site`). Evals model chat follow-ups. Run 8: 97% on 34 cases. Waiting on: npm name + publish go, Vercel deploy, full re-run.
 - 2026-10-25: V1 work package 3 (Ink chat UI) done: plain `remy` opens a multi-turn chat (`apps/cli/src/chat.ts` controller, `chat-ui.ts` components, `theme.ts`, `--debug`). No JSX; components use `createElement`.
