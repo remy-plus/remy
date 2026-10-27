@@ -19,6 +19,13 @@ const CLAY = '#D08A78';
 export const SYMBOLS = {
   prompt: '›',
   cursor: '▌',
+  bullet: '•',
+  bulletSub: '◦',
+  gutter: '│',
+  quote: '▎',
+  rule: '─',
+  ellipsis: '…',
+  dot: '·',
   ok: '✓',
   failed: '✗',
   denied: '–',
@@ -30,8 +37,27 @@ export const SYMBOLS = {
   spinner: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
 } as const;
 
-/** Spaces and rows. */
-export const SPACE = { indent: 2, gap: 1 } as const;
+/**
+ * Spaces and rows. Everything is a multiple of one column; the transcript has one left margin
+ * (`indent`), a two-column lead for glyphs (`lead`) and one blank row between turns (`turn`).
+ */
+export const SPACE = {
+  indent: 2,
+  gap: 1,
+  lead: 2,
+  turn: 1,
+  /** Columns between a card's border and its text. */
+  pad: 1,
+  /** Tool verbs are padded to this width so targets line up. */
+  verb: 7,
+  /** Longest horizontal rule inside a reply. */
+  rule: 40,
+  /** Columns between table columns. */
+  column: 3,
+} as const;
+
+/** Milliseconds per spinner frame: calm, not busy. */
+export const SPINNER_MS = 100;
 
 export type Background = 'dark' | 'light';
 
