@@ -181,6 +181,13 @@ const shortPath = (p: string) => {
   return q.length > 48 ? `${q.slice(0, 14)}…${q.slice(-33)}` : q;
 };
 
+/** Example requests on the empty screen: what Remy is for, in a person's own words. */
+export const EXAMPLES = [
+  'Tidy the files in this folder by type',
+  'Research the three best standing desks under $400 and compare them',
+  'Summarise notes.txt in three bullets',
+] as const;
+
 function Header(p: {
   theme: Theme;
   columns: number;
@@ -189,12 +196,15 @@ function Header(p: {
   compact?: boolean;
 }) {
   const { theme } = p;
+  const { turn, indent, lead } = theme.space;
   const muted = mutedProps(theme);
-  const info = [p.model, p.workspace && shortPath(p.workspace)].filter(Boolean).join(' · ');
+  const info = [p.model, p.workspace && shortPath(p.workspace)]
+    .filter(Boolean)
+    .join(` ${theme.symbols.dot} `);
   if (p.compact || p.columns < WORDMARK_WIDTH + 4)
     return h(
       Box,
-      { paddingLeft: theme.space.indent, marginTop: 1, marginBottom: 1 },
+      { paddingLeft: indent, marginTop: turn },
       h(
         Text,
         { wrap: 'truncate-end' },
@@ -204,16 +214,47 @@ function Header(p: {
     );
   return h(
     Box,
-    { flexDirection: 'column', marginTop: 1, marginBottom: 1, paddingLeft: theme.space.indent },
+    { flexDirection: 'column', marginTop: turn, paddingLeft: indent },
     ...WORDMARK.map((line, i) =>
       h(Text, { key: i, bold: true, color: theme.ramp(i, WORDMARK.length) }, line),
     ),
-    h(Text, muted, TAGLINE),
-    h(Text, { ...muted, wrap: 'truncate-end' }, info),
+    h(
+      Box,
+      { marginTop: turn, flexDirection: 'column' },
+      h(Text, null, TAGLINE),
+      h(Text, { ...muted, wrap: 'truncate-end' }, info),
+    ),
+    // Only once a model is connected: before that the login panel is the one thing to do.
+    p.model
+      ? h(
+          Box,
+          { flexDirection: 'column', marginTop: turn },
+          h(Text, muted, 'Ask in your own words. For example'),
+          ...EXAMPLES.map((e) =>
+            h(
+              Box,
+              { key: e },
+              h(Box, { width: lead, flexShrink: 0 }, h(Text, muted, theme.symbols.prompt)),
+              h(Text, { wrap: 'truncate-end' }, e),
+            ),
+          ),
+        )
+      : null,
   );
 }
 
-function ToolRow(p: { line: ToolLine; theme: Theme; spinner: string; now?: number }) {
+/** Widest a tool row runs, so a right-aligned time stays near its row on a wide terminal. */
+const MEASURE = 100;
+
+function ToolRow(p: {
+  line: ToolLine;
+  theme: Theme;
+  spinner: string;
+  columns: number;
+  now?: number;
+  /** First row of a run of tools: one blank row above it. */
+  first?: boolean;
+}) {
   const { line, theme } = p;
   const { indent, lead, verb, column, turn } = theme.space;
   const sym = theme.symbols;
