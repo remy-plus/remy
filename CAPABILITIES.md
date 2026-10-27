@@ -24,7 +24,7 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 
 **Questions.** When Remy needs something only you know, it asks, at most 3 times per task. In the chat you answer in the input box; otherwise use `remy answer <id> "..."`.
 
-**Models.** Remy works with any OpenAI-compatible endpoint: OpenAI, OpenRouter, Ollama, vLLM or Groq. Set `REMY_PROFILE`, `REMY_MODEL` and that provider's API key.
+**Models.** Remy works with OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Ollama, and any OpenAI-compatible endpoint (vLLM, LM Studio and others). Run `remy login` once to save a provider's key (macOS Keychain, or a private file in `~/.remy`), or set `REMY_PROFILE`, `REMY_MODEL` and that provider's API key.
 
 ## Safety
 

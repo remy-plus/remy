@@ -11,7 +11,7 @@ Remy is an open-source AI agent that completes digital tasks through plain conve
 
 ## What makes it different
 
-- **Any model.** Use OpenRouter, Ollama, or any OpenAI-compatible endpoint, including free open-weight models. Weaker models get a constrained JSON mode.
+- **Any model.** Use OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Ollama, or any OpenAI-compatible endpoint, including free open-weight models. Weaker models get a constrained JSON mode.
 - **Safety enforced in code, not prompts.** Every tool call goes through a policy engine. After Remy reads anything untrusted (a web page, an email), every action beyond reading needs your approval. An approval covers the exact action you saw, once.
 - **Survives crashes without repeating itself.** Every step is an event in a log. Kill the process at any point and `remy resume` picks up where it left off. An action that might already have happened is never re-run without asking.
 - **Measured.** An eval suite tracks success, reliability, cost, latency, safety violations and duplicate actions. Changes that regress it are blocked.
@@ -24,13 +24,27 @@ Requires Node 22.18+ and pnpm (via `corepack enable`).
 git clone https://github.com/remy-plus/remy.git && cd remy
 pnpm install
 
-# Pick a model. Free models on OpenRouter work:
-export REMY_PROFILE=openrouter OPENROUTER_API_KEY=sk-or-...
-export REMY_MODEL=google/gemma-4-26b-a4b-it:free
-# Or a local model:  export REMY_PROFILE=ollama REMY_MODEL=qwen2.5:7b
+# Connect a model once: pick a provider, paste the key, done
+pnpm remy login
 
 pnpm remy
 ```
+
+### Models
+
+`remy login` stores your key in the macOS Keychain, or in a private file in `~/.remy` (mode 0600) elsewhere. `remy login --list` shows what is saved (never the keys), `remy logout <provider>` forgets one, and `echo $KEY | remy login openai --key-stdin` works without a terminal.
+
+| Provider      | Profile            | Key variable         | Notes                                                        |
+| ------------- | ------------------ | -------------------- | ------------------------------------------------------------ |
+| OpenAI        | `openai`           | `OPENAI_API_KEY`     | OpenAI-compatible API                                        |
+| OpenRouter    | `openrouter`       | `OPENROUTER_API_KEY` | Many models, some free                                       |
+| Groq          | `groq`             | `GROQ_API_KEY`       | OpenAI-compatible API                                        |
+| Anthropic     | `anthropic`        | `ANTHROPIC_API_KEY`  | Native Messages API                                          |
+| Google Gemini | `google`           | `GEMINI_API_KEY`     | Native Gemini API                                            |
+| Ollama        | `ollama`           | none                 | Local models                                                 |
+| Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
+
+Settings are resolved per field: flags, then environment variables, then a saved login, then `remy.config.json`. Without a login, set `REMY_PROFILE`, `REMY_MODEL` and the key variable instead, for example `REMY_PROFILE=anthropic REMY_MODEL=claude-sonnet-5-5 ANTHROPIC_API_KEY=...`. Prices and context windows for common models (Claude Opus, Sonnet and Haiku, Gemini 2.5 Pro, Flash and Flash-Lite, GPT-5 nano, Llama 3.3 on Groq) are built in; other ids work and are shown with unknown cost, or you can list them in a `models.json`.
 
 Plain `remy` in a terminal opens the chat: type a message, and each one carries the earlier ones as context. Replies stream in, tool calls show as they run, and Remy asks for a `y` or `n` before anything that needs approval. Ctrl+C stops a running task (resume it with `remy resume <id>`), Ctrl+D quits, `/help` lists the rest. Use `--reduced-motion` to turn off animation and `NO_COLOR=1` to turn off color. For scripts, run one task directly:
 
