@@ -7,6 +7,7 @@ import {
   describeApproval,
   flushTools,
   narrate,
+  reasoningTitle,
   streamBudget,
   summarizeTool,
   type ToolLine,
@@ -182,6 +183,26 @@ describe('narrate', () => {
     const t = line('a', { state: 'running', verb: 'run', target: 'ls -la' });
     expect(narrate({ ...base, tools: [t], plan, secs: 0 })).toBe(
       'Running ls -la · step 2 of 3 · 0s',
+    );
+  });
+});
+
+describe('thinking titles', () => {
+  it('takes the newest bold heading, else a short first sentence, else nothing', () => {
+    expect(reasoningTitle('**Reading** the notes.\n\n**Planning the move**\nDetails')).toBe(
+      'Planning the move',
+    );
+    expect(reasoningTitle('Checking the folder. Then more.')).toBe('Checking the folder');
+    expect(reasoningTitle('x'.repeat(100))).toBe('');
+    expect(reasoningTitle('')).toBe('');
+  });
+  it('narrates the title while thinking, but not while writing', () => {
+    const base = { streaming: '', tools: [] as ToolLine[] };
+    expect(narrate({ ...base, thinkingTitle: 'Planning the move', secs: 2 })).toBe(
+      'Thinking: Planning the move · 2s',
+    );
+    expect(narrate({ ...base, streaming: 'Hi', thinkingTitle: 'Planning', secs: 2 })).toBe(
+      'Writing · 2s',
     );
   });
 });

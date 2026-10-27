@@ -60,11 +60,16 @@ export function debugModel(inner: ModelClient, log: DebugLog): ModelClient {
   return {
     id: inner.id,
     caps: inner.caps,
-    async complete(req: ModelRequest, signal: AbortSignal, onText): Promise<ModelResponse> {
+    async complete(
+      req: ModelRequest,
+      signal: AbortSignal,
+      onText,
+      onReasoning,
+    ): Promise<ModelResponse> {
       const t0 = Date.now();
       log.write('model.request', { model: inner.id, request: req });
       try {
-        const response = await inner.complete(req, signal, onText);
+        const response = await inner.complete(req, signal, onText, onReasoning);
         log.write('model.response', { latencyMs: Date.now() - t0, response });
         return response;
       } catch (e) {

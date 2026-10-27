@@ -78,6 +78,10 @@ export interface ChatState {
   retrying?: string;
   /** The user asked to quit with /exit. */
   wantsExit?: boolean;
+  /** Reasoning summary of the current model call, if the provider streams one. Never stored. */
+  reasoning: string;
+  /** /thinking: show the summary text under the status row. */
+  showThinking: boolean;
   /** Counts /clear, so the screen knows to start over. */
   clears: number;
 }
@@ -86,6 +90,7 @@ export interface RuntimeHooks {
   onEvent: (e: StoredEvent) => void;
   onText: (delta: string) => void;
   onModelStart: () => void;
+  onReasoning: (delta: string) => void;
 }
 
 export interface ChatDeps {
@@ -135,6 +140,7 @@ export const HELP_TEXT = [
   '',
   'Commands',
   '  /help     this list',
+  "  /thinking show or hide the model's reasoning summary, when it shares one",
   '  /new      start a fresh conversation',
   '  /clear    clear the screen and start a fresh conversation',
   '  /exit     quit',
@@ -182,11 +188,15 @@ const initial = (): ChatState => ({
   tokens: 0,
   contextTokens: 0,
   taskCostUsd: 0,
+  reasoning: '',
+  showThinking: false,
   clears: 0,
 });
 
 /** Finished tool lines beyond this many leave the live area at once. */
 const MAX_LIVE_DONE = 4;
+/** Reasoning kept for display only; the newest characters win. */
+const MAX_REASONING_CHARS = 2000;
 
 export function createChat(deps: ChatDeps): Chat {
   let s: ChatState = { ...initial(), contextWindow: deps.contextWindow };
@@ -323,11 +333,14 @@ export function createChat(deps: ChatDeps): Chat {
     onText: (delta) => {
       if (running) set({ streaming: s.streaming + delta });
     },
+    onReasoning: (delta) => {
+      if (running) set({ reasoning: (s.reasoning + delta).slice(-MAX_REASONING_CHARS) });
+    },
     onModelStart: () => {
       if (!running) return;
       // The last call's tool lines are done: they go to the transcript before anything new.
       flush(false);
-      set({ thinking: true, streaming: '', retrying: undefined });
+      set({ thinking: true, streaming: '', reasoning: '', retrying: undefined });
     },
   };
   const runtime = deps.runtime(hooks);
@@ -472,6 +485,13 @@ export function createChat(deps: ChatDeps): Chat {
       turns = [];
       // The screen wipes itself and prints the header again; the transcript starts empty.
       set({ items: [], clears: s.clears + 1 });
+    } else if (name === 'thinking') {
+      const on = !s.showThinking;
+      set({ showThinking: on });
+      commit({
+        kind: 'note',
+        text: on ? 'Showing thinking when the model shares it.' : 'Thinking detail is off.',
+      });
     } else if (name === 'exit' || name === 'quit') set({ wantsExit: true });
     else commit({ kind: 'error', text: `Unknown command ${line.split(/\s+/)[0]}. Run /help.` });
   }

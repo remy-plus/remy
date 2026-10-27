@@ -29,6 +29,16 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
+/** A model that also streams a reasoning summary, as some providers do. */
+const withReasoning = (inner: ModelClient, thought: string): ModelClient => ({
+  id: inner.id,
+  caps: inner.caps,
+  complete: (req, signal, onText, onReasoning) => {
+    onReasoning?.(thought);
+    return inner.complete(req, signal, onText);
+  },
+});
+
 function harness(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read', 'write']) {
   const store = new MemoryEventStore();
   const contexts: number[] = [];
@@ -132,6 +142,22 @@ describe('chat controller', () => {
     const { chat } = harness(new ScriptedModelClient([write, done('Wrote a.txt.')]));
     await chat.submit('write a file');
     expect(chat.getState().phase).toBe('idle');
+  });
+
+  it('keeps a reasoning summary in the live state only, and /thinking toggles the detail', async () => {
+    const inner = new ScriptedModelClient([done('Four.')]);
+    const { chat, store } = harness(withReasoning(inner, '**Doing the sum** 2 and 2.'));
+    const seen: string[] = [];
+    chat.subscribe(() => seen.push(chat.getState().reasoning));
+    await chat.submit('/thinking');
+    expect(chat.getState().showThinking).toBe(true);
+    await chat.submit('what is 2+2');
+    expect(seen).toContain('**Doing the sum** 2 and 2.');
+    const [task] = await store.listTasks();
+    const log = JSON.stringify(await store.read(task?.taskId ?? ''));
+    expect(log).not.toContain('Doing the sum');
+    await chat.submit('/thinking');
+    expect(chat.getState().showThinking).toBe(false);
   });
 
   it('shows tool state and waits for approval, then runs the tool', async () => {

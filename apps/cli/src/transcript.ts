@@ -171,6 +171,20 @@ export interface NarrateInput {
   plan?: PlanStep[];
   /** Seconds since the turn began; omitted when motion is reduced. */
   secs?: number;
+  /** Short title of the model's reasoning summary, when the provider streams one. */
+  thinkingTitle?: string;
+}
+
+/**
+ * The title of a reasoning summary: its newest bold heading (`**Planning the move**`), else its
+ * first sentence if that is short. Empty when there is nothing to show.
+ */
+export function reasoningTitle(text: string): string {
+  const heads = [...text.matchAll(/\*\*([^*\n]{2,80})\*\*/g)];
+  const last = heads.at(-1)?.[1];
+  if (last) return last.trim();
+  const first = text.trim().split(/(?<=[.!?])\s|\n/)[0] ?? '';
+  return first.length > 0 && first.length <= 60 ? first.replace(/[.:]$/, '') : '';
 }
 
 /** One calm row: the running tool, else the plan step in progress, else writing or thinking. */
@@ -184,7 +198,8 @@ export function narrate(s: NarrateInput): string {
     head = `${verb}${first.target ? ` ${first.target}` : ''}`;
     if (running.length > 1) head += ` +${running.length - 1} more`;
   } else if (doing) head = doing.text;
-  else head = s.streaming ? 'Writing' : 'Thinking';
+  else if (s.streaming) head = 'Writing';
+  else head = s.thinkingTitle ? `Thinking: ${s.thinkingTitle}` : 'Thinking';
   if (s.secs === undefined) return `${head}...`;
   const parts = [head];
   if (s.plan && s.plan.length > 1) {

@@ -321,6 +321,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         if (line) out(line);
       },
       ...(opts.hooks?.onText && { onText: opts.hooks.onText }),
+      ...(opts.hooks?.onReasoning && { onReasoning: opts.hooks.onReasoning }),
       ...(opts.hooks?.onModelStart && { onModelStart: opts.hooks.onModelStart }),
     });
     return { runtime, timeline, tools };

@@ -55,6 +55,7 @@ import {
   approvalRows,
   narrate,
   type PlanStep,
+  reasoningTitle,
   streamBudget,
   type ToolLine,
   tailLines,
@@ -532,8 +533,18 @@ function Live(p: {
     ? 1 + Math.min(state.plan.length, MAX_PLAN_ROWS) + (state.plan.length > MAX_PLAN_ROWS ? 1 : 0)
     : 0;
   const approval = state.phase === 'waiting_approval' ? state.approvalView : undefined;
+  const detail =
+    busy && state.showThinking && state.reasoning && !state.streaming
+      ? tailLines(state.reasoning.split('\n').filter(Boolean), 3)
+      : [];
   const fixedBase =
-    p.below + tools.length + queued.length + planRows + (busy ? 1 : 0) + (state.retrying ? 1 : 0);
+    p.below +
+    tools.length +
+    queued.length +
+    planRows +
+    detail.length +
+    (busy ? 1 : 0) +
+    (state.retrying ? 1 : 0);
   // An expanded card may use what the screen has left, minus the card's own frame.
   const cardRoom = Math.max(APPROVAL_ROWS, p.rows - 1 - fixedBase - 6);
   const fixed = fixedBase + (approval ? approvalHeight(approval, p.expanded, cardRoom) : 0);
@@ -547,7 +558,14 @@ function Live(p: {
 
   // One row, and it changes at most once a second so the live area does not flicker.
   const secs = state.turnStartedAt ? Math.floor((Date.now() - state.turnStartedAt) / 1000) : 0;
-  const narration = useSettled(narrate({ ...state, secs: animate ? secs : undefined }), 1000);
+  const narration = useSettled(
+    narrate({
+      ...state,
+      secs: animate ? secs : undefined,
+      thinkingTitle: reasoningTitle(state.reasoning),
+    }),
+    1000,
+  );
 
   const kids: ReactNode[] = [];
   if (tail.length)
@@ -590,6 +608,14 @@ function Live(p: {
       ),
     );
   }
+  for (const [i, l] of detail.entries())
+    kids.push(
+      h(
+        Box,
+        { key: `r${i}`, paddingLeft: theme.space.indent + 2 },
+        h(Text, { ...muted, wrap: 'truncate-end' }, l.replace(/\*\*/g, '')),
+      ),
+    );
   return h(Box, { flexDirection: 'column' }, ...kids);
 }
 
