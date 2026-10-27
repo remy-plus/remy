@@ -30,6 +30,7 @@ import {
 } from 'react';
 import type { Chat, ChatState, Item, ModelChoice } from './chat.ts';
 import { COMMANDS, matchCommands } from './commands.ts';
+import { Hints } from './hints.ts';
 import {
   EMPTY_INPUT,
   editInput,
@@ -495,24 +496,21 @@ export function costPart(s: Pick<ChatState, 'taskCostUsd' | 'budgetUsd'>): strin
   return `${spent} of $${s.budgetUsd.toFixed(2)}`;
 }
 
+/** Columns between the footer's figures and its key hints. */
+const FOOTER_GAP = 3;
+
 function Footer(p: {
   state: ChatState;
   theme: Theme;
+  columns: number;
   model?: string;
   hasInput: boolean;
   noting: boolean;
   menu?: 'slash' | 'file';
 }) {
-  const { state } = p;
+  const { state, theme } = p;
   const unconnected = !p.model;
-  const left = [
-    p.model ?? 'not connected',
-    contextPart(state),
-    costPart(state),
-    unconnected ? '' : STATE_WORD[state.phase],
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const word = unconnected ? '' : STATE_WORD[state.phase];
   const hint = hintsFor({
     phase: state.phase,
     hasInput: p.hasInput,
@@ -522,10 +520,34 @@ function Footer(p: {
     unconnected,
     fresh: !state.items.some((i) => i.kind === 'user'),
   });
+  // On a narrow terminal the figures go first and the key hints last: hints are what unblocks.
+  const room = p.columns - theme.space.indent * 2;
+  const join = (parts: string[]) => parts.filter(Boolean).join(` ${theme.symbols.dot} `);
+  const name = p.model ?? 'not connected';
+  const tries = [[contextPart(state), costPart(state)], [costPart(state)], []].map((figures) =>
+    join(figures),
+  );
+  const fits = (figures: string) =>
+    strWidth(join([name, figures, word])) + (hint ? FOOTER_GAP + strWidth(hint) : 0) <= room;
+  const figures = tries.find(fits) ?? '';
+  const attention = state.phase === 'waiting_approval' || state.phase === 'waiting_user';
   return h(
     Box,
-    { paddingLeft: p.theme.space.indent },
-    h(Text, { wrap: 'truncate-end', ...mutedProps(p.theme) }, hint ? `${left}   ${hint}` : left),
+    { paddingLeft: theme.space.indent },
+    h(
+      Box,
+      { flexShrink: 0 },
+      h(
+        Text,
+        null,
+        h(Text, unconnected ? mutedProps(theme) : null, name),
+        figures ? h(Text, mutedProps(theme), ` ${theme.symbols.dot} ${figures}`) : null,
+        word
+          ? h(Text, attention ? null : mutedProps(theme), ` ${theme.symbols.dot} ${word}`)
+          : null,
+      ),
+    ),
+    hint ? h(Box, { marginLeft: FOOTER_GAP, flexShrink: 1 }, h(Hints, { hint, theme })) : null,
   );
 }
 
@@ -1057,6 +1079,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       : h(Footer, {
           state,
           theme,
+          columns,
           model: state.model ?? props.subtitle,
           hasInput: input.text.length > 0,
           noting,
