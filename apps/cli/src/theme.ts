@@ -11,7 +11,11 @@ export const PALETTE = {
 /** `none` prints no color codes at all; `basic` uses the 16 terminal colors. */
 export type ColorLevel = 'none' | 'basic' | 'truecolor';
 
-export type Role = 'text' | 'muted' | 'accent' | 'error' | 'diffAdd' | 'diffDel';
+/**
+ * Colour roles. `muted` is secondary text; `faint` is structure (rules, gutters, borders) and
+ * sits below muted; `code` is inline code, set apart by a quiet surface rather than the accent.
+ */
+export type Role = 'text' | 'muted' | 'faint' | 'accent' | 'error' | 'diffAdd' | 'diffDel' | 'code';
 
 /** Functional colours outside the brand palette: a soft clay for errors and removed lines. */
 const CLAY = '#D08A78';
@@ -68,6 +72,12 @@ export interface Theme {
   withBackground(bg: Background): Theme;
   /** A color for Ink's `color` prop, or undefined to leave the terminal default. */
   color(role: Role): string | undefined;
+  /** Ink `<Text>` props for a role: its colour, or dim where there are no colours. */
+  props(role: Role): { color?: string; dimColor?: boolean; backgroundColor?: string };
+  /** A faint surface behind inline code (truecolor only). */
+  surface: string | undefined;
+  /** A faint tint behind an added or removed line (truecolor only). */
+  diffSurface(kind: 'add' | 'del'): string | undefined;
   /** Wordmark row color: a soft brightness ramp from the top row to the bottom one. */
   ramp(row: number, rows: number): string | undefined;
   symbols: typeof SYMBOLS;
@@ -102,6 +112,8 @@ const RAMP_TOP = '#B9B6AF';
 
 const BASIC: Record<Exclude<Role, 'text'>, string> = {
   muted: 'gray',
+  faint: 'gray',
+  code: 'cyan',
   accent: 'green',
   diffAdd: 'green',
   diffDel: 'red',
@@ -110,6 +122,8 @@ const BASIC: Record<Exclude<Role, 'text'>, string> = {
 const TRUE: Record<Background, Record<Exclude<Role, 'text'>, string>> = {
   dark: {
     muted: PALETTE.stone,
+    faint: '#55534F',
+    code: '#D6D3CC',
     accent: PALETTE.signal,
     diffAdd: PALETTE.signal,
     diffDel: CLAY,
@@ -118,12 +132,19 @@ const TRUE: Record<Background, Record<Exclude<Role, 'text'>, string>> = {
   // Darker shades of the same hues, so they keep their contrast on paper.
   light: {
     muted: '#6B6964',
+    faint: '#A9A6A0',
+    code: '#2B2A28',
     accent: '#4A7A3C',
     diffAdd: '#4A7A3C',
     diffDel: '#A8503E',
     error: '#A8503E',
   },
 };
+const DIFF_SURFACE: Record<Background, { add: string; del: string }> = {
+  dark: { add: '#1B2619', del: '#2B1D19' },
+  light: { add: '#DFEBD8', del: '#F2DDD5' },
+};
+const SURFACE: Record<Background, string> = { dark: '#212123', light: '#E0DDD6' };
 // On a light background the wordmark ramps from a lifted ink down to ink.
 const RAMP_TOP_LIGHT = '#5A5854';
 const RAMP_END_LIGHT = PALETTE.ink;
@@ -132,15 +153,26 @@ export function createTheme(level: ColorLevel, background: Background = 'dark'):
   const truecolor = TRUE[background];
   const [from, to] =
     background === 'light' ? [RAMP_TOP_LIGHT, RAMP_END_LIGHT] : [RAMP_TOP, PALETTE.paper];
+  const color = (role: Role): string | undefined => {
+    if (level === 'none' || role === 'text') return undefined;
+    if (level === 'basic') return BASIC[role];
+    return truecolor[role];
+  };
   return {
     level,
     background,
     withBackground: (bg) => createTheme(level, bg),
-    color: (role) => {
-      if (level === 'none' || role === 'text') return undefined;
-      if (level === 'basic') return BASIC[role];
-      return truecolor[role];
+    color,
+    props: (role) => {
+      const c = color(role);
+      if (c)
+        return role === 'code' && level === 'truecolor'
+          ? { color: c, backgroundColor: SURFACE[background] }
+          : { color: c };
+      return role === 'muted' || role === 'faint' ? { dimColor: true } : {};
     },
+    diffSurface: (kind) => (level === 'truecolor' ? DIFF_SURFACE[background][kind] : undefined),
+    surface: level === 'truecolor' ? SURFACE[background] : undefined,
     ramp: (row, rows) =>
       level === 'truecolor' ? mix(from, to, rows > 1 ? row / (rows - 1) : 1) : undefined,
     symbols: SYMBOLS,
@@ -154,7 +186,7 @@ export function ansi(level: ColorLevel, role: Role | 'bold'): string {
   if (role === 'bold') return '\x1b[1m';
   if (role === 'text') return '';
   if (level === 'basic')
-    return `\x1b[${role === 'muted' ? 90 : role === 'error' || role === 'diffDel' ? 31 : 32}m`;
+    return `\x1b[${role === 'muted' || role === 'faint' ? 90 : role === 'error' || role === 'diffDel' ? 31 : role === 'code' ? 36 : 32}m`;
   const [r, g, b] = rgb(TRUE.dark[role]);
   return `\x1b[38;2;${r};${g};${b}m`;
 }

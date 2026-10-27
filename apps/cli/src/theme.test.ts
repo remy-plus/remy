@@ -41,6 +41,16 @@ describe('theme', () => {
     expect(createTheme('basic').color('muted')).toBe('gray');
     expect(createTheme('none').color('accent')).toBeUndefined();
   });
+  it('gives props per role: faint structure, inline code on a surface, dim without colour', () => {
+    const t = createTheme('truecolor');
+    expect(t.props('code')).toMatchObject({ color: '#D6D3CC', backgroundColor: t.surface });
+    expect(t.props('faint').color).not.toBe(t.props('muted').color);
+    expect(createTheme('basic').props('code')).toEqual({ color: 'cyan' });
+    expect(createTheme('none').props('muted')).toEqual({ dimColor: true });
+    expect(createTheme('none').props('faint')).toEqual({ dimColor: true });
+    expect(createTheme('none').surface).toBeUndefined();
+    expect(createTheme('truecolor', 'light').diffSurface('add')).not.toBe(t.diffSurface('add'));
+  });
   it('styles plain output by level', () => {
     expect(styler('none').dim('x')).toBe('x');
     expect(styler('basic').dim('x')).toBe('\x1b[90mx\x1b[0m');
