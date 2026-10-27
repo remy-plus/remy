@@ -53,7 +53,7 @@ import {
   isFocusReport,
   type Notifier,
 } from './terminal.ts';
-import type { Theme } from './theme.ts';
+import { SPINNER_MS, type Theme } from './theme.ts';
 import {
   APPROVAL_ROWS,
   type ApprovalView,
@@ -105,7 +105,7 @@ function useFrame(active: boolean, frames: number): number {
   const [frame, setFrame] = useState(0);
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => setFrame((f) => (f + 1) % frames), 80);
+    const t = setInterval(() => setFrame((f) => (f + 1) % frames), SPINNER_MS);
     return () => clearInterval(t);
   }, [active, frames]);
   return active ? frame : 0;
