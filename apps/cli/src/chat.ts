@@ -5,7 +5,6 @@ import {
   type ConversationTurn,
   type Effect,
   type EventStore,
-  fencePasted,
   fold,
   ModelError,
   type RemyRuntime,
@@ -518,16 +517,25 @@ export function createChat(deps: ChatDeps): Chat {
 
   async function openPicker() {
     const all = (await deps.listTasks?.()) ?? [];
-    const rows = all
+    const picked = all
       .filter((t) => RESUMABLE.includes(t.status))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, MAX_PICKER_ROWS)
-      .map((t) => ({
+      .slice(0, MAX_PICKER_ROWS);
+    const rows: SessionRow[] = [];
+    for (const t of picked) {
+      // The title is what the user typed: pasted text stays out of it.
+      const first = (await deps.readEvents?.(t.taskId))?.[0]?.event;
+      const pasted = first?.type === 'task.created' ? (first.config.pasted ?? []) : [];
+      let typed = t.prompt;
+      for (const seg of pasted) typed = typed.split(seg).join(' ');
+      typed = typed.replace(/\s+/g, ' ').trim();
+      rows.push({
         taskId: t.taskId,
-        title: truncate(t.prompt.replace(/\s+/g, ' ').trim(), 80),
+        title: truncate(typed || '(pasted text)', 80),
         status: t.status,
         updatedAt: t.updatedAt,
-      }));
+      });
+    }
     if (!rows.length)
       return commit({ kind: 'note', text: 'Nothing to resume. Unfinished tasks show up here.' });
     set({ picker: rows });
@@ -574,7 +582,7 @@ export function createChat(deps: ChatDeps): Chat {
     }
   }
 
-  function command(line: string) {
+  function command(line: string): Promise<void> | undefined {
     const [name] = line.slice(1).split(/\s+/);
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
@@ -585,7 +593,7 @@ export function createChat(deps: ChatDeps): Chat {
       // The screen wipes itself and prints the header again; the transcript starts empty.
       set({ items: [], clears: s.clears + 1 });
     } else if (name === 'resume') {
-      void openPicker();
+      return openPicker();
     } else if (name === 'thinking') {
       const on = !s.showThinking;
       set({ showThinking: on });
@@ -620,7 +628,7 @@ export function createChat(deps: ChatDeps): Chat {
         set({ phase: 'running', thinking: true, question: undefined });
         running = true;
         try {
-          await runtime.answer(id, fencePasted(text, segs));
+          await runtime.answer(id, text, segs);
           await drive(id, my);
         } catch (e) {
           if (my !== gen) return;
