@@ -562,25 +562,34 @@ export function promptWindow(text: string, cursor: number) {
   return { lines: lines.slice(start, start + MAX_PROMPT_LINES), from: start, at };
 }
 
-function Prompt(p: { value: InputState; theme: Theme }) {
+function Prompt(p: { value: InputState; theme: Theme; columns: number }) {
   const { text, cursor } = p.value;
   const { theme } = p;
   const { lines, from, at } = promptWindow(text, cursor);
   const col = cursor - (text.split('\n').slice(0, at).join('\n').length + (at ? 1 : 0));
   return h(
     Box,
-    { flexDirection: 'column', paddingLeft: theme.space.indent, marginTop: 1 },
+    { flexDirection: 'column' },
+    h(
+      Box,
+      { paddingLeft: theme.space.indent },
+      h(
+        Text,
+        theme.props('faint'),
+        theme.symbols.rule.repeat(Math.max(0, p.columns - theme.space.indent * 2)),
+      ),
+    ),
     ...lines.map((line, i) => {
       const here = from + i === at;
       const before = here ? line.slice(0, col) : line;
       const sym = h(
         Box,
-        { width: 2, flexShrink: 0 },
+        { width: theme.space.lead, flexShrink: 0 },
         h(Text, mutedProps(theme), from + i === 0 ? theme.symbols.prompt : ' '),
       );
       return h(
         Box,
-        { key: i },
+        { key: i, paddingLeft: theme.space.indent },
         sym,
         here
           ? h(
@@ -1069,7 +1078,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           noting,
         }),
     showPrompt && !viewing && !state.picker && !state.overlay
-      ? h(Prompt, { value: input, theme })
+      ? h(Prompt, { value: input, theme, columns })
       : null,
     menu && !viewing && !state.picker && !state.overlay
       ? h(Menu, { items: menuItems, at, theme, indent: theme.space.indent + 2 })
