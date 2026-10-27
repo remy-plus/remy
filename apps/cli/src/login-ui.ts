@@ -1,6 +1,8 @@
 // `remy login`: pick a provider, paste the key (masked), optionally name a default model.
+
 import { Box, render, Text, useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
+import { Hints } from './hints.ts';
 import { moveSelection } from './session-picker.ts';
 import type { Theme } from './theme.ts';
 
@@ -109,8 +111,7 @@ export function LoginFlow(p: {
     setText((t) => t + clean);
   });
 
-  const mutedColor = theme.color('muted');
-  const muted = mutedColor ? { color: mutedColor } : { dimColor: true };
+  const muted = theme.props('muted');
   const accent = theme.color('accent');
   const accentProps = accent ? { color: accent } : {};
   const errorColor = theme.color('error');
@@ -137,14 +138,20 @@ export function LoginFlow(p: {
           { key: c.id },
           h(
             Box,
-            { width: 2, flexShrink: 0 },
+            { width: theme.space.lead, flexShrink: 0 },
             h(Text, on ? accentProps : muted, on ? theme.symbols.prompt : ' '),
           ),
           h(Text, on ? { bold: true } : {}, c.label),
         ),
       );
     }
-    rows.push(h(Text, { key: 'hint', ...muted }, '↑↓ choose · Enter select · Esc cancel'));
+    rows.push(
+      h(
+        Box,
+        { key: 'hint', marginTop: theme.space.turn },
+        h(Hints, { hint: '↑↓ choose · Enter select · Esc cancel', theme }),
+      ),
+    );
   } else {
     rows.push(h(Text, { key: 'who', ...muted }, choice.label));
     if (step === 'baseUrl')
@@ -175,7 +182,13 @@ export function LoginFlow(p: {
       );
     else if (step === 'checking') rows.push(h(Text, { key: 'q', ...muted }, 'Checking the key.'));
     if (step !== 'checking' && step !== 'done')
-      rows.push(h(Text, { key: 'hint', ...muted }, 'Enter continue · Esc cancel'));
+      rows.push(
+        h(
+          Box,
+          { key: 'hint', marginTop: theme.space.turn },
+          h(Hints, { hint: 'Enter continue · Esc cancel', theme }),
+        ),
+      );
   }
   if (note)
     rows.push(

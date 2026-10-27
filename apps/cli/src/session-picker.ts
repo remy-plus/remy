@@ -2,7 +2,8 @@
 import { Box, Text, useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
 import { type SessionRow, shortId } from './chat.ts';
-import type { Theme } from './theme.ts';
+import { Hints } from './hints.ts';
+import { SPACE, type Theme } from './theme.ts';
 
 /** `just now`, `5 min ago`, `3 h ago`, `2 days ago`. */
 export function ageWord(iso: string, now = Date.now()): string {
@@ -47,7 +48,8 @@ export function SessionPicker(p: {
   return h(
     Box,
     { flexDirection: 'column', paddingLeft: theme.space.indent, marginTop: 1 },
-    h(Text, null, 'Resume which task?'),
+    h(Text, { bold: true }, 'Resume which task?'),
+    h(Text, theme.props('faint'), theme.symbols.rule.repeat(SPACE.rule)),
     ...rows.map((r, i) => {
       const on = i === at;
       return h(
@@ -74,6 +76,10 @@ export function SessionPicker(p: {
         ),
       );
     }),
-    h(Text, muted, '↑↓ choose · Enter resume · Esc cancel'),
+    h(
+      Box,
+      { marginTop: theme.space.turn },
+      h(Hints, { hint: '↑↓ choose · Enter resume · Esc cancel', theme }),
+    ),
   );
 }

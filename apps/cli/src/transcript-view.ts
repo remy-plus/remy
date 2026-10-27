@@ -214,8 +214,7 @@ export function TranscriptView(p: TranscriptViewProps): ReactElement {
   });
   const top = clampTop(st.top, all.length, page);
   const shown = all.slice(top, top + page);
-  const mutedColor = theme.color('muted');
-  const muted = mutedColor ? { color: mutedColor } : { dimColor: true };
+  const muted = theme.props('muted');
   const style: Record<ViewRowKind, Record<string, unknown>> = {
     plain: {},
     muted,
