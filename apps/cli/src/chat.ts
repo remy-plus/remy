@@ -64,7 +64,7 @@ export function resumeBanner(taskId: string, plan: PlanStep[] | undefined): stri
   const done = plan.filter((p) => p.status === 'done').length;
   const next = plan.find((p) => p.status === 'doing') ?? plan.find((p) => p.status === 'pending');
   const n = plan.length;
-  return `${head}: ${done} of ${n} ${n === 1 ? 'step' : 'steps'} done.${next ? ` Next: ${next.text}.` : ''}`;
+  return `${head}: ${done} of ${n} ${n === 1 ? 'step' : 'steps'} done.${next ? ` Next: ${next.text.replace(/\.$/, '')}.` : ''}`;
 }
 
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
@@ -519,7 +519,7 @@ export function createChat(deps: ChatDeps): Chat {
   async function openPicker() {
     const all = (await deps.listTasks?.()) ?? [];
     const rows = all
-      .filter((t) => RESUMABLE.includes(t.status) && t.taskId !== current?.id)
+      .filter((t) => RESUMABLE.includes(t.status))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, MAX_PICKER_ROWS)
       .map((t) => ({

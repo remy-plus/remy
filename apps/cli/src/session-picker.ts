@@ -58,11 +58,19 @@ export function SessionPicker(p: {
           { width: 2, flexShrink: 0 },
           h(Text, on && accent ? { color: accent } : muted, on ? theme.symbols.prompt : ' '),
         ),
-        h(Text, { wrap: 'truncate-end', ...(on ? { bold: true } : {}) }, r.title),
         h(
-          Text,
-          { ...muted, wrap: 'truncate-end' },
-          `  ${shortId(r.taskId)} · ${stateWord(r.status)} · ${ageWord(r.updatedAt, p.now)}`,
+          Box,
+          { flexShrink: 1, flexGrow: 1 },
+          h(Text, { wrap: 'truncate-end', ...(on ? { bold: true } : {}) }, r.title),
+        ),
+        h(
+          Box,
+          { flexShrink: 0, marginLeft: 2 },
+          h(
+            Text,
+            muted,
+            `${shortId(r.taskId)} · ${stateWord(r.status)} · ${ageWord(r.updatedAt, p.now)}`,
+          ),
         ),
       );
     }),
