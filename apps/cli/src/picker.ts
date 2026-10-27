@@ -3,8 +3,9 @@
 import { Box, Text, useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
 import { fuzzyScore } from './commands.ts';
+import { Hints } from './hints.ts';
 import { moveSelection } from './session-picker.ts';
-import type { Theme } from './theme.ts';
+import { SPACE, type Theme } from './theme.ts';
 
 export interface PickItem {
   id: string;
@@ -40,10 +41,36 @@ export function filterItems(items: PickItem[], query: string): PickItem[] {
   return scored.sort((a, b) => b.s - a.s).map((x) => x.i);
 }
 
-const mutedOf = (theme: Theme) => {
-  const color = theme.color('muted');
-  return color ? { color } : { dimColor: true };
-};
+const mutedOf = (theme: Theme) => theme.props('muted');
+
+/**
+ * Which characters of `title` the query matched: the typed text where it appears as written,
+ * otherwise the first in-order spread of its letters (g5n in gpt-5-nano).
+ */
+export function matchSpans(title: string, query: string): [string, boolean][] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [[title, false]];
+  const low = title.toLowerCase();
+  const marks = new Array<boolean>(title.length).fill(false);
+  const at = low.indexOf(q);
+  if (at >= 0) marks.fill(true, at, at + q.length);
+  else {
+    let from = 0;
+    for (const ch of q) {
+      const k = low.indexOf(ch, from);
+      if (k < 0) return [[title, false]];
+      marks[k] = true;
+      from = k + 1;
+    }
+  }
+  const out: [string, boolean][] = [];
+  for (let i = 0; i < title.length; i++) {
+    const last = out[out.length - 1];
+    if (last && last[1] === marks[i]) last[0] += title[i];
+    else out.push([title[i] as string, marks[i] as boolean]);
+  }
+  return out;
+}
 
 /** How many rows `Menu` takes for this many items. */
 export const menuRows = (count: number, max = MENU_ROWS) =>
@@ -56,6 +83,8 @@ export function Menu(p: {
   max?: number;
   /** Indent in columns; the prompt's text starts at 4. */
   indent?: number;
+  /** What was typed: matching letters in each title are underlined. */
+  query?: string;
 }): ReactElement | null {
   const { theme, items } = p;
   const max = p.max ?? MENU_ROWS;
@@ -74,15 +103,26 @@ export function Menu(p: {
         { key: it.id },
         h(
           Box,
-          { width: 2, flexShrink: 0 },
+          { width: theme.space.lead, flexShrink: 0 },
           h(Text, on && accent ? { color: accent } : muted, on ? theme.symbols.prompt : ' '),
         ),
-        h(Text, { wrap: 'truncate-end', ...(on ? { bold: true } : {}) }, it.title.padEnd(wide)),
+        h(
+          Text,
+          { wrap: 'truncate-end', ...(on ? { bold: true } : {}) },
+          ...matchSpans(it.title, p.query ?? '').map(([text, hit], n) =>
+            h(Text, { key: n, ...(hit && { underline: true }) }, text),
+          ),
+          ' '.repeat(Math.max(0, wide - it.title.length)),
+        ),
         it.detail ? h(Text, { wrap: 'truncate-end', ...muted }, `  ${it.detail}`) : null,
       );
     }),
     items.length > max
-      ? h(Text, muted, `  ${items.length - max} more. Keep typing to narrow.`)
+      ? h(
+          Text,
+          muted,
+          `${' '.repeat(theme.space.lead)}${items.length - max} more. Keep typing to narrow.`,
+        )
       : null,
   );
 }
@@ -132,7 +172,7 @@ export function Picker(p: {
   const accent = theme.color('accent');
   return h(
     Box,
-    { flexDirection: 'column', paddingLeft: theme.space.indent, marginTop: 1 },
+    { flexDirection: 'column', paddingLeft: theme.space.indent, marginTop: theme.space.turn },
     h(Text, { bold: true }, p.title),
     h(
       Box,
@@ -142,9 +182,21 @@ export function Picker(p: {
       h(Text, accent ? { color: accent } : {}, theme.symbols.cursor),
       query ? null : h(Text, muted, ' type to narrow the list'),
     ),
+    h(Text, theme.props('faint'), theme.symbols.rule.repeat(SPACE.rule)),
     shown.length
-      ? h(Menu, { items: shown, at: cur, theme, indent: 0, ...(p.max && { max: p.max }) })
+      ? h(Menu, {
+          items: shown,
+          at: cur,
+          theme,
+          indent: 0,
+          query,
+          ...(p.max && { max: p.max }),
+        })
       : h(Text, muted, p.empty ?? 'Nothing matches.'),
-    h(Text, muted, '↑↓ choose · Enter select · Esc close'),
+    h(
+      Box,
+      { marginTop: theme.space.turn },
+      h(Hints, { hint: '↑↓ choose · Enter select · Esc close', theme }),
+    ),
   );
 }

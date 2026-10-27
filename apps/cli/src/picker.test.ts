@@ -1,7 +1,7 @@
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { filterItems, Menu, menuRows, Picker, windowAround } from './picker.ts';
+import { filterItems, Menu, matchSpans, menuRows, Picker, windowAround } from './picker.ts';
 import { createTheme } from './theme.ts';
 
 const items = [
@@ -75,5 +75,24 @@ describe('Menu and Picker', () => {
     await tick();
     expect(app.lastFrame()).toContain('Use "zzz"');
     app.unmount();
+  });
+});
+
+describe('matchSpans', () => {
+  it('marks the typed text where it appears as written', () => {
+    expect(matchSpans('gpt-5-nano', 'nano')).toEqual([
+      ['gpt-5-', false],
+      ['nano', true],
+    ]);
+  });
+  it('marks spread letters in order, and nothing when they do not all appear', () => {
+    expect(
+      matchSpans('gpt-5-nano', 'g5n')
+        .filter(([, hit]) => hit)
+        .map(([t]) => t)
+        .join(''),
+    ).toBe('g5n');
+    expect(matchSpans('gpt', 'xyz')).toEqual([['gpt', false]]);
+    expect(matchSpans('gpt', '')).toEqual([['gpt', false]]);
   });
 });
