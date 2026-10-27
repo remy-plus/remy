@@ -13,6 +13,7 @@ export const PROFILES: Record<string, Profile> = {
   openrouter: { baseUrl: 'https://openrouter.ai/api/v1', keyEnv: 'OPENROUTER_API_KEY' },
   ollama: { baseUrl: 'http://localhost:11434/v1' },
   openai: { baseUrl: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY' },
+  groq: { baseUrl: 'https://api.groq.com/openai/v1', keyEnv: 'GROQ_API_KEY' },
 };
 
 type Env = Record<string, string | undefined>;

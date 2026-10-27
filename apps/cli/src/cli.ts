@@ -89,7 +89,7 @@ Usage
   remy --version | help
 
 Options for run
-  --profile <name>      openrouter, ollama or openai
+  --profile <name>      openrouter, ollama, openai or groq
   --model <id>          Model id
   --base-url <url>      Any OpenAI-compatible endpoint
   --auto <risks>        Risks approved without asking (default read). Example: read,write

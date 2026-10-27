@@ -69,6 +69,13 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 131072,
     pricing: { inPerMTok: 0.1, outPerMTok: 0.32 },
   },
+  // Groq ids. Prices are Groq's paid list prices; its free tier costs nothing but is rate-limited.
+  'llama-3.3-70b-versatile': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 131072,
+    pricing: { inPerMTok: 0.59, outPerMTok: 0.79 },
+  },
   'openai/gpt-5-nano': {
     jsonSchema: true,
     contextTokens: 400000,

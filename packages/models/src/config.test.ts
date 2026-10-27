@@ -44,6 +44,11 @@ describe('modelFromEnv', () => {
         REMY_BASE_URL: 'http://local/v1',
         REMY_API_KEY: 'mine',
       }).complete(req, sig);
+      await modelFromEnv({
+        REMY_PROFILE: 'groq',
+        REMY_MODEL: 'llama-3.3-70b-versatile',
+        GROQ_API_KEY: 'gq-key',
+      }).complete(req, sig);
     } finally {
       globalThis.fetch = realFetch;
     }
@@ -51,6 +56,8 @@ describe('modelFromEnv', () => {
     expect(seen[0]?.headers.authorization).toBe('Bearer or-key');
     expect(seen[1]?.url).toBe('http://local/v1/chat/completions');
     expect(seen[1]?.headers.authorization).toBe('Bearer mine');
+    expect(seen[2]?.url).toBe('https://api.groq.com/openai/v1/chat/completions');
+    expect(seen[2]?.headers.authorization).toBe('Bearer gq-key');
   });
 
   it('errors on missing or unknown config', () => {
