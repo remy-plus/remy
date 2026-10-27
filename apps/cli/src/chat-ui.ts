@@ -130,10 +130,7 @@ export function useSettled(value: string, ms: number): string {
 }
 
 /** Text props for a muted look that still works with colors off. */
-const mutedProps = (theme: Theme) => {
-  const color = theme.color('muted');
-  return color ? { color } : { dimColor: true };
-};
+const mutedProps = (theme: Theme) => theme.props('muted');
 
 function spanProps(sp: Span, theme: Theme) {
   return {
@@ -165,7 +162,7 @@ function Row(p: { theme: Theme; lead?: ReactNode; marginTop?: number; children?:
   return h(
     Box,
     { paddingLeft: p.theme.space.indent, marginTop: p.marginTop ?? 0 },
-    h(Box, { width: 2, flexShrink: 0 }, p.lead ?? null),
+    h(Box, { width: p.theme.space.lead, flexShrink: 0 }, p.lead ?? null),
     h(Box, { flexDirection: 'column', flexGrow: 1, flexShrink: 1 }, p.children),
   );
 }
@@ -648,7 +645,7 @@ function Live(p: {
     kids.push(
       h(
         Box,
-        { key: 'spin', paddingLeft: theme.space.indent },
+        { key: 'spin', paddingLeft: theme.space.indent, marginTop: theme.space.turn },
         h(Text, { ...muted, wrap: 'truncate-end' }, `${glyph} ${narration}`),
       ),
     );
