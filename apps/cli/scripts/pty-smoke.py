@@ -82,7 +82,7 @@ def _row_html(cells, bg_default: str, fg_default: str) -> str:
     return "".join(out)
 
 
-def write_shots(prefix: str, screen, cols: int, rows: int, bg: str) -> None:
+def write_shots(prefix: str, screen, cols: int, rows: int, bg: str, scroll: bool = True) -> None:
     """Render the final screen, and scrollback plus screen, to PNG with true colours."""
     bg_default, fg_default = THEMES[bg]
     blank = pyte.screens.Char(" ")
@@ -96,7 +96,8 @@ def write_shots(prefix: str, screen, cols: int, rows: int, bg: str) -> None:
             rs.pop()
         return rs
 
-    for name, rs in ((prefix + ".png", cur), (prefix + "-all.png", trim(hist + cur))):
+    jobs = [(prefix + ".png", cur)] + ([(prefix + "-all.png", trim(hist + cur))] if scroll else [])
+    for name, rs in jobs:
         html = "".join(_row_html(r, bg_default, fg_default) + "\n" for r in rs)
         doc = (
             f"<!doctype html><meta charset=utf-8><body style='margin:0;background:{bg_default}'>"
@@ -215,6 +216,8 @@ def main() -> int:
 
     def shot_ease(name: str) -> list[str]:
         ease_shots[name] = [l.rstrip() for l in screen.display if l.strip()]
+        if args.shot:
+            write_shots(f"{args.shot}-{name.replace(' ', '-')}", screen, args.cols, args.rows, args.bg, scroll=False)
         return ease_shots[name]
 
     def has(name: str, text: str) -> bool:
@@ -253,6 +256,8 @@ def main() -> int:
     for t in turns:
         send(t)
         pump(1.5)  # let the turn begin
+        if args.shot and "working" in last_line() and t == turns[-1]:
+            write_shots(f"{args.shot}-working", screen, args.cols, args.rows, args.bg, scroll=False)
         # A turn is over once the chat waits on the user again.
         if not wait_for("ready", args.timeout, "needs approval", "needs your answer"):
             print(f"timed out waiting for the turn to finish: {t!r}")
@@ -261,6 +266,8 @@ def main() -> int:
         pump(0.3)
         if "needs approval" in last_line():
             approval_screens.append([l.rstrip() for l in screen.display if l.strip()])
+            if args.shot:
+                write_shots(f"{args.shot}-approval{len(approval_screens)}", screen, args.cols, args.rows, args.bg, scroll=False)
     if args.ease and ok:
         # The workspace is empty; put a file in it for @ to find.
         import glob
@@ -365,12 +372,16 @@ def main() -> int:
         ok = wait_for("ready", args.timeout, "needs approval", "needs your answer") and ok
         pump(0.3)
         resume_shots["after paste turn"] = shot2()
+        if args.shot:
+            write_shots(f"{args.shot}-approval", screen, args.cols, args.rows, args.bg, scroll=False)
         if "needs approval" in last_line():
             os.write(master, b"\x03")  # stop: the task stays resumable
             pump(1.0)
         send("/resume")
         pump(1.0)
         resume_shots["picker"] = shot2()
+        if args.shot:
+            write_shots(f"{args.shot}-resume-picker", screen, args.cols, args.rows, args.bg, scroll=False)
         os.write(master, b"\r")
         pump(2.0)
         resume_shots["resumed"] = shot2()
