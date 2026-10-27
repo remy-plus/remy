@@ -1,10 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- **`remy login`.** Pick a provider, paste the key (hidden), optionally name a default model; Remy checks the key and saves it in the macOS Keychain or a private file in `~/.remy`. `remy login --list`, `remy logout <provider>`, and `remy login <provider> --key-stdin` for scripts. Flags beat env, env beats a saved login, a saved login beats `remy.config.json`.
-- **Anthropic and Google Gemini.** Native API profiles (`anthropic`, `google`) with Claude Opus 5.5, Sonnet 5.5, Haiku 5.5 and 4.5, and Gemini 2.5 Pro, Flash and Flash-Lite priced in the catalog. Groq's key is now redacted from logs like the others.
-
 ## 0.2.0 (2026-10-27)
 
 The terminal grows up: Remy narrates what it is doing, asks better questions, and treats what you paste with care.
@@ -18,6 +13,8 @@ The terminal grows up: Remy narrates what it is doing, asks better questions, an
 - **Terminal manners.** Flicker-free redraws where the terminal supports them, a bell when Remy waits and the window is unfocused (`REMY_NOTIFY=off`), light and dark detection, and stray output kept out of the layout.
 - **Patience with rate limits.** A 429 waits as long as the provider asks (up to a minute) and gets more attempts, so free tiers work.
 - **Groq.** `REMY_PROFILE=groq` with `GROQ_API_KEY`.
+- **`remy login`.** Pick a provider, paste the key (hidden), optionally name a default model; Remy checks the key and saves it in the macOS Keychain or a private file in `~/.remy`. `remy login --list`, `remy logout <provider>`, and `remy login <provider> --key-stdin` for scripts. Flags beat env, env beats a saved login, a saved login beats `remy.config.json`.
+- **Anthropic and Google Gemini.** Native API profiles (`anthropic`, `google`) with Claude Opus 5.5, Sonnet 5.5, Haiku 5.5 and 4.5, and Gemini 2.5 Pro, Flash and Flash-Lite priced in the catalog. Groq's key is now redacted from logs like the others.
 - **New tagline:** "Your assistant, anywhere."
 
 ## 0.1.0 (2026-10-26)
