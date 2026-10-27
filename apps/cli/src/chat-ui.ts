@@ -1063,7 +1063,9 @@ export function ChatApp(props: ChatAppProps): ReactElement {
 
   return h(
     Box,
-    { flexDirection: 'column', width: columns },
+    // One column short of the edge: a line that fills the last column makes many terminals
+    // wrap on their own, leaving a stray character alone on the next row.
+    { flexDirection: 'column', width: Math.max(20, columns - 1) },
     h(Static<{ id: string; item?: Item }>, {
       items: entries,
       // biome-ignore lint/correctness/noChildrenProp: createElement's types only accept Static's render function as a prop
