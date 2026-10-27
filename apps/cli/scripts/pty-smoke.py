@@ -39,6 +39,82 @@ APPROVAL_KEYS = ("y", "n", "e", "v")
 DEFAULT_TURNS = ["hello", "Research what happened to the Golden Hind in 3 bullets"]
 
 
+# ---- coloured screenshots ----------------------------------------------------------------
+NAMED = {
+    "black": "#000000", "red": "#cd3131", "green": "#0dbc79", "brown": "#e5e510", "blue": "#2472c8",
+    "magenta": "#bc3fbc", "cyan": "#11a8cd", "white": "#e5e5e5", "brightblack": "#666666",
+    "brightred": "#f14c4c", "brightgreen": "#23d18b", "brightbrown": "#f5f543", "brightblue": "#3b8eea",
+    "brightmagenta": "#d670d6", "brightcyan": "#29b8db", "brightwhite": "#ffffff",
+}
+THEMES = {"dark": ("#0F0F10", "#EDEBE6"), "light": ("#EDEBE6", "#0F0F10")}
+CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+
+def _css(color: str, default: str) -> str:
+    if color == "default":
+        return default
+    if color in NAMED:
+        return NAMED[color]
+    if re.fullmatch(r"[0-9a-fA-F]{6}", color):
+        return "#" + color
+    return default
+
+
+def _row_html(cells, bg_default: str, fg_default: str) -> str:
+    out = []
+    for ch in cells:
+        fg, bg = _css(ch.fg, fg_default), _css(ch.bg, bg_default)
+        if ch.reverse:
+            fg, bg = bg, fg
+        style = f"color:{fg};"
+        if bg != bg_default:
+            style += f"background:{bg};"
+        if ch.bold:
+            style += "font-weight:700;"
+        if ch.italics:
+            style += "font-style:italic;"
+        if ch.underscore:
+            style += "text-decoration:underline;"
+        if ch.strikethrough:
+            style += "text-decoration:line-through;"
+        data = ch.data.replace("&", "&amp;").replace("<", "&lt;") or " "
+        out.append(f'<span style="{style}">{data}</span>')
+    return "".join(out)
+
+
+def write_shots(prefix: str, screen, cols: int, rows: int, bg: str) -> None:
+    """Render the final screen, and scrollback plus screen, to PNG with true colours."""
+    bg_default, fg_default = THEMES[bg]
+    blank = pyte.screens.Char(" ")
+    hist = []
+    for line in screen.history.top:
+        hist.append([line[i] if i in line else blank for i in range(cols)])
+    cur = [[screen.buffer[y][x] for x in range(cols)] for y in range(rows)]
+
+    def trim(rs):
+        while rs and all(c.data.strip() == "" and c.bg == "default" for c in rs[-1]):
+            rs.pop()
+        return rs
+
+    for name, rs in ((prefix + ".png", cur), (prefix + "-all.png", trim(hist + cur))):
+        html = "".join(_row_html(r, bg_default, fg_default) + "\n" for r in rs)
+        doc = (
+            f"<!doctype html><meta charset=utf-8><body style='margin:0;background:{bg_default}'>"
+            f"<pre style=\"margin:0;padding:20px 24px;font:14px/18px 'JetBrains Mono',Menlo,monospace;"
+            f"color:{fg_default};background:{bg_default};\">{html}</pre>"
+        )
+        hp = name[:-4] + ".html"
+        with open(hp, "w") as f:
+            f.write(doc)
+        w, h = int(cols * 8.43) + 48 + 8, len(rs) * 18 + 40 + 8
+        subprocess.run(
+            [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--window-size={w},{h}",
+             "--force-device-scale-factor=2", f"--screenshot={name}", "file://" + os.path.abspath(hp)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60,
+        )
+        os.remove(hp)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cols", type=int, default=100)
@@ -53,6 +129,8 @@ def main() -> int:
     ap.add_argument("--ease", action="store_true", help="first run in an empty REMY_HOME, then /, Ctrl+P, /model and @ completion")
     ap.add_argument("--cli-arg", action="append", default=[], help="an extra argument for the chat (repeatable)")
     ap.add_argument("--raw", help="write the raw bytes to this file")
+    ap.add_argument("--shot", help="write PREFIX.png (final screen) and PREFIX-all.png (scrollback plus screen), coloured, via headless Chrome")
+    ap.add_argument("--bg", choices=("dark", "light"), default="dark", help="terminal background reported to the chat and used for --shot")
     ap.add_argument("--env-file", help="a file with KEY=<openai key>, used when OPENAI_API_KEY is unset")
     args = ap.parse_args()
     turns = args.turn or DEFAULT_TURNS
@@ -105,7 +183,8 @@ def main() -> int:
             stream.feed(data)
             # Answer the probe like a capable terminal: sync supported, dark background.
             if b"\x1b[?2026$p" in data and not args.no_reply:
-                os.write(master, b"\x1b[?2026;2$y\x1b]11;rgb:0f0f/0f0f/1010\x07\x1b[?64c")
+                bgc = b"rgb:0f0f/0f0f/1010" if args.bg == "dark" else b"rgb:eded/ebeb/e6e6"
+                os.write(master, b"\x1b[?2026;2$y\x1b]11;" + bgc + b"\x07\x1b[?64c")
 
     def last_line() -> str:
         rows = [l.rstrip() for l in screen.display if l.strip()]
@@ -318,6 +397,8 @@ def main() -> int:
             return "".join(line[i].data if i in line else " " for i in range(args.cols)).rstrip()
         return line.rstrip()
 
+    if args.shot:
+        write_shots(args.shot, screen, args.cols, args.rows, args.bg)
     history = [text(l) for l in screen.history.top]
     final = [l.rstrip() for l in screen.display]
     lines = history + final
