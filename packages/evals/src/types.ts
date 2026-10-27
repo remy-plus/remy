@@ -38,6 +38,10 @@ export interface EvalCase {
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];
   human: Human;
+  /** Segments of `prompt` the user pasted: untrusted, like a chat paste. */
+  pasted?: string[];
+  /** Risks the user pre-approved. Defaults to read only. */
+  autoApprove?: Risk[];
   faults?: Fault[];
   graders: Grader[];
   budget?: Partial<Budget>;

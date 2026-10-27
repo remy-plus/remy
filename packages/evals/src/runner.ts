@@ -88,7 +88,7 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
 
     const base: TaskConfig = {
       model: model.id,
-      permissions: { autoApprove: ['read'], allowTools: world.allowTools },
+      permissions: { autoApprove: c.autoApprove ?? ['read'], allowTools: world.allowTools },
       budget: { ...DEFAULT_BUDGET, ...c.budget },
       workspaceDir: world.dir,
     };
@@ -137,6 +137,7 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
       const taskId = await rt.start(prompt, {
         ...base,
         ...(context.length && { context: [...context] }),
+        ...(turn === 0 && c.pasted && { pasted: c.pasted }),
       });
       taskIds.push(taskId);
       const outcome = await drive(taskId);
