@@ -251,7 +251,8 @@ export function describeApproval(
   const undo = /undone/i.test(req.reason)
     ? ''
     : `${reversible ? 'Can usually be undone.' : 'Cannot be undone.'} `;
-  const risk = `Risk: ${req.risk}. ${undo}${req.reason}.`;
+  const reason = req.reason.charAt(0).toUpperCase() + req.reason.slice(1);
+  const risk = `Risk: ${req.risk}. ${undo}${reason}.`;
   const v = rowsFor(tool, args, req, risk);
   return {
     ...v,

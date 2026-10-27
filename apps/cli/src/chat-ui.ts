@@ -56,6 +56,7 @@ import {
 import { SPINNER_MS, type Theme } from './theme.ts';
 import {
   APPROVAL_ROWS,
+  type ApprovalRow,
   type ApprovalView,
   approvalHeight,
   approvalRows,
@@ -355,48 +356,53 @@ function ApprovalCard(p: {
   noting: boolean;
 }) {
   const { view, theme } = p;
-  const inner = Math.max(10, p.columns - theme.space.indent * 2 - 4);
+  const { indent, pad } = theme.space;
+  // Border (1) and padding on both sides, inside the left margin.
+  const inner = Math.max(10, p.columns - indent * 2 - (1 + pad) * 2);
   const fit = (s: string) => clip(s, inner);
   const muted = mutedProps(theme);
-  const colorOf = {
-    add: theme.color('diffAdd'),
-    del: theme.color('diffDel'),
-    dim: undefined,
-    plain: undefined,
+  const rowProps = (kind: ApprovalRow['kind'], text: string) => {
+    if (kind === 'add' || kind === 'del') {
+      // A tinted band across the card makes a diff line read as one block.
+      const bg = theme.diffSurface(kind);
+      return {
+        color: theme.color(kind === 'add' ? 'diffAdd' : 'diffDel'),
+        ...(bg && { backgroundColor: bg }),
+        text: bg ? fit(text).padEnd(inner) : fit(text),
+      };
+    }
+    return { ...(kind === 'dim' && muted), text: fit(text) };
   };
   const { shown, hidden } = approvalRows(view, p.expanded, p.room);
-  const key = (k: string, label: string) => [h(Text, { key: k, bold: true }, k), ` ${label}`];
+  const key = (k: string, label: string, accent = false) => [
+    h(Text, { key: k, bold: true, ...(accent && { color: theme.color('accent') }) }, k),
+    h(Text, { key: `${k}-label`, ...muted }, ` ${label}`),
+  ];
+  const gap = h(Text, null, '   ');
   return h(
     Box,
-    { paddingLeft: theme.space.indent },
+    { paddingLeft: indent },
     h(
       Box,
       {
         flexDirection: 'column',
         borderStyle: 'round',
-        borderColor: theme.color('muted'),
-        paddingX: 1,
+        borderColor: theme.color('faint'),
+        ...(theme.color('faint') ? {} : { borderDimColor: true }),
+        paddingX: pad,
         flexGrow: 1,
       },
       h(Text, { bold: true, wrap: 'truncate-end' }, fit(view.title)),
-      ...shown.map((r, i) =>
-        h(
-          Text,
-          {
-            key: i,
-            wrap: 'truncate-end',
-            color: colorOf[r.kind],
-            ...(r.kind === 'dim' && muted),
-          },
-          fit(r.text),
-        ),
-      ),
+      ...shown.map((r, i) => {
+        const { text, ...props } = rowProps(r.kind, r.text);
+        return h(Text, { key: i, wrap: 'truncate-end', ...props }, text);
+      }),
       hidden
         ? h(
             Text,
             { wrap: 'truncate-end', ...muted },
             fit(
-              `... ${hidden} more ${hidden === 1 ? 'row' : 'rows'}${p.expanded ? '' : ' (v shows all)'}`,
+              `${theme.symbols.ellipsis} ${hidden} more ${hidden === 1 ? 'row' : 'rows'}${p.expanded ? '' : ' (v shows all)'}`,
             ),
           )
         : null,
@@ -415,12 +421,12 @@ function ApprovalCard(p: {
         : h(
             Text,
             { wrap: 'truncate-end' },
-            ...key('y', 'approve once   '),
-            ...key('n', 'deny   '),
+            ...key('y', 'approve once', true),
+            gap,
+            ...key('n', 'deny'),
+            gap,
             ...key('e', 'deny and say why'),
-            ...(view.more
-              ? [h(Text, { key: 'v', ...muted }, '   '), ...key('v', p.expanded ? 'fewer' : 'more')]
-              : []),
+            ...(view.more ? [gap, ...key('v', p.expanded ? 'fewer' : 'more')] : []),
           ),
     ),
   );
