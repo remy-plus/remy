@@ -10,6 +10,9 @@ Needs: python3, `pip install pyte`, and a model key in the environment (never in
   OPENAI_API_KEY=... REMY_PROFILE=openai REMY_MODEL=gpt-5-nano \\
     python3 apps/cli/scripts/pty-smoke.py [--cols 100] [--rows 30] [--turn "message" ...]
 
+  --ease runs the ease-of-use path from an empty REMY_HOME: the login panel on first run, a pasted
+  key, a first turn, the "/" list, Ctrl+P, /model and "@" file completion.
+
 Exit code 0 when the checks pass, 1 when they fail.
 """
 
@@ -47,6 +50,7 @@ def main() -> int:
     ap.add_argument("--unfocus", action="store_true", help="send a focus-out report, then expect a bell at approval")
     ap.add_argument("--editing", action="store_true", help="also try a multi-line message, a bracketed paste and the Ctrl+O view")
     ap.add_argument("--pasted-write", action="store_true", help="paste an email with a hidden instruction, ask for a write, expect an approval; then /resume it")
+    ap.add_argument("--ease", action="store_true", help="first run in an empty REMY_HOME, then /, Ctrl+P, /model and @ completion")
     ap.add_argument("--cli-arg", action="append", default=[], help="an extra argument for the chat (repeatable)")
     ap.add_argument("--raw", help="write the raw bytes to this file")
     ap.add_argument("--env-file", help="a file with KEY=<openai key>, used when OPENAI_API_KEY is unset")
@@ -64,8 +68,17 @@ def main() -> int:
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", args.rows, args.cols, 0, 0))
     home = tempfile.mkdtemp(prefix="remy-smoke-")
     env = dict(os.environ, TERM=args.term, COLORTERM="truecolor", REMY_HOME=home)
-    env.setdefault("REMY_PROFILE", "openai")
-    env.setdefault("REMY_MODEL", "gpt-5-nano")
+    env["REMY_KEYCHAIN"] = "off"  # never touch the real Keychain from a smoke run
+    key = env.get("OPENAI_API_KEY", "")
+    if args.ease:
+        # A new user: no profile, no model, no key in the environment.
+        for k in ("REMY_PROFILE", "REMY_MODEL", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "REMY_API_KEY"):
+            env.pop(k, None)
+        if not args.turn:
+            turns = ["Reply with the single word ready."]
+    else:
+        env.setdefault("REMY_PROFILE", "openai")
+        env.setdefault("REMY_MODEL", "gpt-5-nano")
     proc = subprocess.Popen(
         ["node", "--conditions=@remy/source", "apps/cli/src/main.ts", *args.cli_arg],
         cwd=ROOT, env=env, stdin=slave, stdout=slave, stderr=slave, close_fds=True,
@@ -118,7 +131,39 @@ def main() -> int:
             os.write(master, b"\r")
 
     approval_screens: list[list[str]] = []
-    ok = wait_for("ready", 30)
+    ease_shots: dict[str, list[str]] = {}
+    ease_fail: list[str] = []
+
+    def shot_ease(name: str) -> list[str]:
+        ease_shots[name] = [l.rstrip() for l in screen.display if l.strip()]
+        return ease_shots[name]
+
+    def has(name: str, text: str) -> bool:
+        return any(text in l for l in ease_shots.get(name, []))
+
+    if args.ease:
+        pump(2.0)
+        shot_ease("first run")
+        if not has("first run", "Connect a model provider"):
+            ease_fail.append("first run did not open the login panel")
+        os.write(master, b"\r")  # OpenAI is first in the list
+        pump(0.5)
+        shot_ease("key question")
+        # A bracketed paste, as a terminal sends it, then Enter for the key and Enter for the default model.
+        os.write(master, b"\x1b[200~" + key.encode() + b"\x1b[201~")
+        pump(0.5)
+        shot_ease("key pasted")
+        if key and key[:8] in "\n".join(ease_shots["key pasted"]):
+            ease_fail.append("the key is visible on screen")
+        os.write(master, b"\r")
+        pump(0.5)
+        os.write(master, b"\r")
+        wait_for("gpt-5-nano \u00b7 ready", 30)
+        pump(0.5)
+        shot_ease("connected")
+        if not has("connected", "gpt-5-nano"):
+            ease_fail.append("login did not end on a connected model")
+    ok = True if args.ease else wait_for("ready", 30)
     if not ok:
         print("the chat did not become ready; screen:\n" + "\n".join(screen.display))
         proc.kill()
@@ -137,6 +182,60 @@ def main() -> int:
         pump(0.3)
         if "needs approval" in last_line():
             approval_screens.append([l.rstrip() for l in screen.display if l.strip()])
+    if args.ease and ok:
+        # The workspace is empty; put a file in it for @ to find.
+        import glob
+        for ws in glob.glob(os.path.join(home, "workspaces", "chat_*")):
+            with open(os.path.join(ws, "notes.txt"), "w") as f:
+                f.write("Remy smoke note: the passphrase is mango.\n")
+        os.write(master, b"/")
+        pump(0.5)
+        shot_ease("slash list")
+        os.write(master, b"mo")
+        pump(0.4)
+        shot_ease("slash narrowed")
+        os.write(master, b"\x1b")  # Esc clears
+        pump(0.3)
+        os.write(master, b"\x10")  # Ctrl+P
+        pump(0.5)
+        shot_ease("palette")
+        os.write(master, b"sess")
+        pump(0.4)
+        shot_ease("palette filtered")
+        os.write(master, b"\x1b")
+        pump(0.4)
+        os.write(master, b"/model")
+        pump(0.3)
+        os.write(master, b"\r")
+        pump(0.6)
+        shot_ease("model list")
+        os.write(master, b"\x1b")
+        pump(0.4)
+        os.write(master, b"What is the passphrase in @no")
+        pump(0.6)
+        shot_ease("at list")
+        os.write(master, b"\t")
+        pump(0.3)
+        shot_ease("at completed")
+        os.write(master, b"\r")
+        pump(1.5)
+        ok = wait_for("ready", args.timeout) and ok
+        pump(0.3)
+        shot_ease("file answer")
+        for name, want in (
+            ("slash list", "Switch the model"),
+            ("slash narrowed", "Tab complete"),
+            ("palette", "Commands"),
+            ("palette filtered", "Pick up an unfinished task"),
+            ("model list", "Switch model"),
+            ("at list", "notes.txt"),
+            ("at completed", "@notes.txt"),
+            ("file answer", "Attached notes.txt"),
+        ):
+            if not has(name, want):
+                ease_fail.append(f"{name}: {want!r} not on screen")
+        if not any("mango" in l.lower() for l in ease_shots["file answer"]):
+            ease_fail.append("the model did not see the attached file")
     editing_shots: dict[str, list[str]] = {}
     editing_turns: list[str] = []
     if args.editing and ok:
@@ -234,6 +333,9 @@ def main() -> int:
     for name, rows_ in resume_shots.items():
         print(f"\n--- paste/resume screen: {name} ---")
         print("\n".join(rows_))
+    for name, rows_ in ease_shots.items():
+        print(f"\n--- ease screen: {name} ---")
+        print("\n".join(rows_))
     print("\n--- checks ---")
 
     failures = []
@@ -315,6 +417,7 @@ def main() -> int:
         if "Pasted block" not in joined or "[Pasted 9 lines]" in joined and "filler row 7" not in joined:
             print("note: the pasted block is in the transcript as its marker or its text")
         print(f"editing checks done ({len(editing_turns)} multi-line turn)")
+    failures.extend(ease_fail)
     for f in failures:
         print("FAIL:", f)
     print("clean" if not failures and ok else "NOT CLEAN")
