@@ -16,6 +16,7 @@ The terminal grows up: Remy narrates what it is doing, asks better questions, an
 - **`remy login`.** Pick a provider, paste the key (hidden), optionally name a default model; Remy checks the key and saves it in the macOS Keychain or a private file in `~/.remy`. `remy login --list`, `remy logout <provider>`, and `remy login <provider> --key-stdin` for scripts. Flags beat env, env beats a saved login, a saved login beats `remy.config.json`.
 - **Anthropic and Google Gemini.** Native API profiles (`anthropic`, `google`) with Claude Opus 5.5, Sonnet 5.5, Haiku 5.5 and 4.5, and Gemini 2.5 Pro, Flash and Flash-Lite priced in the catalog. Groq's key is now redacted from logs like the others.
 - **Easy from the first run.** With nothing connected, `remy` opens a login panel instead of exiting. In the chat: `/model` switches the model, `/login` connects a provider, `/sessions` picks up a task, `Ctrl+P` lists every command, typing `/` suggests commands, and `@path` hands Remy a workspace file (as untrusted context). Errors end with the one next step.
+- **A quieter, sharper look.** Even rhythm between turns, aligned tool rows with timings at the edge, approval cards with coloured diffs, real Markdown (labelled code blocks, tables, nested lists), a calm spinner, a welcome screen with examples, and matched letters underlined in every picker. Light terminals and `NO_COLOR` look right too. Screens: `design/screens/0.2/`.
 - **New tagline:** "Your assistant, anywhere."
 
 ## 0.1.0 (2026-10-26)
