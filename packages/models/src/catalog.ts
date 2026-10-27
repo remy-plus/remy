@@ -88,6 +88,50 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 400000,
     pricing: { inPerMTok: 0.05, outPerMTok: 0.4 },
   },
+  // Anthropic (first-party list prices; Haiku 5.5 is $0.10 / $0.50 up to 100K-token prompts).
+  'claude-opus-5-5': {
+    jsonSchema: false,
+    contextTokens: 1000000,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 4, outPerMTok: 20 },
+  },
+  'claude-sonnet-5-5': {
+    jsonSchema: false,
+    contextTokens: 1000000,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 2, outPerMTok: 10 },
+  },
+  'claude-haiku-5-5': {
+    jsonSchema: false,
+    contextTokens: 1000000,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 0.1, outPerMTok: 0.5 },
+  },
+  'claude-haiku-4-5': {
+    jsonSchema: false,
+    contextTokens: 200000,
+    contextWindow: 200000,
+    pricing: { inPerMTok: 1, outPerMTok: 5 },
+  },
+  // Google Gemini (paid tier, standard prompts; Pro costs more above 200K tokens).
+  'gemini-2.5-pro': {
+    jsonSchema: false,
+    contextTokens: 1048576,
+    contextWindow: 1048576,
+    pricing: { inPerMTok: 1.25, outPerMTok: 10 },
+  },
+  'gemini-2.5-flash': {
+    jsonSchema: false,
+    contextTokens: 1048576,
+    contextWindow: 1048576,
+    pricing: { inPerMTok: 0.3, outPerMTok: 2.5 },
+  },
+  'gemini-2.5-flash-lite': {
+    jsonSchema: false,
+    contextTokens: 1048576,
+    contextWindow: 1048576,
+    pricing: { inPerMTok: 0.1, outPerMTok: 0.4 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },

@@ -1,4 +1,5 @@
 import type { ModelClient } from '@remy/core';
+import { createAiSdkClient } from './ai-sdk-client.ts';
 import { BUILTIN_CATALOG, type Catalog, resolveCaps } from './catalog.ts';
 import { createOpenAIClient } from './openai.ts';
 import { selectStrategy } from './strategy.ts';
@@ -16,6 +17,17 @@ export const PROFILES: Record<string, Profile> = {
   ollama: { baseUrl: 'http://localhost:11434/v1' },
   openai: { baseUrl: 'https://api.openai.com/v1', keyEnv: 'OPENAI_API_KEY' },
   groq: { baseUrl: 'https://api.groq.com/openai/v1', keyEnv: 'GROQ_API_KEY' },
+  // Native APIs (not OpenAI-compatible), served by the AI SDK client.
+  anthropic: {
+    kind: 'anthropic',
+    baseUrl: 'https://api.anthropic.com/v1',
+    keyEnv: 'ANTHROPIC_API_KEY',
+  },
+  google: {
+    kind: 'google',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    keyEnv: 'GEMINI_API_KEY',
+  },
 };
 
 type Env = Record<string, string | undefined>;
@@ -33,11 +45,13 @@ export function modelFromEnv(env: Env, catalog?: Catalog): ModelClient {
   const model = env.REMY_MODEL;
   if (!model) throw new Error('set REMY_MODEL');
   const apiKey = env.REMY_API_KEY ?? (profile?.keyEnv ? env[profile.keyEnv] : undefined);
-  const raw = createOpenAIClient({
-    id: model,
-    baseUrl,
-    ...(apiKey && { apiKey }),
-    caps: resolveCaps(model, { ...BUILTIN_CATALOG, ...catalog }),
-  });
+  const caps = resolveCaps(model, { ...BUILTIN_CATALOG, ...catalog });
+  const kind = profile?.kind ?? 'openai';
+  if (kind !== 'openai' && !apiKey)
+    throw new Error(`the ${name} profile needs an API key (${profile?.keyEnv})`);
+  const raw =
+    kind === 'openai'
+      ? createOpenAIClient({ id: model, baseUrl, ...(apiKey && { apiKey }), caps })
+      : createAiSdkClient({ kind, id: model, baseUrl, apiKey: apiKey as string, caps });
   return selectStrategy(raw);
 }

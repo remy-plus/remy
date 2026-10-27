@@ -1,3 +1,4 @@
+export * from './ai-sdk-client.ts';
 export * from './catalog.ts';
 export * from './config.ts';
 export * from './doubles.ts';
