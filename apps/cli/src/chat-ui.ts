@@ -286,7 +286,7 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
         h(
           Box,
           { flexDirection: 'column' },
-          h(Text, { bold: true }, shown.join('\n')),
+          h(Text, null, shown.join('\n')),
           more ? h(Text, muted, `... ${more} more lines (Ctrl+O shows all)`) : null,
         ),
       );
@@ -306,8 +306,12 @@ function TranscriptItem(p: { item: Item; theme: Theme; columns: number }) {
     case 'error':
       return h(
         Row,
-        { theme, marginTop: 1, lead: h(Text, null, theme.symbols.failed) },
-        h(Text, { bold: true }, item.text),
+        {
+          theme,
+          marginTop: turn,
+          lead: h(Text, { color: theme.color('error') }, theme.symbols.failed),
+        },
+        h(Text, { color: theme.color('error') }, item.text),
       );
     case 'note':
       return h(Row, { theme, marginTop: turn }, h(Text, muted, item.text));
