@@ -2,12 +2,16 @@
 // lines of styled spans already wrapped to a width, so the screen knows exactly how many rows
 // a block takes and can keep the live area short. Pure; no Ink in here.
 
+import { SPACE, SYMBOLS } from './theme.ts';
+
 export interface Span {
   text: string;
   bold?: boolean;
   italic?: boolean;
   code?: boolean;
   dim?: boolean;
+  /** Structure (gutters, rules, quote bars): quieter than `dim`. */
+  faint?: boolean;
 }
 export type MdLine = Span[];
 
@@ -97,6 +101,7 @@ const style = (s: Span): Omit<Span, 'text'> => ({
   ...(s.italic && { italic: true }),
   ...(s.code && { code: true }),
   ...(s.dim && { dim: true }),
+  ...(s.faint && { faint: true }),
 });
 
 /**
@@ -157,8 +162,16 @@ export function wrapSpans(spans: Span[], width: number, first = '', rest = first
 }
 
 const BULLET = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
-const HEADING = /^#{1,6}\s+(.*)$/;
-const FENCE = /^\s*(```|~~~)/;
+const HEADING = /^(#{1,6})\s+(.*)$/;
+const FENCE = /^\s*(```|~~~)\s*([\w+#.-]*)/;
+const QUOTE = /^\s*>\s?(.*)$/;
+/** Dim a list marker so the text carries the line. */
+function dimMarker(lines: MdLine[], pad: string, marker: string): MdLine[] {
+  const first = lines[0];
+  if (first?.[0]?.text === pad + marker)
+    first.splice(0, 1, ...(pad ? [{ text: pad }] : []), { text: marker, dim: true });
+  return lines;
+}
 
 export function renderMarkdown(src: string, width: number): MdLine[] {
   const w = Math.max(12, width);
@@ -169,16 +182,24 @@ export function renderMarkdown(src: string, width: number): MdLine[] {
     if (!blank) out.push([]);
     blank = true;
   };
+  const rows = src.replace(/\r/g, '').split('\n');
 
-  for (const raw of src.replace(/\r/g, '').split('\n')) {
-    const line = raw.replace(/\s+$/, '');
-    if (FENCE.test(line)) {
+  for (let n = 0; n < rows.length; n++) {
+    const line = (rows[n] as string).replace(/\s+$/, '');
+    const fence = FENCE.exec(line);
+    if (fence) {
       fenced = !fenced;
+      if (fenced) {
+        gap();
+        if (fence[2]) out.push([{ text: `  ${fence[2]}`, dim: true }]);
+        blank = false;
+      } else blank = false;
+      if (!fenced) gap();
       continue;
     }
     if (fenced) {
       const parts = line ? hardSplit(line.replace(/\t/g, '  '), w - 4) : [''];
-      for (const p of parts) out.push([{ text: '  │ ', dim: true }, { text: p }]);
+      for (const p of parts) out.push([{ text: `  ${SYMBOLS.gutter} `, faint: true }, { text: p }]);
       blank = false;
       continue;
     }
@@ -189,22 +210,52 @@ export function renderMarkdown(src: string, width: number): MdLine[] {
     const head = HEADING.exec(line);
     if (head) {
       gap();
-      const spans = inline(head[1] as string).map((s) => ({ ...s, bold: true }));
-      out.push(...wrapSpans(spans, w));
+      const level = (head[1] as string).length;
+      const spans = inline(head[2] as string).map((s) => ({
+        ...s,
+        bold: true,
+        ...(level > 2 && { dim: true }),
+      }));
+      const wrapped = wrapSpans(spans, w);
+      out.push(...wrapped);
+      if (level === 1)
+        out.push([
+          {
+            text: SYMBOLS.rule.repeat(Math.min(SPACE.rule, Math.max(...wrapped.map(lineWidth)))),
+            faint: true,
+          },
+        ]);
       blank = false;
       continue;
     }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
-      out.push([{ text: '─'.repeat(Math.min(w, 40)), dim: true }]);
+      out.push([{ text: SYMBOLS.rule.repeat(Math.min(w, SPACE.rule)), faint: true }]);
+      blank = false;
+      continue;
+    }
+    const quote = QUOTE.exec(line);
+    if (quote) {
+      const bar = `${SYMBOLS.quote} `;
+      for (const l of wrapSpans(
+        inline(quote[1] as string).map((s) => ({ ...s, dim: true })),
+        w - 2,
+      ))
+        out.push([{ text: bar, faint: true }, ...l]);
       blank = false;
       continue;
     }
     const li = BULLET.exec(line);
     if (li) {
-      const pad = ' '.repeat(Math.floor((li[1] as string).length / 2) * 2);
-      const marker = /\d/.test(li[2] as string) ? `${li[2]} ` : '• ';
+      const depth = Math.floor((li[1] as string).length / 2);
+      const pad = ' '.repeat(depth * 2);
+      const ordered = /\d/.test(li[2] as string);
+      const marker = ordered ? `${li[2]} ` : `${depth ? SYMBOLS.bulletSub : SYMBOLS.bullet} `;
       out.push(
-        ...wrapSpans(inline(li[3] as string), w, pad + marker, pad + ' '.repeat(marker.length)),
+        ...dimMarker(
+          wrapSpans(inline(li[3] as string), w, pad + marker, pad + ' '.repeat(marker.length)),
+          pad,
+          marker,
+        ),
       );
       blank = false;
       continue;

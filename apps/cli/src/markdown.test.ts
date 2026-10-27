@@ -36,10 +36,23 @@ describe('renderMarkdown', () => {
         expect(lineWidth(l)).toBeLessThanOrEqual(Math.max(w, 12));
   });
 
-  it('indents fenced code with a dim border and drops the fence', () => {
-    const out = renderMarkdown('before\n```ts\nlet a = 1;\n```', 40);
-    expect(plain(out)).toEqual(['before', '  │ let a = 1;']);
-    expect(out[1]?.[0]?.dim).toBe(true);
+  it('sets fenced code apart: language label, faint gutter, no fence, a blank row around it', () => {
+    const out = renderMarkdown('before\n```ts\nlet a = 1;\n```\nafter', 40);
+    expect(plain(out)).toEqual(['before', '', '  ts', '  │ let a = 1;', '', 'after']);
+    expect(out[2]?.[0]?.dim).toBe(true);
+    expect(out[3]?.[0]?.faint).toBe(true);
+  });
+
+  it('draws a quote bar and a rule under a top heading, dims level three', () => {
+    const q = renderMarkdown('> quoted', 40);
+    expect(plain(q)).toEqual(['▎ quoted']);
+    const h = renderMarkdown('# Title\n### Small', 40);
+    expect(plain(h)).toEqual(['Title', '─────', '', 'Small']);
+    expect(h[3]?.[0]?.dim).toBe(true);
+  });
+
+  it('marks nested list items with a hollow bullet', () => {
+    expect(plain(renderMarkdown('- a\n  - b', 40))).toEqual(['• a', '  ◦ b']);
   });
 
   it('makes headings bold and collapses blank runs', () => {
