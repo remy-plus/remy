@@ -43,6 +43,42 @@ const chunk = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
 const toolDelta = (index: number, fn: Record<string, string>, id?: string) =>
   chunk({ choices: [{ delta: { tool_calls: [{ index, ...(id && { id }), function: fn }] } }] });
 
+describe('reasoning summaries', () => {
+  it('forwards the reasoning fields providers send, and keeps them out of the response', async () => {
+    const full =
+      chunk({ choices: [{ delta: { reasoning: '**Checking files** ' } }] }) +
+      chunk({ choices: [{ delta: { reasoning_content: 'then moving.' } }] }) +
+      chunk({ choices: [{ delta: { reasoning_details: [{ summary: 'more' }] } }] }) +
+      chunk({ choices: [{ delta: { content: 'Done' }, finish_reason: 'stop' }] }) +
+      'data: [DONE]\n\n';
+    const { client } = make(() => sse(full));
+    const thoughts: string[] = [];
+    const res = await client.complete(
+      req,
+      sig(),
+      () => {},
+      (d) => thoughts.push(d),
+    );
+    expect(thoughts).toEqual(['**Checking files** ', 'then moving.', 'more']);
+    expect(res.text).toBe('Done');
+    expect(JSON.stringify(res)).not.toContain('Checking');
+  });
+
+  it('shows nothing when the provider sends no reasoning', async () => {
+    const { client } = make(() =>
+      sse(chunk({ choices: [{ delta: { content: 'Hi' }, finish_reason: 'stop' }] })),
+    );
+    const thoughts: string[] = [];
+    await client.complete(
+      req,
+      sig(),
+      () => {},
+      (d) => thoughts.push(d),
+    );
+    expect(thoughts).toEqual([]);
+  });
+});
+
 describe('createOpenAIClient streaming', () => {
   it('requests a stream with usage and accumulates split text chunks', async () => {
     const full =

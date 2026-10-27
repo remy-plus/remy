@@ -59,8 +59,9 @@ export class RecordingModelClient implements ModelClient {
     req: ModelRequest,
     signal: AbortSignal,
     onText?: (delta: string) => void,
+    onReasoning?: (delta: string) => void,
   ): Promise<ModelResponse> {
-    const res = await this.#inner.complete(req, signal, onText);
+    const res = await this.#inner.complete(req, signal, onText, onReasoning);
     this.cassette.set(argsHash(req), res);
     return res;
   }

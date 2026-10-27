@@ -53,10 +53,28 @@ interface Reply {
   usage: Json;
 }
 
+/**
+ * Reasoning text in a streamed delta, for the providers that send it: `reasoning_content`
+ * (DeepSeek, vLLM), `reasoning` (OpenRouter, Ollama) and `reasoning_details` summary or text items.
+ */
+export function reasoningDeltas(delta: Json): string[] {
+  const out: string[] = [];
+  for (const key of ['reasoning_content', 'reasoning'])
+    if (typeof delta[key] === 'string' && delta[key]) return [delta[key] as string];
+  if (Array.isArray(delta.reasoning_details))
+    for (const d of delta.reasoning_details as Json[]) {
+      const t =
+        typeof d.summary === 'string' ? d.summary : typeof d.text === 'string' ? d.text : '';
+      if (t) out.push(t);
+    }
+  return out;
+}
+
 /** Reads a chat-completions SSE stream into the same shape as a full response, forwarding text deltas. */
 async function readStream(
   res: Response,
   onText: (delta: string) => void,
+  onReasoning: ((delta: string) => void) | undefined,
   signal: AbortSignal,
   timeout: AbortSignal,
   timeoutMs: number,
@@ -82,6 +100,7 @@ async function readStream(
       reply.text += delta.content;
       onText(delta.content);
     }
+    if (onReasoning) for (const r of reasoningDeltas(delta)) onReasoning(r);
     for (const c of (delta.tool_calls as Json[] | undefined) ?? []) {
       const i = Number(c.index ?? 0);
       const call = reply.calls[i] ?? { name: '', args: '' };
@@ -132,6 +151,7 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       req: RawRequest,
       signal: AbortSignal,
       onText?: (delta: string) => void,
+      onReasoning?: (delta: string) => void,
     ): Promise<ModelResponse> {
       const body: Json = {
         model: opts.id,
@@ -152,7 +172,7 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
           function: { name: t.name, description: t.description, parameters: t.parameters },
         }));
       if (req.responseFormat) body.response_format = req.responseFormat;
-      if (onText) {
+      if (onText || onReasoning) {
         body.stream = true;
         body.stream_options = { include_usage: true };
       }
@@ -185,7 +205,15 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       }
 
       let reply: Reply;
-      if (onText) reply = await readStream(res, onText, signal, timeout, timeoutMs);
+      if (onText || onReasoning)
+        reply = await readStream(
+          res,
+          onText ?? (() => {}),
+          onReasoning,
+          signal,
+          timeout,
+          timeoutMs,
+        );
       else {
         let data: Json;
         try {

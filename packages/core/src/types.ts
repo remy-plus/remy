@@ -220,11 +220,16 @@ export interface ModelResponse {
 export interface ModelClient {
   readonly id: string;
   readonly caps: ModelCaps;
-  /** `onText` receives assistant text as it arrives. The returned response is the same either way. */
+  /**
+   * `onText` receives assistant text as it arrives. The returned response is the same either way.
+   * `onReasoning` receives reasoning summaries, only from providers that stream them; it is never
+   * part of the response and never stored.
+   */
   complete(
     req: ModelRequest,
     signal: AbortSignal,
     onText?: (delta: string) => void,
+    onReasoning?: (delta: string) => void,
   ): Promise<ModelResponse>;
 }
 

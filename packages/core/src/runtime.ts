@@ -47,6 +47,8 @@ export interface RuntimeDeps {
    * reset its streaming buffer on every `onModelStart`.
    */
   onText?: (delta: string) => void;
+  /** Reasoning summaries, where the provider streams them. Like `onText`, never persisted. */
+  onReasoning?: (delta: string) => void;
   /** Called before each model call, including retries. */
   onModelStart?: () => void;
 }
@@ -171,6 +173,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             },
             signal,
             deps.onText,
+            deps.onReasoning,
           );
           // Nothing to act on or report: a glitch, not an answer.
           if (!res.text?.trim() && res.calls.length === 0)
