@@ -15,3 +15,4 @@ Reference study for Remy's interfaces, written 2026-10-25. Start with `remy-dire
 | `engineering/comparison.md`  | Side-by-side decisions and tradeoffs, including Remy today                                                                |
 
 Conventions: "verified" means read in source or an official page; "inferred" means deduced and unconfirmed. Dates are access dates. No images or long passages are copied.
+- [subscription-login.md](subscription-login.md): which providers allow signing in with a consumer subscription in a third-party app (only GitHub Copilot, through its SDK).
