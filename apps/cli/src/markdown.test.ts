@@ -43,6 +43,34 @@ describe('renderMarkdown', () => {
     expect(out[3]?.[0]?.faint).toBe(true);
   });
 
+  it('lays a pipe table out in aligned columns under a bold header and a rule', () => {
+    const out = renderMarkdown(
+      '| Type | Action |\n|---|---|\n| pdf | Move to Documents |\n| jpg | Move |',
+      60,
+    );
+    expect(plain(out)).toEqual(
+      ['Type   Action', `${'─'.repeat(4 + 3 + 17)}`, 'pdf    Move to Documents', 'jpg    Move'].map(
+        (l) => l.trimEnd(),
+      ),
+    );
+    expect(out[0]?.[0]?.bold).toBe(true);
+    expect(out[1]?.[0]?.faint).toBe(true);
+  });
+
+  it('reads a table written without the outer pipes', () => {
+    const out = renderMarkdown('Type | Note\n--- | ---\nTea | Hot', 40);
+    expect(plain(out).map((l) => l.trimEnd())).toEqual([
+      'Type   Note',
+      '───────────',
+      'Tea    Hot',
+    ]);
+  });
+
+  it('clips table cells to fit a narrow width', () => {
+    const out = renderMarkdown('| a | b |\n|--|--|\n| short | a very long cell indeed |', 20);
+    for (const l of plain(out)) expect(strWidth(l)).toBeLessThanOrEqual(20);
+  });
+
   it('draws a quote bar and a rule under a top heading, dims level three', () => {
     const q = renderMarkdown('> quoted', 40);
     expect(plain(q)).toEqual(['▎ quoted']);

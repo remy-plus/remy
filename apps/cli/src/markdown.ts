@@ -165,6 +165,62 @@ const BULLET = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const FENCE = /^\s*(```|~~~)\s*([\w+#.-]*)/;
 const QUOTE = /^\s*>\s?(.*)$/;
+const TABLE_RULE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+/** `---|---` under a header row, with or without the outer pipes. */
+const isTableRule = (row: string) =>
+  row.includes('|') && row.includes('-') && TABLE_RULE.test(row.trim());
+const MIN_COLUMN = 6;
+
+const plain = (spans: Span[]) => spans.map((s) => s.text).join('');
+const cellsOf = (row: string) =>
+  row
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split(/(?<!\\)\|/)
+    .map((c) => c.trim().replace(/\\\|/g, '|'));
+
+/** A pipe table as aligned rows: bold header, a faint rule, cells clipped to fit `width`. */
+function renderTable(rows: string[], width: number): MdLine[] {
+  const [head, , ...body] = rows.map(cellsOf);
+  const cols = (head as string[]).length;
+  const grid = [
+    head as string[],
+    ...body.map((r) => Array.from({ length: cols }, (_, i) => r[i] ?? '')),
+  ];
+  const parsed = grid.map((r) => r.map((c) => inline(c)));
+  const widths = Array.from({ length: cols }, (_, c) =>
+    Math.max(...parsed.map((r) => strWidth(plain(r[c] as Span[])))),
+  );
+  const gaps = SPACE.column * (cols - 1);
+  while (widths.reduce((a, b) => a + b, 0) + gaps > width) {
+    const widest = widths.indexOf(Math.max(...widths));
+    if ((widths[widest] as number) <= MIN_COLUMN) break;
+    widths[widest] = (widths[widest] as number) - 1;
+  }
+  const gap = ' '.repeat(SPACE.column);
+  const line = (cells: Span[][], header: boolean): MdLine => {
+    const out: MdLine = [];
+    cells.forEach((spans, c) => {
+      const room = widths[c] as number;
+      const text = plain(spans);
+      const fits = strWidth(text) <= room;
+      const shown: Span[] = fits ? spans : [{ text: clip(text, room) }];
+      for (const sp of shown) out.push(header ? { ...sp, bold: true } : sp);
+      const used = fits ? strWidth(text) : Math.min(room, strWidth(clip(text, room)));
+      if (c < cols - 1) out.push({ text: ' '.repeat(room - used) + gap });
+    });
+    return out;
+  };
+  const rule: MdLine = [
+    {
+      text: widths.map((w) => SYMBOLS.rule.repeat(w)).join(SYMBOLS.rule.repeat(SPACE.column)),
+      faint: true,
+    },
+  ];
+  return [line(parsed[0] as Span[][], true), rule, ...parsed.slice(1).map((r) => line(r, false))];
+}
+
 /** Dim a list marker so the text carries the line. */
 function dimMarker(lines: MdLine[], pad: string, marker: string): MdLine[] {
   const first = lines[0];
@@ -205,6 +261,16 @@ export function renderMarkdown(src: string, width: number): MdLine[] {
     }
     if (!line.trim()) {
       gap();
+      continue;
+    }
+    if (line.includes('|') && isTableRule(rows[n + 1] ?? '')) {
+      const table = [line, rows[n + 1] as string];
+      let k = n + 2;
+      while (k < rows.length && (rows[k] as string).includes('|')) table.push(rows[k++] as string);
+      gap();
+      out.push(...renderTable(table, w));
+      blank = false;
+      n = k - 1;
       continue;
     }
     const head = HEADING.exec(line);
