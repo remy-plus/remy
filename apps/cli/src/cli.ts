@@ -19,7 +19,7 @@ import {
   type TaskStatus,
   ToolRegistry,
 } from '@remy/core';
-import { DEFAULT_CAPS, modelFromEnv, PROFILES } from '@remy/models';
+import { DEFAULT_CAPS, modelFromEnv, PROFILES, verifyKey } from '@remy/models';
 import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
@@ -45,8 +45,10 @@ import {
 } from '@remy/tools';
 import { createChat, type RuntimeHooks, releaseLease } from './chat.ts';
 import { type FileConfig, loadConfig } from './config.ts';
+import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
+import { listLogins, providerChoices, saveLogin } from './login.ts';
 import { createTheme, detectColor } from './theme.ts';
 
 export interface CliDeps {
@@ -60,6 +62,11 @@ export interface CliDeps {
   ask?: (question: string) => Promise<string | null>;
   store?: EventStore;
   model?: ModelClient;
+  /** Saved logins; default is the Keychain or REMY_HOME. */
+  credentials?: Credentials;
+  /** Reads all of stdin (for `remy login <provider> --key-stdin`). */
+  readStdin?: () => Promise<string>;
+  fetch?: typeof fetch;
   /** Registers an interrupt (Ctrl-C) handler; returns a disposer. */
   onInterrupt?: (handler: () => Promise<void>) => () => void;
 }
@@ -73,7 +80,7 @@ const STATUSES: TaskStatus[] = [
   'cancelled',
 ];
 
-const HELP = `remy: tell it what you need done.
+const help = () => `remy: tell it what you need done.
 
 Usage
   remy                            Open the chat (in a terminal)
@@ -86,10 +93,14 @@ Usage
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
   remy show <id> [--json]         Show what a task did (--json prints raw events)
+  remy login [<provider> --key-stdin [--model <id>] [--base-url <url>]]
+                                  Connect a provider: pick one, paste the key, done
+  remy login --list               Show saved logins (never the keys)
+  remy logout <provider>          Forget a saved login
   remy --version | help
 
 Options for run
-  --profile <name>      openrouter, ollama, openai or groq
+  --profile <name>      ${Object.keys(PROFILES).join(', ')}
   --model <id>          Model id
   --base-url <url>      Any OpenAI-compatible endpoint
   --auto <risks>        Risks approved without asking (default read). Example: read,write
@@ -109,8 +120,10 @@ Chat
   NO_COLOR or FORCE_COLOR=0 turns color off; terminals without truecolor get 16 colors.
 
 Setup
-  Set REMY_PROFILE and REMY_MODEL (and the profile's API key, such as OPENROUTER_API_KEY).
-  Optional remy.config.json in the current folder or REMY_HOME. Flags beat env, env beats config.
+  Run remy login once. The key goes in the macOS Keychain, or a private file in REMY_HOME.
+  Or set REMY_PROFILE and REMY_MODEL with the profile's API key, such as OPENROUTER_API_KEY.
+  Optional remy.config.json in the current folder or REMY_HOME.
+  Flags beat env, env beats a saved login, a saved login beats the config file.
   Data lives in REMY_HOME (default ~/.remy). Web search turns on with BRAVE_API_KEY,
   TAVILY_API_KEY or SEARXNG_URL.
 `;
@@ -124,6 +137,8 @@ const OPTIONS = {
   'max-steps': { type: 'string' },
   'max-cost': { type: 'string' },
   'net-allow': { type: 'string' },
+  list: { type: 'boolean' },
+  'key-stdin': { type: 'boolean' },
   status: { type: 'string' },
   json: { type: 'boolean' },
   debug: { type: 'boolean' },
@@ -138,6 +153,9 @@ const SECRET_ENV = [
   'REMY_API_KEY',
   'OPENROUTER_API_KEY',
   'OPENAI_API_KEY',
+  'GROQ_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'GEMINI_API_KEY',
   'BRAVE_API_KEY',
   'TAVILY_API_KEY',
 ];
@@ -183,12 +201,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   }
   const chatMode = !command && deps.isTTY && !flags.help;
   if (!chatMode && (!command || command === 'help' || flags.help)) {
-    deps.out(HELP);
+    deps.out(help());
     return 0;
   }
   if (
     command &&
-    !['run', 'resume', 'approve', 'answer', 'cancel', 'list', 'show'].includes(command)
+    !['run', 'resume', 'approve', 'answer', 'cancel', 'list', 'show', 'login', 'logout'].includes(
+      command,
+    )
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
 
@@ -196,6 +216,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const level = detectColor(env, deps.isTTY);
   const st = styler(level);
   const owner = `cli-${randomUUID().slice(0, 8)}`;
+
+  let creds: Credentials | undefined;
+  const credentials = () => {
+    creds ??= deps.credentials ?? openCredentials({ home });
+    return creds;
+  };
+
+  if (command === 'login' || command === 'logout') return await loginCommands(command);
   if (!deps.store) mkdirSync(home, { recursive: true });
   const ownStore = deps.store ? undefined : new SqliteEventStore(join(home, 'remy.sqlite'));
   const store: EventStore = deps.store ?? (ownStore as SqliteEventStore);
@@ -215,11 +243,71 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return events;
   };
 
+  async function loginCommands(which: 'login' | 'logout'): Promise<number> {
+    const store = credentials();
+    const known = [...Object.keys(PROFILES), 'custom'];
+    const [provider] = rest;
+    if (which === 'logout') {
+      if (!provider) throw new Error('Usage: remy logout <provider>');
+      out(
+        store.remove(provider)
+          ? `Forgot the ${provider} login.`
+          : `No saved login for ${provider}. Run remy login --list.`,
+      );
+      return 0;
+    }
+    if (flags.list) {
+      for (const line of listLogins(store)) out(line);
+      return 0;
+    }
+    if (provider || flags['key-stdin']) {
+      if (!provider || !known.includes(provider))
+        throw new Error(
+          `Usage: remy login <provider> --key-stdin. Providers: ${known.join(', ')}.`,
+        );
+      if (!flags['key-stdin'] && PROFILES[provider]?.keyEnv)
+        throw new Error(
+          `Run remy login to pick a provider and paste the key, or pipe it: remy login ${provider} --key-stdin.`,
+        );
+      const key = flags['key-stdin'] ? ((await deps.readStdin?.()) ?? '').trim() : '';
+      const baseUrl = flags['base-url'];
+      const result = await saveLogin(
+        { credentials: store, ...(deps.fetch && { fetch: deps.fetch }) },
+        {
+          provider,
+          key,
+          ...(baseUrl && { baseUrl }),
+          ...(flags.model && { model: flags.model }),
+        },
+      );
+      if (!result.ok) throw new Error(result.message);
+      out(result.message);
+      return 0;
+    }
+    if (!deps.isTTY)
+      throw new Error(
+        'remy login needs a terminal. Pipe a key instead: remy login <provider> --key-stdin.',
+      );
+    const { runLogin } = await import('./login-ui.ts');
+    await runLogin({
+      providers: providerChoices(),
+      theme: createTheme(level),
+      onSubmit: (entry) =>
+        saveLogin({ credentials: store, ...(deps.fetch && { fetch: deps.fetch }) }, entry),
+    });
+    return 0;
+  }
+
   const cfg = (): FileConfig => loadConfig(cwd, home);
 
   const secrets: Record<string, string> = {};
   for (const k of SECRET_ENV) if (env[k]) secrets[k] = env[k];
-  const redact = createRedactor(secrets);
+  let redactor = createRedactor(secrets);
+  const redact = (text: string) => redactor(text);
+  const addSecret = (name: string, value: string) => {
+    secrets[name] = value;
+    redactor = createRedactor(secrets);
+  };
   const debug = openDebug({
     flag: Boolean(flags.debug),
     env: env.REMY_DEBUG,
@@ -233,20 +321,33 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   function modelFor(file: FileConfig): ModelClient {
     if (deps.model) return deps.model;
+    // Per field: flags, then env, then a saved login, then remy.config.json.
+    const explicitUrl = flags['base-url'] ?? env.REMY_BASE_URL;
+    const named = flags.profile ?? env.REMY_PROFILE;
+    const profileName =
+      named ?? (explicitUrl ? undefined : credentials().defaultProvider()) ?? file.profile;
+    const saved = profileName ? credentials().load(profileName) : undefined;
+    if (saved?.key) addSecret(`${profileName}_LOGIN_KEY`, saved.key);
     const e: Record<string, string | undefined> = {
       ...env,
-      REMY_PROFILE: flags.profile ?? env.REMY_PROFILE ?? file.profile,
-      REMY_MODEL: flags.model ?? env.REMY_MODEL ?? file.model,
-      REMY_BASE_URL: flags['base-url'] ?? env.REMY_BASE_URL ?? file.baseUrl,
+      REMY_PROFILE: profileName === 'custom' ? undefined : profileName,
+      REMY_MODEL: flags.model ?? env.REMY_MODEL ?? saved?.model ?? file.model,
+      REMY_BASE_URL: explicitUrl ?? saved?.baseUrl ?? file.baseUrl,
     };
     if (!e.REMY_PROFILE && !e.REMY_BASE_URL)
       throw new Error(
-        `No model is configured. Set REMY_PROFILE to one of ${Object.keys(PROFILES).join(', ')} and REMY_MODEL, or pass --profile and --model.`,
+        'Remy needs a model first. Run remy login to connect one, or set REMY_PROFILE and REMY_MODEL.',
       );
-    if (!e.REMY_MODEL) throw new Error('No model is chosen. Set REMY_MODEL or pass --model.');
+    if (!e.REMY_MODEL)
+      throw new Error(
+        'No model is chosen. Pass --model <id> or set REMY_MODEL, or run remy login again and name a default.',
+      );
     const keyEnv = e.REMY_PROFILE ? PROFILES[e.REMY_PROFILE]?.keyEnv : undefined;
+    if (saved?.key && !e.REMY_API_KEY && !(keyEnv && e[keyEnv])) e.REMY_API_KEY = saved.key;
     if (keyEnv && !e.REMY_API_KEY && !e[keyEnv])
-      throw new Error(`The ${e.REMY_PROFILE} profile needs an API key. Set ${keyEnv}.`);
+      throw new Error(
+        `The ${e.REMY_PROFILE} profile needs an API key. Run remy login, or set ${keyEnv}.`,
+      );
     return modelFromEnv(e);
   }
 

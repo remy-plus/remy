@@ -23,6 +23,11 @@ process.exitCode = await cli(process.argv.slice(2), {
   err: (s) => process.stderr.write(s),
   isTTY: tty,
   ask,
+  readStdin: async () => {
+    const chunks: Buffer[] = [];
+    for await (const c of process.stdin) chunks.push(c as Buffer);
+    return Buffer.concat(chunks).toString('utf8');
+  },
   onInterrupt: (handler) => {
     const onSigint = () => void handler().finally(() => process.exit(130));
     process.once('SIGINT', onSigint);

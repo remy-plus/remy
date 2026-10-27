@@ -4,6 +4,8 @@ import { createOpenAIClient } from './openai.ts';
 import { selectStrategy } from './strategy.ts';
 
 export interface Profile {
+  /** Wire format. Default `openai`: any OpenAI-compatible chat-completions API. */
+  kind?: 'openai' | 'anthropic' | 'google';
   baseUrl: string;
   /** Env var holding the API key, if the provider needs one. */
   keyEnv?: string;

@@ -164,8 +164,7 @@ describe('remy run', () => {
     const h = harness();
     const r = await h.run('run', 'hello');
     expect(r.code).toBe(1);
-    expect(r.err).toContain('REMY_PROFILE');
-    expect(r.err).toContain('REMY_MODEL');
+    expect(r.err).toContain('remy login');
     expect(r.err.trim().split('\n')).toHaveLength(1);
   });
 
