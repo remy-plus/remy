@@ -15,7 +15,10 @@ import {
   type TaskStatus,
   type TaskSummary,
 } from '@remy/core';
+import { COMMANDS, findCommand } from './commands.ts';
 import { truncate } from './format.ts';
+import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
+import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
 import {
   type ApprovalView,
   collapseFailure,
@@ -66,6 +69,38 @@ export function resumeBanner(taskId: string, plan: PlanStep[] | undefined): stri
   return `${head}: ${done} of ${n} ${n === 1 ? 'step' : 'steps'} done.${next ? ` Next: ${next.text.replace(/\.$/, '')}.` : ''}`;
 }
 
+/** One model the user can switch to: a saved login and a model id. */
+export interface ModelChoice {
+  provider: string;
+  model: string;
+  /** Price and context, one short line. */
+  detail: string;
+}
+
+export interface SwitchResult {
+  ok: boolean;
+  message: string;
+  model?: string;
+  contextWindow?: number;
+}
+
+/** What `/login` and `/model` need from the host: saved logins and a way to change models. */
+export interface ConnectApi {
+  providers(): ProviderChoice[];
+  models(): ModelChoice[];
+  /** Verifies and saves a login, then switches to it when a model is known. */
+  login(entry: LoginEntry): Promise<LoginResult & Omit<SwitchResult, 'ok' | 'message'>>;
+  use(provider: string, model: string): Promise<SwitchResult>;
+}
+
+/** Workspace files for `@path`, read through the workspace's ScopedFs. */
+export interface FilesApi {
+  list(path: string): Promise<{ name: string; dir: boolean }[]>;
+  read(path: string): Promise<string | undefined>;
+}
+
+export type Overlay = 'login' | 'model' | 'palette';
+
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
 export interface ChatState {
@@ -111,6 +146,10 @@ export interface ChatState {
   picker?: SessionRow[];
   /** Counts /clear, so the screen knows to start over. */
   clears: number;
+  /** The model in use; undefined until one is connected. */
+  model?: string;
+  /** A panel that takes over the input: the login, the model list or the command palette. */
+  overlay?: Overlay;
 }
 
 export interface RuntimeHooks {
@@ -133,6 +172,10 @@ export interface ChatDeps {
   release: (taskId: string) => Promise<void>;
   /** The model's context window in tokens, when it is known. */
   contextWindow?: number;
+  /** The model in use at the start; none means the chat opens on the login panel. */
+  model?: string;
+  connect?: ConnectApi;
+  files?: FilesApi;
   /** A tool's effect, for telling whether an approval can be taken back. */
   effectOf?: (tool: string) => Effect | undefined;
 }
@@ -144,6 +187,19 @@ export interface Chat {
   submit(text: string, pasted?: string[]): Promise<void>;
   /** Closes the `/resume` picker. */
   closePicker(): void;
+  openOverlay(which: Overlay): void;
+  /** Closes the panel; with `only`, just when that panel is the one open. */
+  closeOverlay(only?: Overlay): void;
+  /** Runs a command by name, as if typed (the palette uses this). */
+  runCommand(name: string): Promise<void>;
+  providers(): ProviderChoice[];
+  models(): ModelChoice[];
+  /** The login panel's submit: saves, and switches when a model is known. */
+  saveLogin(entry: LoginEntry): Promise<LoginResult>;
+  /** Switches the model for the next message; the conversation carries over. */
+  chooseModel(provider: string, model: string): Promise<void>;
+  /** Paths in the workspace for `@query`. */
+  completeFiles(query: string): Promise<string[]>;
   /** Picks up an unfinished task from the store and carries on with it. */
   resume(taskId: string): Promise<void>;
   /** Answers the pending approval. A denial may carry a note the model reads. */
@@ -162,6 +218,9 @@ export const HELP_TEXT = [
   '',
   'Keys',
   '  Enter     send; while Remy works, the message waits its turn',
+  '  /         commands as you type; Tab completes',
+  '  Ctrl+P    command palette: every command, filtered as you type',
+  '  @         attach a workspace file: @notes.txt',
   '  Ctrl+J    new line (or type \\ then Enter); a big paste shows as [Pasted N lines]',
   '  Ctrl+W    delete a word; Ctrl+K delete to the end of the line',
   '  Up        bring back your last message',
@@ -174,12 +233,7 @@ export const HELP_TEXT = [
   '  v         show the whole action',
   '',
   'Commands',
-  '  /help     this list',
-  "  /thinking show or hide the model's reasoning summary, when it shares one",
-  '  /resume   pick up an unfinished task',
-  '  /new      start a fresh conversation',
-  '  /clear    clear the screen and start a fresh conversation',
-  '  /exit     quit',
+  ...COMMANDS.map((c) => `  /${c.name.padEnd(9)} ${c.summary}`),
 ].join('\n');
 
 /** Tools that are plumbing, not work worth a status line. */
@@ -202,11 +256,29 @@ export function parsePlan(args: unknown): PlanStep[] | undefined {
   return out.length ? out : undefined;
 }
 
+/** A model failure in plain words, ending with the one thing to do. Undefined when unknown. */
+export function explainModelError(msg: string): string | undefined {
+  const m = msg.toLowerCase();
+  if (/http (401|403)\b|invalid api key|incorrect api key|unauthorized|api_key_invalid/.test(m))
+    return 'The key was rejected. Run /login to replace it.';
+  if (/http 429|rate limit|too many requests/.test(m))
+    return 'The provider is rate limiting this key. Wait a minute and send your message again, or switch with /model.';
+  if (/insufficient_quota|exceeded your current quota|http 402|out of credit/.test(m))
+    return 'The account is out of credit. Add credit with the provider, or switch with /model.';
+  if (/http 404|model_not_found|does not exist|not found/.test(m) && /model/.test(m))
+    return 'This key cannot use that model. Pick another with /model.';
+  if (/network error|fetch failed|enotfound|econnrefused|econnreset|timed out|etimedout/.test(m))
+    return 'Could not reach the model. Check your connection, then send your message again.';
+  return undefined;
+}
+
 /** One calm line: what happened, then what to do next. */
 export function friendlyError(e: unknown): string {
   const msg = (e instanceof Error ? e.message : String(e)).trim().replace(/\s+/g, ' ');
+  const known = explainModelError(msg);
+  if (known) return known;
   if (e instanceof ModelError)
-    return `The model did not answer: ${truncate(msg, 160)}. Check your connection and key, then send your message again.`;
+    return `The model did not answer: ${truncate(msg, 160)}. Send your message again, or switch with /model.`;
   if (e instanceof TaskBusyError)
     return 'Another run holds this task. Wait a few seconds, then send your message again.';
   return `${truncate(msg, 200)}. Send your message again, or run /help.`;
@@ -237,7 +309,13 @@ const MAX_REASONING_CHARS = 2000;
 const MAX_PICKER_ROWS = 8;
 
 export function createChat(deps: ChatDeps): Chat {
-  let s: ChatState = { ...initial(), contextWindow: deps.contextWindow };
+  let s: ChatState = {
+    ...initial(),
+    contextWindow: deps.contextWindow,
+    ...(deps.model && { model: deps.model }),
+    // With no model yet, the chat opens on the login panel.
+    ...(deps.connect && !deps.model && { overlay: 'login' as const }),
+  };
   let turns: ConversationTurn[] = [];
   const sent: string[] = [];
   const listeners = new Set<() => void>();
@@ -322,7 +400,7 @@ export function createChat(deps: ChatDeps): Chat {
           thinking: false,
           streaming: '',
           retrying: ev.retryable
-            ? `The model call failed (${truncate(ev.error, 80)}). Trying again.`
+            ? `${explainModelError(ev.error)?.split('. ')[0] ?? `The model call failed (${truncate(ev.error, 80)})`}. Trying again.`
             : undefined,
         });
         break;
@@ -470,7 +548,9 @@ export function createChat(deps: ChatDeps): Chat {
         if (o.status === 'failed')
           return await end(false, {
             kind: 'error',
-            text: `${(o.reason ?? 'The task could not finish').replace(/\.$/, '')}. Send your message again, or see what happened: remy show ${id}`,
+            text:
+              explainModelError(o.reason ?? '') ??
+              `${(o.reason ?? 'The task could not finish').replace(/\.$/, '')}. Send your message again, or see what happened: remy show ${id}`,
           });
         return await end(false, { kind: 'note', text: `Cancelled. ${o.reason ?? ''}`.trim() });
       }
@@ -480,7 +560,39 @@ export function createChat(deps: ChatDeps): Chat {
     }
   }
 
+  /** Reads the files a message mentions. Their text rides along as untrusted context. */
+  async function attach(text: string) {
+    if (!deps.files) return undefined;
+    const found: string[] = [];
+    const missing: string[] = [];
+    const blocks: string[] = [];
+    for (const path of mentionedPaths(text).slice(0, MAX_FILES)) {
+      const body = await deps.files.read(path).catch(() => undefined);
+      if (body === undefined) missing.push(path);
+      else {
+        found.push(path);
+        blocks.push(fileContext(body));
+      }
+    }
+    const notes: string[] = [];
+    if (found.length) notes.push(`Attached ${found.join(', ')}.`);
+    if (missing.length)
+      notes.push(`Could not read ${missing.join(', ')} in the workspace. Type @ to pick a file.`);
+    if (!notes.length) return undefined;
+    const prompt = found.length
+      ? `${text}\n\nFiles the user attached (read-only copies):\n${found
+          .map((p, i) => `--- ${p} ---\n${blocks[i]}`)
+          .join('\n\n')}`
+      : text;
+    return { prompt, pasted: blocks.filter(Boolean), notes };
+  }
+
   async function start(text: string) {
+    if (deps.connect && !s.model) {
+      // Keep the message; it is sent once a model is connected.
+      commit({ kind: 'note', text: 'Connect a model first, then your message goes through.' });
+      return void set({ queue: [...s.queue, text], overlay: 'login' });
+    }
     const my = ++gen;
     sent.push(text);
     running = true;
@@ -498,13 +610,17 @@ export function createChat(deps: ChatDeps): Chat {
       taskCostUsd: 0,
     });
     try {
-      const pasted = pastedFor.get(text);
+      const typedPaste = pastedFor.get(text);
       pastedFor.delete(text);
+      const files = await attach(text);
+      if (files) for (const n of files.notes) commit({ kind: 'note', text: n });
+      const prompt = files?.prompt ?? text;
+      const pasted = [...(typedPaste ?? []), ...(files?.pasted ?? [])];
       const base = deps.config(turns);
-      const config = pasted?.length ? { ...base, pasted } : base;
+      const config = pasted.length ? { ...base, pasted } : base;
       set({ budgetUsd: config.budget.maxCostUsd });
-      const id = await runtime.start(text, config);
-      current = { id, prompt: text, ...(pasted?.length && { pasted }) };
+      const id = await runtime.start(prompt, config);
+      current = { id, prompt, ...(pasted.length && { pasted }) };
       set({ taskId: id });
       await drive(id, my);
     } catch (e) {
@@ -583,7 +699,8 @@ export function createChat(deps: ChatDeps): Chat {
   }
 
   function command(line: string): Promise<void> | undefined {
-    const [name] = line.slice(1).split(/\s+/);
+    const [typed = '', ...args] = line.slice(1).split(/\s+/);
+    const name = findCommand(typed)?.name;
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
       turns = [];
@@ -592,8 +709,15 @@ export function createChat(deps: ChatDeps): Chat {
       turns = [];
       // The screen wipes itself and prints the header again; the transcript starts empty.
       set({ items: [], clears: s.clears + 1 });
-    } else if (name === 'resume') {
+    } else if (name === 'sessions') {
       return openPicker();
+    } else if (name === 'login' || name === 'model') {
+      if (!deps.connect)
+        return void commit({ kind: 'note', text: 'Models are set when Remy starts here.' });
+      const wanted = args.join(' ');
+      const hit = wanted ? deps.connect.models().find((m) => m.model === wanted) : undefined;
+      if (name === 'model' && hit) return api.chooseModel(hit.provider, hit.model);
+      set({ overlay: name });
     } else if (name === 'thinking') {
       const on = !s.showThinking;
       set({ showThinking: on });
@@ -601,8 +725,8 @@ export function createChat(deps: ChatDeps): Chat {
         kind: 'note',
         text: on ? 'Showing thinking when the model shares it.' : 'Thinking detail is off.',
       });
-    } else if (name === 'exit' || name === 'quit') set({ wantsExit: true });
-    else commit({ kind: 'error', text: `Unknown command ${line.split(/\s+/)[0]}. Run /help.` });
+    } else if (name === 'exit') set({ wantsExit: true });
+    else commit({ kind: 'error', text: `There is no command /${typed}. Type / to see them.` });
   }
 
   const api: Chat = {
@@ -644,6 +768,49 @@ export function createChat(deps: ChatDeps): Chat {
 
     closePicker: () => set({ picker: undefined }),
     resume: resumeTask,
+    openOverlay: (which) => set({ overlay: which }),
+    closeOverlay: (only) => {
+      if (!only || s.overlay === only) set({ overlay: undefined });
+    },
+    async runCommand(name) {
+      set({ overlay: undefined });
+      await command(`/${name}`);
+    },
+    providers: () => deps.connect?.providers() ?? [],
+    models: () => deps.connect?.models() ?? [],
+    async saveLogin(entry) {
+      if (!deps.connect) return { ok: false, message: 'Logins are not available here.' };
+      const r = await deps.connect.login(entry);
+      if (!r.ok) return r;
+      if (r.model) {
+        set({ model: r.model, contextWindow: r.contextWindow });
+        commit({ kind: 'note', text: r.message });
+        void drain();
+      } else {
+        // Connected, but no model is chosen yet: the model list is the next step.
+        commit({ kind: 'note', text: r.message });
+        set({ overlay: 'model' });
+      }
+      return r;
+    },
+    async chooseModel(provider, model) {
+      if (!deps.connect) return;
+      if (s.phase !== 'idle')
+        return void commit({
+          kind: 'note',
+          text: 'Remy is working. Let it finish or press Ctrl+C, then switch with /model.',
+        });
+      set({ overlay: undefined });
+      const r = await deps.connect.use(provider, model);
+      if (!r.ok) return void commit({ kind: 'error', text: r.message });
+      set({ model: r.model ?? model, contextWindow: r.contextWindow });
+      commit({ kind: 'note', text: r.message });
+      void drain();
+    },
+    async completeFiles(query) {
+      if (!deps.files) return [];
+      return completePaths(deps.files, query);
+    },
 
     async approve(granted, note) {
       const a = s.approval;

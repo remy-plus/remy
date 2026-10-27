@@ -178,7 +178,10 @@ describe('remy run', () => {
   it('reads the model from remy.config.json when env and flags are silent', async () => {
     const h = harness();
     const { writeFileSync } = await import('node:fs');
-    writeFileSync(join(home, 'remy.config.json'), JSON.stringify({ profile: 'ollama' }));
+    writeFileSync(
+      join(home, 'remy.config.json'),
+      JSON.stringify({ baseUrl: 'http://localhost:9/v1' }),
+    );
     const r = await h.run('run', 'hello');
     expect(r.err).toContain('REMY_MODEL');
     expect(r.err).not.toContain('REMY_PROFILE');

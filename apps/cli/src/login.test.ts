@@ -212,7 +212,7 @@ describe('the login picker', () => {
     expect(app.lastFrame()).toContain('•••');
     app.stdin.write('\r');
     await tick();
-    expect(app.lastFrame()).toContain('Default model');
+    expect(app.lastFrame()).toContain('Model');
     app.stdin.write('gpt-5-nano');
     await tick();
     app.stdin.write('\r');
@@ -268,7 +268,7 @@ describe('the login picker', () => {
     await tick();
     app.stdin.write('\r');
     await tick();
-    expect(app.lastFrame()).toContain('Default model');
+    expect(app.lastFrame()).toContain('Model');
     app.stdin.write('\r');
     await tick();
     expect(onSubmit).toHaveBeenCalledWith({ provider: 'ollama', key: '' });

@@ -11,8 +11,10 @@ export interface ProviderChoice {
   needsKey: boolean;
   /** True for the custom endpoint: asks for its base URL first. */
   needsBaseUrl?: boolean;
-  /** Shown as a hint under the model question. */
+  /** The model used when none is named; shown under the model question. */
   exampleModel?: string;
+  /** Where to get a key, shown under the key question. */
+  keyUrl?: string;
 }
 
 export interface LoginEntry {
@@ -29,6 +31,8 @@ type Step = 'provider' | 'baseUrl' | 'key' | 'model' | 'checking' | 'done';
 export function LoginFlow(p: {
   providers: ProviderChoice[];
   theme: Theme;
+  /** A line under the title, for the first run. */
+  intro?: string;
   /** Verifies and saves. `ok: false` returns to the key question with the message. */
   onSubmit: (entry: LoginEntry) => Promise<LoginResult>;
   onDone: () => void;
@@ -120,7 +124,10 @@ export function LoginFlow(p: {
       cursor,
     );
 
-  const rows: ReactElement[] = [h(Text, { key: 'title' }, 'Connect a model provider')];
+  const rows: ReactElement[] = [
+    h(Text, { key: 'title', bold: true }, 'Connect a model provider'),
+    ...(p.intro && step === 'provider' ? [h(Text, { key: 'intro', ...muted }, p.intro)] : []),
+  ];
   if (step === 'provider') {
     for (const [i, c] of providers.entries()) {
       const on = i === at;
@@ -152,6 +159,7 @@ export function LoginFlow(p: {
     else if (step === 'key')
       rows.push(
         h(Text, { key: 'q' }, 'Paste your API key. It is hidden as you type.'),
+        ...(choice.keyUrl ? [h(Text, { key: 'u', ...muted }, `Get one at ${choice.keyUrl}`)] : []),
         h(Box, { key: 'f' }, field(true)),
       );
     else if (step === 'model')
@@ -159,7 +167,9 @@ export function LoginFlow(p: {
         h(
           Text,
           { key: 'q' },
-          `Default model (optional${choice.exampleModel ? `, such as ${choice.exampleModel}` : ''}). Enter to skip.`,
+          choice.exampleModel
+            ? `Model. Enter to use ${choice.exampleModel}, or type another id.`
+            : 'Model id to use. Enter to choose from a list later.',
         ),
         h(Box, { key: 'f' }, field(false)),
       );

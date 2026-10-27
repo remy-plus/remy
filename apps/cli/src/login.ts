@@ -3,13 +3,38 @@ import { PROFILES, verifyKey } from '@remy/models';
 import type { Credentials } from './credentials.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 
-const LABELS: Record<string, { label: string; model?: string }> = {
-  openai: { label: 'OpenAI', model: 'gpt-5-nano' },
-  openrouter: { label: 'OpenRouter', model: 'openai/gpt-5-nano' },
-  groq: { label: 'Groq', model: 'llama-3.3-70b-versatile' },
-  anthropic: { label: 'Anthropic' },
-  google: { label: 'Google Gemini' },
+const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }> = {
+  openai: { label: 'OpenAI', model: 'gpt-5-nano', keyUrl: 'platform.openai.com/api-keys' },
+  openrouter: { label: 'OpenRouter', model: 'openai/gpt-5-nano', keyUrl: 'openrouter.ai/keys' },
+  groq: { label: 'Groq', model: 'llama-3.3-70b-versatile', keyUrl: 'console.groq.com/keys' },
+  anthropic: {
+    label: 'Anthropic',
+    model: 'claude-haiku-5-5',
+    keyUrl: 'console.anthropic.com/settings/keys',
+  },
+  google: {
+    label: 'Google Gemini',
+    model: 'gemini-2.5-flash',
+    keyUrl: 'aistudio.google.com/apikey',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
+};
+
+/** The model a provider starts with when the user names none. */
+export const defaultModelFor = (provider: string): string | undefined => LABELS[provider]?.model;
+
+/** A few models worth offering per provider in `/model`; any other id can be typed. */
+export const SUGGESTED_MODELS: Record<string, string[]> = {
+  openai: ['gpt-5-nano', 'gpt-4o-mini', 'gpt-4o'],
+  openrouter: [
+    'openai/gpt-5-nano',
+    'meta-llama/llama-3.3-70b-instruct',
+    'google/gemma-4-26b-a4b-it:free',
+  ],
+  groq: ['llama-3.3-70b-versatile'],
+  anthropic: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
+  google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+  ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 
 /** Every profile, then a custom OpenAI-compatible endpoint. */
@@ -27,6 +52,7 @@ export function providerChoices(): ProviderChoice[] {
         label: l?.label ?? id,
         needsKey: Boolean(PROFILES[id]?.keyEnv),
         ...(l?.model && { exampleModel: l.model }),
+        ...(l?.keyUrl && { keyUrl: l.keyUrl }),
       };
     }),
     {

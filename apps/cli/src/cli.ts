@@ -19,7 +19,7 @@ import {
   type TaskStatus,
   ToolRegistry,
 } from '@remy/core';
-import { DEFAULT_CAPS, modelFromEnv, PROFILES, verifyKey } from '@remy/models';
+import { BUILTIN_CATALOG, DEFAULT_CAPS, modelFromEnv, PROFILES, resolveCaps } from '@remy/models';
 import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
@@ -43,12 +43,24 @@ import {
   updatePlan,
   writeFile,
 } from '@remy/tools';
-import { createChat, type RuntimeHooks, releaseLease } from './chat.ts';
+import {
+  type ConnectApi,
+  createChat,
+  type ModelChoice,
+  type RuntimeHooks,
+  releaseLease,
+} from './chat.ts';
 import { type FileConfig, loadConfig } from './config.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
-import { listLogins, providerChoices, saveLogin } from './login.ts';
+import {
+  defaultModelFor,
+  listLogins,
+  providerChoices,
+  SUGGESTED_MODELS,
+  saveLogin,
+} from './login.ts';
 import { createTheme, detectColor } from './theme.ts';
 
 export interface CliDeps {
@@ -116,7 +128,9 @@ Options for every command
   --reduced-motion      No animation in the chat (also REMY_REDUCED_MOTION=1)
 
 Chat
-  Type a message and press Enter. Ctrl+C stops a running task, Ctrl+D quits, /help lists keys.
+  Type a message and press Enter. Type / for commands (/model, /login, /sessions), Ctrl+P for the
+  command palette, @ to attach a file from the workspace. Ctrl+C stops a running task, Ctrl+D quits.
+  With nothing connected yet, remy opens on the login panel.
   NO_COLOR or FORCE_COLOR=0 turns color off; terminals without truecolor get 16 colors.
 
 Setup
@@ -124,6 +138,7 @@ Setup
   Or set REMY_PROFILE and REMY_MODEL with the profile's API key, such as OPENROUTER_API_KEY.
   Optional remy.config.json in the current folder or REMY_HOME.
   Flags beat env, env beats a saved login, a saved login beats the config file.
+  REMY_KEYCHAIN=off keeps keys in a private file instead of the Keychain.
   Data lives in REMY_HOME (default ~/.remy). Web search turns on with BRAVE_API_KEY,
   TAVILY_API_KEY or SEARXNG_URL.
 `;
@@ -219,7 +234,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   let creds: Credentials | undefined;
   const credentials = () => {
-    creds ??= deps.credentials ?? openCredentials({ home });
+    creds ??=
+      deps.credentials ??
+      openCredentials({ home, ...(env.REMY_KEYCHAIN === 'off' && { platform: 'linux' as const }) });
     return creds;
   };
 
@@ -331,7 +348,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const e: Record<string, string | undefined> = {
       ...env,
       REMY_PROFILE: profileName === 'custom' ? undefined : profileName,
-      REMY_MODEL: flags.model ?? env.REMY_MODEL ?? saved?.model ?? file.model,
+      REMY_MODEL:
+        flags.model ??
+        env.REMY_MODEL ??
+        saved?.model ??
+        file.model ??
+        (profileName ? defaultModelFor(profileName) : undefined),
       REMY_BASE_URL: explicitUrl ?? saved?.baseUrl ?? file.baseUrl,
     };
     if (!e.REMY_PROFILE && !e.REMY_BASE_URL)
@@ -547,15 +569,133 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     };
   }
 
+  /** A client for a saved login and a model id, used when switching inside the chat. */
+  function clientFor(provider: string, modelId: string): ModelClient {
+    const saved = credentials().load(provider);
+    const profile = provider === 'custom' ? undefined : PROFILES[provider];
+    if (!profile && provider !== 'custom') throw new Error(`Unknown provider "${provider}".`);
+    if (saved?.key) addSecret(`${provider}_LOGIN_KEY`, saved.key);
+    const key = saved?.key || (profile?.keyEnv ? env[profile.keyEnv] : undefined);
+    if ((profile?.keyEnv || provider === 'custom') && !key)
+      throw new Error(`There is no key for ${provider}. Run /login to add one.`);
+    return modelFromEnv({
+      ...env,
+      REMY_PROFILE: profile ? provider : undefined,
+      REMY_MODEL: modelId,
+      REMY_BASE_URL: saved?.baseUrl,
+      REMY_API_KEY: key,
+    });
+  }
+
+  const usd = (n: number) => `$${n >= 10 ? n : n.toFixed(2)}`;
+  const priceWord = (id: string, provider: string) => {
+    const c = resolveCaps(id, BUILTIN_CATALOG);
+    const listed = id in BUILTIN_CATALOG;
+    const price =
+      c.pricing.inPerMTok || c.pricing.outPerMTok
+        ? `${usd(c.pricing.inPerMTok)} in, ${usd(c.pricing.outPerMTok)} out per M`
+        : provider === 'ollama'
+          ? 'free, runs here'
+          : listed
+            ? 'free'
+            : 'price not listed';
+    return listed
+      ? `${price} · ${Math.round((c.contextWindow ?? c.contextTokens) / 1000)}k context`
+      : price;
+  };
+
   async function chatFlow(): Promise<number> {
     const file = cfg();
-    const model = deps.model ?? modelFor(file);
+    let first: ModelClient | undefined;
+    let activeProvider: string | undefined;
+    try {
+      first = deps.model ?? modelFor(file);
+      activeProvider = flags.profile ?? env.REMY_PROFILE ?? credentials().defaultProvider();
+    } catch (e) {
+      // Nothing connected yet: the chat opens on the login panel instead of exiting.
+      if (!/needs a model first|needs an API key|No model is chosen/.test(String(e))) throw e;
+    }
+    let active = first;
+    // The runtime holds this stand-in, so /model can swap the real client under it.
+    const model: ModelClient = {
+      get id() {
+        return active?.id ?? 'none';
+      },
+      get caps() {
+        return active?.caps ?? DEFAULT_CAPS;
+      },
+      complete(...a) {
+        if (!active) throw new Error('No model is connected. Run /login.');
+        return active.complete(...a);
+      },
+    };
     // One workspace for the whole conversation, so files made in one turn are there in the next.
     const workspace = flags.workspace
       ? resolve(cwd, flags.workspace)
       : join(home, 'workspaces', `chat_${randomUUID().replaceAll('-', '').slice(0, 12)}`);
     taskConfig(file, model.id, workspace); // fail on bad flags before the screen opens
     mkdirSync(workspace, { recursive: true });
+    const wsFs = createScopedFs(workspace);
+    const switchTo = (provider: string, modelId: string) => {
+      active = clientFor(provider, modelId);
+      activeProvider = provider;
+      const saved = credentials().load(provider);
+      // Remember the choice: the next `remy` starts on it.
+      credentials().save(provider, saved?.key ?? '', {
+        model: modelId,
+        ...(saved?.baseUrl && { baseUrl: saved.baseUrl }),
+      });
+      return { model: active.id, contextWindow: active.caps.contextWindow };
+    };
+    const connect: ConnectApi = {
+      providers: providerChoices,
+      models() {
+        const rows = new Map<string, ModelChoice>();
+        const add = (provider: string, id: string | undefined) => {
+          if (id && !rows.has(`${provider}\t${id}`))
+            rows.set(`${provider}\t${id}`, {
+              provider,
+              model: id,
+              detail: priceWord(id, provider),
+            });
+        };
+        if (activeProvider && active) add(activeProvider, active.id);
+        for (const l of credentials().list()) {
+          add(l.provider, credentials().load(l.provider)?.model);
+          for (const id of SUGGESTED_MODELS[l.provider] ?? []) add(l.provider, id);
+        }
+        return [...rows.values()];
+      },
+      async login(entry) {
+        const r = await saveLogin(
+          { credentials: credentials(), ...(deps.fetch && { fetch: deps.fetch }) },
+          entry,
+        );
+        if (!r.ok) return r;
+        const wanted = entry.model || defaultModelFor(entry.provider);
+        const message = r.message.replace(/ Run remy to start\.$/, '');
+        if (!wanted) return { ok: true, message: `${message} Pick a model next.` };
+        try {
+          const done = switchTo(entry.provider, wanted);
+          return { ok: true, message: `${message} Using ${wanted}.`, ...done };
+        } catch (e) {
+          return { ok: false, message: e instanceof Error ? e.message : String(e) };
+        }
+      },
+      async use(provider, modelId) {
+        try {
+          const done = switchTo(provider, modelId);
+          return {
+            ok: true,
+            message: `Now using ${modelId} on ${provider}. The conversation carries over.`,
+            ...done,
+          };
+        } catch (e) {
+          const why = e instanceof Error ? e.message : String(e);
+          return { ok: false, message: `Could not switch to ${modelId}: ${why}` };
+        }
+      },
+    };
     let registry: ToolRegistry | undefined;
     const chat = createChat({
       runtime: (hooks) => {
@@ -568,7 +708,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       listTasks: () => store.listTasks(),
       readEvents: (id) => store.read(id),
       release: releaseLease(store, owner),
-      contextWindow: model.caps.contextWindow,
+      ...(first && { model: first.id, contextWindow: first.caps.contextWindow }),
+      connect,
+      files: {
+        list: (p) => wsFs.list(p),
+        async read(p) {
+          const text = await wsFs.readText(p).catch(() => undefined);
+          return text === undefined || text.includes('\0') ? undefined : text;
+        },
+      },
     });
     const { runChat } = await import('./chat-ui.ts');
     const { probeTerminal } = await import('./terminal.ts');
@@ -581,7 +729,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       onStray: debug ? (stream, text) => debug.write('stray', { stream, text }) : undefined,
       theme: createTheme(level, probe.background),
       reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
-      subtitle: model.id,
+      ...(first && { subtitle: first.id }),
       workspace,
     });
     return 0;

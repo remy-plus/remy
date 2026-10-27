@@ -58,8 +58,13 @@ const asObject = (data: unknown): Record<string, unknown> =>
 /** Logs each model request and its response (or error), then passes them through unchanged. */
 export function debugModel(inner: ModelClient, log: DebugLog): ModelClient {
   return {
-    id: inner.id,
-    caps: inner.caps,
+    // Getters, so a model that is switched under the wrapper shows its new id and prices.
+    get id() {
+      return inner.id;
+    },
+    get caps() {
+      return inner.caps;
+    },
     async complete(
       req: ModelRequest,
       signal: AbortSignal,

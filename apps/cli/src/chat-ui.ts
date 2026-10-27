@@ -28,7 +28,8 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import type { Chat, ChatState, Item } from './chat.ts';
+import type { Chat, ChatState, Item, ModelChoice } from './chat.ts';
+import { COMMANDS, matchCommands } from './commands.ts';
 import {
   EMPTY_INPUT,
   editInput,
@@ -38,8 +39,12 @@ import {
   pasteInput,
   pressEnter,
   recallInput,
+  withText,
 } from './input.ts';
+import { LoginFlow } from './login-ui.ts';
 import { clip, type MdLine, renderMarkdown, type Span, strWidth } from './markdown.ts';
+import { applyMention, atToken } from './mentions.ts';
+import { Menu, menuRows, Picker, type PickItem } from './picker.ts';
 import { SessionPicker } from './session-picker.ts';
 import {
   captureStray,
@@ -398,10 +403,33 @@ const STATE_WORD: Record<ChatState['phase'], string> = {
   waiting_user: 'needs your answer',
 };
 
+/** What the footer offers right now. */
+export interface HintContext {
+  phase: ChatState['phase'];
+  hasInput: boolean;
+  noting?: boolean;
+  /** An autocomplete list is open under the prompt. */
+  menu?: 'slash' | 'file';
+  /** A panel (login, models, palette) is open. */
+  overlay?: boolean;
+  /** No model is connected yet. */
+  unconnected?: boolean;
+  /** Nothing has been said yet. */
+  fresh?: boolean;
+}
+
 /** Context-aware key hints for the footer. */
-export function hintsFor(phase: ChatState['phase'], hasInput: boolean, noting = false): string {
-  if (noting) return 'Enter send note · Esc back · Ctrl+C stop';
-  switch (phase) {
+export function hintsFor(
+  phase: ChatState['phase'] | HintContext,
+  hasInput = false,
+  noting = false,
+): string {
+  const c: HintContext = typeof phase === 'string' ? { phase, hasInput, noting } : phase;
+  if (c.overlay) return '';
+  if (c.noting) return 'Enter send note · Esc back · Ctrl+C stop';
+  if (c.menu === 'slash') return '↑↓ choose · Tab complete · Enter run';
+  if (c.menu === 'file') return '↑↓ choose · Tab attach';
+  switch (c.phase) {
     case 'running':
       return 'Enter queue · Ctrl+C stop';
     case 'waiting_approval':
@@ -409,7 +437,11 @@ export function hintsFor(phase: ChatState['phase'], hasInput: boolean, noting = 
     case 'waiting_user':
       return 'Enter answer · Ctrl+C stop';
     default:
-      return hasInput ? 'Enter send · Esc clear' : 'Enter send · ↑ recall · /help';
+      if (c.unconnected) return '/login connect a model · Ctrl+P menu';
+      if (c.hasInput) return 'Enter send · Esc clear';
+      return c.fresh
+        ? 'Enter send · / commands · @ file · Ctrl+P menu'
+        : 'Enter send · / commands · Ctrl+P menu';
   }
 }
 
@@ -433,19 +465,31 @@ function Footer(p: {
   model?: string;
   hasInput: boolean;
   noting: boolean;
+  menu?: 'slash' | 'file';
 }) {
   const { state } = p;
-  const left = [p.model, contextPart(state), costPart(state), STATE_WORD[state.phase]]
+  const unconnected = !p.model;
+  const left = [
+    p.model ?? 'not connected',
+    contextPart(state),
+    costPart(state),
+    unconnected ? '' : STATE_WORD[state.phase],
+  ]
     .filter(Boolean)
     .join(' · ');
+  const hint = hintsFor({
+    phase: state.phase,
+    hasInput: p.hasInput,
+    noting: p.noting,
+    menu: p.menu,
+    overlay: Boolean(state.overlay),
+    unconnected,
+    fresh: !state.items.some((i) => i.kind === 'user'),
+  });
   return h(
     Box,
     { paddingLeft: p.theme.space.indent },
-    h(
-      Text,
-      { wrap: 'truncate-end', ...mutedProps(p.theme) },
-      `${left}   ${hintsFor(state.phase, p.hasInput, p.noting)}`,
-    ),
+    h(Text, { wrap: 'truncate-end', ...mutedProps(p.theme) }, hint ? `${left}   ${hint}` : left),
   );
 }
 
@@ -620,6 +664,81 @@ function Live(p: {
   return h(Box, { flexDirection: 'column' }, ...kids);
 }
 
+const choiceId = (c: ModelChoice) => `${c.provider}\t${c.model}`;
+
+/** The login, model and palette panels. Each takes over the prompt until it closes. */
+function Overlay(p: {
+  chat: Chat;
+  state: ChatState;
+  theme: Theme;
+  onTranscript: () => void;
+}): ReactElement | null {
+  const { chat, state, theme } = p;
+  const close = () => chat.closeOverlay();
+  if (state.overlay === 'login')
+    return h(LoginFlow, {
+      providers: chat.providers(),
+      theme,
+      ...(!state.model && {
+        intro: 'Remy needs a model to think with. Pick a provider; the key stays on this computer.',
+      }),
+      onSubmit: (entry) => chat.saveLogin(entry),
+      onDone: () => chat.closeOverlay('login'),
+      onCancel: () => chat.closeOverlay('login'),
+    });
+  if (state.overlay === 'model') {
+    const choices = chat.models();
+    const items: PickItem[] = [
+      ...choices.map((c) => ({
+        id: choiceId(c),
+        title: c.model,
+        detail: `${c.provider} · ${c.detail}${c.model === state.model ? ' · in use' : ''}`,
+      })),
+      { id: '#login', title: 'Connect another provider', detail: '/login' },
+    ];
+    const provider = choices.find((c) => c.model === state.model)?.provider ?? choices[0]?.provider;
+    return h(Picker, {
+      title: 'Switch model',
+      items,
+      theme,
+      empty: 'No saved logins. Run /login to connect a provider.',
+      extra: (q) =>
+        provider && !choices.some((c) => c.model === q)
+          ? [{ id: `#use\t${provider}\t${q}`, title: `Use "${q}"`, detail: `on ${provider}` }]
+          : [],
+      onPick: (item) => {
+        if (item.id === '#login') return chat.openOverlay('login');
+        const [kind, a, b] = item.id.split('\t');
+        if (kind === '#use') return void chat.chooseModel(a as string, b as string);
+        void chat.chooseModel(kind as string, a as string);
+      },
+      onCancel: close,
+    });
+  }
+  const items: PickItem[] = [
+    ...COMMANDS.map((c) => ({
+      id: c.name,
+      title: c.summary,
+      detail: [`/${c.name}`, c.keys].filter(Boolean).join(' · '),
+    })),
+    { id: '#transcript', title: 'Read the whole conversation', detail: 'Ctrl+O' },
+  ];
+  return h(Picker, {
+    title: 'Commands',
+    items,
+    theme,
+    max: items.length,
+    onPick: (item) => {
+      if (item.id === '#transcript') {
+        chat.closeOverlay();
+        return p.onTranscript();
+      }
+      void chat.runCommand(item.id);
+    },
+    onCancel: close,
+  });
+}
+
 export function ChatApp(props: ChatAppProps): ReactElement {
   const { chat, theme } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
@@ -633,6 +752,9 @@ export function ChatApp(props: ChatAppProps): ReactElement {
   const [noting, setNoting] = useState(false);
   const [viewing, setViewing] = useState(false);
   const { write } = useStdout();
+  const [menuAt, setMenuAt] = useState(0);
+  const [files, setFiles] = useState<string[]>([]);
+  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
   const approvalId = state.approval?.callId;
 
   // Each approval starts collapsed, with no note under way.
@@ -677,9 +799,66 @@ export function ChatApp(props: ChatAppProps): ReactElement {
     if (state.phase === 'waiting_approval' || state.phase === 'waiting_user') setViewing(false);
   }, [state.phase]);
 
+  // Autocomplete under the prompt: commands after a `/`, workspace files after an `@`.
+  const idle = state.phase === 'idle';
+  const slashQuery =
+    idle && /^\/[^\s]*$/.test(input.text) && !state.overlay ? input.text.slice(1) : undefined;
+  const slashItems: PickItem[] =
+    slashQuery === undefined
+      ? []
+      : matchCommands(slashQuery).map((c) => ({
+          id: c.name,
+          title: `/${c.name}`,
+          detail: c.summary,
+        }));
+  const tok =
+    state.phase !== 'waiting_approval' && !state.overlay && !slashQuery
+      ? atToken(input.text, input.cursor)
+      : undefined;
+  const atQuery = tok?.query;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the query is the trigger
+  useEffect(() => {
+    if (atQuery === undefined) return setFiles([]);
+    let live = true;
+    void chat.completeFiles(atQuery).then((f) => live && setFiles(f));
+    return () => {
+      live = false;
+    };
+  }, [atQuery]);
+  const fileItems: PickItem[] =
+    tok && hiddenFor !== input.text ? files.map((f) => ({ id: f, title: f })) : [];
+  const menu: 'slash' | 'file' | undefined = slashItems.length
+    ? 'slash'
+    : fileItems.length
+      ? 'file'
+      : undefined;
+  const menuItems = menu === 'slash' ? slashItems : fileItems;
+  const at = Math.min(menuAt, Math.max(0, menuItems.length - 1));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new query starts at the top
+  useEffect(() => setMenuAt(0), [slashQuery, atQuery]);
+
   useInput((ch, key) => {
-    // The transcript view and the session picker read their own keys.
-    if (viewing || state.picker) return;
+    // The transcript view, the pickers and the panels read their own keys.
+    if (viewing || state.picker || state.overlay) return;
+    if (key.ctrl && ch === 'p' && idle) return chat.openOverlay('palette');
+    if (menu) {
+      if (key.upArrow || key.downArrow) {
+        const n = menuItems.length;
+        return setMenuAt((i) => (i + (key.upArrow ? -1 : 1) + n) % n);
+      }
+      const pick = menuItems[at];
+      if (pick && (key.tab || key.return)) {
+        if (menu === 'slash') {
+          if (key.tab) return setInput(withText(`${pick.title} `));
+          recall.current = -1;
+          setInput(EMPTY_INPUT);
+          return void chat.submit(pick.title);
+        }
+        const done = applyMention(input.text, input.cursor, pick.id);
+        return setInput((cur) => ({ ...cur, ...done }));
+      }
+      if (key.escape && menu === 'file') return setHiddenFor(input.text);
+    }
     // Focus reports are for the notifier, not the editor.
     if (isFocusReport(ch)) return;
     if (key.ctrl && ch === 'd') return void quit();
@@ -747,12 +926,15 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       if (viewing || (state.phase === 'waiting_approval' && !noting)) return;
       setInput((cur) => pasteInput(cur, text));
     },
-    { isActive: mode === 'multi' },
+    { isActive: mode === 'multi' && !state.overlay },
   );
 
   const showPrompt = state.phase !== 'waiting_approval' || noting;
   // Prompt (with its blank line above) and the footer.
-  const below = (showPrompt ? 1 + promptRows(input.text, columns, input.cursor) : 0) + 1;
+  const below =
+    (showPrompt && !state.overlay ? 1 + promptRows(input.text, columns, input.cursor) : 0) +
+    1 +
+    (showPrompt && !state.overlay ? menuRows(menuItems.length) : 0);
   const entries = [{ id: 'header' } as { id: string; item?: Item }].concat(
     state.items.map((item, i) => ({ id: `i${i}`, item })),
   );
@@ -795,6 +977,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           onCancel: () => chat.closePicker(),
         })
       : null,
+    state.overlay ? h(Overlay, { chat, state, theme, onTranscript: () => setViewing(true) }) : null,
     viewing
       ? null
       : h(Live, {
@@ -807,15 +990,21 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           expanded,
           noting,
         }),
-    showPrompt && !viewing && !state.picker ? h(Prompt, { value: input, theme }) : null,
+    showPrompt && !viewing && !state.picker && !state.overlay
+      ? h(Prompt, { value: input, theme })
+      : null,
+    menu && !viewing && !state.picker && !state.overlay
+      ? h(Menu, { items: menuItems, at, theme, indent: theme.space.indent + 2 })
+      : null,
     viewing
       ? null
       : h(Footer, {
           state,
           theme,
-          model: props.subtitle,
+          model: state.model ?? props.subtitle,
           hasInput: input.text.length > 0,
           noting,
+          menu,
         }),
   );
 }

@@ -265,7 +265,7 @@ describe('chat controller', () => {
     await chat.submit('hello');
     const err = chat.getState().items.find((i) => i.kind === 'error');
     expect(err).toBeDefined();
-    expect(JSON.stringify(err)).toContain('Send your message again');
+    expect(JSON.stringify(err)).toContain('send your message again');
     expect(JSON.stringify(err)).not.toContain('!');
   });
 
@@ -280,7 +280,7 @@ describe('chat controller', () => {
     await chat.submit('/nope');
     expect(contexts).toEqual([0, 0]);
     expect(await store.listTasks()).toHaveLength(2);
-    expect(JSON.stringify(chat.getState().items.at(-1))).toContain('Unknown command /nope');
+    expect(JSON.stringify(chat.getState().items.at(-1))).toContain('There is no command /nope');
     await chat.submit('/exit');
     expect(chat.getState().wantsExit).toBe(true);
   });

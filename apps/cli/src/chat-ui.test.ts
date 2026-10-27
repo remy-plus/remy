@@ -489,10 +489,10 @@ describe('full transcript view', () => {
     await until(() => frame(app).includes('q back'));
     expect(frame(app)).toContain('j/k scroll');
     expect(frame(app)).toContain('Saved.');
-    expect(frame(app)).not.toContain('/help');
+    expect(frame(app)).not.toContain('/ commands');
     app.stdin.write('q');
     await until(() => !frame(app).includes('q back'));
-    expect(frame(app)).toContain('/help');
+    expect(frame(app)).toContain('/ commands');
     app.unmount();
   });
 });
