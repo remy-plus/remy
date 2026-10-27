@@ -3,7 +3,14 @@
 import { randomUUID } from 'node:crypto';
 import { argsHash, idempotencyKey } from './hash.ts';
 import { buildMessages, fencePasted, SYSTEM_PROMPT } from './messages.ts';
-import { type Action, MAX_MODEL_ATTEMPTS, MAX_TOOL_ATTEMPTS, nextAction } from './next.ts';
+import {
+  type Action,
+  MAX_MODEL_ATTEMPTS,
+  MAX_RATE_LIMIT_WAIT_MS,
+  MAX_RATE_LIMITED_ATTEMPTS,
+  MAX_TOOL_ATTEMPTS,
+  nextAction,
+} from './next.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
 import { type CallState, fold, reduce, type TaskState } from './state.ts';
@@ -188,9 +195,13 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             retryable,
             attempt,
           };
-          if (retryable && attempt < MAX_MODEL_ATTEMPTS) {
+          // A rate limit is the provider asking us to wait, so it gets more patience,
+          // and at least the wait it asked for (within reason).
+          const limited = e instanceof ModelError && e.rateLimited;
+          if (retryable && attempt < (limited ? MAX_RATE_LIMITED_ATTEMPTS : MAX_MODEL_ATTEMPTS)) {
             await commit([failed]);
-            await sleep(backoffMs(attempt, random));
+            const asked = limited ? Math.min(MAX_RATE_LIMIT_WAIT_MS, e.retryAfterMs ?? 0) : 0;
+            await sleep(Math.max(asked, backoffMs(attempt, random)));
           } else {
             const reason = `The model failed: ${failed.error}`;
             await commit([failed, { type: 'task.finished', status: 'failed', reason }]);

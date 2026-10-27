@@ -237,9 +237,19 @@ export interface ModelClient {
 export class ModelError extends Error {
   override name = 'ModelError';
   readonly retryable: boolean;
-  constructor(message: string, retryable: boolean) {
+  /** The provider said "too many requests"; worth waiting longer than a glitch. */
+  readonly rateLimited: boolean;
+  /** How long the provider asked us to wait, when it said. */
+  readonly retryAfterMs?: number;
+  constructor(
+    message: string,
+    retryable: boolean,
+    rate?: { rateLimited: true; retryAfterMs?: number },
+  ) {
     super(message);
     this.retryable = retryable;
+    this.rateLimited = rate?.rateLimited ?? false;
+    if (rate?.retryAfterMs !== undefined) this.retryAfterMs = rate.retryAfterMs;
   }
 }
 

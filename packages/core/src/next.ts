@@ -21,6 +21,9 @@ export type Action =
 /** Identical (tool, args) calls allowed per task before the runner stops. */
 export const MAX_IDENTICAL_CALLS = 3;
 export const MAX_MODEL_ATTEMPTS = 3;
+/** Rate limits clear with time, so they get more attempts and longer waits. */
+export const MAX_RATE_LIMITED_ATTEMPTS = 6;
+export const MAX_RATE_LIMIT_WAIT_MS = 60_000;
 export const MAX_TOOL_ATTEMPTS = 3;
 
 export function currentCalls(s: TaskState): CallState[] {

@@ -200,8 +200,12 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
 
       if (!res.ok) {
         const detail = (await res.text().catch(() => '')).slice(0, 500);
-        const retryable = res.status === 429 || res.status >= 500;
-        throw new ModelError(`HTTP ${res.status}: ${detail}`, retryable);
+        if (res.status === 429)
+          throw new ModelError(`HTTP 429: ${detail}`, true, {
+            rateLimited: true,
+            retryAfterMs: retryAfterMs(res.headers, Date.now()),
+          });
+        throw new ModelError(`HTTP ${res.status}: ${detail}`, res.status >= 500);
       }
 
       let reply: Reply;
@@ -263,4 +267,20 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       };
     },
   };
+}
+
+/**
+ * The wait a rate-limited reply asks for: `Retry-After` (seconds or a date), else an
+ * `X-RateLimit-Reset` time (epoch seconds or milliseconds). Undefined when it says nothing.
+ */
+export function retryAfterMs(headers: Headers, now: number): number | undefined {
+  const after = headers.get('retry-after');
+  if (after) {
+    const secs = Number(after);
+    const ms = Number.isFinite(secs) ? secs * 1000 : Date.parse(after) - now;
+    if (Number.isFinite(ms)) return Math.max(0, ms);
+  }
+  const reset = Number(headers.get('x-ratelimit-reset'));
+  if (reset > 0) return Math.max(0, (reset < 1e12 ? reset * 1000 : reset) - now);
+  return undefined;
 }

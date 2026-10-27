@@ -173,7 +173,10 @@ function crashing(store: EventStore, n: number, when: 'before' | 'after'): Event
   });
 }
 
-function setup(plan: Move[], opts: { store?: EventStore; clock?: { t: number } } = {}) {
+function setup(
+  plan: Move[],
+  opts: { store?: EventStore; clock?: { t: number }; sleep?: (ms: number) => Promise<void> } = {},
+) {
   const { w, tools } = world();
   const clock = opts.clock ?? { t: Date.parse('2026-10-24T00:00:00Z') };
   const store = opts.store ?? new MemoryEventStore({ now: () => clock.t });
@@ -190,7 +193,7 @@ function setup(plan: Move[], opts: { store?: EventStore; clock?: { t: number } }
       }),
       clock: { now: () => clock.t },
       leaseMs: 1000,
-      sleep: async () => {},
+      sleep: opts.sleep ?? (async () => {}),
       random: () => 0,
     });
   return { w, tools, clock, store, model, make, rt: make() };
@@ -319,6 +322,25 @@ describe('runtime', () => {
       status: 'failed',
       reason: expect.stringContaining('401'),
     });
+  });
+
+  it('waits out a rate limit for as long as the provider asks, with more patience than a glitch', async () => {
+    const slept: number[] = [];
+    const t = setup([], { sleep: async (ms) => void slept.push(ms) });
+    let n = 0;
+    t.model.complete = async () => {
+      n += 1;
+      if (n <= 4)
+        throw new ModelError('HTTP 429', true, {
+          rateLimited: true,
+          retryAfterMs: n === 1 ? 120_000 : 5000,
+        });
+      return { text: 'ok', calls: [], usage: { inTokens: 1, outTokens: 1 } };
+    };
+    const id = await t.rt.start('go', config());
+    // Four rate limits in a row would fail an ordinary glitch (3 attempts); here it gets through.
+    expect(await drive(t.rt, id)).toMatchObject({ status: 'succeeded' });
+    expect(slept).toEqual([60_000, 5000, 5000, 5000]);
   });
 
   it('retries an empty reply and fails if it stays empty, never succeeding with no answer', async () => {

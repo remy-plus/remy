@@ -1,6 +1,6 @@
 import { type ModelCaps, ModelError } from '@remy/core';
 import { describe, expect, it } from 'vitest';
-import { createOpenAIClient, REASONING_MIN_OUTPUT_TOKENS } from './openai.ts';
+import { createOpenAIClient, REASONING_MIN_OUTPUT_TOKENS, retryAfterMs } from './openai.ts';
 import type { RawRequest } from './types.ts';
 
 const caps: ModelCaps = {
@@ -149,6 +149,24 @@ describe('createOpenAIClient', () => {
     const err = await client.complete(req, sig()).catch((e) => e);
     expect(err).toBeInstanceOf(ModelError);
     expect(err.retryable).toBe(retryable);
+  });
+
+  it('a 429 is a rate limit and carries the wait the provider asked for', async () => {
+    const { client } = make(
+      () => new Response('slow down', { status: 429, headers: { 'retry-after': '7' } }),
+    );
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toMatchObject({ retryable: true, rateLimited: true, retryAfterMs: 7000 });
+  });
+
+  it('reads Retry-After as seconds or a date, else X-RateLimit-Reset in seconds or ms', () => {
+    const now = Date.parse('2026-10-27T00:00:00Z');
+    const at = (h: Record<string, string>) => retryAfterMs(new Headers(h), now);
+    expect(at({ 'retry-after': '3' })).toBe(3000);
+    expect(at({ 'retry-after': 'Tue, 27 Oct 2026 00:00:10 GMT' })).toBe(10_000);
+    expect(at({ 'x-ratelimit-reset': String(now / 1000 + 20) })).toBe(20_000);
+    expect(at({ 'x-ratelimit-reset': String(now + 4000) })).toBe(4000);
+    expect(at({})).toBeUndefined();
   });
 
   it('network errors are retryable', async () => {
