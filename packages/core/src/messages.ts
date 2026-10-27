@@ -67,7 +67,7 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry): Message[] {
     if (entry.kind === 'user')
       return {
         role: 'user',
-        content: entry.text === s.prompt ? fencePasted(entry.text, s.config.pasted) : entry.text,
+        content: fencePasted(entry.text, entry.text === s.prompt ? s.config.pasted : entry.pasted),
       };
     if (entry.kind === 'model') {
       const calls = entry.callIds.map((id) => {

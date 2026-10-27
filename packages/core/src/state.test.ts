@@ -90,6 +90,17 @@ describe('reducer', () => {
     expect(fold(log({ ...created, config: { ...config, pasted: [] } })).tainted).toBe(false);
   });
 
+  it('a pasted answer taints the task; old answer events fold untainted', () => {
+    const asked: Event = { type: 'user.asked', question: 'Which?' };
+    const plain = fold(log(created, responded(1), asked, { type: 'user.answered', answer: 'a' }));
+    expect(plain.tainted).toBe(false);
+    const pasted = fold(
+      log(created, responded(1), asked, { type: 'user.answered', answer: 'a X', pasted: ['X'] }),
+    );
+    expect(pasted.tainted).toBe(true);
+    expect(pasted.log.at(-1)).toMatchObject({ kind: 'user', pasted: ['X'] });
+  });
+
   it('turns a deny into a final error result', () => {
     const s = fold(
       log(created, responded(1, call('c1')), {

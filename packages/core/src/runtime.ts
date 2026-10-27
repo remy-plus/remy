@@ -2,7 +2,7 @@
 // or finishes. PLAN.md "The runner" and "Persistence, recovery, retries, duplicate protection".
 import { randomUUID } from 'node:crypto';
 import { argsHash, idempotencyKey } from './hash.ts';
-import { buildMessages, SYSTEM_PROMPT } from './messages.ts';
+import { buildMessages, fencePasted, SYSTEM_PROMPT } from './messages.ts';
 import { type Action, MAX_MODEL_ATTEMPTS, MAX_TOOL_ATTEMPTS, nextAction } from './next.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
@@ -362,7 +362,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
                 callId: c.callId,
                 result: {
                   ok: true,
-                  content: `The user answered: ${c.userAnswer}`,
+                  content: `The user answered: ${fencePasted(c.userAnswer ?? '', c.userAnswerPasted)}`,
                   trust: 'trusted',
                 },
                 latencyMs: 0,
@@ -434,10 +434,10 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       });
     },
 
-    async answer(taskId, answer) {
+    async answer(taskId, answer, pasted) {
       await withLease(taskId, async ({ state, commit }) => {
         if (!state().pendingQuestion) throw new Error('the task is not waiting for an answer');
-        await commit([{ type: 'user.answered', answer }]);
+        await commit([{ type: 'user.answered', answer, ...(pasted?.length && { pasted }) }]);
       });
     },
 

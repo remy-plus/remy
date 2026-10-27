@@ -131,7 +131,7 @@ export type Event =
   | { type: 'tool.failed'; callId: string; error: string; retryable: boolean; attempt: number }
   | { type: 'tool.reconciled'; callId: string; outcome: 'already_done' | 'not_done' | 'unknown' }
   | { type: 'user.asked'; question: string; callId?: string }
-  | { type: 'user.answered'; answer: string }
+  | { type: 'user.answered'; answer: string; pasted?: string[] }
   | { type: 'task.cancel_requested'; by: string }
   | { type: 'task.finished'; status: FinalStatus; answer?: string; reason?: string };
 
@@ -327,6 +327,7 @@ export interface Runtime {
     /** With a denial: guidance the model reads as the tool result. Ignored when granted. */
     note?: string,
   ): Promise<void>;
-  answer(taskId: string, answer: string): Promise<void>;
+  /** `pasted`: segments of the answer the user pasted. They are untrusted and taint the task. */
+  answer(taskId: string, answer: string, pasted?: string[]): Promise<void>;
   cancel(taskId: string, by: string): Promise<void>;
 }

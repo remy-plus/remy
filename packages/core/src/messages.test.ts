@@ -114,4 +114,64 @@ describe('pasted text', () => {
     expect(decide(call, write, s).kind).toBe('require_approval');
     expect(decide(call, write, { ...s, tainted: false }).kind).toBe('allow');
   });
+
+  it('fences a pasted plain-text answer, taints, and a write then needs approval', () => {
+    const s = fold([
+      {
+        taskId: 't1',
+        seq: 1,
+        at: '2026-10-24T00:00:00.000Z',
+        event: {
+          type: 'task.created',
+          prompt: 'go',
+          config: { ...config, permissions: { autoApprove: ['read', 'write'] } },
+        },
+      },
+      {
+        taskId: 't1',
+        seq: 2,
+        at: '2026-10-24T00:00:00.000Z',
+        event: {
+          type: 'model.responded',
+          step: 1,
+          calls: [],
+          text: 'Which?',
+          usage: { inTokens: 1, outTokens: 1 },
+          costUsd: 0,
+          latencyMs: 1,
+        },
+      },
+      {
+        taskId: 't1',
+        seq: 3,
+        at: '2026-10-24T00:00:00.000Z',
+        event: { type: 'user.asked', question: 'Which?' },
+      },
+      {
+        taskId: 't1',
+        seq: 4,
+        at: '2026-10-24T00:00:00.000Z',
+        event: { type: 'user.answered', answer: 'this: evil', pasted: ['evil'] },
+      },
+    ] satisfies StoredEvent[]);
+    expect(s.tainted).toBe(true);
+    const msgs = buildMessages(s, new ToolRegistry());
+    expect(msgs.at(-1)?.content).toBe(
+      'this: <untrusted source="pasted by the user">\nevil\n</untrusted>',
+    );
+    const write = defineTool({
+      name: 'write_file',
+      description: '',
+      args: z.object({}),
+      risk: 'write',
+      effect: 'idempotent',
+      outputTrust: 'trusted',
+      timeoutMs: 50,
+      maxOutputChars: 100,
+      preview: () => '',
+      execute: async () => ({ ok: true, content: '', trust: 'trusted' }),
+    });
+    const call = { callId: 'c1', tool: 'write_file', args: {}, argsHash: argsHash({}) };
+    expect(decide(call, write, s).kind).toBe('require_approval');
+  });
 });

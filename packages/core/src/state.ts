@@ -27,11 +27,13 @@ export interface CallState extends PlannedCall {
   reconciled?: 'already_done' | 'not_done' | 'unknown';
   /** The user's answer to a question about this call (ask_user, or an uncertain recovery). */
   userAnswer?: string;
+  /** Segments of `userAnswer` the user pasted. */
+  userAnswerPasted?: string[];
   result?: ToolResult;
 }
 
 export type LogEntry =
-  | { kind: 'user'; text: string }
+  | { kind: 'user'; text: string; pasted?: string[] }
   | { kind: 'model'; step: number; text?: string; callIds: string[] }
   | { kind: 'result'; callId: string };
 
@@ -255,9 +257,16 @@ function on(s: TaskState, e: Event) {
       if (q.callId) {
         const call = callOf(s, q.callId);
         call.userAnswer = e.answer;
+        if (e.pasted?.length) call.userAnswerPasted = e.pasted;
         // The user now owns the uncertain outcome; the runner retries or skips.
         call.inFlight = false;
-      } else s.log.push({ kind: 'user', text: e.answer });
+      } else
+        s.log.push({
+          kind: 'user',
+          text: e.answer,
+          ...(e.pasted?.length && { pasted: e.pasted }),
+        });
+      if (e.pasted?.length) s.tainted = true;
       s.pendingQuestion = undefined;
       s.status = 'running';
       return;
