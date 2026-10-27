@@ -69,7 +69,7 @@ export function decide(
   if (state.tainted && tool.risk !== 'read')
     return {
       kind: 'require_approval',
-      reason: 'this task read untrusted content (a web page, search result or email)',
+      reason: 'this task read untrusted content (a web page, search result, email or pasted text)',
     };
   // 5. Standing permissions.
   if (autoApprove.includes(tool.risk)) return { kind: 'allow' };

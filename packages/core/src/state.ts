@@ -112,7 +112,7 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
       step: 0,
       calls: {},
       log: [{ kind: 'user', text: e.prompt }],
-      tainted: false,
+      tainted: (e.config.pasted?.length ?? 0) > 0,
       usage: { inTokens: 0, outTokens: 0 },
       costUsd: 0,
       modelAttempts: 0,

@@ -83,6 +83,13 @@ describe('reducer', () => {
     expect(s.tainted).toBe(true);
   });
 
+  it('starts tainted when the prompt holds pasted text, and still folds old logs untainted', () => {
+    const pasted: Event = { ...created, config: { ...config, pasted: ['secret email'] } };
+    expect(fold(log(pasted)).tainted).toBe(true);
+    expect(fold(log(created)).tainted).toBe(false);
+    expect(fold(log({ ...created, config: { ...config, pasted: [] } })).tainted).toBe(false);
+  });
+
   it('turns a deny into a final error result', () => {
     const s = fold(
       log(created, responded(1, call('c1')), {

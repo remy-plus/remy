@@ -52,10 +52,17 @@ export interface TaskConfig {
   workspaceDir: string;
   /** Earlier turns of the same conversation, oldest first. Rendered as prior messages; see `buildMessages`. */
   context?: ConversationTurn[];
+  /**
+   * Segments of the prompt the user pasted rather than typed. They are untrusted data: the task
+   * starts tainted and `buildMessages` fences them. Absent in older event logs.
+   */
+  pasted?: string[];
 }
 
 export interface ConversationTurn {
   prompt: string;
+  /** Pasted segments of `prompt`, fenced when the turn is replayed as context. */
+  pasted?: string[];
   answer: string;
 }
 
