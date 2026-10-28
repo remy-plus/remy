@@ -13,7 +13,7 @@ Needs: python3, `pip install pyte`, and a model key in the environment (never in
   No key? The script starts a local fake OpenAI-compatible server (streamed text, no network) and
   points the chat at it; pass --live to use the real model from the environment instead.
 
-  --mode classic|full picks the screen mode (classic passes --classic when the build has it).
+  --mode minimal|full picks the screen mode (minimal passes --minimal; classic is an alias).
   Full mode checks the alternate screen: prompt near the bottom, the reply on the screen, and the
   shell restored on exit. A build without a full-screen mode reports "full mode unavailable" and
   exits 3. Every run ends with a "flicker:" line (clears and bytes per streamed token).
@@ -304,7 +304,7 @@ def main() -> int:
     ap.add_argument("--shot-dir", help="like --shot, with the prefix DIR/<mode>-<cols>x<rows>-<bg>")
     ap.add_argument("--seq", help="comma-separated steps after the turns: a key (pgup, ctrl+p, esc ...), type:text, wait:secs, shot:name")
     ap.add_argument("--bg", choices=("dark", "light"), default="dark", help="terminal background reported to the chat and used for --shot")
-    ap.add_argument("--mode", choices=("classic", "full"), default="classic", help="screen mode to drive; full needs the alternate screen build")
+    ap.add_argument("--mode", choices=("minimal", "classic", "full"), default="minimal", help="screen mode to drive; full needs the alternate screen build")
     ap.add_argument("--live", action="store_true", help="use the real model from the environment, not the local fake")
     ap.add_argument("--env-file", help="a file with KEY=<openai key>, used when OPENAI_API_KEY is unset")
     args = ap.parse_args()
@@ -347,11 +347,15 @@ def main() -> int:
         ["node", "--conditions=@remy/source", "apps/cli/src/main.ts", "--help"],
         cwd=ROOT, env=env, capture_output=True, text=True, timeout=60,
     ).stdout
-    has_classic = "--classic" in help_text
-    mode_args = ["--classic"] if args.mode == "classic" and has_classic else []
+    # Builds before 0.3 only know --classic; those before the full screen know neither.
+    has_minimal = "--minimal" in help_text
+    has_classic = has_minimal or "--classic" in help_text
+    mode_args = (["--minimal"] if has_minimal else ["--classic"]) if args.mode != "full" and has_classic else []
     if args.mode == "full" and not has_classic:
-        print("full mode unavailable: this build has no --classic flag, so classic is the only screen mode")
+        print("full mode unavailable: this build has no --minimal flag, so minimal is the only screen mode")
         return 3
+    if args.mode == "minimal":
+        args.mode = "classic"  # the checks below treat every scrolling screen alike
     # Something already on the shell's screen, to prove it comes back after the chat exits.
     os.write(slave, b"$ echo SHELLMARK\r\nSHELLMARK\r\n$ remy\r\n")
     proc = subprocess.Popen(

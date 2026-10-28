@@ -4,7 +4,7 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 
 ## Works today
 
-**Chat.** Run `remy` in a terminal to open the chat. Replies stream as they arrive, and each tool call shows its status as it runs. Multi-step tasks show a plan. Earlier turns carry into the next task: the last 10 turns, or about 8,000 characters. `remy run "<prompt>"` runs a single task, for scripts and pipes.
+**Chat.** Run `remy` in a terminal to open the chat. Replies stream as they arrive, and each tool call shows its status as it runs. Multi-step tasks show a plan. Earlier turns carry into the next task: the last 10 turns, or about 8,000 characters. `/theme auto|light|dark` switches colors at once and is remembered. `remy --minimal` (or `/minimal` to make it the default) opens a quieter scrolling chat without the full screen. `remy run "<prompt>"` runs a single task, for scripts and pipes.
 
 **Files**, inside one workspace folder (by default `~/.remy/workspaces/<task id>`, or the folder you pass with `--workspace`):
 - read and list files
