@@ -221,7 +221,7 @@ export const HELP_TEXT = [
   '  /         commands as you type; Tab completes',
   '  Ctrl+P    command palette: every command, filtered as you type',
   '  @         attach a workspace file: @notes.txt',
-  '  Ctrl+J    new line (or type \\ then Enter); a big paste shows as [Pasted N lines]',
+  '  Ctrl+J    new line (or type \\ then Enter); a big paste shows as [Pasted ~N lines]',
   '  Ctrl+W    delete a word; Ctrl+K delete to the end of the line',
   '  Up        bring back your last message',
   '  Esc       clear the input',
