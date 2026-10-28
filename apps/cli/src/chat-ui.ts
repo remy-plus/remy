@@ -8,33 +8,24 @@
 //     frame as tall as the terminal makes Ink clear and reprint everything, so the streaming
 //     text is cut to the tail that fits.
 import { Box, render, Static, Text, useStdout, useWindowSize } from 'ink';
-import {
-  createElement as h,
-  type ReactElement,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
-import type { Chat, ChatState, Item, ModelChoice } from './chat.ts';
+import { createElement as h, type ReactElement, type ReactNode, useSyncExternalStore } from 'react';
+import { ApprovalCard } from './approval-ui.ts';
+import type { Chat, ChatState, Item } from './chat.ts';
 import { APPROVAL_SETTLE_MS, useChatKeys } from './chat-keys.ts';
-import { COMMANDS } from './commands.ts';
+import { EXAMPLES } from './examples.ts';
 import { Hints } from './hints.ts';
 import type { InputMode, InputState } from './input.ts';
-import { LoginFlow } from './login-ui.ts';
-import { clip, type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
-import { Menu, menuRows, Picker, type PickItem } from './picker.ts';
+import { useFrame, useSettled } from './live-hooks.ts';
+import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
+import { Overlay } from './overlay-ui.ts';
+import { Menu, menuRows } from './picker.ts';
 import { SessionPicker } from './session-picker.ts';
 import { spanProps } from './span-style.ts';
 import { captureStray, createNotifier, gateSync, type Notifier } from './terminal.ts';
-import { SPINNER_MS, type Theme } from './theme.ts';
+import type { Theme } from './theme.ts';
 import {
   APPROVAL_ROWS,
-  type ApprovalRow,
-  type ApprovalView,
   approvalHeight,
-  approvalRows,
   narrate,
   type PlanStep,
   reasoningTitle,
@@ -76,35 +67,6 @@ export interface RunOptions extends Omit<ChatAppProps, 'onClear' | 'compactHeade
   env?: Record<string, string | undefined>;
 }
 
-/** The next frame index, ticking while `active`. Always 0 when motion is reduced. */
-function useFrame(active: boolean, frames: number): number {
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setFrame((f) => (f + 1) % frames), SPINNER_MS);
-    return () => clearInterval(t);
-  }, [active, frames]);
-  return active ? frame : 0;
-}
-
-/** `value`, but a change shows at most once per `ms`; the first value shows at once. */
-export function useSettled(value: string, ms: number): string {
-  const [shown, setShown] = useState(value);
-  const last = useRef(Date.now());
-  useEffect(() => {
-    if (value === shown) return;
-    const wait = ms - (Date.now() - last.current);
-    const apply = () => {
-      last.current = Date.now();
-      setShown(value);
-    };
-    if (wait <= 0) return apply();
-    const t = setTimeout(apply, wait);
-    return () => clearTimeout(t);
-  }, [value, shown, ms]);
-  return shown;
-}
-
 /** Text props for a muted look that still works with colors off. */
 const mutedProps = (theme: Theme) => theme.props('muted');
 
@@ -134,7 +96,7 @@ function Row(p: { theme: Theme; lead?: ReactNode; marginTop?: number; children?:
   );
 }
 
-export { APPROVAL_SETTLE_MS };
+export { APPROVAL_SETTLE_MS, EXAMPLES, useSettled };
 
 const home = process.env.HOME;
 const shortPath = (p: string) => {
@@ -142,13 +104,6 @@ const shortPath = (p: string) => {
   // Keep both ends of a long path: the start says where, the end says which.
   return q.length > 48 ? `${q.slice(0, 14)}…${q.slice(-33)}` : q;
 };
-
-/** Example requests on the empty screen: what Remy is for, in a person's own words. */
-export const EXAMPLES = [
-  'Tidy the files in this folder by type',
-  'Research the three best standing desks under $400 and compare them',
-  'Summarise notes.txt in three bullets',
-] as const;
 
 function Header(p: {
   theme: Theme;
@@ -347,93 +302,6 @@ function TranscriptItem(p: { item: Item; prev?: Item; theme: Theme; columns: num
     case 'note':
       return h(Row, { theme, marginTop: turn }, h(Text, muted, item.text));
   }
-}
-
-function ApprovalCard(p: {
-  view: ApprovalView;
-  theme: Theme;
-  columns: number;
-  expanded: boolean;
-  /** Rows the expanded card may take. */
-  room: number;
-  /** The user is typing a note for a denial. */
-  noting: boolean;
-}) {
-  const { view, theme } = p;
-  const { indent, pad } = theme.space;
-  // Border (1) and padding on both sides, inside the left margin.
-  const inner = Math.max(10, p.columns - indent * 2 - (1 + pad) * 2);
-  const fit = (s: string) => clip(s, inner);
-  const muted = mutedProps(theme);
-  const rowProps = (kind: ApprovalRow['kind'], text: string) => {
-    if (kind === 'add' || kind === 'del') {
-      // A tinted band across the card makes a diff line read as one block.
-      const bg = theme.diffSurface(kind);
-      return {
-        color: theme.color(kind === 'add' ? 'diffAdd' : 'diffDel'),
-        ...(bg && { backgroundColor: bg }),
-        text: bg ? fit(text).padEnd(inner) : fit(text),
-      };
-    }
-    return { ...(kind === 'dim' && muted), text: fit(text) };
-  };
-  const { shown, hidden } = approvalRows(view, p.expanded, p.room);
-  const key = (k: string, label: string, accent = false) => [
-    h(Text, { key: k, bold: true, ...(accent && { color: theme.color('accent') }) }, k),
-    h(Text, { key: `${k}-label`, ...muted }, ` ${label}`),
-  ];
-  const gap = h(Text, null, '   ');
-  return h(
-    Box,
-    { paddingLeft: indent },
-    h(
-      Box,
-      {
-        flexDirection: 'column',
-        borderStyle: 'round',
-        borderColor: theme.color('faint'),
-        ...(theme.color('faint') ? {} : { borderDimColor: true }),
-        paddingX: pad,
-        flexGrow: 1,
-      },
-      h(Text, { bold: true, wrap: 'truncate-end' }, fit(view.title)),
-      ...shown.map((r, i) => {
-        const { text, ...props } = rowProps(r.kind, r.text);
-        return h(Text, { key: i, wrap: 'truncate-end', ...props }, text);
-      }),
-      hidden
-        ? h(
-            Text,
-            { wrap: 'truncate-end', ...muted },
-            fit(
-              `${theme.symbols.ellipsis} ${hidden} more ${hidden === 1 ? 'row' : 'rows'}${p.expanded ? '' : ' (v shows all)'}`,
-            ),
-          )
-        : null,
-      h(Text, { wrap: 'truncate-end', ...muted }, fit(view.risk)),
-      h(
-        Text,
-        { wrap: 'truncate-end', ...muted },
-        fit(`Approval covers exactly this call (${view.shortHash}).`),
-      ),
-      p.noting
-        ? h(
-            Text,
-            { wrap: 'truncate-end' },
-            'Say why below. Enter sends it as a denial, Esc goes back.',
-          )
-        : h(
-            Text,
-            { wrap: 'truncate-end' },
-            ...key('y', 'approve once', true),
-            gap,
-            ...key('n', 'deny'),
-            gap,
-            ...key('e', 'deny and say why'),
-            ...(view.more ? [gap, ...key('v', p.expanded ? 'fewer' : 'more')] : []),
-          ),
-    ),
-  );
 }
 
 const STATE_WORD: Record<ChatState['phase'], string> = {
@@ -746,81 +614,6 @@ function Live(p: {
       ),
     );
   return h(Box, { flexDirection: 'column' }, ...kids);
-}
-
-const choiceId = (c: ModelChoice) => `${c.provider}\t${c.model}`;
-
-/** The login, model and palette panels. Each takes over the prompt until it closes. */
-function Overlay(p: {
-  chat: Chat;
-  state: ChatState;
-  theme: Theme;
-  onTranscript: () => void;
-}): ReactElement | null {
-  const { chat, state, theme } = p;
-  const close = () => chat.closeOverlay();
-  if (state.overlay === 'login')
-    return h(LoginFlow, {
-      providers: chat.providers(),
-      theme,
-      ...(!state.model && {
-        intro: 'Remy needs a model to think with. Pick a provider; the key stays on this computer.',
-      }),
-      onSubmit: (entry) => chat.saveLogin(entry),
-      onDone: () => chat.closeOverlay('login'),
-      onCancel: () => chat.closeOverlay('login'),
-    });
-  if (state.overlay === 'model') {
-    const choices = chat.models();
-    const items: PickItem[] = [
-      ...choices.map((c) => ({
-        id: choiceId(c),
-        title: c.model,
-        detail: `${c.provider} · ${c.detail}${c.model === state.model ? ' · in use' : ''}`,
-      })),
-      { id: '#login', title: 'Connect another provider', detail: '/login' },
-    ];
-    const provider = choices.find((c) => c.model === state.model)?.provider ?? choices[0]?.provider;
-    return h(Picker, {
-      title: 'Switch model',
-      items,
-      theme,
-      empty: 'No saved logins. Run /login to connect a provider.',
-      extra: (q) =>
-        provider && !choices.some((c) => c.model === q)
-          ? [{ id: `#use\t${provider}\t${q}`, title: `Use "${q}"`, detail: `on ${provider}` }]
-          : [],
-      onPick: (item) => {
-        if (item.id === '#login') return chat.openOverlay('login');
-        const [kind, a, b] = item.id.split('\t');
-        if (kind === '#use') return void chat.chooseModel(a as string, b as string);
-        void chat.chooseModel(kind as string, a as string);
-      },
-      onCancel: close,
-    });
-  }
-  const items: PickItem[] = [
-    ...COMMANDS.map((c) => ({
-      id: c.name,
-      title: c.summary,
-      detail: [`/${c.name}`, c.keys].filter(Boolean).join(' · '),
-    })),
-    { id: '#transcript', title: 'Read the whole conversation', detail: 'Ctrl+O' },
-  ];
-  return h(Picker, {
-    title: 'Commands',
-    items,
-    theme,
-    max: items.length,
-    onPick: (item) => {
-      if (item.id === '#transcript') {
-        chat.closeOverlay();
-        return p.onTranscript();
-      }
-      void chat.runCommand(item.id);
-    },
-    onCancel: close,
-  });
 }
 
 export function ChatApp(props: ChatAppProps): ReactElement {
