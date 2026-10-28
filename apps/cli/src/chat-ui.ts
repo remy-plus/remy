@@ -19,6 +19,7 @@ import { useFrame, useSettled } from './live-hooks.ts';
 import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
 import { Overlay } from './overlay-ui.ts';
 import { Menu, menuRows } from './picker.ts';
+import { FullApp } from './screen/full-app.ts';
 import { SessionPicker } from './session-picker.ts';
 import { spanProps } from './span-style.ts';
 import { captureStray, createNotifier, gateSync, type Notifier } from './terminal.ts';
@@ -60,6 +61,8 @@ export interface ChatAppProps {
 }
 
 export interface RunOptions extends Omit<ChatAppProps, 'onClear' | 'compactHeader' | 'notifier'> {
+  /** `classic` keeps the scrollback UI of 0.2; the default is the full screen on a terminal. */
+  screen?: 'full' | 'classic';
   /** The terminal answered the synchronized-output query; without it frames are not wrapped. */
   sync?: boolean;
   /** Stray console and stderr writes while the screen is up: they go here, not onto the screen. */
@@ -725,7 +728,10 @@ const CLEAR_SCREEN = '\x1b[2J\x1b[3J\x1b[H';
 
 /** Opens the chat on the terminal and resolves when the user quits. */
 export async function runChat(props: RunOptions): Promise<void> {
-  const { sync = false, onStray, env = process.env, ...appProps } = props;
+  const { sync = false, onStray, env = process.env, screen, ...appProps } = props;
+  const full =
+    (screen ?? (env.REMY_SCREEN === 'classic' ? 'classic' : 'full')) === 'full' &&
+    Boolean(process.stdout.isTTY);
   appProps.inputMode ??= env.REMY_INPUT === 'single' ? 'single' : 'multi';
   const stdout = gateSync(process.stdout, sync);
   const notifier = createNotifier(env, process.stdin, process.stdout);
@@ -735,6 +741,18 @@ export async function runChat(props: RunOptions): Promise<void> {
     onStray ?? ((stream, text) => void kept.push(stream === 'stderr' ? text : `${text}\n`)),
   );
   try {
+    if (full) {
+      const app = render(h(FullApp, { ...appProps, notifier }), {
+        stdout,
+        exitOnCtrlC: false,
+        patchConsole: false,
+        alternateScreen: true,
+        incrementalRendering: true,
+        maxFps: 60,
+      });
+      await app.waitUntilExit();
+      return;
+    }
     let compact = false;
     for (;;) {
       let restart = false;

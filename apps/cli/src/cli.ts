@@ -126,6 +126,7 @@ Options for every command
                         They go to stderr, or in the chat to REMY_HOME/debug-<time>.jsonl.
                         REMY_DEBUG=1 does the same; REMY_DEBUG=<path> picks the file.
   --reduced-motion      No animation in the chat (also REMY_REDUCED_MOTION=1)
+  --classic             The scrolling chat of 0.2 instead of the full screen (also REMY_SCREEN=classic)
 
 Chat
   Type a message and press Enter. Type / for commands (/model, /login, /sessions), Ctrl+P for the
@@ -158,6 +159,7 @@ const OPTIONS = {
   json: { type: 'boolean' },
   debug: { type: 'boolean' },
   'reduced-motion': { type: 'boolean' },
+  classic: { type: 'boolean' },
   deny: { type: 'boolean' },
   note: { type: 'string' },
   version: { type: 'boolean', short: 'v' },
@@ -729,6 +731,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       onStray: debug ? (stream, text) => debug.write('stray', { stream, text }) : undefined,
       theme: createTheme(level, probe.background),
       reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
+      ...(flags.classic && { screen: 'classic' as const }),
       ...(first && { subtitle: first.id }),
       workspace,
     });
