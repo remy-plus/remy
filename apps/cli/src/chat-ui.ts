@@ -25,6 +25,7 @@ import { Hints } from './hints.ts';
 import type { InputMode, InputState } from './input.ts';
 import { useFrame, useSettled } from './live-hooks.ts';
 import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
+import type { MemoryStore } from './memory.ts';
 import type { Onboarding } from './onboarding-flow.ts';
 import { TaskStrip } from './onboarding-ui.ts';
 import { NO_TOUR, TourView } from './onboarding-view.ts';
@@ -81,6 +82,8 @@ export interface ChatAppProps {
   approvalSettleMs?: number;
   /** The local profile: the home greeting, the example requests and the tips follow it. */
   profile?: ProfileStore;
+  /** The saved notes about the user, for /memory. */
+  memory?: MemoryStore;
   /** The welcome tour; while it runs it has the screen. */
   onboarding?: Onboarding;
 }
@@ -789,6 +792,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           theme,
           onTranscript: () => setViewing(true),
           ...(props.profile && { profile: props.profile }),
+          ...(props.memory && { memory: props.memory }),
           touring: Boolean(tour),
         })
       : null,

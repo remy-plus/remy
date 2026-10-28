@@ -9,6 +9,8 @@ import { useConnections } from '../connections-flow.ts';
 import type { ConnectionsApi } from '../connections-view.ts';
 import { defaultModelFor } from '../login.ts';
 import { LoginFlow } from '../login-ui.ts';
+import type { MemoryStore } from '../memory.ts';
+import { MemoryPanel } from '../memory-ui.ts';
 import { cheapChoice } from '../onboarding.ts';
 import { themeItems } from '../overlay-ui.ts';
 import type { ThemeChoice } from '../prefs.ts';
@@ -142,6 +144,7 @@ export function Dialogs(p: {
   onTranscript: () => void;
   onSidebar: () => void;
   profile?: ProfileStore;
+  memory?: MemoryStore;
   /** The tour is on: the model list highlights a cheap default. */
   touring?: boolean;
 }): ReactElement | null {
@@ -227,6 +230,13 @@ export function Dialogs(p: {
       theme,
       dialog: { columns, rows },
       onClose: () => chat.closeOverlay('profile'),
+    });
+  if (state.overlay === 'memory' && p.memory)
+    return h(MemoryPanel, {
+      store: p.memory,
+      theme,
+      dialog: { columns, rows },
+      onClose: () => chat.closeOverlay('memory'),
     });
   if (state.overlay === 'theme')
     return h(ListDialog, {

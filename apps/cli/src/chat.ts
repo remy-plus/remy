@@ -22,6 +22,7 @@ import type { ConnectFlowApi } from './connect-ui.ts';
 import { CONNECT_HELP, type ConnectionsApi, plainConnections } from './connections-view.ts';
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
+import { type MemoryStore, plainMemory } from './memory.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
 import { defaultMore, type More, pauseQuestion } from './pause.ts';
 import { isThemeChoice, type ThemeChoice } from './prefs.ts';
@@ -121,6 +122,7 @@ export type Overlay =
   | 'palette'
   | 'theme'
   | 'profile'
+  | 'memory'
   | 'connections'
   | 'connect';
 
@@ -235,6 +237,8 @@ export interface ChatDeps {
   saveMinimal?: (on: boolean) => boolean;
   /** /profile opens when the host keeps a profile. */
   profileEnabled?: boolean;
+  /** /memory: the saved notes about the user, and whether they are in use. */
+  memory?: { store: MemoryStore; personalise: () => boolean };
   /** /tour replays the onboarding; absent where there is none. */
   startTour?: () => void;
 }
@@ -975,6 +979,22 @@ export function createChat(deps: ChatDeps): Chat {
       if (!deps.profileEnabled)
         return void commit({ kind: 'note', text: 'There is no profile to edit here.' });
       set({ overlay: 'profile' });
+    } else if (name === 'memory') {
+      const m = deps.memory;
+      if (!m) return void commit({ kind: 'note', text: 'There is no memory here.' });
+      if (args[0] === 'forget') {
+        if (!args[1]) return void commit({ kind: 'error', text: 'Use /memory forget <id>.' });
+        const gone = m.store.remove(args[1]);
+        return void commit({
+          kind: 'note',
+          text: gone ? `Forgot ${args[1]}.` : `There is no saved note ${args[1]}.`,
+        });
+      }
+      const file = m.store.load();
+      // A plain list when asked for, and when there is nothing to open a panel for.
+      if (args[0] === 'list' || !file.entries.length)
+        return void commit({ kind: 'note', text: plainMemory(file, m.personalise()) });
+      set({ overlay: 'memory' });
     } else if (name === 'tour') {
       if (!deps.startTour) return void commit({ kind: 'note', text: 'There is no tour here.' });
       deps.startTour();

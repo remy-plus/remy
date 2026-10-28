@@ -28,6 +28,7 @@ import {
   askUser,
   braveSearch,
   calculate,
+  createMemoryTools,
   createRedactor,
   createScopedFetch,
   createScopedFs,
@@ -38,6 +39,8 @@ import {
   finish,
   listFiles,
   makeDir,
+  memoryBlock,
+  memoryQuery,
   moveFile,
   readFile,
   runCommand,
@@ -73,6 +76,7 @@ import { CATALOG, findCatalog } from './mcp-catalog.ts';
 import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
+import { type MemoryStore, openMemory, personaliseOn, plainMemory } from './memory.ts';
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
@@ -139,6 +143,10 @@ Usage
                                   allows that tool for good (writes and sends only)
   remy approvals [list|remove <tool>]
                                   See the tools you always allow, or stop allowing one
+  remy memory [list|forget <id>|clear]
+                                  See what Remy remembers about you, forget one note
+                                  or all of them (notes are used only while
+                                  "Personalise replies" is on in /profile)
   remy answer <id> "<text>"       Answer a pending question, then continue
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
@@ -304,6 +312,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'logout',
       'connect',
       'approvals',
+      'memory',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -326,6 +335,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const standing = () => {
     standingStore ??= openApprovals(home);
     return standingStore;
+  };
+  let memoryStore: MemoryStore | undefined;
+  const memory = () => {
+    memoryStore ??= openMemory(home, { enabled: () => personaliseOn(home) });
+    return memoryStore;
   };
   /** Tool names the user always allows. A damaged file turns them off, with one note. */
   const standingNames = (): string[] => {
@@ -554,7 +568,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             throw new Error('No model is needed for this command.');
           },
         };
-    const model = debug ? debugModel(base, debug) : base;
+    const inner = debug ? debugModel(base, debug) : base;
     // Every task has a workspace, so the file tools and run_command are always available.
     const tools = new ToolRegistry([
       readFile,
@@ -571,6 +585,25 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       askUser,
       finish,
     ]);
+    // Notes about the user: tools and recall exist only while personalising is on.
+    if (personaliseOn(home)) for (const t of createMemoryTools(memory())) tools.add(t);
+    const model: ModelClient = {
+      get id() {
+        return inner.id;
+      },
+      get caps() {
+        return inner.caps;
+      },
+      complete(req, ...a) {
+        if (!personaliseOn(home)) return inner.complete(req, ...a);
+        const block = memoryBlock(
+          memory().list(),
+          memoryQuery(req.messages),
+          Boolean(tools.get('remember')),
+        );
+        return inner.complete(block ? { ...req, system: `${req.system}\n\n${block}` } : req, ...a);
+      },
+    };
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
     else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
@@ -959,6 +992,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const chat = createChat({
       ...(process.stdout.isTTY && { gate: stdoutGate(process.stdout) }),
       profileEnabled: true,
+      memory: { store: memory(), personalise: () => personaliseOn(home) },
       startTour: () => onboarding?.start(),
       theme: prefs.theme ?? 'auto',
       saveTheme: (choice) => savePrefs(home, { theme: choice }),
@@ -1022,6 +1056,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     await runChat({
       chat,
       profile,
+      memory: memory(),
       onboarding,
       sync: probe.sync,
       env,
@@ -1136,6 +1171,25 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           throw new Error('Use remy approvals list or remy approvals remove <tool>.');
         const { tools } = makeRuntime(cfg(), { model: false });
         out(plainApprovals(standing().load(), (t) => tools.get(t)?.risk));
+        return 0;
+      }
+
+      case 'memory': {
+        const sub = rest[0] ?? 'list';
+        if (sub === 'forget') {
+          need(2, 'remy memory forget <id>');
+          const id = rest[1] as string;
+          if (!memory().remove(id)) throw new Error(`There is no saved note ${id}.`);
+          out(`Forgot ${id}.`);
+          return 0;
+        }
+        if (sub === 'clear') {
+          const n = memory().clear();
+          out(n ? `Forgot ${n} note${n === 1 ? '' : 's'}.` : 'There was nothing to forget.');
+          return 0;
+        }
+        if (sub !== 'list') throw new Error('Use remy memory list, forget <id> or clear.');
+        out(plainMemory(memory().load(), personaliseOn(home)));
         return 0;
       }
 

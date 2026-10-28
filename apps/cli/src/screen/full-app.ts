@@ -373,6 +373,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
         onTranscript: () => setViewing(true),
         onSidebar: () => setSidebarOn((on) => !on),
         ...(props.profile && { profile: props.profile }),
+        ...(props.memory && { memory: props.memory }),
         touring: Boolean(tour),
       })
     : null;

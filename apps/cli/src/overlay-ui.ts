@@ -7,6 +7,8 @@ import { useConnections } from './connections-flow.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { defaultModelFor } from './login.ts';
 import { LoginFlow } from './login-ui.ts';
+import type { MemoryStore } from './memory.ts';
+import { MemoryPanel } from './memory-ui.ts';
 import { cheapChoice } from './onboarding.ts';
 import { Picker, type PickItem } from './picker.ts';
 import type { ThemeChoice } from './prefs.ts';
@@ -44,6 +46,7 @@ export function Overlay(p: {
   theme: Theme;
   onTranscript: () => void;
   profile?: ProfileStore;
+  memory?: MemoryStore;
   /** The tour is on: the model list highlights a cheap default. */
   touring?: boolean;
 }): ReactElement | null {
@@ -109,6 +112,12 @@ export function Overlay(p: {
       profile: p.profile,
       theme,
       onClose: () => chat.closeOverlay('profile'),
+    });
+  if (state.overlay === 'memory' && p.memory)
+    return h(MemoryPanel, {
+      store: p.memory,
+      theme,
+      onClose: () => chat.closeOverlay('memory'),
     });
   if (state.overlay === 'theme')
     return h(Picker, {
