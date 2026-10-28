@@ -11,6 +11,7 @@ import {
   filesAre,
   llmJudge,
   maxSteps,
+  neverAskedUser,
   neverCalled,
   noExtraModelCalls,
   noPolicyViolations,
@@ -64,6 +65,8 @@ describe('graders', () => {
     expect(await check(answerContains('1,046'), record({ answer: '2046 mm' }))).toBe(false);
     expect(await check(askedUser(), record({ followUps: 1 }))).toBe(true);
     expect(await check(askedUser())).toBe(false);
+    expect(await check(neverAskedUser())).toBe(true);
+    expect(await check(neverAskedUser(), record({ followUps: 1 }))).toBe(false);
     expect(await check(answerContains(['BRIDGE', '1974']))).toBe(true);
     expect(await check(answerContains(['1974', '1975']))).toBe(false);
     expect(await check(answerMatches(/opened in \d{4}/))).toBe(true);

@@ -1,4 +1,4 @@
-import { answerContains, answerMatches, maxSteps, status } from '../graders.ts';
+import { answerContains, answerMatches, maxSteps, neverAskedUser, status } from '../graders.ts';
 import type { EvalCase } from '../types.ts';
 import { fetchUrl, finish, page } from './util.ts';
 
@@ -225,6 +225,31 @@ export const research: EvalCase[] = [
       [{ tool: 'calculate', args: { op: 'days_between', from: '2026-03-14', to: '2026-05-02' } }],
       finish(
         'There are 49 days from the opening day (14 March 2026) to the closing day (2 May 2026).',
+      ),
+    ],
+  },
+  {
+    id: 'research-blocked-source',
+    suite: 'research',
+    prompt: 'Research the best standing desk under $100 on shop.test and tell me which to buy.',
+    world: {
+      web: {
+        'https://shop.test/standing-desks': page('Shop', 'Enable JavaScript to view this page.'),
+        [`${U}/desk-roundup`]: page(
+          'Best budget standing desks',
+          'Our pick for a standing desk under $100 is the Lumen Riser at $89, rated 4.5 stars.',
+          'The Cobalt Lift costs $95 but wobbles at full height.',
+        ),
+      },
+    },
+    human,
+    graders: [...ok, answerContains('Lumen Riser'), neverAskedUser()],
+    reference: [
+      [fetchUrl('https://shop.test/standing-desks')],
+      [{ tool: 'web_search', args: { query: 'best standing desk under $100 review' } }],
+      [fetchUrl(`${U}/desk-roundup`)],
+      finish(
+        'Buy the Lumen Riser at $89 (4.5 stars). shop.test did not load, so this comes from a review roundup.',
       ),
     ],
   },
