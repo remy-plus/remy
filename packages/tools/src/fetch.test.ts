@@ -30,6 +30,11 @@ beforeAll(async () => {
     } else if (req.url === '/to-page') {
       res.writeHead(301, { location: '/page' });
       res.end();
+    } else if (req.url === '/long') {
+      res.setHeader('content-type', 'text/html');
+      res.end(
+        `<html><body><script>${'x'.repeat(50000)}</script><p>${'word '.repeat(4000)}</p></body></html>`,
+      );
     } else if (req.url === '/big') {
       res.end('x'.repeat(5000));
     } else if (req.url === '/loop') {
@@ -175,6 +180,14 @@ describe('fetch_url', () => {
     expect(r).toMatchObject({ ok: true, trust: 'untrusted' });
     expect(r.ok && r.content).toContain('Hello & welcome');
     expect(r.ok && r.content).not.toContain('evil()');
+  });
+
+  it('caps long pages with a marker, ignoring script weight', async () => {
+    const r = await fetchUrl.execute({ url: url('/long') }, ctx());
+    expect(r.ok && r.content.length).toBeLessThan(6_200);
+    expect(r.ok && r.content).toMatch(/… 1\d{4} more characters not shown$/);
+    const more = await fetchUrl.execute({ url: url('/long'), max_chars: 1000 }, ctx());
+    expect(more.ok && more.content.length).toBeLessThan(1_200);
   });
 
   it('reports blocked URLs as non-retryable errors', async () => {
