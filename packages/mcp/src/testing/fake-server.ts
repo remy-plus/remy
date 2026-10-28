@@ -1,5 +1,6 @@
 // An in-process MCP server for tests. Not part of the build.
 
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
@@ -21,6 +22,8 @@ export interface FakeServer {
   options: McpConnectionOptions;
   /** Closes the server side of the live session (a "crash"). */
   crash(): Promise<void>;
+  /** Ends the live session and refuses every new one the way an expired sign-in does (a 401). */
+  signOut(): Promise<void>;
   connects: number;
   calls: { name: string; args: Record<string, unknown> }[];
 }
@@ -32,14 +35,28 @@ export function fakeServer(
   opts: { pageSize?: number } = {},
 ): FakeServer {
   let live: Server | undefined;
+  let signedOut = false;
   const fake: FakeServer = {
     connects: 0,
     calls: [],
     async crash() {
       await live?.close();
     },
+    async signOut() {
+      signedOut = true;
+      await live?.close();
+    },
     options: {
       async createTransport() {
+        if (signedOut)
+          return {
+            // The HTTP transport fails its start with this error when the server answers 401.
+            start: async () => {
+              throw new UnauthorizedError();
+            },
+            send: async () => {},
+            close: async () => {},
+          };
         fake.connects++;
         const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
         const server = new Server(

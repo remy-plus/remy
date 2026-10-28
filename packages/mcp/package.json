@@ -15,7 +15,9 @@
       "@remy/source": "./src/testing/oauth-server.ts"
     },
     "./testing": {
-      "@remy/source": "./src/testing/fake-server.ts"
+      "@remy/source": "./src/testing/fake-server.ts",
+      "types": "./dist/testing/fake-server.d.ts",
+      "default": "./dist/testing/fake-server.js"
     }
   },
   "dependencies": {
