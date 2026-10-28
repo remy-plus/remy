@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 (2026-10-28)
+
+Typing stays instant while Remy streams, and you can cut in.
+
+- **Instant keys.** Right after a keypress, the screen redraws every 4 ms instead of every 16, so what you type and the cursor show up at once, even mid-reply.
+- **Steady on slow links.** When the terminal falls behind (over SSH, for example), Remy waits for it to catch up and then draws the latest state, instead of piling up frames.
+- **Send now.** While Remy works, Enter still queues your message; **Ctrl+S** (or Alt+Enter) stops the current turn and sends it straight away. Messages already queued run after it, and the stopped task stays resumable.
+
 ## 0.4.0 (2026-10-28)
 
 Remy gets to know you in two minutes, then greets you by name.
