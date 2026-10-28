@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.0 (2026-10-28)
 
 Remy gets to know you in two minutes, then greets you by name.
 
@@ -11,6 +11,13 @@ Remy gets to know you in two minutes, then greets you by name.
 - **`/profile`** shows and edits it: name, goals, personalise on or off, delete. **`/tour`** replays the tour.
 - **Minimal mode** has the same steps as plain text.
 - Screens: `design/screens/0.4/`.
+
+Steadier on small and free models:
+
+- **Long pages fit.** Fetched pages are capped at 6,000 characters, and what Remy sends the model stays inside its context and per-minute token limits (Groq's free tier included). If a provider still says a request is too large, Remy halves it and tries once more.
+- **Plain errors.** Provider errors read as one sentence with the next step, never raw JSON.
+- **Fewer questions.** When a site can't be read, Remy tries other sources before asking you, and says what it couldn't reach.
+- **Plans that stop say so.** Steps left unfinished when a turn ends show as stopped, not in progress.
 
 ## 0.3.0 (2026-10-27)
 
