@@ -2,7 +2,7 @@
 // or finishes. PLAN.md "The runner" and "Persistence, recovery, retries, duplicate protection".
 import { randomUUID } from 'node:crypto';
 import { argsHash, idempotencyKey } from './hash.ts';
-import { buildMessages, fencePasted, SYSTEM_PROMPT } from './messages.ts';
+import { buildMessages, fencePasted, SYSTEM_PROMPT, toolResultBudgetChars } from './messages.ts';
 import {
   type Action,
   MAX_MODEL_ATTEMPTS,
@@ -170,12 +170,21 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         let res: Awaited<ReturnType<ModelClient['complete']>>;
         try {
           deps.onModelStart?.();
+          const system = deps.systemPrompt ?? SYSTEM_PROMPT;
+          const specs = tools.specs(names);
+          const maxOutputTokens = deps.maxOutputTokens ?? 2048;
+          const toolBudgetChars = toolResultBudgetChars({
+            caps: model.caps,
+            system,
+            toolSpecsChars: JSON.stringify(specs).length,
+            maxOutputTokens,
+          });
           res = await model.complete(
             {
-              system: deps.systemPrompt ?? SYSTEM_PROMPT,
-              messages: buildMessages(s, tools),
-              tools: tools.specs(names),
-              maxOutputTokens: deps.maxOutputTokens ?? 2048,
+              system,
+              messages: buildMessages(s, tools, { toolBudgetChars }),
+              tools: specs,
+              maxOutputTokens,
               temperature: 0,
             },
             signal,

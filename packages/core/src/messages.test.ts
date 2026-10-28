@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { argsHash } from './hash.ts';
-import { buildMessages, MAX_CONTEXT_CHARS, MAX_CONTEXT_TURNS, renderContext } from './messages.ts';
+import {
+  buildMessages,
+  MAX_CONTEXT_CHARS,
+  MAX_CONTEXT_TURNS,
+  renderContext,
+  toolResultBudgetChars,
+} from './messages.ts';
 import { decide } from './policy.ts';
 import { defineTool, ToolRegistry } from './registry.ts';
 import { fold } from './state.ts';
@@ -173,5 +179,90 @@ describe('pasted text', () => {
     });
     const call = { callId: 'c1', tool: 'write_file', args: {}, argsHash: argsHash({}) };
     expect(decide(call, write, s).kind).toBe('require_approval');
+  });
+});
+
+describe('tool result budget', () => {
+  const tool = defineTool({
+    name: 'fetch_url',
+    description: 'x',
+    args: z.object({ url: z.string() }),
+    risk: 'read',
+    effect: 'none',
+    outputTrust: 'untrusted',
+    timeoutMs: 1000,
+    maxOutputChars: 20_000,
+    preview: () => 'x',
+    async execute() {
+      return { ok: true, content: '', trust: 'untrusted' };
+    },
+  });
+  const tools = new ToolRegistry();
+  tools.add(tool);
+  const withResults = (sizes: number[]) => {
+    let seq = 0;
+    const ev = (event: StoredEvent['event']): StoredEvent => ({
+      taskId: 't1',
+      seq: ++seq,
+      at: '2026-10-24T00:00:00.000Z',
+      event,
+    });
+    const events: StoredEvent[] = [ev({ type: 'task.created', prompt: 'go', config })];
+    sizes.forEach((n, i) => {
+      const args = { url: `u${i}` };
+      const callId = `c${i}`;
+      events.push(
+        ev({
+          type: 'model.responded',
+          step: i + 1,
+          text: '',
+          calls: [{ callId, tool: 'fetch_url', args, argsHash: argsHash(args) }],
+          usage: { inTokens: 0, outTokens: 0 },
+          costUsd: 0,
+          latencyMs: 0,
+        }),
+        ev({
+          type: 'tool.completed',
+          callId,
+          result: { ok: true, content: `${i}`.repeat(n), trust: 'untrusted' },
+          latencyMs: 0,
+        }),
+      );
+    });
+    return fold(events);
+  };
+  const toolText = (msgs: ReturnType<typeof buildMessages>) =>
+    msgs.filter((m) => m.role === 'tool').map((m) => m.content ?? '');
+
+  it('sends results whole when they fit', () => {
+    const state = withResults([5000, 5000]);
+    const out = toolText(buildMessages(state, tools, { toolBudgetChars: 20_000 }));
+    expect(out).toHaveLength(2);
+    expect(out.every((t) => !t.includes('[truncated'))).toBe(true);
+  });
+
+  it('shortens the oldest results first and keeps the total inside the budget', () => {
+    const state = withResults([6000, 6000, 6000]);
+    const out = toolText(buildMessages(state, tools, { toolBudgetChars: 9000 }));
+    expect(out.reduce((n, t) => n + t.length, 0)).toBeLessThanOrEqual(9000 + 200);
+    expect(out[0]).toContain('[truncated');
+    expect(out[2]).not.toContain('[truncated');
+    expect(out[0]).toContain('<untrusted source="fetch_url">');
+  });
+
+  it('leaves the stored result untouched', () => {
+    const state = withResults([6000, 6000]);
+    buildMessages(state, tools, { toolBudgetChars: 2000 });
+    const r = Object.values(state.calls)[0]?.result;
+    expect(r?.ok && r.content.length).toBe(6000);
+  });
+
+  it('derives the budget from the context window and tokens per minute', () => {
+    const base = { system: 'x'.repeat(1000), toolSpecsChars: 6000, maxOutputTokens: 2048 };
+    const big = toolResultBudgetChars({ caps: { contextTokens: 131072 }, ...base });
+    const groq = toolResultBudgetChars({ caps: { contextTokens: 131072, tpm: 8000 }, ...base });
+    expect(big).toBeGreaterThan(100_000);
+    expect(groq).toBeLessThan(12_000);
+    expect(groq).toBeGreaterThanOrEqual(1500);
   });
 });
