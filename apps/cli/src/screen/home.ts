@@ -61,6 +61,11 @@ export function Home(p: HomeProps): ReactElement {
     mark,
     h(Box, { height: 1, flexShrink: 0 }),
     h(Box, { width: promptWidth, flexShrink: 0, flexDirection: 'column' }, p.prompt),
+    h(
+      Box,
+      { width: promptWidth, flexShrink: 0, justifyContent: 'flex-end' },
+      h(Text, null, 'ctrl+p', h(Text, { ...muted }, ' commands')),
+    ),
     p.notice
       ? h(
           Box,

@@ -33,6 +33,12 @@ describe('tips', () => {
 });
 
 describe('home', () => {
+  it('shows the ctrl+p commands hint under the prompt', () => {
+    const lines = frame(100, 30).split('\n');
+    const at = lines.findIndex((l) => l.includes('> ask'));
+    expect(lines[at + 1]).toContain('ctrl+p commands');
+  });
+
   it('caps the footer workspace path to about 40% of the width', () => {
     const long = '/work/a-very-long-directory-name/another-long-directory/and-one-more/project';
     const out = frame(100, 30, { workspace: long });
