@@ -28,7 +28,6 @@ import { introRows } from './intro.ts';
 import { computeLayout } from './layout.ts';
 import { PromptBox, promptBoxRows } from './prompt-box.ts';
 import {
-  halfDown,
   halfUp,
   pageDown,
   pageUp,
@@ -116,8 +115,6 @@ export function FullApp(props: ChatAppProps): ReactElement {
       if (key.pageDown) return (setScroll((s) => pageDown(s, total, height)), true);
       if (!input.text && key.ctrl && ch === 'u')
         return (setScroll((s) => halfUp(s, total, height)), true);
-      if (!input.text && key.ctrl && ch === 'd')
-        return (setScroll((s) => halfDown(s, total, height)), true);
       if (!input.text && key.home) return (setScroll(toTop(total, height)), true);
       if (!input.text && key.end) return (setScroll(toBottom()), true);
       if (key.escape && chat.getState().phase === 'running') return (void chat.interrupt(), true);

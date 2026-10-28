@@ -259,7 +259,7 @@ describe('FullApp', () => {
     expect(m.frame()).toContain('Research the three best standing desks');
     m.app.unmount();
   });
-  it('scrolls by half pages with ctrl+u and ctrl+d and jumps with home and end', async () => {
+  it('scrolls with page down and page up and jumps with home and end', async () => {
     const answer = Array.from({ length: 40 }, (_, i) => `line number ${i}`).join('\n\n');
     const m = await open(new ScriptedModelClient([done(answer)]));
     await m.send('long one');
@@ -270,10 +270,10 @@ describe('FullApp', () => {
     await tick();
     expect(m.frame()).toContain('long one');
     expect(m.frame()).not.toContain('line number 39');
-    m.app.stdin.write('\x04'); // ctrl+d: half page down
+    m.app.stdin.write('\x1b[6~'); // page down
     await tick();
     expect(m.frame()).not.toContain('long one');
-    m.app.stdin.write('\x15'); // ctrl+u: and back up
+    m.app.stdin.write('\x1b[5~'); // page up: and back up
     await tick();
     expect(m.frame()).toContain('long one');
     m.app.stdin.write('\x1b[F'); // end
