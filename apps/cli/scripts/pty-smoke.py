@@ -18,6 +18,14 @@ Needs: python3, `pip install pyte`, and a model key in the environment (never in
   shell restored on exit. A build without a full-screen mode reports "full mode unavailable" and
   exits 3. Every run ends with a "flicker:" line (clears and bytes per streamed token).
 
+  --shot-dir DIR writes coloured PNGs to DIR/<mode>-<cols>x<rows>-<bg>-<step>.png (for design/screens/).
+  --seq "pgup,shot:scrolled,ctrl+p,shot:palette,esc" runs after the turns: keys, "type:text",
+  "wait:seconds" and "shot:name" captures. Example for 0.3:
+    for bg in dark light; do for sz in "100 32" "80 24"; do set -- $sz
+      python3 apps/cli/scripts/pty-smoke.py --mode full --bg $bg --cols $1 --rows $2 \\
+        --shot-dir design/screens/0.3 --seq "shot:chat,ctrl+p,shot:palette,esc,pgup,shot:scrolled"
+    done; done
+
   --ease runs the ease-of-use path from an empty REMY_HOME: the login panel on first run, a pasted
   key, a first turn, the "/" list, Ctrl+P, /model and "@" file completion.
 
@@ -242,6 +250,24 @@ def start_fake_model(delay: float = 0.02):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, f"http://127.0.0.1:{srv.server_address[1]}", stats
 
+KEYS = {
+    "pgup": b"\x1b[5~", "pgdn": b"\x1b[6~", "up": b"\x1b[A", "down": b"\x1b[B", "right": b"\x1b[C",
+    "left": b"\x1b[D", "home": b"\x1b[H", "end": b"\x1b[F", "esc": b"\x1b", "enter": b"\r",
+    "tab": b"\t", "space": b" ", "backspace": b"\x7f", "shift+tab": b"\x1b[Z",
+}
+
+
+def key_bytes(name: str) -> bytes:
+    """pgup, ctrl+p, alt+b ... to the bytes a terminal sends."""
+    n = name.strip().lower()
+    if n in KEYS:
+        return KEYS[n]
+    if n.startswith("ctrl+") and len(n) == 6:
+        return bytes([ord(n[5]) & 0x1F])
+    if n.startswith("alt+") and len(n) == 5:
+        return b"\x1b" + n[4].encode()
+    raise SystemExit(f"unknown key in --seq: {name!r}")
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -258,12 +284,17 @@ def main() -> int:
     ap.add_argument("--cli-arg", action="append", default=[], help="an extra argument for the chat (repeatable)")
     ap.add_argument("--raw", help="write the raw bytes to this file")
     ap.add_argument("--shot", help="write PREFIX.png (final screen) and PREFIX-all.png (scrollback plus screen), coloured, via headless Chrome")
+    ap.add_argument("--shot-dir", help="like --shot, with the prefix DIR/<mode>-<cols>x<rows>-<bg>")
+    ap.add_argument("--seq", help="comma-separated steps after the turns: a key (pgup, ctrl+p, esc ...), type:text, wait:secs, shot:name")
     ap.add_argument("--bg", choices=("dark", "light"), default="dark", help="terminal background reported to the chat and used for --shot")
     ap.add_argument("--mode", choices=("classic", "full"), default="classic", help="screen mode to drive; full needs the alternate screen build")
     ap.add_argument("--live", action="store_true", help="use the real model from the environment, not the local fake")
     ap.add_argument("--env-file", help="a file with KEY=<openai key>, used when OPENAI_API_KEY is unset")
     args = ap.parse_args()
     turns = args.turn or DEFAULT_TURNS
+    if args.shot_dir:
+        os.makedirs(args.shot_dir, exist_ok=True)
+        args.shot = os.path.join(args.shot_dir, f"{args.mode}-{args.cols}x{args.rows}-{args.bg}")
 
     if args.env_file and not os.environ.get("OPENAI_API_KEY"):
         for row in open(args.env_file):
@@ -546,6 +577,25 @@ def main() -> int:
     pump(0.3)
     mode_shots["turn"] = [l.rstrip() for l in screen.display]
     in_alt_before_exit = screen.in_alt
+    for step in (args.seq or "").split(","):
+        step = step.strip()
+        if not step:
+            continue
+        kind, _, rest = step.partition(":")
+        if kind == "shot":
+            name = rest or "step"
+            mode_shots[f"seq {name}"] = [l.rstrip() for l in screen.display]
+            if args.shot:
+                write_shots(f"{args.shot}-{name}", screen, args.cols, args.rows, args.bg, scroll=False)
+                print(f"shot: {args.shot}-{name}.png")
+        elif kind == "type":
+            os.write(master, rest.encode())
+            pump(0.4)
+        elif kind == "wait":
+            pump(float(rest))
+        else:
+            os.write(master, key_bytes(step))
+            pump(0.5)
     if args.shot and in_alt_before_exit:
         write_shots(f"{args.shot}-fullscreen", screen, args.cols, args.rows, args.bg, scroll=False)
     send("/exit")
