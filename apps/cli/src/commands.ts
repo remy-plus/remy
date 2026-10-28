@@ -21,6 +21,7 @@ export const COMMANDS: CommandInfo[] = [
     summary: 'Switch between light and dark, or follow the terminal',
     aliases: ['light', 'dark', 'day', 'night'],
   },
+  { name: 'minimal', summary: 'Use the quiet minimal screen at start (saved)' },
   { name: 'help', summary: 'List commands and keys' },
   { name: 'exit', summary: 'Quit', aliases: ['quit'], keys: 'Ctrl+D' },
 ];

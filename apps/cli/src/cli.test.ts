@@ -255,7 +255,8 @@ describe('misc', () => {
     const h = harness();
     expect((await h.run('--version')).out).toMatch(/^remy \d+\.\d+\.\d+/);
     expect((await h.run('help')).out).toContain('remy run');
-    expect((await h.run('help')).out).toContain('--classic');
+    expect((await h.run('help')).out).toContain('--minimal');
+    expect((await h.run('help')).out).not.toContain('--classic');
     expect((await h.run()).out).toContain('Usage');
   });
 

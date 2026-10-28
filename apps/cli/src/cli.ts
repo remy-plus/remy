@@ -127,7 +127,8 @@ Options for every command
                         They go to stderr, or in the chat to REMY_HOME/debug-<time>.jsonl.
                         REMY_DEBUG=1 does the same; REMY_DEBUG=<path> picks the file.
   --reduced-motion      No animation in the chat (also REMY_REDUCED_MOTION=1)
-  --classic             The scrolling chat of 0.2 instead of the full screen (also REMY_SCREEN=classic)
+  --minimal             A quiet scrolling chat instead of the full screen (also REMY_SCREEN=minimal;
+                        /minimal in the chat saves the choice)
 
 Chat
   Type a message and press Enter. Type / for commands (/model, /login, /sessions), Ctrl+P for the
@@ -160,6 +161,8 @@ const OPTIONS = {
   json: { type: 'boolean' },
   debug: { type: 'boolean' },
   'reduced-motion': { type: 'boolean' },
+  minimal: { type: 'boolean' },
+  // Hidden alias of --minimal, kept for one release.
   classic: { type: 'boolean' },
   deny: { type: 'boolean' },
   note: { type: 'string' },
@@ -701,10 +704,19 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     };
     let registry: ToolRegistry | undefined;
     const prefs = loadPrefs(home);
+    // The flag and REMY_SCREEN win over the saved choice; REMY_SCREEN=full turns a saved one off.
+    const minimal =
+      flags.minimal ||
+      flags.classic ||
+      env.REMY_SCREEN === 'minimal' ||
+      env.REMY_SCREEN === 'classic' ||
+      (Boolean(prefs.minimal) && env.REMY_SCREEN !== 'full');
     const chat = createChat({
       theme: prefs.theme ?? 'auto',
       saveTheme: (choice) => savePrefs(home, { theme: choice }),
-      newClears: !flags.classic && env.REMY_SCREEN !== 'classic',
+      newClears: !minimal,
+      minimal: prefs.minimal ?? false,
+      saveMinimal: (on) => savePrefs(home, { minimal: on }),
       runtime: (hooks) => {
         const made = makeRuntime(file, { model, hooks });
         registry = made.tools;
@@ -739,7 +751,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       theme: themeFor(prefs.theme ?? 'auto'),
       themeFor,
       reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
-      ...(flags.classic && { screen: 'classic' as const }),
+      ...(minimal && { screen: 'minimal' as const }),
       ...(first && { subtitle: first.id }),
       workspace,
       version: version(),

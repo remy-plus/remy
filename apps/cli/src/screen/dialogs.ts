@@ -30,6 +30,7 @@ const GROUPS: Record<string, string> = {
   login: 'Model',
   thinking: 'View',
   theme: 'View',
+  minimal: 'View',
   help: 'Help',
 };
 

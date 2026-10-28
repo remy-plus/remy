@@ -6,7 +6,7 @@ import { createScopedFetch, createScopedFs, finish } from '@remy/tools';
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { describe, expect, it } from 'vitest';
-import { createChat, releaseLease } from './chat.ts';
+import { type ChatDeps, createChat, releaseLease } from './chat.ts';
 import { ChatApp } from './chat-ui.ts';
 import { createTheme } from './theme.ts';
 import { TAGLINE, WORDMARK } from './wordmark.ts';
@@ -16,7 +16,7 @@ const until = async (fn: () => boolean) => {
   for (let i = 0; i < 200 && !fn(); i++) await tick(10);
 };
 
-function mount(minimal: boolean) {
+function mount(minimal: boolean, extra: Partial<ChatDeps> = {}) {
   const store = new MemoryEventStore();
   const model = new ScriptedModelClient([
     {
@@ -48,6 +48,7 @@ function mount(minimal: boolean) {
     release: releaseLease(store, 'minimal-ui'),
     model: 'gpt-5-nano',
     contextWindow: 128_000,
+    ...extra,
   });
   const app = render(
     h(ChatApp, {
@@ -90,6 +91,33 @@ describe('minimal screen', () => {
     const m = mount(false);
     await tick();
     expect(m.frame()).toContain(TAGLINE);
+    m.app.unmount();
+  });
+});
+
+describe('/minimal', () => {
+  const last = (m: ReturnType<typeof mount>) =>
+    m.chat
+      .getState()
+      .items.flatMap((i) => (i.kind === 'note' || i.kind === 'error' ? [i.text] : []))
+      .at(-1);
+
+  it('toggles the saved preference and says it applies on the next start', async () => {
+    const saved: boolean[] = [];
+    const m = mount(false, { saveMinimal: (on) => saved.push(on) > 0 });
+    await m.chat.submit('/minimal');
+    expect(saved).toEqual([true]);
+    expect(last(m)).toBe('Minimal screen is on. It takes effect the next time Remy starts.');
+    await m.chat.submit('/minimal');
+    expect(saved).toEqual([true, false]);
+    expect(last(m)).toContain('Minimal screen is off');
+    m.app.unmount();
+  });
+
+  it('starts from the saved preference and reports a failed save', async () => {
+    const m = mount(false, { minimal: true, saveMinimal: () => false });
+    await m.chat.submit('/minimal');
+    expect(last(m)).toBe('Could not save the minimal setting.');
     m.app.unmount();
   });
 });

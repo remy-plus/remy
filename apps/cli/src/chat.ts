@@ -201,6 +201,10 @@ export interface ChatDeps {
   theme?: ThemeChoice;
   /** Saves the theme choice for next time; false when it could not be written. */
   saveTheme?: (choice: ThemeChoice) => boolean;
+  /** The saved minimal-screen preference at the start. */
+  minimal?: boolean;
+  /** Saves the minimal-screen preference; false when it could not be written. */
+  saveMinimal?: (on: boolean) => boolean;
 }
 
 export interface Chat {
@@ -353,6 +357,7 @@ export function createChat(deps: ChatDeps): Chat {
     ...(deps.connect && !deps.model && { overlay: 'login' as const }),
   };
   let turns: ConversationTurn[] = [];
+  let minimal = deps.minimal ?? false;
   const sent: string[] = [];
   const listeners = new Set<() => void>();
   /** Bumped by interrupt and /new, so a stopped run's late callbacks are ignored. */
@@ -795,6 +800,18 @@ export function createChat(deps: ChatDeps): Chat {
           text: `There is no theme "${word}". Use /theme auto, light or dark.`,
         });
       api.setTheme(word);
+    } else if (name === 'minimal') {
+      const on = !minimal;
+      const saved = deps.saveMinimal?.(on) ?? false;
+      if (saved) minimal = on;
+      commit({
+        kind: 'note',
+        text: !saved
+          ? 'Could not save the minimal setting.'
+          : on
+            ? 'Minimal screen is on. It takes effect the next time Remy starts.'
+            : 'Minimal screen is off. The full screen returns the next time Remy starts.',
+      });
     } else if (name === 'exit') set({ wantsExit: true });
     else commit({ kind: 'error', text: `There is no command /${typed}. Type / to see them.` });
   }
