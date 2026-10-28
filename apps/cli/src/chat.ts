@@ -28,7 +28,7 @@ import {
   touchFiles,
   workspacePath,
 } from './session-data.ts';
-import { createTextBatcher, FRAME_MS } from './stream.ts';
+import { createTextBatcher, FRAME_MS, type Gate } from './stream.ts';
 import {
   type ApprovalView,
   collapseFailure,
@@ -197,6 +197,8 @@ export interface ChatDeps {
   effectOf?: (tool: string) => Effect | undefined;
   /** Streamed text reaches subscribers at most once per this many ms. Default 16; 0 is per delta. */
   frameMs?: number;
+  /** Holds streamed text back while the terminal is not keeping up (see `stdoutGate`). */
+  gate?: Gate;
   /** `/new` empties the transcript (the full-screen app returns to its home screen). */
   newClears?: boolean;
   /** The saved theme choice at the start. Default `auto`. */
@@ -241,6 +243,8 @@ export interface Chat {
   approve(granted: boolean, note?: string): Promise<void>;
   /** Stops the running task. It stays resumable. */
   interrupt(): Promise<void>;
+  /** A key was pressed: streamed text shows up in short frames for a moment, so typing stays instant. */
+  noteInput(): void;
   /** The messages the user has sent, oldest first, for recall. */
   history(): string[];
   /** Starts a task in the given folder instead of the conversation's workspace (the tour's first task). */
@@ -381,7 +385,9 @@ export function createChat(deps: ChatDeps): Chat {
   let workspaceDir: string | undefined;
 
   /** Streamed text waits here and joins the state with the next update, so order holds. */
-  const batch = createTextBatcher(deps.frameMs ?? FRAME_MS, () => set({}));
+  const batch = createTextBatcher(deps.frameMs ?? FRAME_MS, () => set({}), {
+    ...(deps.gate && { gate: deps.gate }),
+  });
 
   const set = (patch: Partial<ChatState>) => {
     const waiting = batch.take();
@@ -860,6 +866,7 @@ export function createChat(deps: ChatDeps): Chat {
       return () => void listeners.delete(fn);
     },
     history: () => sent,
+    noteInput: () => batch.boost(),
 
     async submit(raw, pasted) {
       const text = raw.trim();

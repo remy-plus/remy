@@ -145,6 +145,8 @@ export function useChatKeys(o: ChatKeysOptions) {
   useEffect(() => setMenuAt(0), [slashQuery, atQuery]);
 
   useInput((ch, key) => {
+    // Streamed text yields to typing: frames get short for a moment after any key.
+    chat.noteInput();
     // The transcript view, the pickers and the panels read their own keys.
     if (o.paused || viewing || state.picker || state.overlay) return;
     if (o.onKey?.(ch, key, input)) return;

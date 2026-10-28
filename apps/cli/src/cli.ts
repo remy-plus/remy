@@ -64,6 +64,7 @@ import {
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
+import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 
 export interface CliDeps {
@@ -718,6 +719,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       (Boolean(prefs.minimal) && env.REMY_SCREEN !== 'full');
     let onboarding: Onboarding | undefined;
     const chat = createChat({
+      ...(process.stdout.isTTY && { gate: stdoutGate(process.stdout) }),
       profileEnabled: true,
       startTour: () => onboarding?.start(),
       theme: prefs.theme ?? 'auto',

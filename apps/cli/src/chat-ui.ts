@@ -843,7 +843,9 @@ export async function runChat(props: RunOptions): Promise<void> {
         patchConsole: false,
         alternateScreen: true,
         incrementalRendering: true,
-        maxFps: 60,
+        // Ink's own limit is the shortest frame (a keypress after 4 ms); streamed text is paced
+        // by the batcher in chat.ts, which uses 16 ms unless a key was just pressed.
+        maxFps: 250,
       });
       await app.waitUntilExit();
       return;
