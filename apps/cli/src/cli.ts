@@ -19,6 +19,7 @@ import {
   type TaskStatus,
   ToolRegistry,
 } from '@remy/core';
+import type { McpConnectionOptions } from '@remy/mcp';
 import { BUILTIN_CATALOG, DEFAULT_CAPS, modelFromEnv, PROFILES, resolveCaps } from '@remy/models';
 import { SqliteEventStore } from '@remy/store';
 import {
@@ -51,6 +52,8 @@ import {
   releaseLease,
 } from './chat.ts';
 import { type FileConfig, loadConfig } from './config.ts';
+import { connectCommand } from './connect.ts';
+import type { ConnectionsApi } from './connections-view.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
@@ -61,6 +64,9 @@ import {
   SUGGESTED_MODELS,
   saveLogin,
 } from './login.ts';
+import { type McpHost, startMcp } from './mcp-host.ts';
+import { importSources } from './mcp-import.ts';
+import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
@@ -83,6 +89,18 @@ export interface CliDeps {
   /** Reads all of stdin (for `remy login <provider> --key-stdin`). */
   readStdin?: () => Promise<string>;
   fetch?: typeof fetch;
+  /** Secrets for connected servers; default is the Keychain or REMY_HOME. */
+  secrets?: SecretStore;
+  /** Asks for a value without echoing it (`remy connect add --secret`). */
+  askSecret?: (question: string) => Promise<string | null>;
+  /** The user's real home folder, where other apps keep their MCP servers. Default os.homedir(). */
+  homeDir?: string;
+  /** Reads a file as text for `remy connect --import`; undefined when it is missing. */
+  readText?: (path: string) => string | undefined;
+  /** Replaces the MCP transports (tests). */
+  mcpOptions?: (name: string) => McpConnectionOptions;
+  /** How long startup waits for MCP servers (tests). */
+  mcpBudgetMs?: number;
   /** Registers an interrupt (Ctrl-C) handler; returns a disposer. */
   onInterrupt?: (handler: () => Promise<void>) => () => void;
 }
@@ -113,6 +131,8 @@ Usage
                                   Connect a provider: pick one, paste the key, done
   remy login --list               Show saved logins (never the keys)
   remy logout <provider>          Forget a saved login
+  remy connect add|list|remove    Connect apps and services through MCP servers; --import
+                                  brings in the ones Claude Desktop or Claude Code already use
   remy --version | help
 
 Options for run
@@ -133,8 +153,12 @@ Options for every command
   --minimal             A quiet scrolling chat instead of the full screen (also REMY_SCREEN=minimal;
                         /minimal in the chat saves the choice)
 
+Options for connect
+  --url <url>  --header K=V  --env K=V  --secret KEY  --secret-stdin  --yes  --import
+  Run remy connect for the full usage.
+
 Chat
-  Type a message and press Enter. Type / for commands (/model, /login, /sessions), Ctrl+P for the
+  Type a message and press Enter. Type / for commands (/model, /login, /connections, /sessions), Ctrl+P for the
   command palette, @ to attach a file from the workspace. Ctrl+C stops a running task, Ctrl+D quits.
   With nothing connected yet, remy opens on the login panel.
   NO_COLOR or FORCE_COLOR=0 turns color off; terminals without truecolor get 16 colors.
@@ -142,7 +166,11 @@ Chat
 Setup
   Run remy login once. The key goes in the macOS Keychain, or a private file in REMY_HOME.
   Or set REMY_PROFILE and REMY_MODEL with the profile's API key, such as OPENROUTER_API_KEY.
-  Optional remy.config.json in the current folder or REMY_HOME.
+  Optional remy.config.json in the current folder or REMY_HOME. Its "mcpServers" (the same shape
+  as Claude Desktop's) are merged with the servers remy connect saved in REMY_HOME/connections.json;
+  a config entry replaces a saved one with the same name. A token can be written as
+  "\${secret:<name>}" and kept in the Keychain. Servers start with Remy; one that is slow or fails
+  never holds Remy up.
   Flags beat env, env beats a saved login, a saved login beats the config file.
   REMY_KEYCHAIN=off keeps keys in a private file instead of the Keychain.
   Data lives in REMY_HOME (default ~/.remy). Web search turns on with BRAVE_API_KEY,
@@ -160,6 +188,13 @@ const OPTIONS = {
   'net-allow': { type: 'string' },
   list: { type: 'boolean' },
   'key-stdin': { type: 'boolean' },
+  url: { type: 'string' },
+  header: { type: 'string', multiple: true },
+  env: { type: 'string', multiple: true },
+  secret: { type: 'string', multiple: true },
+  'secret-stdin': { type: 'boolean' },
+  yes: { type: 'boolean', short: 'y' },
+  import: { type: 'boolean' },
   status: { type: 'string' },
   json: { type: 'boolean' },
   debug: { type: 'boolean' },
@@ -230,9 +265,18 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   }
   if (
     command &&
-    !['run', 'resume', 'approve', 'answer', 'cancel', 'list', 'show', 'login', 'logout'].includes(
-      command,
-    )
+    ![
+      'run',
+      'resume',
+      'approve',
+      'answer',
+      'cancel',
+      'list',
+      'show',
+      'login',
+      'logout',
+      'connect',
+    ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
 
@@ -249,12 +293,54 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return creds;
   };
 
+  let secretStore: SecretStore | undefined;
+  const secretsFor = () => {
+    secretStore ??=
+      deps.secrets ??
+      openSecretStore({
+        home,
+        ...(env.REMY_KEYCHAIN === 'off' && { platform: 'linux' as const }),
+      });
+    return secretStore;
+  };
+
   if (command === 'login' || command === 'logout') return await loginCommands(command);
+  if (command === 'connect') {
+    const dash = argv.indexOf('--');
+    const homeDir = deps.homeDir ?? homedir();
+    return await connectCommand({
+      rest,
+      flags,
+      commandArgs: dash >= 0 ? argv.slice(dash + 1) : undefined,
+      home,
+      cwd,
+      secrets: secretsFor(),
+      fromConfig: loadConfig(cwd, home).mcpServers ?? {},
+      sources: importSources(homeDir, cwd, process.platform),
+      readText:
+        deps.readText ??
+        ((path) => {
+          try {
+            return readFileSync(path, 'utf8');
+          } catch {
+            return undefined;
+          }
+        }),
+      isTTY: deps.isTTY,
+      ask: deps.ask,
+      askSecret: deps.askSecret,
+      readStdin: deps.readStdin,
+      out,
+    });
+  }
   if (!deps.store) mkdirSync(home, { recursive: true });
   const ownStore = deps.store ? undefined : new SqliteEventStore(join(home, 'remy.sqlite'));
   const store: EventStore = deps.store ?? (ownStore as SqliteEventStore);
   let active: string | undefined;
+  /** Connected MCP servers; started by the first runtime that needs a model. */
+  let mcp: McpHost | undefined;
   const dispose = deps.onInterrupt?.(async () => {
+    await mcp?.close();
     if (!active) return;
     await store.releaseLease({ taskId: active, owner, expiresAt: 0 });
     out(`\nStopped. Continue with: remy resume ${active}`);
@@ -382,6 +468,28 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return modelFromEnv(e);
   }
 
+  /** Starts the connected servers once per process. Trouble with the config never stops Remy. */
+  function mcpHost(file: FileConfig, quiet: boolean): McpHost | undefined {
+    if (mcp) return mcp;
+    try {
+      mcp = startMcp({
+        home,
+        fromConfig: file.mcpServers,
+        secrets: secretsFor(),
+        redact,
+        addSecret,
+        ...(deps.mcpOptions && { options: deps.mcpOptions }),
+        ...(deps.mcpBudgetMs !== undefined && { budgetMs: deps.mcpBudgetMs }),
+        debug: (event, data) => debug?.write(event, data),
+      });
+    } catch (e) {
+      deps.err(`${st.dim(`Connections are off: ${redact(String((e as Error).message))}`)}\n`);
+      return undefined;
+    }
+    if (!quiet) mcp.onNote((n) => deps.err(`${st.dim(n)}\n`));
+    return mcp;
+  }
+
   function makeRuntime(
     file: FileConfig,
     opts: { model: boolean | ModelClient; taskId?: string; hooks?: Partial<RuntimeHooks> },
@@ -417,6 +525,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
     else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
+    // Commands that never call a model (cancel) do not start the servers.
+    if (opts.model) mcpHost(file, Boolean(opts.hooks))?.attach(tools);
     const timeline = createTimeline(st, { live: true });
     let pre = opts.taskId;
     const runtime = createRuntime({
@@ -537,6 +647,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   async function resumeFlow(id: string, before?: (rt: Rt) => Promise<void>) {
     const events = await exists(id);
     const { runtime, timeline } = makeRuntime(cfg(), { model: true });
+    await mcp?.ready;
     timeline.seed(events);
     if (before) await before(runtime);
     return drive(runtime, id);
@@ -739,6 +850,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       release: releaseLease(store, owner),
       ...(first && { model: first.id, contextWindow: first.caps.contextWindow }),
       connect,
+      connections: {
+        list: () => mcp?.list() ?? [],
+        setEnabled: (name, on) => mcp?.setEnabled(name, on) ?? '',
+        remove: (name) => mcp?.remove(name) ?? '',
+      } satisfies ConnectionsApi,
+      ready: () => mcp?.ready ?? Promise.resolve(),
       files: {
         list: (p) => wsFs.list(p),
         async read(p) {
@@ -747,6 +864,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         },
       },
     });
+    // Failed servers are told once, quietly, in the transcript.
+    mcp?.onNote((note) => chat.notify(note));
     onboarding = createOnboarding({
       chat,
       profile,
@@ -795,6 +914,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           flags.workspace ? resolve(cwd, flags.workspace) : join(home, 'workspaces', id),
         );
         mkdirSync(config.workspaceDir, { recursive: true });
+        await mcp?.ready;
         await runtime.start(prompt, config);
         out(st.dim(`Task ${id}. Workspace ${config.workspaceDir}`));
         return await drive(runtime, id);
@@ -892,6 +1012,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return 0;
   } finally {
     dispose?.();
+    await mcp?.close();
     ownStore?.close();
   }
 }
