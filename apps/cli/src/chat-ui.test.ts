@@ -430,7 +430,7 @@ describe('multi-line input and paste', () => {
     const app = scripted(say('ok'));
     app.stdin.write(`\x1b[200~${bigPaste}\x1b[201~`);
     await pause();
-    expect(frame(app)).toContain('[Pasted 9 lines]');
+    expect(frame(app)).toContain('[Pasted ~9 lines]');
     expect(frame(app)).not.toContain('pasted row 3');
     app.stdin.write('\r');
     await until(() => app.chat.history().length === 1);

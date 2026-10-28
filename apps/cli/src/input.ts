@@ -1,6 +1,6 @@
 // Line editing for the chat input, as plain functions so they can be tested without Ink.
 // The text may hold several lines ("\n"). A large paste is not put into the text: a marker like
-// `[Pasted 120 lines]` stands for it, and the real text comes back when the message is sent.
+// `[Pasted ~120 lines]` stands for it, and the real text comes back when the message is sent.
 
 export interface InputState {
   text: string;
@@ -30,15 +30,15 @@ export interface EditKey {
 export type InputMode = 'multi' | 'single';
 
 /** A paste of this many lines, or this many characters, becomes a marker. */
-export const PASTE_LINES = 5;
-export const PASTE_CHARS = 800;
+export const PASTE_LINES = 3;
+export const PASTE_CHARS = 150;
 
 export const withText = (text: string): InputState => ({ text, cursor: text.length, pastes: {} });
 
-const MARKER = /\[Pasted (\d+) (?:lines?|characters)(?: #(\d+))?\]/g;
+const MARKER = /\[Pasted (?:~\d+ lines?|\d+ chars)(?: #(\d+))?\]/g;
 
 const lineCount = (s: string) => s.split('\n').length;
-const isBig = (s: string) => lineCount(s) >= PASTE_LINES || s.length > PASTE_CHARS;
+const isBig = (s: string) => lineCount(s) >= PASTE_LINES || s.length >= PASTE_CHARS;
 
 /** Line endings of any kind become "\n". */
 export const normalizeNewlines = (s: string) => s.replace(/\r\n?/g, '\n');
@@ -57,7 +57,7 @@ export function pasteInput(st: InputState, raw: string, mode: InputMode = 'multi
   const ids = Object.keys(st.pastes).map(Number);
   const id = ids.length ? Math.max(...ids) + 1 : 1;
   const n = lineCount(s);
-  const what = n >= PASTE_LINES ? `${n} lines` : `${s.length} characters`;
+  const what = n >= PASTE_LINES ? `~${n} lines` : `${s.length} chars`;
   const marker = `[Pasted ${what}${id > 1 ? ` #${id}` : ''}]`;
   return { ...insert(st, marker), pastes: { ...st.pastes, [id]: s } };
 }
@@ -68,13 +68,13 @@ export const recallInput = (text: string): InputState =>
 
 /** The message to send: markers swapped for the text they stand for. */
 export function expandPastes(st: InputState): string {
-  return st.text.replace(MARKER, (m, _n, id) => st.pastes[id ? Number(id) : 1] ?? m);
+  return st.text.replace(MARKER, (m, id) => st.pastes[id ? Number(id) : 1] ?? m);
 }
 
 /** The pasted texts a message holds, for the ones whose markers are still in it. */
 export function pastedSegments(st: InputState): string[] {
   const out: string[] = [];
-  st.text.replace(MARKER, (m, _n, id) => {
+  st.text.replace(MARKER, (m, id) => {
     const seg = st.pastes[id ? Number(id) : 1];
     if (seg !== undefined) out.push(seg);
     return m;

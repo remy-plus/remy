@@ -133,17 +133,24 @@ describe('paste', () => {
   it('turns a long paste into a marker and expands it on send', () => {
     const text = big(12);
     const s = pasteInput(withText('see: '), text);
-    expect(s.text).toBe('see: [Pasted 12 lines]');
+    expect(s.text).toBe('see: [Pasted ~12 lines]');
     expect(expandPastes(s)).toBe(`see: ${text}`);
     const wide = pasteInput(EMPTY_INPUT, 'x'.repeat(900));
-    expect(wide.text).toBe('[Pasted 900 characters]');
+    expect(wide.text).toBe('[Pasted 900 chars]');
     expect(expandPastes(wide)).toHaveLength(900);
+  });
+
+  it('turns 3 lines or 150 characters into a marker, and nothing less', () => {
+    expect(pasteInput(EMPTY_INPUT, 'a\nb').text).toBe('a\nb');
+    expect(pasteInput(EMPTY_INPUT, 'x'.repeat(149)).pastes).toEqual({});
+    expect(pasteInput(EMPTY_INPUT, 'a\nb\nc').text).toBe('[Pasted ~3 lines]');
+    expect(pasteInput(EMPTY_INPUT, 'x'.repeat(150)).text).toBe('[Pasted 150 chars]');
   });
 
   it('numbers later pastes so equal-looking markers stay apart', () => {
     let s = pasteInput(EMPTY_INPUT, big(6));
     s = pasteInput(s, `${big(6)}\nlast`);
-    expect(s.text).toBe('[Pasted 6 lines][Pasted 7 lines #2]');
+    expect(s.text).toBe('[Pasted ~6 lines][Pasted ~7 lines #2]');
     expect(expandPastes(s)).toBe(`${big(6)}${big(6)}\nlast`);
   });
 
@@ -152,12 +159,12 @@ describe('paste', () => {
     expect(editInput(s, '', { backspace: true }).text).toBe('a ');
     expect(editInput(s, 'w', { ctrl: true }).text).toBe('a ');
     const before = { ...s, cursor: 2 };
-    expect(editInput(before, '', { backspace: true }).text).toBe('a[Pasted 8 lines]');
+    expect(editInput(before, '', { backspace: true }).text).toBe('a[Pasted ~8 lines]');
   });
 
   it('brings a recalled big message back as a marker', () => {
     const r = recallInput(big(7));
-    expect(r.text).toBe('[Pasted 7 lines]');
+    expect(r.text).toBe('[Pasted ~7 lines]');
     expect(expandPastes(r)).toBe(big(7));
     expect(recallInput('short').text).toBe('short');
   });
