@@ -85,6 +85,8 @@ export function Menu(p: {
   indent?: number;
   /** What was typed: matching letters in each title are underlined. */
   query?: string;
+  /** Fills the list with a background and a fixed width (the full-screen menu above the prompt). */
+  fill?: { color: string; width: number };
 }): ReactElement | null {
   const { theme, items } = p;
   const max = p.max ?? MENU_ROWS;
@@ -95,7 +97,11 @@ export function Menu(p: {
   const accent = theme.color('accent');
   return h(
     Box,
-    { flexDirection: 'column', paddingLeft: p.indent ?? theme.space.indent },
+    {
+      flexDirection: 'column',
+      paddingLeft: p.indent ?? theme.space.indent,
+      ...(p.fill && { backgroundColor: p.fill.color, width: p.fill.width }),
+    },
     ...items.slice(start, end).map((it, k) => {
       const on = start + k === p.at;
       return h(

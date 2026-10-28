@@ -289,7 +289,18 @@ export function FullApp(props: ChatAppProps): ReactElement {
         prompt: h(
           Box,
           { flexDirection: 'column' },
-          menu && !panelOpen ? h(Menu, { items: menuItems, at, theme, indent: 1, query }) : null,
+          menu && !panelOpen
+            ? h(Menu, {
+                items: menuItems,
+                at,
+                theme,
+                indent: 1,
+                query,
+                ...(theme.element && {
+                  fill: { color: theme.element, width: layout.homePromptWidth },
+                }),
+              })
+            : null,
           h(PromptBox, {
             value: input,
             theme,
@@ -328,7 +339,14 @@ export function FullApp(props: ChatAppProps): ReactElement {
             })
           : null,
         showPrompt && menu && !panelOpen
-          ? h(Menu, { items: menuItems, at, theme, indent: 1, query })
+          ? h(Menu, {
+              items: menuItems,
+              at,
+              theme,
+              indent: 1,
+              query,
+              ...(theme.element && { fill: { color: theme.element, width } }),
+            })
           : null,
         showPrompt
           ? h(PromptBox, {
