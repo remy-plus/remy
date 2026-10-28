@@ -383,7 +383,10 @@ describe('FullApp', () => {
               source: 'saved',
             },
           ],
-          setEnabled: (name, on) => (calls.push(`${on ? 'on' : 'off'} ${name}`), ''),
+          setEnabled: (name, on) => {
+            calls.push(`${on ? 'on' : 'off'} ${name}`);
+            return '';
+          },
           remove: () => '',
         },
       },

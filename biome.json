@@ -15,6 +15,12 @@
   "linter": {
     "rules": { "preset": "recommended" }
   },
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts"],
+      "linter": { "rules": { "suspicious": { "noTemplateCurlyInString": "off" } } }
+    }
+  ],
   "assist": {
     "actions": { "source": { "organizeImports": "on" } }
   }
