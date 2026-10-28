@@ -10,6 +10,8 @@ import { type ToolLine, toolBits } from '../transcript.ts';
 export interface RSpan extends Span {
   role?: Role;
   strike?: boolean;
+  /** An exact colour over the role's, for a fade. */
+  color?: string;
 }
 
 export interface Row {

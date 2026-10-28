@@ -11,6 +11,7 @@ function textProps(sp: RSpan, theme: Theme) {
     ...spanProps(sp, theme),
     ...(role && theme.props(role)),
     ...(sp.strike && { strikethrough: true }),
+    ...(sp.color && { color: sp.color }),
   };
 }
 

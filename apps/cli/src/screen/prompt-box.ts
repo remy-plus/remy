@@ -5,6 +5,7 @@ import { createElement as h, type ReactElement, type ReactNode, useEffect, useRe
 import type { InputState } from '../input.ts';
 import { strWidth } from '../markdown.ts';
 import type { Theme } from '../theme.ts';
+import { fadeColor } from './motion.ts';
 import { layoutPrompt } from './prompt-layout.ts';
 
 /** Columns of padding between the bar and the text, and the text and the right edge. */
@@ -23,6 +24,8 @@ export interface PromptBoxProps {
   provider?: string;
   /** Reverse history search under way (Ctrl+R): its query shows in the meta row. */
   search?: string;
+  /** 0 to 1: the provider fades in from the panel colour (truecolor only). */
+  fade?: number;
 }
 
 /** Rows the box takes: a padding row, the text, a gap, and the meta row. */
@@ -104,6 +107,11 @@ export function PromptBox(p: PromptBoxProps): ReactElement {
       chars.slice(at + 1).join(''),
     );
   });
+  const mutedHex = theme.color('muted');
+  const fading = (t: number | undefined) =>
+    t !== undefined && t < 1 && mutedHex && theme.element
+      ? { color: fadeColor(theme.element, mutedHex, t) }
+      : undefined;
   const meta = [p.model ?? 'not connected', p.provider].filter(Boolean);
   return h(
     Box,
@@ -115,7 +123,9 @@ export function PromptBox(p: PromptBoxProps): ReactElement {
       BoxRow,
       { theme, width: p.width, focused: p.focused },
       p.search === undefined ? h(Text, null, meta[0]) : null,
-      p.search === undefined && meta[1] ? h(Text, muted, ` ${theme.symbols.dot} ${meta[1]}`) : null,
+      p.search === undefined && meta[1]
+        ? h(Text, fading(p.fade) ?? muted, ` ${theme.symbols.dot} ${meta[1]}`)
+        : null,
       p.search !== undefined
         ? h(Text, muted, `search: ${p.search}${theme.symbols.cursor}  enter accept · esc cancel`)
         : null,

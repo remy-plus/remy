@@ -25,7 +25,6 @@ import {
   type SearchState,
   searchKey,
 } from '../input-history.ts';
-import { useFrame, useSettled } from '../live-hooks.ts';
 import { Menu, menuRows } from '../picker.ts';
 import { APPROVAL_ROWS, approvalHeight, narrate, reasoningTitle } from '../transcript.ts';
 import { TranscriptView } from '../transcript-view.ts';
@@ -34,6 +33,7 @@ import { Dialogs } from './dialogs.ts';
 import { Home } from './home.ts';
 import { introRows } from './intro.ts';
 import { computeLayout } from './layout.ts';
+import { fadeColor, formatElapsed, useElapsed, useFadeIn, useThrottled } from './motion.ts';
 import { PromptBox, promptBoxRows } from './prompt-box.ts';
 import {
   halfUp,
@@ -46,6 +46,7 @@ import {
   toTop,
 } from './scroll.ts';
 import { Sidebar } from './sidebar.ts';
+import { SCAN_WIDTH, Scanner, useSpinner } from './spinner.ts';
 import { statusLine } from './status.ts';
 import { pickTip } from './tips.ts';
 import { Viewport } from './viewport.ts';
@@ -61,14 +62,20 @@ function placeholderFor(state: ChatState): string {
 function StatusRow(p: {
   theme: ChatAppProps['theme'];
   width: number;
-  working?: { spinner: string; narration: string };
+  working?: { narration: string; reducedMotion: boolean };
   workspace?: string;
   contextPct?: number;
   costUsd?: number;
 }): ReactElement {
   const { theme } = p;
   const muted = theme.props('muted');
-  const s = statusLine({ ...p, width: p.width - 1 });
+  // The scanner takes eight columns and a space where the old spinner took one and a space.
+  const lead = SCAN_WIDTH + 1;
+  const s = statusLine({
+    ...p,
+    working: p.working && { spinner: ' '.repeat(SCAN_WIDTH), narration: p.working.narration },
+    width: p.width - 1,
+  });
   const right = s.right.endsWith('ctrl+p commands')
     ? s.right.slice(0, -'ctrl+p commands'.length)
     : s.right;
@@ -78,7 +85,19 @@ function StatusRow(p: {
     h(
       Box,
       { flexGrow: 1, flexShrink: 1 },
-      h(Text, { wrap: 'truncate-end', ...muted }, s.left),
+      p.working && s.left.length >= lead
+        ? h(Scanner, {
+            active: true,
+            level: theme.level,
+            width: SCAN_WIDTH,
+            reducedMotion: p.working.reducedMotion,
+          })
+        : null,
+      h(
+        Text,
+        { wrap: 'truncate-end', ...muted },
+        p.working && s.left.length >= lead ? s.left.slice(SCAN_WIDTH) : s.left,
+      ),
       s.hint ? h(Text, null, h(Text, muted, ' · '), 'esc', h(Text, muted, ' interrupt')) : null,
     ),
     s.right
@@ -177,16 +196,17 @@ export function FullApp(props: ChatAppProps): ReactElement {
   // The live turn.
   const busy = state.phase === 'running';
   const animate = !props.reducedMotion && busy;
-  const spin = theme.symbols.spinner;
-  const frame = useFrame(animate, spin.length);
-  const glyph = animate ? (spin[frame] as string) : theme.symbols.running;
+  const glyph = useSpinner(busy, { reducedMotion: props.reducedMotion });
   const title = reasoningTitle(state.reasoning);
   const thinking =
     busy && state.showThinking && title && !state.streaming ? `Thinking: ${title}` : undefined;
-  const secs = state.turnStartedAt ? Math.floor((Date.now() - state.turnStartedAt) / 1000) : 0;
-  const narration = useSettled(
-    narrate({ ...state, secs: animate ? secs : undefined, thinkingTitle: title }),
-    1000,
+  const secs = useElapsed(animate ? state.turnStartedAt : undefined);
+  const narration = useThrottled(
+    narrate({ ...state, secs: animate ? secs : undefined, thinkingTitle: title }).replace(
+      / · \d+s$/,
+      ` · ${formatElapsed(secs)}`,
+    ),
+    250,
   );
   const live: LiveInput = {
     streaming: state.streaming,
@@ -237,6 +257,23 @@ export function FullApp(props: ChatAppProps): ReactElement {
   geometry.current = { total: all.length, height };
   const top = topOf(scroll, all.length, height);
 
+  // A calm fade-in for a finished reply's footer and for the provider in the prompt's meta row.
+  const motion = !props.reducedMotion && theme.level === 'truecolor';
+  const replies = state.items.filter((i) => i.kind === 'reply').length;
+  const replyFade = useFadeIn(replies, motion ? 150 : 0);
+  const rowsShown = useMemo(() => {
+    const muted = theme.color('muted');
+    if (replyFade >= 1 || !muted || !theme.surface) return all;
+    for (let i = all.length - 1; i >= 0; i--) {
+      const r = all[i] as (typeof all)[number];
+      if (!r.spans[0]?.text.startsWith('▣')) continue;
+      const color = fadeColor(theme.surface, muted, replyFade);
+      const faded = { ...r, spans: r.spans.map((sp) => ({ ...sp, color })) };
+      return [...all.slice(0, i), faded, ...all.slice(i + 1)];
+    }
+    return all;
+  }, [all, replyFade, theme]);
+
   // Sending a message brings the session back to the end.
   const last = state.items.at(-1);
   useEffect(() => {
@@ -251,6 +288,8 @@ export function FullApp(props: ChatAppProps): ReactElement {
       return undefined;
     }
   }, [chat, state.model]);
+
+  const metaFade = useFadeIn(provider ?? '', motion ? 150 : 0);
 
   if (viewing)
     return h(TranscriptView, {
@@ -311,6 +350,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
             model,
             provider,
             search: search?.query,
+            fade: metaFade,
           }),
         ),
       }),
@@ -323,7 +363,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
     h(
       Box,
       { flexDirection: 'column', width: main, height: rows, paddingX: 2, paddingBottom: 1 },
-      h(Viewport, { rows: all, top, height, width, theme }),
+      h(Viewport, { rows: rowsShown, top, height, width, theme }),
       h(
         Box,
         { flexDirection: 'column', flexShrink: 0, marginTop: 1, width },
@@ -359,13 +399,16 @@ export function FullApp(props: ChatAppProps): ReactElement {
               model,
               provider,
               search: search?.query,
+              fade: metaFade,
             })
           : null,
         showPrompt
           ? h(StatusRow, {
               theme,
               width,
-              working: busy ? { spinner: glyph, narration } : undefined,
+              working: busy
+                ? { narration, reducedMotion: Boolean(props.reducedMotion) }
+                : undefined,
               workspace: props.workspace,
               contextPct:
                 state.contextWindow && state.contextTokens > 0
