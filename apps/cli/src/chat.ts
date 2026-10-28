@@ -18,6 +18,7 @@ import {
 } from '@remy/core';
 import { type ApprovalsStore, plainApprovals } from './approvals.ts';
 import { COMMANDS, findCommand } from './commands.ts';
+import type { ConnectFlowApi } from './connect-ui.ts';
 import { CONNECT_HELP, type ConnectionsApi, plainConnections } from './connections-view.ts';
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
@@ -113,7 +114,14 @@ export interface FilesApi {
   read(path: string): Promise<string | undefined>;
 }
 
-export type Overlay = 'login' | 'model' | 'palette' | 'theme' | 'profile' | 'connections';
+export type Overlay =
+  | 'login'
+  | 'model'
+  | 'palette'
+  | 'theme'
+  | 'profile'
+  | 'connections'
+  | 'connect';
 
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
@@ -201,6 +209,8 @@ export interface ChatDeps {
   approvals?: ApprovalsStore;
   /** A tool's risk, for listing standing approvals. */
   riskOf?: (tool: string) => Risk | undefined;
+  /** Adds an app or service, for /connect. */
+  addConnection?: ConnectFlowApi;
   /** Settles when connected servers have had their start budget; sending waits for it. */
   ready?: () => Promise<void>;
   files?: FilesApi;
@@ -242,6 +252,8 @@ export interface Chat {
   notify(text: string): void;
   /** The connected servers with every change noted in the transcript. */
   connections(): ConnectionsApi;
+  /** The /connect flow's backend; each result is noted in the transcript. */
+  addConnection(): ConnectFlowApi;
   /** Runs a command by name, as if typed (the palette uses this). */
   runCommand(name: string): Promise<void>;
   providers(): ProviderChoice[];
@@ -881,7 +893,8 @@ export function createChat(deps: ChatDeps): Chat {
       if (name === 'model' && hit) return api.chooseModel(hit.provider, hit.model);
       set({ overlay: name });
     } else if (name === 'connect') {
-      commit({ kind: 'note', text: CONNECT_HELP });
+      if (deps.addConnection) set({ overlay: 'connect' });
+      else commit({ kind: 'note', text: CONNECT_HELP });
     } else if (name === 'approvals') {
       if (!deps.approvals)
         return void commit({ kind: 'note', text: 'There are no standing approvals here.' });
@@ -1004,6 +1017,29 @@ export function createChat(deps: ChatDeps): Chat {
     notify(text) {
       if (s.phase === 'idle' && !s.items.length) held.push(text);
       else commit({ kind: 'note', text });
+    },
+    addConnection() {
+      const inner = deps.addConnection;
+      if (!inner) throw new Error('Connecting apps is not available here.');
+      return {
+        ...inner,
+        async add(plan, values, hooks) {
+          let line: string;
+          try {
+            line = await inner.add(plan, values, {
+              ...hooks,
+              onUrl(url, opened) {
+                hooks.onUrl?.(url, opened);
+                if (!opened) commit({ kind: 'note', text: `Open this link to sign in: ${url}` });
+              },
+            });
+          } catch (e) {
+            line = e instanceof Error ? e.message : String(e);
+          }
+          commit({ kind: 'note', text: line });
+          return line;
+        },
+      };
     },
     connections() {
       const inner = deps.connections;

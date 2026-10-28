@@ -51,6 +51,8 @@ export interface McpHostDeps {
 export interface McpHost extends ConnectionsApi {
   /** Adds the tools loaded so far, and any that load later, to this registry. */
   attach(registry: ToolRegistry): void;
+  /** Starts a server that was just saved. Resolves with a line for the transcript. */
+  start(name: string): Promise<string>;
   /** Settles when every server is up or failed, or the start budget is spent. Never rejects. */
   ready: Promise<void>;
   /** Calls `fn` with each failure note: those already seen, then future ones. */
@@ -162,6 +164,20 @@ export function startMcp(deps: McpHostDeps): McpHost {
     note(`${name} needs you to sign in. Run remy connect auth ${name}, or open /connections.`);
   };
 
+  /** Starts one declared server now, with its secrets filled in (a server just added). */
+  const startNamed = async (name: string): Promise<void> => {
+    const d = declare().find((x) => x.name === name);
+    if (!d || d.disabled) return;
+    const r = resolveServers([d], deps.secrets);
+    for (const [n, value] of Object.entries(r.values)) deps.addSecret(`mcp:${n}`, value);
+    const config = r.servers[name];
+    if (!config) {
+      const missing = r.missing[0];
+      return fail(name, `the secret "${missing?.secret}" is not saved on this computer`, d.source);
+    }
+    await startServer(name, config);
+  };
+
   const loads = Object.entries(resolved.servers).map(([name, config]) => startServer(name, config));
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -219,6 +235,17 @@ export function startMcp(deps: McpHostDeps): McpHost {
         return `${name} is listed in remy.config.json. Remove it there, or switch it off here.`;
       return `Removed ${name}. It stops running the next time Remy starts.`;
     },
+    async start(name) {
+      await startNamed(name);
+      const st = states.get(name);
+      return st?.phase === 'connected'
+        ? `${name} is ready. ${st.tools.length} tool${st.tools.length === 1 ? '' : 's'}.`
+        : st?.phase === 'needs_signin'
+          ? `${name} needs you to sign in. Open /connections.`
+          : st?.phase === 'failed'
+            ? `${name} was added but did not start: ${st.reason}`
+            : `${name} was added.`;
+    },
     async signIn(name, hooks) {
       const found = declare().find((d) => d.name === name);
       if (!found || isStdio(found.config))
@@ -248,8 +275,7 @@ export function startMcp(deps: McpHostDeps): McpHost {
       );
       if (!r.ok) return deps.redact(r.message);
       // Bring the server up now, so its tools are there for the next step.
-      const current = resolved.servers[name] ?? found.config;
-      await startServer(name, { ...current, auth: 'oauth' } as McpServerConfig);
+      await startNamed(name);
       const st = states.get(name);
       return st?.phase === 'connected'
         ? `Signed in to ${name}. ${st.tools.length} tool${st.tools.length === 1 ? '' : 's'} ready.`

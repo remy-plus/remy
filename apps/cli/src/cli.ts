@@ -55,6 +55,8 @@ import {
 } from './chat.ts';
 import { type FileConfig, loadConfig } from './config.ts';
 import { connectCommand } from './connect.ts';
+import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from './connect-plan.ts';
+import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
@@ -66,6 +68,7 @@ import {
   SUGGESTED_MODELS,
   saveLogin,
 } from './login.ts';
+import { CATALOG, findCatalog } from './mcp-catalog.ts';
 import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
@@ -873,6 +876,40 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         }
       },
     };
+    const connectFlow: ConnectFlowApi = {
+      choices: () =>
+        CATALOG.map((e) => ({
+          id: e.id,
+          label: e.label,
+          blurb: e.blurb,
+          ...(e.folder && { folderLabel: e.folder.label }),
+        })),
+      prepare(a) {
+        const taken = takenNames(home, file.mcpServers);
+        if ('custom' in a) return planCustom(a.custom.input, a.custom.name, taken);
+        const entry = findCatalog(a.entryId);
+        if (!entry) throw new Error('That is not on the list.');
+        return planFromEntry(entry, {
+          taken,
+          cwd: workspace,
+          userHome: deps.homeDir ?? homedir(),
+          ...(a.folder && { folder: a.folder }),
+        });
+      },
+      suggestName: (input) => suggestName(input, takenNames(home, file.mcpServers)),
+      defaultFolder: () => workspace,
+      async add(plan, values, hooks) {
+        const stored = applyPlan(plan, { home, secrets: secretsFor(), values });
+        for (const s of plan.secrets) {
+          const v = values[s.key];
+          if (v) addSecret(`mcp:${plan.name}.${s.key}`, v);
+        }
+        const saved = `Added ${plan.name}${stored.length ? `. Saved ${stored.join(', ')}` : ''}.`;
+        if (!mcp) return `${saved} Remy connects to it the next time it starts.`;
+        const line = plan.oauth ? await mcp.signIn?.(plan.name, hooks) : await mcp.start(plan.name);
+        return `${saved} ${line ?? ''}`.trim();
+      },
+    };
     let registry: ToolRegistry | undefined;
     const prefs = loadPrefs(home);
     // The flag and REMY_SCREEN win over the saved choice; REMY_SCREEN=full turns a saved one off.
@@ -918,7 +955,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           standing().remove(tool)
             ? `${tool} asks again from now on.`
             : `${tool} is not on the list.`,
+        signIn: (name, hooks) => mcp?.signIn?.(name, hooks) ?? Promise.resolve(''),
       } satisfies ConnectionsApi,
+      addConnection: connectFlow,
       ready: () => mcp?.ready ?? Promise.resolve(),
       files: {
         list: (p) => wsFs.list(p),

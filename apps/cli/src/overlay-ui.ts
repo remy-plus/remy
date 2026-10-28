@@ -2,6 +2,7 @@
 import { createElement as h, type ReactElement } from 'react';
 import type { Chat, ChatState, ModelChoice } from './chat.ts';
 import { COMMANDS } from './commands.ts';
+import { ConnectFlow } from './connect-ui.ts';
 import { useConnections } from './connections-flow.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { defaultModelFor } from './login.ts';
@@ -90,6 +91,13 @@ export function Overlay(p: {
       onCancel: close,
     });
   }
+  if (state.overlay === 'connect')
+    return h(ConnectFlow, {
+      api: chat.addConnection(),
+      theme,
+      onDone: () => chat.closeOverlay('connect'),
+      onCancel: () => chat.closeOverlay('connect'),
+    });
   if (state.overlay === 'connections')
     return h(ConnectionsPicker, {
       api: chat.connections(),

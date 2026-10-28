@@ -4,6 +4,7 @@ import { useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
 import { type Chat, type ChatState, type ModelChoice, shortId } from '../chat.ts';
 import { COMMANDS } from '../commands.ts';
+import { ConnectFlow } from '../connect-ui.ts';
 import { useConnections } from '../connections-flow.ts';
 import type { ConnectionsApi } from '../connections-view.ts';
 import { defaultModelFor } from '../login.ts';
@@ -206,6 +207,14 @@ export function Dialogs(p: {
       onClose: close,
     });
   }
+  if (state.overlay === 'connect')
+    return h(ConnectFlow, {
+      api: chat.addConnection(),
+      theme,
+      dialog: { columns, rows },
+      onDone: () => chat.closeOverlay('connect'),
+      onCancel: () => chat.closeOverlay('connect'),
+    });
   if (state.overlay === 'connections')
     return h(ConnectionsDialog, {
       api: chat.connections(),

@@ -202,6 +202,31 @@ describe('/connections and /connect in the chat', () => {
     expect(help).toContain('/connections');
   });
 
+  it('/connect opens the picker when it can add things, and notes how adding went', async () => {
+    const add = async () => 'Added notion. Signed in.';
+    const addConnection = {
+      choices: () => [],
+      prepare: () => {
+        throw new Error('no');
+      },
+      suggestName: () => 'x',
+      defaultFolder: () => '/w',
+      add,
+    };
+    const { chat } = make({ addConnection });
+    await chat.submit('/connect');
+    expect(chat.getState().overlay).toBe('connect');
+    const plan = {
+      name: 'notion',
+      config: { url: 'https://x.example/mcp' },
+      secrets: [],
+      oauth: true,
+      label: 'Notion',
+    };
+    await chat.addConnection().add(plan, {}, {});
+    expect(notes(chat)).toContain('Added notion. Signed in.');
+  });
+
   it('holds a failure note back while the home screen shows, then shows it with the first message', async () => {
     const { chat } = make();
     chat.notify('Could not start github: nope.');
