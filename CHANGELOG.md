@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 (2026-10-27)
+
+Remy takes the whole window: a calm, centered home, a conversation that scrolls inside the screen, and an input box that stays put.
+
+- **Full screen by default.** Remy opens on its own screen and gives your terminal back exactly as it was when you quit. Redraws touch only what changed, about 3.5 times less output per streamed word than 0.2, with no flicker.
+- **Home.** The wordmark, the input box and one useful tip, centered; the conversation starts when you send your first message, and `/new` brings you back.
+- **The conversation.** Your messages sit in a quiet panel, replies end with the model and how long the turn took, and tool rows stay on one line unless an edit or a command has something worth showing. PgUp and PgDn scroll, Home and End jump, and new text never pulls you down while you read further up. Approvals and questions take the place of the input box.
+- **Dialogs.** The command palette (`Ctrl+P`), `/model`, `/sessions` and `/login` open as centered panels you can search as you type.
+- **Sidebar.** On terminals wider than 120 columns: the session title, context and spend, the plan, and the files Remy touched. `Ctrl+B` shows or hides it.
+- **Input that feels right.** A real cursor, word moves and deletes (Option or Alt with the arrows, Alt+B, Alt+F, Alt+D, Ctrl+W), cut and paste back (Ctrl+K, Ctrl+U, Ctrl+Y), undo and redo (Ctrl+Z, Alt+Z), `Ctrl+R` to search what you sent before, and pastes of 3 lines or more shown as `[Pasted ~N lines]`.
+- **Motion with restraint.** A quiet sweep while Remy works, a timer that ticks once a second, and soft fades; all of it stops when you ask for reduced motion.
+- **Themes.** `/theme` picks auto, light or dark, applied at once and remembered; `/light`, `/dark`, `/day` and `/night` are shortcuts.
+- **Minimal mode.** `remy --minimal` (or `/minimal`, remembered) keeps Remy inline in your terminal with native scrollback and search: one header line, one quiet status line, your messages and the replies. `--classic` still works for now.
+- **Steadier streaming.** Text arrives once per frame instead of once per fragment, and nothing is lost or reordered.
+- Screens: `design/screens/0.3/`.
+
 ## 0.2.0 (2026-10-27)
 
 The terminal grows up: Remy narrates what it is doing, asks better questions, and treats what you paste with care.
