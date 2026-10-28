@@ -27,6 +27,8 @@ export const SYMBOLS = {
   bulletSub: '◦',
   gutter: '│',
   quote: '▎',
+  /** The left edge of a message or the prompt in the full-screen layout. */
+  bar: '┃',
   rule: '─',
   ellipsis: '…',
   dot: '·',
@@ -76,6 +78,12 @@ export interface Theme {
   props(role: Role): { color?: string; dimColor?: boolean; backgroundColor?: string };
   /** A faint surface behind inline code (truecolor only). */
   surface: string | undefined;
+  /** Surface behind a message block or a tool body, a step off the terminal background. */
+  panel: string | undefined;
+  /** Surface behind the prompt, one step further from the background than `panel`. */
+  element: string | undefined;
+  /** Colour of the left bar: the accent while focused, quiet otherwise. */
+  bar(active: boolean): string | undefined;
   /** A faint tint behind an added or removed line (truecolor only). */
   diffSurface(kind: 'add' | 'del'): string | undefined;
   /** Wordmark row color: a soft brightness ramp from the top row to the bottom one. */
@@ -145,6 +153,9 @@ const DIFF_SURFACE: Record<Background, { add: string; del: string }> = {
   light: { add: '#DFEBD8', del: '#F2DDD5' },
 };
 const SURFACE: Record<Background, string> = { dark: '#212123', light: '#E0DDD6' };
+// Full-screen surfaces sit a little off ink (dark) or paper (light); never under NO_COLOR or basic.
+const PANEL: Record<Background, string> = { dark: '#171718', light: '#E6E3DC' };
+const ELEMENT: Record<Background, string> = { dark: '#1E1E20', light: '#DEDBD3' };
 // On a light background the wordmark ramps from a lifted ink down to ink.
 const RAMP_TOP_LIGHT = '#5A5854';
 const RAMP_END_LIGHT = PALETTE.ink;
@@ -173,6 +184,9 @@ export function createTheme(level: ColorLevel, background: Background = 'dark'):
     },
     diffSurface: (kind) => (level === 'truecolor' ? DIFF_SURFACE[background][kind] : undefined),
     surface: level === 'truecolor' ? SURFACE[background] : undefined,
+    panel: level === 'truecolor' ? PANEL[background] : undefined,
+    element: level === 'truecolor' ? ELEMENT[background] : undefined,
+    bar: (active) => color(active ? 'accent' : 'faint'),
     ramp: (row, rows) =>
       level === 'truecolor' ? mix(from, to, rows > 1 ? row / (rows - 1) : 1) : undefined,
     symbols: SYMBOLS,

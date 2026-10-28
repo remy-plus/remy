@@ -51,6 +51,21 @@ describe('theme', () => {
     expect(createTheme('none').surface).toBeUndefined();
     expect(createTheme('truecolor', 'light').diffSurface('add')).not.toBe(t.diffSurface('add'));
   });
+  it('has panel surfaces and a left bar for the full-screen layout', () => {
+    const dark = createTheme('truecolor');
+    const light = createTheme('truecolor', 'light');
+    expect(dark.panel).toBeDefined();
+    expect(dark.element).not.toBe(dark.panel);
+    expect(light.panel).not.toBe(dark.panel);
+    expect(dark.bar(true)).toBe('#A8C49A');
+    expect(dark.bar(false)).toBe(dark.color('faint'));
+    expect(dark.symbols.bar).toBe('┃');
+    for (const level of ['basic', 'none'] as const) {
+      expect(createTheme(level).panel).toBeUndefined();
+      expect(createTheme(level).element).toBeUndefined();
+    }
+    expect(createTheme('none').bar(true)).toBeUndefined();
+  });
   it('styles plain output by level', () => {
     expect(styler('none').dim('x')).toBe('x');
     expect(styler('basic').dim('x')).toBe('\x1b[90mx\x1b[0m');
