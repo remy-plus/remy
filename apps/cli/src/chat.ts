@@ -69,6 +69,8 @@ export interface SessionRow {
   /** From the first prompt. */
   title: string;
   status: TaskStatus;
+  /** A background worker is driving this task now. */
+  background?: boolean;
   /** ISO time of the last event. */
   updatedAt: string;
 }
@@ -199,6 +201,8 @@ export interface ChatDeps {
   config: (context: ConversationTurn[]) => TaskConfig;
   /** Tasks in the store, newest first, for `/resume`. */
   listTasks?: () => Promise<TaskSummary[]>;
+  /** /bg: starts a task in a detached worker and returns its id. */
+  background?: { start: (prompt: string) => Promise<string>; isRunning: (id: string) => boolean };
   /** A task's events, to rebuild what it was doing. */
   readEvents?: (taskId: string) => Promise<StoredEvent[]>;
   /** Lets go of a task's lease so `remy resume` can take it. */
@@ -837,6 +841,7 @@ export function createChat(deps: ChatDeps): Chat {
         title: truncate(typed || '(pasted text)', 80),
         status: t.status,
         updatedAt: t.updatedAt,
+        ...(deps.background?.isRunning(t.taskId) && { background: true }),
       });
     }
     if (!rows.length)
@@ -995,6 +1000,23 @@ export function createChat(deps: ChatDeps): Chat {
       if (args[0] === 'list' || !file.entries.length)
         return void commit({ kind: 'note', text: plainMemory(file, m.personalise()) });
       set({ overlay: 'memory' });
+    } else if (name === 'bg') {
+      const prompt = args.join(' ').trim();
+      if (!deps.background)
+        return void commit({ kind: 'note', text: 'Background tasks are not available here.' });
+      if (!prompt)
+        return void commit({
+          kind: 'error',
+          text: 'Use /bg <task>. It runs on its own and Remy tells you when it is done.',
+        });
+      return deps.background.start(prompt).then(
+        (id) =>
+          commit({
+            kind: 'note',
+            text: `Started ${id} in the background. Follow it: remy attach ${id}. It shows in /sessions.`,
+          }),
+        (e) => commit({ kind: 'error', text: friendlyError(e) }),
+      );
     } else if (name === 'tour') {
       if (!deps.startTour) return void commit({ kind: 'note', text: 'There is no tour here.' });
       deps.startTour();

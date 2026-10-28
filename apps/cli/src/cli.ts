@@ -51,6 +51,19 @@ import {
 } from '@remy/tools';
 import { type ApprovalsStore, openApprovals, plainApprovals } from './approvals.ts';
 import {
+  bgState,
+  currentEntry,
+  type EntryPoint,
+  forwardedFlags,
+  nextCommand,
+  pidAlive,
+  readMarker,
+  type Spawner,
+  spawnWorker,
+  startedLine,
+  writeMarker,
+} from './background.ts';
+import {
   type ConnectApi,
   createChat,
   type ModelChoice,
@@ -77,6 +90,7 @@ import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { type MemoryStore, openMemory, personaliseOn, plainMemory } from './memory.ts';
+import { notificationFor, notify, type RunScript } from './notify.ts';
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
@@ -116,6 +130,16 @@ export interface CliDeps {
   mcpBudgetMs?: number;
   /** Registers an interrupt (Ctrl-C) handler; returns a disposer. */
   onInterrupt?: (handler: () => Promise<void>) => () => void;
+  /** Starts the background worker process (tests replace it). */
+  spawner?: Spawner;
+  /** The script and node flags a worker is started with. Default: this process. */
+  entry?: EntryPoint;
+  /** Runs an AppleScript for a notification (tests replace it). */
+  notifyRun?: RunScript;
+  /** Overrides process.platform for notifications (tests). */
+  platform?: string;
+  /** Waits between polls in `remy attach` (tests). Default 700 ms. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 const STATUSES: TaskStatus[] = [
@@ -133,6 +157,10 @@ const help = () => `remy: tell it what you need done.
 Usage
   remy                            Open the chat (in a terminal)
   remy run "<prompt>" [options]   Start a task and run it
+  remy run --background "<prompt>"
+                                  Start a task and leave it running; Remy tells you
+                                  when it finishes or needs you (REMY_NOTIFY=off to mute)
+  remy attach <id>                Follow a background task live; answers its questions
   remy resume <id>                Continue a task that stopped
   remy continue <id> [--steps n] [--cost usd]
                                   Give a paused task more budget and carry on
@@ -168,6 +196,7 @@ Options for run
   --workspace <dir>     Folder the task may read and write (default ~/.remy/workspaces/<id>)
   --max-steps <n>       Step budget (default ${DEFAULT_BUDGET.maxSteps})
   --max-cost <usd>      Cost budget (default ${DEFAULT_BUDGET.maxCostUsd})
+  --background          Start the task and return at once; follow it with remy attach
   --long                A bigger budget for long jobs: ${LONG_BUDGET.maxSteps} steps, $${LONG_BUDGET.maxCostUsd}, 4 hours
   --net-allow <hosts>   Only allow these domains. Example: example.com,docs.example.com
 
@@ -215,6 +244,7 @@ const OPTIONS = {
   steps: { type: 'string' },
   cost: { type: 'string' },
   long: { type: 'boolean' },
+  background: { type: 'boolean' },
   'net-allow': { type: 'string' },
   list: { type: 'boolean' },
   'key-stdin': { type: 'boolean' },
@@ -308,6 +338,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'cancel',
       'list',
       'show',
+      'attach',
+      'worker',
       'login',
       'logout',
       'connect',
@@ -400,8 +432,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   let active: string | undefined;
   /** Connected MCP servers; started by the first runtime that needs a model. */
   let mcp: McpHost | undefined;
+  let attaching: string | undefined;
   const dispose = deps.onInterrupt?.(async () => {
     await mcp?.close();
+    if (attaching) {
+      out(`\nDetached. ${attaching} keeps running. Follow it again: remy attach ${attaching}`);
+      return;
+    }
     if (!active) return;
     await store.releaseLease({ taskId: active, owner, expiresAt: 0 });
     out(`\nStopped. Continue with: remy resume ${active}`);
@@ -772,6 +809,106 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return drive(runtime, id);
   }
 
+  /** Spawns the worker for a task that already has its `task.created` event. */
+  function startBackground(id: string): void {
+    const { pid } = spawnWorker({
+      home,
+      id,
+      cwd,
+      env,
+      entry: deps.entry ?? currentEntry(),
+      extraArgs: forwardedFlags(flags),
+      ...(deps.spawner && { spawner: deps.spawner }),
+    });
+    debug?.write('background', { id, pid });
+    out(startedLine(id));
+  }
+
+  /** `remy worker <id>`: drives the task until it ends or needs the user, then says so. */
+  async function workerFlow(id: string): Promise<number> {
+    await exists(id);
+    writeMarker(home, id, { pid: process.pid, startedAt: new Date().toISOString() });
+    out(`worker ${process.pid} started for ${id}`);
+    let code = 1;
+    try {
+      code = await resumeFlow(id);
+    } catch (e) {
+      out(`worker error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    const s = fold(await store.read(id));
+    out(`worker finished: ${s.status}`);
+    const note = notificationFor({ status: s.status, id, prompt: s.prompt });
+    if (note)
+      notify(note, {
+        env,
+        ...(deps.platform && { platform: deps.platform }),
+        ...(deps.notifyRun && { run: deps.notifyRun }),
+      });
+    return code;
+  }
+
+  /**
+   * `remy attach <id>`: prints the task's timeline and then follows the log. When the task needs
+   * the user (approval, question, budget) the worker has already exited, so attach carries on in
+   * this terminal: it asks inline and drives the task itself. Ctrl+C only detaches.
+   */
+  async function attachFlow(id: string): Promise<number> {
+    const events = await exists(id);
+    const tl = createTimeline(st, { live: false });
+    const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+    const shown = events.length;
+    const first = fold(events);
+    out(`${st.bold(`Task ${id}`)}  ${first.status}`);
+    out(st.dim(`Prompt: ${truncate(first.prompt, 200)}`));
+    const lines: string[] = [];
+    for (const e of events) {
+      const line = tl.line(e);
+      if (line) lines.push(line);
+    }
+    // Catching up: the last few lines are enough.
+    if (lines.length > 12) out(st.dim(`… ${lines.length - 12} earlier lines: remy show ${id}`));
+    for (const l of lines.slice(-12)) out(l);
+    attaching = id;
+    let seen = shown;
+    let idle = 0;
+    for (;;) {
+      const now = await store.read(id);
+      for (const e of now.slice(seen)) {
+        const line = tl.line(e);
+        if (line) out(line);
+      }
+      seen = now.length;
+      const s = fold(now);
+      if (s.final) {
+        attaching = undefined;
+        if (s.final.answer) out(`\n${s.final.answer.trim()}`);
+        else if (s.final.reason) out(`\n${s.final.reason}`);
+        out(st.dim(`${id}, ${s.step} steps, ${fmtCost(s.costUsd)}. Details: remy show ${id}`));
+        return s.status === 'failed' ? 1 : 0;
+      }
+      if (s.status !== 'running') {
+        attaching = undefined;
+        if (deps.isTTY && deps.ask) return await resumeFlow(id);
+        out(`Waiting for you (${s.status}). Run: ${nextCommand(s.status, id)}`);
+        return 0;
+      }
+      const m = readMarker(home, id);
+      idle = m && pidAlive(m.pid) ? 0 : idle + 1;
+      if (idle >= 3) {
+        // No live worker: confirm no one else holds the lease before saying so.
+        const lease = await store.acquireLease(id, owner, 1000);
+        if (lease) {
+          await store.releaseLease(lease);
+          attaching = undefined;
+          out(`No worker is running ${id}. Pick it up: remy resume ${id}`);
+          return 1;
+        }
+        idle = 0;
+      }
+      await sleep(700);
+    }
+  }
+
   /** The task config shared by `run` and the chat: flags beat the config file, which beats defaults. */
   function taskConfig(
     file: FileConfig,
@@ -1009,6 +1146,32 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       approvals: standing(),
       config: (context) => taskConfig(file, model.id, workspace, context),
       listTasks: () => store.listTasks(),
+      background: {
+        async start(prompt) {
+          // Its own runtime and workspace: the chat's conversation is not part of this task.
+          const id = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+          const { runtime } = makeRuntime(file, { model, taskId: id, hooks: {} });
+          const config = taskConfig(file, model.id, join(home, 'workspaces', id));
+          mkdirSync(config.workspaceDir, { recursive: true });
+          await mcp?.ready;
+          await runtime.start(prompt, config);
+          const { pid } = spawnWorker({
+            home,
+            id,
+            cwd,
+            env,
+            entry: deps.entry ?? currentEntry(),
+            extraArgs: forwardedFlags(flags),
+            ...(deps.spawner && { spawner: deps.spawner }),
+          });
+          debug?.write('background', { id, pid });
+          return id;
+        },
+        isRunning(id) {
+          const m = readMarker(home, id);
+          return Boolean(m && pidAlive(m.pid));
+        },
+      },
       readEvents: (id) => store.read(id),
       release: releaseLease(store, owner),
       ...(first && { model: first.id, contextWindow: first.caps.contextWindow }),
@@ -1090,8 +1253,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         mkdirSync(config.workspaceDir, { recursive: true });
         await mcp?.ready;
         await runtime.start(prompt, config);
+        if (flags.background) {
+          startBackground(id);
+          return 0;
+        }
         out(st.dim(`Task ${id}. Workspace ${config.workspaceDir}`));
         return await drive(runtime, id);
+      }
+
+      case 'worker': {
+        need(1, 'remy worker <id>');
+        return await workerFlow(rest[0] as string);
+      }
+
+      case 'attach': {
+        need(1, 'remy attach <id>');
+        return await attachFlow(rest[0] as string);
       }
 
       case 'resume':
@@ -1227,10 +1404,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(status ? `No ${status} tasks.` : 'No tasks yet. Start one with remy run "<prompt>".');
           return 0;
         }
-        const w = Math.max(...tasks.map((t) => t.status.length));
+        const label = (t: (typeof tasks)[number]) => {
+          const m = readMarker(home, t.taskId);
+          return m ? `bg ${bgState(t.status, pidAlive(m.pid))}` : t.status;
+        };
+        const w = Math.max(...tasks.map((t) => label(t).length));
         for (const t of tasks)
           out(
-            `${t.taskId}  ${t.status.padEnd(w)}  ${st.dim(t.createdAt.slice(0, 16).replace('T', ' '))}  ${truncate(t.prompt, 60)}`,
+            `${t.taskId}  ${label(t).padEnd(w)}  ${st.dim(t.createdAt.slice(0, 16).replace('T', ' '))}  ${truncate(t.prompt, 60)}`,
           );
         return 0;
       }

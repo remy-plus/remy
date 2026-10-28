@@ -690,3 +690,41 @@ describe('turn metadata', () => {
     expect(chat.getState().turnStartedAt).toBeUndefined();
   });
 });
+
+describe('/bg', () => {
+  const noteTexts = (chat: Chat) =>
+    chat.getState().items.flatMap((i) => (i.kind === 'note' || i.kind === 'error' ? [i.text] : []));
+
+  it('starts a background task and tells how to follow it', async () => {
+    const started: string[] = [];
+    const { chat } = harness(new ScriptedModelClient([]), ['read'], {
+      background: {
+        start: async (p) => {
+          started.push(p);
+          return 'task_abc123abc123';
+        },
+        isRunning: () => false,
+      },
+    });
+    await chat.submit('/bg tidy my downloads');
+    expect(started).toEqual(['tidy my downloads']);
+    expect(noteTexts(chat)[0]).toContain('remy attach task_abc123abc123');
+    expect(chat.getState().phase).toBe('idle');
+  });
+
+  it('asks for a task, and reports a failed start', async () => {
+    const { chat } = harness(new ScriptedModelClient([]), ['read'], {
+      background: {
+        start: async () => {
+          throw new Error('no model');
+        },
+        isRunning: () => false,
+      },
+    });
+    await chat.submit('/bg');
+    await chat.submit('/bg do it');
+    const notes = noteTexts(chat);
+    expect(notes[0]).toContain('Use /bg <task>');
+    expect(notes[1]).toContain('no model');
+  });
+});

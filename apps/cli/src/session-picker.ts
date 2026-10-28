@@ -72,7 +72,7 @@ export function SessionPicker(p: {
           h(
             Text,
             muted,
-            `${shortId(r.taskId)} · ${stateWord(r.status)} · ${ageWord(r.updatedAt, p.now)}`,
+            `${shortId(r.taskId)} · ${r.background ? 'running in the background' : stateWord(r.status)} · ${ageWord(r.updatedAt, p.now)}`,
           ),
         ),
       );

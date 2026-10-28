@@ -31,6 +31,8 @@ export class SqliteEventStore implements EventStore {
   constructor(path: string, opts: { now?: () => number } = {}) {
     this.now = opts.now ?? Date.now;
     this.db = new DatabaseSync(path);
+    // A background worker and a foreground command share this file: wait for a lock, do not fail.
+    this.db.exec('PRAGMA busy_timeout = 5000');
     if (path !== ':memory:') this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec(SCHEMA);
   }
