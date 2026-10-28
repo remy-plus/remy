@@ -44,8 +44,8 @@ export type { ApprovalView, FileTouch, PlanStep, ToolLine, ToolState };
 /** Things that stay on screen once they are said. Appended once; never changed. */
 export type Item =
   | { kind: 'user'; text: string }
-  /** The final answer of a task. */
-  | { kind: 'reply'; text: string }
+  /** The final answer of a task, with the model that gave it and how long the turn took. */
+  | { kind: 'reply'; text: string; model?: string; ms?: number }
   /** What the assistant said while working, one per model call. */
   | { kind: 'text'; text: string }
   | { kind: 'question'; text: string }
@@ -568,7 +568,13 @@ export function createChat(deps: ChatDeps): Chat {
             ...turns,
             { prompt, answer, ...(current?.pasted?.length && { pasted: current.pasted }) },
           ].slice(-MAX_CONTEXT_TURNS);
-          return await end(true, { kind: 'reply', text: answer });
+          const ms = s.turnStartedAt === undefined ? undefined : Date.now() - s.turnStartedAt;
+          return await end(true, {
+            kind: 'reply',
+            text: answer,
+            ...(s.model && { model: s.model }),
+            ...(ms !== undefined && { ms }),
+          });
         }
         if (o.status === 'failed')
           return await end(false, {

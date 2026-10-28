@@ -561,3 +561,30 @@ describe('sidebar data', () => {
     expect(chat.getState().filesTouched).toBeUndefined();
   });
 });
+
+describe('turn metadata', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  it('puts the model and the turn duration on the reply', async () => {
+    const slow: ModelClient = {
+      id: 'scripted',
+      caps: DEFAULT_CAPS,
+      complete: async () => {
+        await new Promise((r) => setTimeout(r, 1500));
+        return { calls: [{ tool: 'finish', args: { answer: 'Four.' } }], usage };
+      },
+    };
+    const { chat } = harness(slow, ['read', 'write'], { model: 'gpt-x' });
+    const run = chat.submit('2+2');
+    expect(chat.getState().turnStartedAt).toBeTypeOf('number');
+    await vi.advanceTimersByTimeAsync(1500);
+    await run;
+    expect(chat.getState().items.at(-1)).toEqual({
+      kind: 'reply',
+      text: 'Four.',
+      model: 'gpt-x',
+      ms: 1500,
+    });
+    expect(chat.getState().turnStartedAt).toBeUndefined();
+  });
+});
