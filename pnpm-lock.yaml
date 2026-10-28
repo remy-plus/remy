@@ -254,6 +254,9 @@ importers:
       '@remy/evals':
         specifier: workspace:*
         version: link:../../packages/evals
+      '@remy/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@remy/models':
         specifier: workspace:*
         version: link:../../packages/models

@@ -14,7 +14,7 @@ const ALLOWED: Record<string, string[]> = {
   'packages/store': ['core'],
   'packages/mcp': ['core'],
   'packages/evals': ['core', 'models', 'tools', 'store'],
-  'apps/cli': ['core', 'models', 'tools', 'store', 'evals'],
+  'apps/cli': ['core', 'models', 'tools', 'store', 'evals', 'mcp'],
 };
 
 // Third-party runtime dependencies `core` may use. Everything else goes behind a port.
@@ -79,7 +79,9 @@ describe('package boundaries', () => {
           const where = relative(ROOT, file);
           for (const spec of importsOf(file)) {
             if (spec.startsWith('@remy/')) {
-              expect(declared, `${where} imports ${spec}`).toContain(spec.slice('@remy/'.length));
+              expect(declared, `${where} imports ${spec}`).toContain(
+                spec.slice('@remy/'.length).split('/')[0],
+              );
             } else if (spec.startsWith('.')) {
               const target = resolve(dirname(file), spec);
               expect(target.startsWith(pkgRoot), `${where} reaches outside via ${spec}`).toBe(true);

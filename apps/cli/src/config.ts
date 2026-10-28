@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Budget } from '@remy/core';
+import { type McpServerConfig, mcpServersSchema } from '@remy/mcp';
 
 export interface FileConfig {
   profile?: string;
@@ -9,6 +10,8 @@ export interface FileConfig {
   autoApprove?: string[];
   budget?: Partial<Budget>;
   netAllow?: string[];
+  /** Same shape as Claude Desktop's `mcpServers`. Wins over servers saved by `remy connect`. */
+  mcpServers?: Record<string, McpServerConfig>;
 }
 
 const strings = (v: unknown, name: string): string[] | undefined => {
@@ -48,5 +51,16 @@ export function loadConfig(cwd: string, home: string): FileConfig {
   if (autoApprove) out.autoApprove = autoApprove;
   if (netAllow) out.netAllow = netAllow;
   if (budget) out.budget = budget as Partial<Budget>;
+  if (raw.mcpServers !== undefined) {
+    const servers = mcpServersSchema.safeParse(raw.mcpServers);
+    if (!servers.success) {
+      const issue = servers.error.issues[0];
+      const where = issue?.path.length ? ` (${issue.path.join('.')})` : '';
+      throw new Error(
+        `${path}: "mcpServers"${where}: ${issue?.message ?? 'not valid'}. Each server needs a command or a url.`,
+      );
+    }
+    out.mcpServers = servers.data;
+  }
   return out;
 }

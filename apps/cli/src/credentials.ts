@@ -56,8 +56,38 @@ export interface CredentialsOptions {
 }
 
 /** Keychain commands are fed on stdin (`security -i`), so a key never shows up in `ps`. */
-const SAFE_KEY = /^[\x21-\x7e]+$/;
-const unsafeForKeychain = (key: string) => !SAFE_KEY.test(key) || /["'\\]/.test(key);
+const SAFE_VALUE = /^[\x20-\x7e]+$/;
+const unsafeForKeychain = (value: string) => !SAFE_VALUE.test(value) || /["'\\]/.test(value);
+
+/** Stores a value as a generic password of the `remy` service. False when it cannot be (use a file). */
+export function keychainSet(exec: Exec, account: string, value: string): boolean {
+  if (unsafeForKeychain(value) || value !== value.trim()) return false;
+  // A value with a space (a "Bearer ..." header) is quoted for `security -i`.
+  const arg = value.includes(' ') ? `"${value}"` : value;
+  const r = exec(
+    'security',
+    ['-i'],
+    `add-generic-password -U -s ${KEYCHAIN_SERVICE} -a ${account} -w ${arg}\n`,
+  );
+  return r.status === 0;
+}
+
+export function keychainGet(exec: Exec, account: string): string | undefined {
+  const r = exec('security', [
+    'find-generic-password',
+    '-s',
+    KEYCHAIN_SERVICE,
+    '-a',
+    account,
+    '-w',
+  ]);
+  const value = r.stdout.replace(/\r?\n$/, '');
+  return r.status === 0 && value ? value : undefined;
+}
+
+export function keychainDelete(exec: Exec, account: string): void {
+  exec('security', ['delete-generic-password', '-s', KEYCHAIN_SERVICE, '-a', account]);
+}
 
 export function openCredentials(o: CredentialsOptions): Credentials {
   const exec = o.exec ?? realExec;
@@ -87,34 +117,15 @@ export function openCredentials(o: CredentialsOptions): Credentials {
   };
   const files = () => readJson<Record<string, string>>(filePath, {});
 
-  const keychainSet = (provider: string, key: string): boolean => {
-    if (!keychain || unsafeForKeychain(key)) return false;
-    const r = exec(
-      'security',
-      ['-i'],
-      `add-generic-password -U -s ${KEYCHAIN_SERVICE} -a ${provider} -w ${key}\n`,
-    );
-    return r.status === 0;
-  };
-  const keychainGet = (provider: string): string | undefined => {
-    const r = exec('security', [
-      'find-generic-password',
-      '-s',
-      KEYCHAIN_SERVICE,
-      '-a',
-      provider,
-      '-w',
-    ]);
-    const key = r.stdout.replace(/\r?\n$/, '');
-    return r.status === 0 && key ? key : undefined;
-  };
+  const keychainSetKey = (provider: string, key: string) =>
+    keychain && keychainSet(exec, provider, key);
 
   return {
     save(provider, key, meta = {}) {
       const idx = index();
       let store: LoginSummary['store'] = 'none';
       if (key) {
-        if (keychainSet(provider, key)) store = 'keychain';
+        if (keychainSetKey(provider, key)) store = 'keychain';
         else {
           writePrivate(filePath, { ...files(), [provider]: key });
           store = 'file';
@@ -143,7 +154,7 @@ export function openCredentials(o: CredentialsOptions): Credentials {
       if (!entry) return undefined;
       const key =
         entry.store === 'keychain'
-          ? keychainGet(provider)
+          ? keychainGet(exec, provider)
           : entry.store === 'file'
             ? files()[provider]
             : '';
@@ -173,8 +184,7 @@ export function openCredentials(o: CredentialsOptions): Credentials {
       const idx = index();
       const entry = idx.providers[provider];
       if (!entry) return false;
-      if (entry.store === 'keychain')
-        exec('security', ['delete-generic-password', '-s', KEYCHAIN_SERVICE, '-a', provider]);
+      if (entry.store === 'keychain') keychainDelete(exec, provider);
       const f = files();
       if (provider in f) {
         delete f[provider];

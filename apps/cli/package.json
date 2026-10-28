@@ -28,7 +28,7 @@
     "release"
   ],
   "scripts": {
-    "bundle": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=esm --conditions=@remy/source --external:ink --external:react --external:'react/*' --outfile=release/remy.js --log-level=warning"
+    "bundle": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=esm --conditions=@remy/source --external:ink --external:react --external:'react/*' --banner:js=\"import{createRequire as __remyRequire}from'node:module';const require=__remyRequire(import.meta.url);\" --outfile=release/remy.js --log-level=warning"
   },
   "dependencies": {
     "ink": "^8.0.0",
@@ -37,6 +37,7 @@
   "devDependencies": {
     "@remy/core": "workspace:*",
     "@remy/evals": "workspace:*",
+    "@remy/mcp": "workspace:*",
     "@remy/models": "workspace:*",
     "@remy/store": "workspace:*",
     "@remy/tools": "workspace:*",
