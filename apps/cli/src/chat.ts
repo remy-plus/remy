@@ -108,7 +108,7 @@ export interface FilesApi {
   read(path: string): Promise<string | undefined>;
 }
 
-export type Overlay = 'login' | 'model' | 'palette' | 'theme';
+export type Overlay = 'login' | 'model' | 'palette' | 'theme' | 'profile';
 
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
@@ -205,6 +205,10 @@ export interface ChatDeps {
   minimal?: boolean;
   /** Saves the minimal-screen preference; false when it could not be written. */
   saveMinimal?: (on: boolean) => boolean;
+  /** /profile opens when the host keeps a profile. */
+  profileEnabled?: boolean;
+  /** /tour replays the onboarding; absent where there is none. */
+  startTour?: () => void;
 }
 
 export interface Chat {
@@ -237,6 +241,8 @@ export interface Chat {
   interrupt(): Promise<void>;
   /** The messages the user has sent, oldest first, for recall. */
   history(): string[];
+  /** Starts a task in the given folder instead of the conversation's workspace (the tour's first task). */
+  startTask(prompt: string, workspaceDir: string): Promise<void>;
 }
 
 /** Earlier turns sent as context are capped so a long chat does not outgrow the model. */
@@ -657,7 +663,7 @@ export function createChat(deps: ChatDeps): Chat {
     return { prompt, pasted: blocks.filter(Boolean), notes };
   }
 
-  async function start(text: string) {
+  async function start(text: string, folder?: string) {
     if (deps.connect && !s.model) {
       // Keep the message; it is sent once a model is connected.
       commit({ kind: 'note', text: 'Connect a model first, then your message goes through.' });
@@ -687,7 +693,7 @@ export function createChat(deps: ChatDeps): Chat {
       if (files) for (const n of files.notes) commit({ kind: 'note', text: n });
       const prompt = files?.prompt ?? text;
       const pasted = [...(typedPaste ?? []), ...(files?.pasted ?? [])];
-      const base = deps.config(turns);
+      const base = folder ? { ...deps.config(turns), workspaceDir: folder } : deps.config(turns);
       workspaceDir = base.workspaceDir;
       const config = pasted.length ? { ...base, pasted } : base;
       set({ budgetUsd: config.budget.maxCostUsd });
@@ -832,6 +838,13 @@ export function createChat(deps: ChatDeps): Chat {
             ? 'Minimal screen is on. It takes effect the next time Remy starts.'
             : 'Minimal screen is off. The full screen returns the next time Remy starts.',
       });
+    } else if (name === 'profile') {
+      if (!deps.profileEnabled)
+        return void commit({ kind: 'note', text: 'There is no profile to edit here.' });
+      set({ overlay: 'profile' });
+    } else if (name === 'tour') {
+      if (!deps.startTour) return void commit({ kind: 'note', text: 'There is no tour here.' });
+      deps.startTour();
     } else if (name === 'exit') set({ wantsExit: true });
     else commit({ kind: 'error', text: `There is no command /${typed}. Type / to see them.` });
   }
@@ -873,6 +886,9 @@ export function createChat(deps: ChatDeps): Chat {
       await start(text);
     },
 
+    startTask: async (prompt, folder) => {
+      if (s.phase === 'idle') await start(prompt, folder);
+    },
     closePicker: () => set({ picker: undefined }),
     resume: resumeTask,
     openOverlay: (which) => set({ overlay: which }),

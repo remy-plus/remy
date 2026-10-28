@@ -22,6 +22,8 @@ export const COMMANDS: CommandInfo[] = [
     aliases: ['light', 'dark', 'day', 'night'],
   },
   { name: 'minimal', summary: 'Use the quiet minimal screen at start (saved)' },
+  { name: 'profile', summary: 'See or change what Remy knows about you' },
+  { name: 'tour', summary: 'Replay the welcome tour' },
   { name: 'help', summary: 'List commands and keys' },
   { name: 'exit', summary: 'Quit', aliases: ['quit'], keys: 'Ctrl+D' },
 ];

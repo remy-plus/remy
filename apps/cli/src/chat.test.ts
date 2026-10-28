@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -291,6 +291,50 @@ describe('chat controller', () => {
     expect(JSON.stringify(chat.getState().items.at(-1))).toContain('There is no command /nope');
     await chat.submit('/exit');
     expect(chat.getState().wantsExit).toBe(true);
+  });
+});
+
+describe('the tour hooks', () => {
+  it('runs a task in the folder it is given and the conversation keeps its own', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'remy-scratch-'));
+    try {
+      const model = new ScriptedModelClient([write, done('Made it.'), write, done('Again.')]);
+      const { chat } = harness(model);
+      await chat.startTask('make a file', scratch);
+      expect(replies(chat)).toEqual(['Made it.']);
+      expect(existsSync(join(scratch, 'a.txt'))).toBe(true);
+      expect(existsSync(join(dir, 'a.txt'))).toBe(false);
+      await chat.submit('again');
+      expect(existsSync(join(dir, 'a.txt'))).toBe(true);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('does not start a second task while one runs', async () => {
+    const { chat } = harness(new ScriptedModelClient([done('x')]));
+    void chat.submit('one');
+    await chat.startTask('two', dir);
+    await vi.waitFor(() => expect(replies(chat)).toEqual(['x']));
+  });
+
+  it('/profile opens its panel only when a profile is kept; /tour needs a host', async () => {
+    const { chat } = harness(new ScriptedModelClient([]));
+    await chat.submit('/profile');
+    expect(chat.getState().overlay).toBeUndefined();
+    expect(JSON.stringify(chat.getState().items.at(-1))).toContain('no profile');
+    await chat.submit('/tour');
+    expect(JSON.stringify(chat.getState().items.at(-1))).toContain('no tour');
+    const startTour = vi.fn();
+    const withHost = harness(new ScriptedModelClient([]), ['read'], {
+      profileEnabled: true,
+      startTour,
+    });
+    await withHost.chat.submit('/profile');
+    expect(withHost.chat.getState().overlay).toBe('profile');
+    withHost.chat.closeOverlay();
+    await withHost.chat.submit('/tour');
+    expect(startTour).toHaveBeenCalledOnce();
   });
 });
 
