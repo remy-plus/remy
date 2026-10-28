@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+
+Remy keeps going on big jobs, works while you are away, and remembers what you tell it.
+
+- **Long runs pause instead of failing.** A task that reaches its step, cost or time limit stops with "Paused after 30 steps and $0.42. Continue for 30 more steps?" Answer y or n, or later with `remy continue <id>`. `--long` gives a task 200 steps, $5 and four hours. Progress notes every 10 steps, and Remy finishes or skips (with a reason) every step of its plan before it says it is done.
+- **Background tasks.** `remy run --background "<task>"` or `/bg <task>` starts a task and hands your terminal back. `remy list` shows where each one is, `remy attach <id>` follows one live and answers its questions there, and a macOS notification says when it finishes or needs you (`REMY_NOTIFY=off` turns them off).
+- **Memory.** With personalise on in your profile, Remy can save short notes about you (preferences, facts, how you like things done), always with your approval, and uses the five most relevant in each task. `/memory` and `remy memory` show, edit and forget them. A web page cannot save a note on its own.
+- Fixed: `remy list` no longer fails with "database is locked" while another Remy process is writing.
+
 ## 0.5.0 (unreleased)
 
 Remy connects to your apps.

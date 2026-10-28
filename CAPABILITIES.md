@@ -1,6 +1,6 @@
-# What Remy can do (v0.5.0)
+# What Remy can do (v0.6.0)
 
-Remy is a terminal agent. You describe a task, and it works in small steps with the tools below until the task is done, it needs you, or it hits a limit. Everything here is tested in `pnpm check` and the eval suites (53 cases).
+Remy is a terminal agent. You describe a task, and it works in small steps with the tools below until the task is done, it needs you, or it hits a limit. Everything here is tested in `pnpm check` and the eval suites (58 cases).
 
 ## Works today
 
@@ -20,6 +20,10 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 
 **Connections.** Remy uses apps through MCP servers: GitHub, Notion, Linear and Sentry, a folder of files, memory and web pages from the built-in list (`remy connect` or `/connect`), and any other server you add or import from Claude Desktop or Claude Code. Remote servers sign in through your browser or take a token; tokens stay in the Keychain. With many tools connected, each step offers the model the most relevant 12, and it can search for the rest.
 
+**Long and background tasks.** A task that reaches its limit pauses and asks to continue (`remy continue <id>`); `--long` allows 200 steps, $5 and four hours. `remy run --background` or `/bg` runs a task while you do something else; `remy attach <id>` follows it, and macOS notifies you when it is done or needs you.
+
+**Memory.** With personalise on, Remy saves short notes about you when you agree, and uses the most relevant five in each task. `/memory` or `remy memory` to see, edit or forget them.
+
 **Commands.** `run_command` runs one program from an allowlist: `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `find`, `git`, `node`, `npm`, `pnpm` and `python3`. There are no pipes, redirects or wildcards. Each command runs in the workspace with a minimal environment, a 30-second timeout and capped output, and **every command needs your approval**.
 
 **Math.** `calculate` does arithmetic and date math, such as the days between two dates or adding days to a date.
@@ -36,7 +40,7 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 - **Untrusted content.** Text from web pages, emails, connections and command output is marked untrusted. Once a task has seen it, every action that is not a read needs your approval, so instructions hidden in a page cannot act on your behalf.
 - **Containment.** Tools only reach the workspace folder and the network through scoped access. Secrets are kept out of what the model sees.
 - **No double actions.** Every task is an append-only event log. If Remy crashes or you press Ctrl+C, `remy resume <id>` continues from where it stopped. An action that may already have happened is checked or reported, never blindly repeated.
-- **Limits.** Each task stops at 30 steps, $1 of model cost or 30 minutes, whichever comes first. Use `--max-steps` and `--max-cost` to change the first two.
+- **Limits.** Each task pauses at 30 steps, $1 of model cost or 30 minutes, whichever comes first, and continues only when you say so. Use `--max-steps`, `--max-cost` or `--long` to change them.
 
 ## Measured
 
@@ -52,5 +56,5 @@ On GPT-5 nano, the 30 cases that existed then passed at 100% across 150 runs (ru
 - Ctrl+C stops the task, but a tool that is already running finishes its current call.
 - `run_command`'s path check is lexical: it does not follow symlinks inside the workspace. Approval is the real guard.
 - `run_command` is not a full sandbox. `node`, `python3` and `git` can do anything you could do in the workspace, so read the command before you approve it.
-- No memory across chats beyond the current conversation, no scheduled tasks and no voice.
+- No scheduled tasks and no voice yet. Memory notes are matched by words, not meaning.
 - Weaker or free models are less reliable than the numbers above. Open-weight baselines are still to be measured.
