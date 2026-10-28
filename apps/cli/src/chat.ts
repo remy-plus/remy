@@ -19,6 +19,13 @@ import { COMMANDS, findCommand } from './commands.ts';
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
+import {
+  changedPaths,
+  type FileTouch,
+  sessionTitle,
+  touchFiles,
+  workspacePath,
+} from './session-data.ts';
 import { createTextBatcher, FRAME_MS } from './stream.ts';
 import {
   type ApprovalView,
@@ -32,7 +39,7 @@ import {
   toolDetail,
 } from './transcript.ts';
 
-export type { ApprovalView, PlanStep, ToolLine, ToolState };
+export type { ApprovalView, FileTouch, PlanStep, ToolLine, ToolState };
 
 /** Things that stay on screen once they are said. Appended once; never changed. */
 export type Item =
@@ -124,6 +131,10 @@ export interface ChatState {
   queue: string[];
   /** When the active turn began (ms since epoch). */
   turnStartedAt?: number;
+  /** The session title: the first message, one line, about 48 characters. */
+  title?: string;
+  /** Files written, edited, moved or deleted this session (workspace-relative), newest first. */
+  filesTouched?: FileTouch[];
   /** Total spend of this conversation. */
   costUsd: number;
   /** Tokens (in and out) used by this conversation. */
@@ -330,6 +341,7 @@ export function createChat(deps: ChatDeps): Chat {
   /** True while a run is live; false once it was interrupted, so late callbacks are ignored. */
   let running = false;
   const calls = new Map<string, { tool: string; args: unknown }>();
+  let workspaceDir: string | undefined;
 
   /** Streamed text waits here and joins the state with the next update, so order holds. */
   const batch = createTextBatcher(deps.frameMs ?? FRAME_MS, () => set({}));
@@ -445,6 +457,10 @@ export function createChat(deps: ChatDeps): Chat {
           ...(!r.ok && { reason: truncate(r.error, 80) }),
         });
         if (!r.ok) set({ tools: collapseFailure(s.tools, ev.callId) });
+        else if (c) {
+          const paths = changedPaths(c.tool, c.args).map((p) => workspacePath(p, workspaceDir));
+          if (paths.length) set({ filesTouched: touchFiles(s.filesTouched ?? [], paths) });
+        }
         flush(false, true);
         break;
       }
@@ -608,6 +624,7 @@ export function createChat(deps: ChatDeps): Chat {
     calls.clear();
     current = undefined;
     commit({ kind: 'user', text });
+    if (!s.title) set({ title: sessionTitle(text, pastedFor.get(text)) });
     set({
       phase: 'running',
       thinking: true,
@@ -626,6 +643,7 @@ export function createChat(deps: ChatDeps): Chat {
       const prompt = files?.prompt ?? text;
       const pasted = [...(typedPaste ?? []), ...(files?.pasted ?? [])];
       const base = deps.config(turns);
+      workspaceDir = base.workspaceDir;
       const config = pasted.length ? { ...base, pasted } : base;
       set({ budgetUsd: config.budget.maxCostUsd });
       const id = await runtime.start(prompt, config);
@@ -687,7 +705,9 @@ export function createChat(deps: ChatDeps): Chat {
         prompt: st.prompt,
         ...(st.config.pasted?.length && { pasted: st.config.pasted }),
       };
+      workspaceDir = st.config.workspaceDir;
       commit({ kind: 'user', text: st.prompt }, { kind: 'note', text: resumeBanner(id, plan) });
+      if (!s.title) set({ title: sessionTitle(st.prompt, st.config.pasted) });
       set({
         phase: 'running',
         thinking: true,
@@ -713,11 +733,12 @@ export function createChat(deps: ChatDeps): Chat {
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
       turns = [];
+      set({ title: undefined, filesTouched: undefined });
       commit({ kind: 'note', text: 'Started a new conversation.' });
     } else if (name === 'clear') {
       turns = [];
       // The screen wipes itself and prints the header again; the transcript starts empty.
-      set({ items: [], clears: s.clears + 1 });
+      set({ items: [], clears: s.clears + 1, title: undefined, filesTouched: undefined });
     } else if (name === 'sessions') {
       return openPicker();
     } else if (name === 'login' || name === 'model') {

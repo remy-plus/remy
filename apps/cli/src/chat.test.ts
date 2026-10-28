@@ -535,3 +535,29 @@ describe('stream coalescing', () => {
     expect(chat.getState().streaming).toBe('');
   });
 });
+
+describe('sidebar data', () => {
+  it('titles the session from the first message and lists files touched', async () => {
+    const { chat } = harness(
+      new ScriptedModelClient([
+        write,
+        call('write_file', { path: './a.txt', content: 'y' }),
+        done('ok'),
+      ]),
+    );
+    await chat.submit('write a file\nwith a very long first message that goes on and on and on');
+    const st = chat.getState();
+    expect(st.title).toHaveLength(48);
+    expect(st.title).not.toContain('\n');
+    expect(st.filesTouched).toEqual([{ path: 'a.txt', edits: 2 }]);
+    await chat.submit('second message');
+    expect(chat.getState().title).toBe(st.title);
+  });
+  it('starts over on /new', async () => {
+    const { chat } = harness(new ScriptedModelClient([write, done('ok')]));
+    await chat.submit('first');
+    await chat.submit('/new');
+    expect(chat.getState().title).toBeUndefined();
+    expect(chat.getState().filesTouched).toBeUndefined();
+  });
+});
