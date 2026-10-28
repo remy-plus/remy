@@ -38,7 +38,10 @@ export function Home(p: HomeProps): ReactElement {
   const showTip = Boolean(p.tip) && rows >= TIP_MIN_ROWS;
   const promptWidth = Math.max(10, Math.min(PROMPT_MAX, columns - 4));
   const version = `v${p.version.replace(/^v/, '')}`;
-  const workspace = shortenPath(p.workspace, Math.max(8, columns - version.length - 6));
+  const workspace = shortenPath(
+    p.workspace,
+    Math.max(8, Math.min(columns - version.length - 6, Math.floor(columns * 0.4))),
+  );
 
   const mark = full
     ? h(

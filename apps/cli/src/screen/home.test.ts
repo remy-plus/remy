@@ -33,6 +33,19 @@ describe('tips', () => {
 });
 
 describe('home', () => {
+  it('caps the footer workspace path to about 40% of the width', () => {
+    const long = '/work/a-very-long-directory-name/another-long-directory/and-one-more/project';
+    const out = frame(100, 30, { workspace: long });
+    const last = out
+      .split('\n')
+      .filter((l) => l.includes('v0.3.0'))
+      .pop() as string;
+    const path = last.replace('v0.3.0', '').trim();
+    expect(path.startsWith('…')).toBe(true);
+    expect(path.length).toBeLessThanOrEqual(40);
+    expect(path.endsWith('project')).toBe(true);
+  });
+
   it('draws the wordmark centred at 100x30', () => {
     const out = frame(100, 30);
     const lines = out.split('\n');
