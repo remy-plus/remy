@@ -18,12 +18,11 @@ import { useChatKeys } from '../chat-keys.ts';
 import type { ChatAppProps } from '../chat-ui.ts';
 import { EXAMPLES } from '../examples.ts';
 import { useFrame, useSettled } from '../live-hooks.ts';
-import { Overlay } from '../overlay-ui.ts';
 import { Menu, menuRows } from '../picker.ts';
-import { SessionPicker } from '../session-picker.ts';
 import { APPROVAL_ROWS, approvalHeight, narrate, reasoningTitle } from '../transcript.ts';
 import { TranscriptView } from '../transcript-view.ts';
 import { buildRows, createRowCache, type LiveInput } from './compose.ts';
+import { Dialogs } from './dialogs.ts';
 import { Home } from './home.ts';
 import { introRows } from './intro.ts';
 import { computeLayout } from './layout.ts';
@@ -41,9 +40,6 @@ import {
 import { statusLine } from './status.ts';
 import { pickTip } from './tips.ts';
 import { Viewport } from './viewport.ts';
-
-/** Rows reserved for a login, model or session panel in the bottom slot. */
-const PANEL_ROWS = 14;
 
 /** The hint in an empty prompt: an example, rotating with each message sent; or the question's cue. */
 function placeholderFor(state: ChatState): string {
@@ -188,14 +184,12 @@ export function FullApp(props: ChatAppProps): ReactElement {
   // Geometry of the bottom slot decides how tall the session is.
   const panelOpen = Boolean(state.overlay || state.picker);
   const card = state.phase === 'waiting_approval' ? state.approvalView : undefined;
-  const showPrompt = !panelOpen && (!card || noting);
+  const showPrompt = !card || noting;
   const cardRoom = Math.max(APPROVAL_ROWS, rows - 12);
   const boxRows = promptBoxRows(input, width, layout.promptMaxRows);
-  const menuH = showPrompt && menu ? menuRows(menuItems.length) : 0;
-  const slot = panelOpen
-    ? PANEL_ROWS
-    : (card ? approvalHeight(card, expanded, cardRoom) : 0) +
-      (showPrompt ? menuH + boxRows + 1 : 0);
+  const menuH = showPrompt && menu && !panelOpen ? menuRows(menuItems.length) : 0;
+  const slot =
+    (card ? approvalHeight(card, expanded, cardRoom) : 0) + (showPrompt ? menuH + boxRows + 1 : 0);
   const height = Math.max(1, rows - slot - 2);
   geometry.current = { total: all.length, height };
   const top = topOf(scroll, all.length, height);
@@ -227,30 +221,38 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const model = state.model ?? props.subtitle;
   const query = slashQuery ?? atQuery ?? '';
   // Nothing said yet: the home screen, with the prompt in its middle. The first message leaves it.
-  if (state.items.length === 0 && state.phase === 'idle' && !panelOpen)
-    return h(Home, {
-      theme,
-      columns,
-      rows,
-      version: props.version ?? '',
-      workspace: props.workspace ?? process.cwd(),
-      tip,
-      prompt: h(
-        Box,
-        { flexDirection: 'column' },
-        menu ? h(Menu, { items: menuItems, at, theme, indent: 1, query }) : null,
-        h(PromptBox, {
-          value: input,
-          theme,
-          width: layout.homePromptWidth,
-          maxRows: layout.promptMaxRows,
-          focused: true,
-          placeholder: placeholderFor(state),
-          model,
-          provider,
-        }),
-      ),
-    });
+  const dialog = panelOpen
+    ? h(Dialogs, { chat, state, theme, columns, rows, onTranscript: () => setViewing(true) })
+    : null;
+  if (state.items.length === 0 && state.phase === 'idle')
+    return h(
+      Box,
+      { width: columns, height: rows },
+      h(Home, {
+        theme,
+        columns,
+        rows,
+        version: props.version ?? '',
+        workspace: props.workspace ?? process.cwd(),
+        tip,
+        prompt: h(
+          Box,
+          { flexDirection: 'column' },
+          menu && !panelOpen ? h(Menu, { items: menuItems, at, theme, indent: 1, query }) : null,
+          h(PromptBox, {
+            value: input,
+            theme,
+            width: layout.homePromptWidth,
+            maxRows: layout.promptMaxRows,
+            focused: !panelOpen,
+            placeholder: placeholderFor(state),
+            model,
+            provider,
+          }),
+        ),
+      }),
+      dialog,
+    );
   return h(
     Box,
     { flexDirection: 'column', width: columns, height: rows, paddingX: 2, paddingBottom: 1 },
@@ -258,20 +260,6 @@ export function FullApp(props: ChatAppProps): ReactElement {
     h(
       Box,
       { flexDirection: 'column', flexShrink: 0, marginTop: 1, width },
-      panelOpen
-        ? h(
-            Box,
-            { flexDirection: 'column', height: PANEL_ROWS, overflow: 'hidden' },
-            state.picker
-              ? h(SessionPicker, {
-                  rows: state.picker,
-                  theme,
-                  onPick: (id) => void chat.resume(id),
-                  onCancel: () => chat.closePicker(),
-                })
-              : h(Overlay, { chat, state, theme, onTranscript: () => setViewing(true) }),
-          )
-        : null,
       card
         ? h(ApprovalCard, {
             view: card,
@@ -283,14 +271,16 @@ export function FullApp(props: ChatAppProps): ReactElement {
             indent: 0,
           })
         : null,
-      showPrompt && menu ? h(Menu, { items: menuItems, at, theme, indent: 1, query }) : null,
+      showPrompt && menu && !panelOpen
+        ? h(Menu, { items: menuItems, at, theme, indent: 1, query })
+        : null,
       showPrompt
         ? h(PromptBox, {
             value: input,
             theme,
             width,
             maxRows: layout.promptMaxRows,
-            focused: state.phase === 'idle' || noting,
+            focused: !panelOpen && (state.phase === 'idle' || noting),
             placeholder: placeholderFor(state),
             model,
             provider,
@@ -310,5 +300,6 @@ export function FullApp(props: ChatAppProps): ReactElement {
           })
         : null,
     ),
+    dialog,
   );
 }

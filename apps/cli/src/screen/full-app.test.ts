@@ -14,7 +14,7 @@ import { createScopedFetch, createScopedFs, deleteFile, finish, writeFile } from
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createChat, releaseLease } from '../chat.ts';
+import { type ChatDeps, createChat, releaseLease } from '../chat.ts';
 import { createTheme } from '../theme.ts';
 import { FullApp } from './full-app.ts';
 
@@ -39,7 +39,7 @@ const until = async (fn: () => boolean) => {
 
 function mount(
   model: ModelClient,
-  opts: { auto?: ('read' | 'write')[]; size?: [number, number] } = {},
+  opts: { auto?: ('read' | 'write')[]; size?: [number, number]; deps?: Partial<ChatDeps> } = {},
 ) {
   const store = new MemoryEventStore();
   const chat = createChat({
@@ -65,6 +65,7 @@ function mount(
     }),
     release: releaseLease(store, 'full-test'),
     model: 'test-model',
+    ...opts.deps,
   });
   const app = render(
     h(FullApp, {
@@ -309,6 +310,95 @@ describe('FullApp', () => {
     m.app.stdin.write('\x1b');
     await tick(80);
     expect(m.frame()).toContain('ctrl+p commands');
+    m.app.unmount();
+  });
+
+  const connect: ChatDeps['connect'] = {
+    providers: () => [
+      { id: 'openai', label: 'OpenAI', needsKey: true },
+      { id: 'ollama', label: 'Ollama', needsKey: false },
+    ],
+    models: () => [
+      { provider: 'openai', model: 'test-model', detail: '$0.05 in' },
+      { provider: 'openai', model: 'gpt-4o', detail: '$2.5 in' },
+    ],
+    login: async () => ({ ok: true, message: 'Connected.', model: 'test-model' }),
+    use: async (provider, model) => ({
+      ok: true,
+      message: `Now using ${model} on ${provider}.`,
+      model,
+    }),
+  };
+
+  it('opens the palette as a centered dialog, grouped, and filters as you type', async () => {
+    const m = await open(new ScriptedModelClient([]), { deps: { connect } });
+    m.app.stdin.write('\x10'); // ctrl+p
+    await until(() => m.chat.getState().overlay === 'palette');
+    await tick();
+    const f = m.frame();
+    const lines = f.split('\n');
+    expect(lines.length).toBeLessThanOrEqual(30);
+    const title = lines.findIndex((l) => l.includes('Commands'));
+    expect(title).toBe(8); // top at a quarter of 30 rows, plus one padding row
+    expect(lines[title]).toContain('esc');
+    // Centered: the title starts well in from the left edge.
+    expect((lines[title] as string).search(/\S/)).toBeGreaterThanOrEqual(6);
+    for (const g of ['Session', 'Model', 'View', 'Help']) expect(f).toContain(g);
+    m.app.stdin.write('think');
+    await tick();
+    expect(m.frame()).toContain('/thinking');
+    expect(m.frame()).not.toContain('Pick up an unfinished task');
+    m.app.stdin.write('\x1b');
+    await until(() => !m.chat.getState().overlay);
+    await tick();
+    expect(m.frame()).not.toContain('Commands');
+    m.app.unmount();
+  });
+
+  it('picks a model in the dialog and keeps the conversation', async () => {
+    const m = await open(new ScriptedModelClient([]), { deps: { connect } });
+    m.app.stdin.write('/model');
+    await tick();
+    m.app.stdin.write('\r');
+    await until(() => m.chat.getState().overlay === 'model');
+    await tick();
+    expect(m.frame()).toContain('Switch model');
+    expect(m.frame()).toContain('gpt-4o');
+    expect(m.frame()).toContain('in use');
+    m.app.stdin.write('4o');
+    await tick();
+    m.app.stdin.write('\r');
+    await until(() => m.chat.getState().model === 'gpt-4o');
+    await tick();
+    expect(m.chat.getState().overlay).toBeUndefined();
+    expect(m.frame()).toContain('gpt-4o');
+    expect(m.frame()).not.toContain('Switch model');
+    m.app.unmount();
+  });
+
+  it('lists providers in the login dialog and moves on to the key in the same frame', async () => {
+    const m = await open(new ScriptedModelClient([]), { deps: { connect } });
+    m.chat.openOverlay('login');
+    await tick();
+    expect(m.frame()).toContain('Connect a model provider');
+    expect(m.frame()).toContain('OpenAI');
+    expect(m.frame()).toContain('Ollama');
+    m.app.stdin.write('\r');
+    await tick();
+    expect(m.frame()).toContain('Connect a model provider');
+    expect(m.frame()).toContain('Paste your API key');
+    m.app.unmount();
+  });
+
+  it('shows the dialog over a session with messages too', async () => {
+    const m = await open(new ScriptedModelClient([done('Four.')]), { deps: { connect } });
+    await m.send('2+2');
+    await until(() => m.chat.getState().phase === 'idle');
+    m.app.stdin.write('\x10');
+    await until(() => m.chat.getState().overlay === 'palette');
+    await tick();
+    expect(m.frame()).toContain('Commands');
+    expect(m.frame()).toContain('2+2');
     m.app.unmount();
   });
 });

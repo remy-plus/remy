@@ -3,6 +3,14 @@
 import { Box, render, Text, useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
 import { Hints } from './hints.ts';
+import { Dialog, dialogSize } from './screen/dialog.ts';
+import {
+  type DialogItem,
+  DialogList,
+  type DialogState,
+  dialogKey,
+  initialDialogState,
+} from './screen/dialog-list.ts';
 import { moveSelection } from './session-picker.ts';
 import type { Theme } from './theme.ts';
 
@@ -35,6 +43,8 @@ export function LoginFlow(p: {
   theme: Theme;
   /** A line under the title, for the first run. */
   intro?: string;
+  /** Draw inside the centered dialog of the full-screen app, for a terminal this size. */
+  dialog?: { columns: number; rows: number };
   /** Verifies and saves. `ok: false` returns to the key question with the message. */
   onSubmit: (entry: LoginEntry) => Promise<LoginResult>;
   onDone: () => void;
@@ -47,7 +57,9 @@ export function LoginFlow(p: {
   const [baseUrl, setBaseUrl] = useState('');
   const [key, setKey] = useState('');
   const [note, setNote] = useState<LoginResult | undefined>();
+  const [dlg, setDlg] = useState<DialogState>(initialDialogState);
   const choice = providers[at] as ProviderChoice;
+  const dialogItems: DialogItem[] = providers.map((c) => ({ id: c.id, title: c.label }));
 
   const submit = async (model: string, k = key, url = baseUrl) => {
     setStep('checking');
@@ -84,6 +96,23 @@ export function LoginFlow(p: {
   useInput((input, k) => {
     if (step === 'checking' || step === 'done') return;
     if (k.escape || (k.ctrl && input === 'c')) return p.onCancel();
+    if (step === 'provider' && p.dialog) {
+      const r = dialogKey(dlg, input, k, { items: dialogItems });
+      setDlg(r.state);
+      if (r.action?.type === 'close') return p.onCancel();
+      if (r.action?.type === 'pick') {
+        const id = r.action.item.id;
+        const idx = providers.findIndex((c) => c.id === id);
+        const c = providers[idx] as ProviderChoice;
+        setAt(idx);
+        setNote(undefined);
+        setText('');
+        setKey('');
+        setBaseUrl('');
+        setStep(c.needsBaseUrl ? 'baseUrl' : c.needsKey ? 'key' : 'model');
+      }
+      return;
+    }
     if (step === 'provider') {
       if (k.upArrow) return setAt((i) => moveSelection(i, -1, providers.length));
       if (k.downArrow) return setAt((i) => moveSelection(i, 1, providers.length));
@@ -126,10 +155,23 @@ export function LoginFlow(p: {
     );
 
   const rows: ReactElement[] = [
-    h(Text, { key: 'title', bold: true }, 'Connect a model provider'),
+    ...(p.dialog ? [] : [h(Text, { key: 'title', bold: true }, 'Connect a model provider')]),
     ...(p.intro && step === 'provider' ? [h(Text, { key: 'intro', ...muted }, p.intro)] : []),
   ];
-  if (step === 'provider') {
+  if (step === 'provider' && p.dialog) {
+    const g = dialogSize(p.dialog.columns, p.dialog.rows, 'small');
+    rows.push(
+      h(DialogList, {
+        key: 'list',
+        items: dialogItems,
+        state: dlg,
+        theme,
+        width: g.inner,
+        rows: Math.min(g.listRows, providers.length + 1),
+        placeholder: 'Search providers',
+      }),
+    );
+  } else if (step === 'provider') {
     for (const [i, c] of providers.entries()) {
       const on = i === at;
       rows.push(
@@ -197,6 +239,12 @@ export function LoginFlow(p: {
         { key: 'note', ...(!note.ok && errorColor ? { color: errorColor } : accentProps) },
         note.message,
       ),
+    );
+  if (p.dialog)
+    return h(
+      Dialog,
+      { title: 'Connect a model provider', theme, ...p.dialog, size: 'small' },
+      ...rows,
     );
   return h(
     Box,
