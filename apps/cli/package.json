@@ -22,7 +22,7 @@
     "node": ">=22.18"
   },
   "bin": {
-    "remy": "./release/remy.js"
+    "remy": "release/remy.js"
   },
   "files": [
     "release"
