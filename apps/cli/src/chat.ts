@@ -932,11 +932,18 @@ export function createChat(deps: ChatDeps): Chat {
           kind: 'note',
           text: 'Remy is working. Let it finish or press Ctrl+C, then switch with /model.',
         });
-      set({ overlay: undefined });
       const r = await deps.connect.use(provider, model);
-      if (!r.ok) return void commit({ kind: 'error', text: r.message });
-      set({ model: r.model ?? model, contextWindow: r.contextWindow });
-      commit({ kind: 'note', text: r.message });
+      // The panel closes together with the result, so a caller watching it sees the note too.
+      if (!r.ok) {
+        set({ overlay: undefined });
+        return void commit({ kind: 'error', text: r.message });
+      }
+      set({
+        model: r.model ?? model,
+        contextWindow: r.contextWindow,
+        overlay: undefined,
+        items: [...s.items, { kind: 'note', text: r.message }],
+      });
       void drain();
     },
     async completeFiles(query) {

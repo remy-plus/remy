@@ -27,6 +27,8 @@ import {
   type SearchState,
   searchKey,
 } from '../input-history.ts';
+import { TaskStrip } from '../onboarding-ui.ts';
+import { NO_TOUR, TourView } from '../onboarding-view.ts';
 import { Menu, menuRows } from '../picker.ts';
 import { APPROVAL_ROWS, approvalHeight, narrate, reasoningTitle } from '../transcript.ts';
 import { TranscriptView } from '../transcript-view.ts';
@@ -125,6 +127,11 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const { chat } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
   const { themeFor } = props;
+  const tourStore = props.onboarding ?? NO_TOUR;
+  const tour = useSyncExternalStore(tourStore.subscribe, tourStore.getState);
+  const taskStep = tour?.step === 'task';
+  const tourRef = useRef<{ ob?: typeof props.onboarding; task: boolean }>({ task: false });
+  tourRef.current = { ob: props.onboarding, task: taskStep };
   const profileStore = props.profile ?? NO_PROFILE;
   const profile = useSyncExternalStore(profileStore.subscribe, profileStore.get);
   const goals = profile?.goals;
@@ -177,6 +184,13 @@ export function FullApp(props: ChatAppProps): ReactElement {
         setSearch(SEARCH_START);
         return true;
       }
+      // During the first task: Enter on an empty prompt moves on, Esc ends the tour.
+      const t = tourRef.current;
+      if (t.task && t.ob) {
+        const phase = chat.getState().phase;
+        if (key.escape && phase !== 'waiting_approval') return (t.ob.skip(), true);
+        if (key.return && !input.text && phase === 'idle') return (t.ob.next(), true);
+      }
       const { total, height } = geometry.current;
       if (key.pageUp) return (setScroll((s) => pageUp(s, total, height)), true);
       if (key.pageDown) return (setScroll((s) => pageDown(s, total, height)), true);
@@ -201,6 +215,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
     mode: props.inputMode ?? 'multi',
     approvalSettleMs: props.approvalSettleMs,
     notifier: props.notifier,
+    paused: Boolean(tour) && !taskStep,
     onKey,
   });
   setInputRef.current = k.setInput;
@@ -280,7 +295,9 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const boxRows = promptBoxRows(input, width, layout.promptMaxRows);
   const menuH = showPrompt && menu && !panelOpen ? menuRows(menuItems.length) : 0;
   const slot =
-    (card ? approvalHeight(card, expanded, cardRoom) : 0) + (showPrompt ? menuH + boxRows + 1 : 0);
+    (card ? approvalHeight(card, expanded, cardRoom) : 0) +
+    (showPrompt ? menuH + boxRows + 1 : 0) +
+    (taskStep ? 1 : 0);
   const height = Math.max(1, rows - slot - 2);
   geometry.current = { total: all.length, height };
   const top = topOf(scroll, all.length, height);
@@ -347,9 +364,18 @@ export function FullApp(props: ChatAppProps): ReactElement {
         rows,
         onTranscript: () => setViewing(true),
         onSidebar: () => setSidebarOn((on) => !on),
+        ...(props.profile && { profile: props.profile }),
+        touring: Boolean(tour),
       })
     : null;
-  if (state.items.length === 0 && state.phase === 'idle')
+  if (tour && props.onboarding && !taskStep)
+    return h(
+      Box,
+      { width: columns, height: rows },
+      h(TourView, { tour: props.onboarding, state: tour, frame: { theme, columns, rows } }),
+      dialog,
+    );
+  if (state.items.length === 0 && state.phase === 'idle' && !taskStep)
     return h(
       Box,
       { width: columns, height: rows },
@@ -405,6 +431,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
       h(
         Box,
         { flexDirection: 'column', flexShrink: 0, marginTop: 1, width },
+        taskStep ? h(TaskStrip, { theme, running: busy }) : null,
         card
           ? h(ApprovalCard, {
               view: card,
