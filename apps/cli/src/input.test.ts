@@ -123,6 +123,57 @@ describe('kill and yank', () => {
   });
 });
 
+describe('undo and redo', () => {
+  const type = (st: InputState, str: string) =>
+    [...str].reduce((acc, ch) => editInput(acc, ch, {}), st);
+
+  it('Ctrl+Z undoes a run of typed characters as one step', () => {
+    let s = type(EMPTY_INPUT, 'hello');
+    s = editInput(s, ' ', {});
+    s = type(s, 'x');
+    expect(s.undo).toHaveLength(1);
+    s = editInput(s, 'z', { ctrl: true });
+    expect(s).toMatchObject({ text: '', cursor: 0 });
+    expect(editInput(s, 'z', { ctrl: true })).toBe(s);
+  });
+
+  it('moving the cursor, deleting and pasting start new steps', () => {
+    let s = type(EMPTY_INPUT, 'ab');
+    s = editInput(s, '', { leftArrow: true });
+    s = type(s, 'X');
+    expect(s.text).toBe('aXb');
+    s = editInput(s, '', { backspace: true });
+    s = editInput(s, '_', { ctrl: true });
+    expect(s.text).toBe('aXb');
+    s = editInput(s, 'z', { ctrl: true });
+    expect(s.text).toBe('ab');
+    s = pasteInput(s, 'more');
+    expect(editInput(s, 'z', { ctrl: true }).text).toBe('ab');
+  });
+
+  it('undoes a word delete, including the paste table', () => {
+    const s = pasteInput(EMPTY_INPUT, big(8));
+    const gone = editInput(s, '', { backspace: true });
+    expect(gone.text).toBe('');
+    const back = editInput(gone, 'z', { ctrl: true });
+    expect(expandPastes(back)).toBe(big(8));
+  });
+
+  it('Alt+Z redoes, and a new edit clears redo', () => {
+    let s = type(EMPTY_INPUT, 'abc');
+    s = editInput(s, 'z', { ctrl: true });
+    expect(editInput(s, 'z', { meta: true }).text).toBe('abc');
+    s = type(s, 'q');
+    expect(editInput(s, 'z', { meta: true })).toBe(s);
+  });
+
+  it('keeps at most 100 steps', () => {
+    let s = EMPTY_INPUT;
+    for (let i = 0; i < 150; i++) s = editInput(editInput(s, 'a', {}), '', { leftArrow: true });
+    expect(s.undo?.length).toBeLessThanOrEqual(100);
+  });
+});
+
 describe('paste', () => {
   it('keeps a small paste as it is, newlines included', () => {
     const s = pasteInput(withText('> '), 'a\r\nb');

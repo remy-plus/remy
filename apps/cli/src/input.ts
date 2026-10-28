@@ -9,7 +9,21 @@ export interface InputState {
   pastes: Record<number, string>;
   /** The last text cut by a kill key (Ctrl+W/U/K, Alt+D, Alt+Backspace); Ctrl+Y puts it back. */
   kill?: string;
+  /** Earlier states for Ctrl+Z, oldest first, at most `UNDO_LIMIT`. */
+  undo?: Snapshot[];
+  /** States undone, for Alt+Z; cleared by the next edit. */
+  redo?: Snapshot[];
+  /** True while the last edit was a typed character, so the next one joins the same undo step. */
+  typing?: boolean;
 }
+
+interface Snapshot {
+  text: string;
+  cursor: number;
+  pastes: Record<number, string>;
+}
+
+export const UNDO_LIMIT = 100;
 
 export const EMPTY_INPUT: InputState = { text: '', cursor: 0, pastes: {} };
 
@@ -51,6 +65,11 @@ const insert = (st: InputState, s: string): InputState => ({
 
 /** Puts pasted text in: small ones as they are, big ones as a marker. */
 export function pasteInput(st: InputState, raw: string, mode: InputMode = 'multi'): InputState {
+  const next = pasteText(st, raw, mode);
+  return next.text === st.text ? st : recordEdit(st, next, false, false);
+}
+
+function pasteText(st: InputState, raw: string, mode: InputMode): InputState {
   const s = normalizeNewlines(raw);
   if (mode === 'single') return insert(st, s.replace(/\n/g, ' '));
   if (!isBig(s)) return insert(st, s);
@@ -64,7 +83,7 @@ export function pasteInput(st: InputState, raw: string, mode: InputMode = 'multi
 
 /** Recalled history: text that would have been a paste comes back as one marker. */
 export const recallInput = (text: string): InputState =>
-  isBig(text) ? pasteInput(EMPTY_INPUT, text) : withText(text);
+  isBig(text) ? pasteText(EMPTY_INPUT, text, 'multi') : withText(text);
 
 /** The message to send: markers swapped for the text they stand for. */
 export function expandPastes(st: InputState): string {
@@ -167,6 +186,61 @@ export function editInput(
   key: EditKey,
   mode: InputMode = 'multi',
 ): InputState {
+  if (key.ctrl && (input === 'z' || input === '_')) return undoInput(st);
+  if (key.meta && !key.ctrl && input === 'z') return redoInput(st);
+  const next = applyKey(st, input, key, mode);
+  if (next === st) return st;
+  if (next.text === st.text) return { ...next, typing: false };
+  const typing = !key.ctrl && !key.meta && !!input && !input.includes('\n');
+  return recordEdit(st, next, typing && st.typing === true, typing);
+}
+
+const snap = (st: InputState): Snapshot => ({
+  text: st.text,
+  cursor: st.cursor,
+  pastes: st.pastes,
+});
+
+/** `next` as the result of an edit to `prev`: pushes `prev` for undo unless this edit joins the last. */
+function recordEdit(
+  prev: InputState,
+  next: InputState,
+  join: boolean,
+  typing: boolean,
+): InputState {
+  const undo = join ? (prev.undo ?? []) : [...(prev.undo ?? []), snap(prev)].slice(-UNDO_LIMIT);
+  return { ...next, undo, redo: [], typing };
+}
+
+/** Ctrl+Z: back to the state before the last edit (a run of typed characters is one edit). */
+export function undoInput(st: InputState): InputState {
+  const undo = st.undo ?? [];
+  const prev = undo[undo.length - 1];
+  if (!prev) return st;
+  return {
+    ...st,
+    ...prev,
+    undo: undo.slice(0, -1),
+    redo: [...(st.redo ?? []), snap(st)],
+    typing: false,
+  };
+}
+
+/** Alt+Z: puts back what Ctrl+Z took away. */
+export function redoInput(st: InputState): InputState {
+  const redo = st.redo ?? [];
+  const next = redo[redo.length - 1];
+  if (!next) return st;
+  return {
+    ...st,
+    ...next,
+    redo: redo.slice(0, -1),
+    undo: [...(st.undo ?? []), snap(st)],
+    typing: false,
+  };
+}
+
+function applyKey(st: InputState, input: string, key: EditKey, mode: InputMode): InputState {
   const { text, cursor } = st;
   const multi = mode === 'multi';
   // Word moves: Alt+B / Alt+F, and Option or Ctrl with the arrows (Ink sets `meta` for Alt).
