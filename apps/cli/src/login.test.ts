@@ -185,6 +185,10 @@ describe('where the key and model come from', () => {
 
 describe('the login picker', () => {
   const tick = () => new Promise((r) => setTimeout(r, 40));
+  /** Waits for a condition instead of a fixed delay: ink throttles renders and onDone fires on a timer. */
+  const until = async (ok: () => boolean) => {
+    for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
+  };
 
   it('lists the providers, hides the key and submits', async () => {
     const onSubmit = vi.fn(
@@ -204,19 +208,19 @@ describe('the login picker', () => {
     for (const word of ['OpenAI', 'OpenRouter', 'Groq', 'Custom base URL'])
       expect(first).toContain(word);
     app.stdin.write('\r');
-    await tick();
+    await until(() => (app.lastFrame() ?? '').includes('Paste your API key'));
     expect(app.lastFrame()).toContain('Paste your API key');
     app.stdin.write(SECRET);
-    await tick();
+    await until(() => (app.lastFrame() ?? '').includes('•••'));
     expect(app.lastFrame()).not.toContain(SECRET);
     expect(app.lastFrame()).toContain('•••');
     app.stdin.write('\r');
-    await tick();
+    await until(() => (app.lastFrame() ?? '').includes('Model'));
     expect(app.lastFrame()).toContain('Model');
     app.stdin.write('gpt-5-nano');
-    await tick();
+    await until(() => (app.lastFrame() ?? '').includes('gpt-5-nano'));
     app.stdin.write('\r');
-    await tick();
+    await until(() => onDone.mock.calls.length > 0);
     expect(onSubmit).toHaveBeenCalledWith({ provider: 'openai', key: SECRET, model: 'gpt-5-nano' });
     expect(app.lastFrame()).toContain('Connected openai.');
     expect(onDone).toHaveBeenCalled();
