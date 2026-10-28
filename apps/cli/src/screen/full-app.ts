@@ -372,6 +372,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
       dialog,
     );
   const main = columns - layout.sidebarWidth;
+  const boxed = theme.level !== 'truecolor';
   const overlayWidth = Math.min(SIDEBAR_WIDTH, Math.max(20, columns - 8));
   return h(
     Box,
@@ -441,8 +442,29 @@ export function FullApp(props: ChatAppProps): ReactElement {
     layout.sidebar === 'none' && overlayOn
       ? h(
           Box,
-          { position: 'absolute', top: 0, right: 0, width: overlayWidth, height: rows },
-          h(Sidebar, { state, theme, height: rows, width: overlayWidth }),
+          {
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: overlayWidth,
+            height: rows,
+            ...(boxed && { borderStyle: 'single' as const }),
+          },
+          boxed
+            ? h(
+                Box,
+                { position: 'absolute', flexDirection: 'column' },
+                ...Array.from({ length: rows - 2 }, (_, i) =>
+                  h(Text, { key: i }, ' '.repeat(overlayWidth - 2)),
+                ),
+              )
+            : null,
+          h(Sidebar, {
+            state,
+            theme,
+            height: boxed ? rows - 2 : rows,
+            width: boxed ? overlayWidth - 2 : overlayWidth,
+          }),
         )
       : null,
     dialog,

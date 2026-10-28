@@ -52,9 +52,10 @@ export function Dialog(p: {
       left: g.left,
       width: g.width,
       flexDirection: 'column',
-      paddingX: 2,
-      paddingY: 1,
-      ...(bg && { backgroundColor: bg }),
+      // Without a panel colour the text beneath would show through; a line marks the edge.
+      ...(bg
+        ? { paddingX: 2, paddingY: 1, backgroundColor: bg }
+        : { paddingX: 1, paddingY: 0, borderStyle: 'single' as const }),
     },
     h(
       Box,
