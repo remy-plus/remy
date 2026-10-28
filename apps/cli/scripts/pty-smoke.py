@@ -269,6 +269,23 @@ def key_bytes(name: str) -> bytes:
     raise SystemExit(f"unknown key in --seq: {name!r}")
 
 
+ERASE_RUN = re.compile(rb"(?:\x1b\[2K\x1b\[1A)+\x1b\[2K")
+
+
+def flicker_line(raw: bytes, deltas: int, secs: float) -> str:
+    """Summarise redraw cost of one streamed turn from the bytes the chat wrote.
+
+    clears: full-screen clears (ESC[2J, ESC[3J). erases: Ink-style erase-and-redraw runs of the
+    live area (one per frame in classic mode). frames: synchronized-output frames.
+    """
+    clears = len(re.findall(rb"\x1b\[[23]J", raw))
+    erases = len(ERASE_RUN.findall(raw))
+    frames = raw.count(b"\x1b[?2026h")
+    per = f"{len(raw) / deltas:.0f}" if deltas else "n/a"
+    return (f"flicker: {deltas} tokens in {secs:.1f}s, {len(raw)} bytes ({per}/token), "
+            f"{clears} full clears, {erases} live-area erases, {frames} sync frames")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cols", type=int, default=100)
@@ -434,7 +451,10 @@ def main() -> int:
     if args.unfocus:
         os.write(master, b"\x1b[O")
         pump(0.3)
+    flick: dict = {}
     for t in turns:
+        if t == turns[-1]:  # the last turn is the one measured
+            flick = {"from": len(raw), "deltas0": fake_stats["deltas"] if fake else 0, "t0": time.time()}
         send(t)
         pump(1.5)  # let the turn begin
         if args.shot and "working" in last_line() and t == turns[-1]:
@@ -445,6 +465,8 @@ def main() -> int:
             ok = False
             break
         pump(0.3)
+        if t == turns[-1]:
+            flick.update(to=len(raw), deltas=(fake_stats["deltas"] - flick["deltas0"]) if fake else 0, secs=time.time() - flick["t0"])
         if "needs approval" in last_line():
             approval_screens.append([l.rstrip() for l in screen.display if l.strip()])
             if args.shot:
@@ -636,6 +658,8 @@ def main() -> int:
     print("\n--- checks ---")
 
     failures = []
+    if flick.get("to"):
+        print(flicker_line(bytes(raw[flick["from"]:flick["to"]]), flick["deltas"], flick["secs"]))
     if args.mode == "full":
         if not (startup_alt or screen.alt_enters):
             print("full mode unavailable: the chat never entered the alternate screen")
