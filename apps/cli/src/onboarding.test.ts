@@ -47,6 +47,12 @@ describe('step order', () => {
     expect(applies('provider', ready)).toBe(false);
   });
 
+  it('passes over the model list when there is nothing to pick from', () => {
+    expect(nextStep('personalise', { connected: true, hasModel: true, choices: false })).toBe(
+      'offer',
+    );
+  });
+
   it('passes over the first task when no model is in use', () => {
     expect(nextStep('model', { connected: true, hasModel: false })).toBe('keys');
   });

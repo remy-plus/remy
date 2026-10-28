@@ -60,10 +60,8 @@ export function createOnboarding(deps: OnboardingDeps): Onboarding {
 
   const facts = (): Facts => {
     const cs = chat.getState();
-    return {
-      connected: Boolean(cs.model) || chat.models().length > 0,
-      hasModel: Boolean(cs.model),
-    };
+    const choices = chat.models().length > 0;
+    return { connected: Boolean(cs.model) || choices, hasModel: Boolean(cs.model), choices };
   };
 
   async function finish(): Promise<void> {

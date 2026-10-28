@@ -27,7 +27,7 @@ function fakeChat(init: { model?: string; saved?: number; overlay?: Overlay } = 
       return () => listeners.delete(fn);
     },
     models: () =>
-      Array.from({ length: init.saved ?? 0 }, (_, i) => ({
+      Array.from({ length: (init.saved ?? 0) + (s.model ? 1 : 0) }, (_, i) => ({
         provider: 'p',
         model: `m${i}`,
         detail: '',

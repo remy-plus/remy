@@ -47,6 +47,8 @@ export interface Facts {
   connected: boolean;
   /** A model is in use, so the first task can run. */
   hasModel: boolean;
+  /** There are models to pick from; a key set only in the environment gives none. Default true. */
+  choices?: boolean;
 }
 
 export const initialState = (prefill?: {
@@ -65,6 +67,7 @@ export const initialState = (prefill?: {
 /** Whether a step is shown, given the facts. */
 export function applies(step: Step, facts: Facts): boolean {
   if (step === 'provider') return !facts.connected;
+  if (step === 'model') return facts.choices !== false;
   if (step === 'offer' || step === 'task') return facts.hasModel;
   return true;
 }
