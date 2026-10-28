@@ -1,6 +1,6 @@
 import type { Tool } from '@remy/core';
 import type { McpServerConfig } from './config.ts';
-import { McpConnection, type McpConnectionOptions } from './connection.ts';
+import { McpAuthRequiredError, McpConnection, type McpConnectionOptions } from './connection.ts';
 import { toTools } from './tools.ts';
 
 export interface McpServerStatus {
@@ -12,7 +12,7 @@ export interface McpServerStatus {
 export interface McpLoadResult {
   tools: Tool[];
   /** Servers that could not be reached or listed. The rest still load. */
-  errors: { server: string; error: string }[];
+  errors: { server: string; error: string; needsAuth?: boolean }[];
 }
 
 /** All configured servers: one lazy connection each, one place to shut them down. */
@@ -60,7 +60,11 @@ export class McpManager {
           const conn = this.connection(server);
           return { server, listed: await conn.listTools(signal) };
         } catch (e) {
-          return { server, error: e instanceof Error ? e.message : String(e) };
+          return {
+            server,
+            error: e instanceof Error ? e.message : String(e),
+            ...(e instanceof McpAuthRequiredError && { needsAuth: true }),
+          };
         }
       }),
     );
@@ -69,7 +73,11 @@ export class McpManager {
     const taken = new Set<string>();
     for (const l of listings) {
       if (l.listed === undefined) {
-        result.errors.push({ server: l.server, error: l.error ?? 'unknown error' });
+        result.errors.push({
+          server: l.server,
+          error: l.error ?? 'unknown error',
+          ...(l.needsAuth && { needsAuth: true }),
+        });
         continue;
       }
       const config = this.#configs[l.server] as McpServerConfig;

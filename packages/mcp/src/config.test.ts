@@ -15,6 +15,15 @@ describe('mcp server config', () => {
     expect(isStdio(c)).toBe(false);
   });
 
+  it('accepts auth: oauth on a remote server only as "oauth"', () => {
+    expect(
+      mcpServerConfigSchema.parse({ url: 'https://x.example/mcp', auth: 'oauth' }),
+    ).toMatchObject({ auth: 'oauth' });
+    expect(
+      mcpServerConfigSchema.safeParse({ url: 'https://x.example/mcp', auth: 'basic' }).success,
+    ).toBe(false);
+  });
+
   it('accepts trustHints, enabled, timeout and tool overrides', () => {
     const c = mcpServerConfigSchema.parse({
       command: 'x',

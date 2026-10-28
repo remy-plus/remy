@@ -34,6 +34,8 @@ export interface McpStdioConfig extends McpServerCommon {
 export interface McpHttpConfig extends McpServerCommon {
   url: string;
   headers?: Record<string, string> | undefined;
+  /** `oauth`: the server asks you to sign in in a browser; Remy keeps the tokens in the Keychain. */
+  auth?: 'oauth' | undefined;
 }
 
 export type McpServerConfig = McpStdioConfig | McpHttpConfig;
@@ -74,6 +76,7 @@ const http = z.object({
   url: z.url({ protocol: /^https?$/ }),
   headers: z.record(z.string(), z.string()).optional(),
   command: z.never({ error: EITHER }).optional(),
+  auth: z.literal('oauth').optional(),
   ...common,
 });
 

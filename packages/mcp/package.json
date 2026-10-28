@@ -11,6 +11,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./oauth-testing": {
+      "@remy/source": "./src/testing/oauth-server.ts"
+    },
     "./testing": {
       "@remy/source": "./src/testing/fake-server.ts"
     }

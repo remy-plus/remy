@@ -1,9 +1,19 @@
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
   getDefaultEnvironment,
   StdioClientTransport,
 } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  InvalidClientError,
+  InvalidGrantError,
+  UnauthorizedClientError,
+} from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   type CallToolResult,
@@ -39,11 +49,31 @@ export interface McpCaller {
   ): Promise<McpCallOutcome>;
 }
 
+/** The server wants you to sign in (or sign in again) before it answers. Not a failure of the server. */
+export class McpAuthRequiredError extends Error {
+  readonly server: string;
+  constructor(server: string) {
+    super(`"${server}" needs sign-in`);
+    this.name = 'McpAuthRequiredError';
+    this.server = server;
+  }
+}
+
 export interface McpConnectionOptions {
+  /** OAuth for a remote server: tokens, client registration and the browser step live behind this. */
+  authProvider?: OAuthClientProvider | undefined;
   /** Replaces the stdio / HTTP transport. Called again on every (re)connect. Used by tests. */
   createTransport?: () => Transport | Promise<Transport>;
   clientVersion?: string;
 }
+
+/** The server wants a (new) sign-in: a 401, or tokens and client registration it no longer accepts. */
+const isAuthError = (e: unknown) =>
+  e instanceof UnauthorizedError ||
+  (e instanceof StreamableHTTPError && e.code === 401) ||
+  e instanceof InvalidGrantError ||
+  e instanceof InvalidClientError ||
+  e instanceof UnauthorizedClientError;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -99,6 +129,8 @@ export class McpConnection implements McpCaller {
       });
     } catch (e) {
       await client.close().catch(() => {});
+      // A 401 with no way to sign in, or a sign-in that has to happen first: say so, not "failed".
+      if (isAuthError(e)) throw new McpAuthRequiredError(this.name);
       throw new Error(`could not connect to MCP server "${this.name}": ${message(e)}`);
     }
     if (this.#closed) {
@@ -129,6 +161,7 @@ export class McpConnection implements McpCaller {
     }
     return new StreamableHTTPClientTransport(new URL(c.url), {
       ...(c.headers ? { requestInit: { headers: c.headers } } : {}),
+      ...(this.#opts.authProvider ? { authProvider: this.#opts.authProvider } : {}),
     });
   }
 
@@ -163,6 +196,13 @@ export class McpConnection implements McpCaller {
       client = await this.connect(signal);
     } catch (e) {
       // Nothing was sent, so nothing happened.
+      if (e instanceof McpAuthRequiredError)
+        return {
+          ok: false,
+          error: `${this.name} needs sign-in. Run remy connect auth ${this.name}.`,
+          retryable: false,
+          phase: 'before_effect',
+        };
       return { ok: false, error: message(e), retryable: true, phase: 'before_effect' };
     }
     try {
@@ -180,6 +220,14 @@ export class McpConnection implements McpCaller {
       ) {
         return { ok: false, error: message(e), retryable: false, phase: 'before_effect' };
       }
+      // The server refused the request itself (token expired mid-session): it did not run the tool.
+      if (isAuthError(e))
+        return {
+          ok: false,
+          error: `${this.name} needs sign-in. Run remy connect auth ${this.name}.`,
+          retryable: false,
+          phase: 'before_effect',
+        };
       // A crash, a closed pipe, a timeout or an abort after sending: the effect may have happened.
       const closed = e instanceof McpError && e.code === ErrorCode.ConnectionClosed;
       if (closed && this.#client === client) this.#client = undefined;
