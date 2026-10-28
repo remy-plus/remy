@@ -473,6 +473,48 @@ describe('resume', () => {
     expect(second.getState().picker).toBeUndefined();
   });
 
+  it('rebuilds the title and files touched when a task is resumed in a new process', async () => {
+    const first = harness(
+      new ScriptedModelClient([write, call('ask_user', { question: 'Next?' })]),
+    );
+    await first.chat.submit('save a note');
+    expect(first.chat.getState().phase).toBe('waiting_user');
+    await first.chat.interrupt();
+    const model = new ScriptedModelClient([done('Saved.')]);
+    const store = first.store;
+    const second = createChat({
+      runtime: (hooks) =>
+        createRuntime({
+          store,
+          model,
+          tools: new ToolRegistry([writeFile, askUser, finish]),
+          owner: 'chat-test-3',
+          capabilities: (config) => ({
+            fs: createScopedFs(config.workspaceDir),
+            net: createScopedFetch({}),
+            secrets: { get: () => undefined },
+          }),
+          sleep: async () => {},
+          ...hooks,
+        }),
+      config: (context) => ({
+        model: model.id,
+        permissions: { autoApprove: ['read', 'write'] },
+        budget: DEFAULT_BUDGET,
+        workspaceDir: dir,
+        context,
+      }),
+      listTasks: () => store.listTasks(),
+      readEvents: (id) => store.read(id),
+      release: releaseLease(store, 'chat-test-3'),
+    });
+    expect(second.getState().title).toBeUndefined();
+    await second.submit('/resume');
+    await second.resume(second.getState().picker?.[0]?.taskId ?? '');
+    expect(second.getState().title).toBe('save a note');
+    expect(second.getState().filesTouched).toMatchObject([{ path: 'a.txt' }]);
+  });
+
   it('says so when nothing is waiting', async () => {
     const { chat } = harness(new ScriptedModelClient([]));
     await chat.submit('/resume');

@@ -740,6 +740,14 @@ export function createChat(deps: ChatDeps): Chat {
       };
       workspaceDir = st.config.workspaceDir;
       commit({ kind: 'user', text: st.prompt }, { kind: 'note', text: resumeBanner(id, plan) });
+      // A new process starts without the sidebar's facts: rebuild them from the stored events.
+      let touched: FileTouch[] = s.filesTouched ?? [];
+      for (const c of Object.values(st.calls).sort((a, b) => a.step - b.step)) {
+        if (!c.result?.ok) continue;
+        const paths = changedPaths(c.tool, c.args).map((p) => workspacePath(p, workspaceDir));
+        if (paths.length) touched = touchFiles(touched, paths);
+      }
+      if (touched.length) set({ filesTouched: touched });
       if (!s.title) set({ title: sessionTitle(st.prompt, st.config.pasted) });
       set({
         phase: 'running',
