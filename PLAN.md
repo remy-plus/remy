@@ -400,15 +400,17 @@ New code lives in `apps/cli/src/screen/`. Pure functions carry the logic and get
 - Components: `Viewport`, `PromptBox`, `Home`, `Session`, `Sidebar`, `Dialog`, `FullApp`.
 
 **Phases** (Sonnet writes, Opus reviews and merges; one concern per commit, `pnpm check` green on each):
-- **A. Foundation.** Theme tokens (`panel`, `element`, `bar`, `barActive`); `layout.ts`; `scroll.ts`; `rows.ts` for user, assistant, tool, error, plan items; key handling pulled out of `ChatApp` into a shared hook; `runChat` picks full-screen or classic; `--classic` flag and env; alternate screen with incremental rendering and a frame cap.
-- **B. Session screen.** Viewport with sticky bottom and PgUp/PgDn, Ctrl+U/D, Home/End; user messages as a panel with a left bar; assistant text indented with markdown; tool rows with icons (muted when done, live spinner when running, error colour on failure, strikethrough when denied); block bodies only for edits and commands, collapsed to 10 lines; thinking as one line; a per-turn footer (model · time); approval and questions replace the prompt in the bottom slot.
-- **C. Prompt box.** Left bar plus panel, 1 to max(6, rows/3) lines, placeholder with an example, a meta row (model · provider), a row below (working status and "esc interrupt", or workspace on the left; context, cost, "ctrl+p commands" on the right); autocomplete pops up above the box.
+- **A. Foundation.** (built 2026-10-27, awaiting review) Theme tokens (`panel`, `element`, `bar`, `barActive`); `layout.ts`; `scroll.ts`; `rows.ts` for user, assistant, tool, error, plan items; key handling pulled out of `ChatApp` into a shared hook; `runChat` picks full-screen or classic; `--classic` flag and env; alternate screen with incremental rendering and a frame cap.
+- **B. Session screen.** (built 2026-10-27, awaiting review) Viewport with sticky bottom and PgUp/PgDn, Ctrl+U/D, Home/End; user messages as a panel with a left bar; assistant text indented with markdown; tool rows with icons (muted when done, live spinner when running, error colour on failure, strikethrough when denied); block bodies only for edits and commands, collapsed to 10 lines; thinking as one line; a per-turn footer (model · time); approval and questions replace the prompt in the bottom slot.
+- **C. Prompt box.** (built 2026-10-27, awaiting review) Left bar plus panel, 1 to max(6, rows/3) lines, placeholder with an example, a meta row (model · provider), a row below (working status and "esc interrupt", or workspace on the left; context, cost, "ctrl+p commands" on the right); autocomplete pops up above the box.
 - **D. Home.** Centered wordmark, prompt (max 75 wide), one tip line, footer (workspace, version). The first message moves to the session screen.
 - **E. Dialogs.** A centered panel (60/88/116 wide, top at rows/4) for the palette, model picker, sessions, login and the transcript search; title with "esc" at right, search field, grouped list.
 - **F. Sidebar.** Inline at >120 columns (42 wide), else toggled as an overlay: title, context and cost, plan, files touched.
 - **G. Input feel.** The real terminal cursor, word moves and deletes, Ctrl+A/E/K/U/W, undo, paste markers at 3+ lines or 150+ characters, history search.
 - **H. Streaming and motion.** Coalesce text deltas to the frame rate, an 80 ms spinner, no layout shift while streaming, a calm fade for the prompt meta.
 - **I. Ship.** pty smoke and screenshots for both modes, docs, CHANGELOG, 0.3.0.
+
+Notes from the build: Ctrl+D and Ctrl+U scroll half a page when the prompt is empty (Ctrl+C or `/exit` quits); Ctrl+O still opens the classic transcript view; replies carry `model` and `ms` for the per-turn footer; tool bodies come from `ToolLine.detail` (8 lines recorded), shown only for edits and commands.
 
 Also researched with REA once its tools load: Claude Code's shipped bundle (its full-screen mode and input handling), recorded in `design/research/engineering/claude-code.md`.
 
