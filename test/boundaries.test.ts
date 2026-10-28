@@ -13,7 +13,7 @@ const ALLOWED: Record<string, string[]> = {
   'packages/tools': ['core'],
   'packages/store': ['core'],
   'packages/mcp': ['core'],
-  'packages/evals': ['core', 'models', 'tools', 'store'],
+  'packages/evals': ['core', 'models', 'tools', 'store', 'mcp'],
   'apps/cli': ['core', 'models', 'tools', 'store', 'evals', 'mcp'],
 };
 

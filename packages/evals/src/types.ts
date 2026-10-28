@@ -1,7 +1,14 @@
 import type { Budget, EventType, ModelClient, Risk, TaskStatus } from '@remy/core';
 
-export type Suite = 'research' | 'files' | 'approval' | 'injection' | 'recovery';
-export const SUITES: readonly Suite[] = ['research', 'files', 'approval', 'injection', 'recovery'];
+export type Suite = 'research' | 'files' | 'approval' | 'injection' | 'recovery' | 'connections';
+export const SUITES: readonly Suite[] = [
+  'research',
+  'files',
+  'approval',
+  'injection',
+  'recovery',
+  'connections',
+];
 
 export interface MockEmail {
   id: string;
@@ -30,11 +37,45 @@ export interface Human {
   answers?: string[];
 }
 
+/** One tool of a fake MCP server. Every parameter is a required string. */
+export interface McpToolSpec {
+  name: string;
+  description: string;
+  /** What the server claims. Remy believes `readOnlyHint` only when the server has `trustHints`. */
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+  /** Parameter name to description. */
+  params?: Record<string, string>;
+  /** What the server answers. Default: the `output` text (or "ok"). */
+  result?: {
+    output?: string;
+    /** An `isError` result: the server ran the tool and says it failed. */
+    isError?: boolean;
+    /** The server process dies while the call is running: no reply ever arrives. */
+    dies?: boolean;
+  };
+}
+
+/** A fake MCP server run in-process, reached through the real MCP client and adapter. */
+export interface McpServerSpec {
+  name: string;
+  /** The user's config says to believe this server's `readOnlyHint`s. Off for a hand-added server. */
+  trustHints?: boolean;
+  tools: McpToolSpec[];
+  /** The sign-in expires right after the tools are listed: every later call is refused (a 401). */
+  signsOutAfterListing?: boolean;
+}
+
 export interface EvalCase {
   id: string;
   suite: Suite;
   prompt: string;
-  world: { web?: Record<string, string>; files?: Record<string, string>; inbox?: MockEmail[] };
+  world: {
+    web?: Record<string, string>;
+    files?: Record<string, string>;
+    inbox?: MockEmail[];
+    /** Fake MCP servers. Their tools are named `<server>__<tool>` and allowed automatically. */
+    mcp?: McpServerSpec[];
+  };
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];
   human: Human;
@@ -103,6 +144,8 @@ export interface RunRecord {
   toolCalls: ToolCallRecord[];
   approvals: ApprovalRecord[];
   crashes: number;
+  /** For cases with MCP servers: the MCP tool names offered to the model on each request, in order. */
+  offered?: string[][];
   /** Extra chat turns after the first task, when the agent ended by asking a question. */
   followUps?: number;
   /** Tools that started without an approval they needed, or after a denial. */
@@ -120,6 +163,8 @@ export interface WorldAfter {
   files: Record<string, string>;
   /** Every email_send execution, duplicates included. */
   emails: SentEmail[];
+  /** Every call that reached a fake MCP server, as the server saw it (tool name without the server prefix). */
+  mcpCalls: { server: string; tool: string; args: Record<string, unknown> }[];
 }
 
 export interface GradeResult {

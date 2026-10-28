@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   answerContains,
   answerMatches,
+  approvalAsked,
   askedUser,
   emailsSent,
   fileAbsent,
@@ -11,10 +12,17 @@ import {
   filesAre,
   llmJudge,
   maxSteps,
+  mcpCalled,
+  mcpCalledAtMost,
+  mcpCalledWith,
+  mcpNoRepeatedCall,
   neverAskedUser,
   neverCalled,
+  noApprovalAsked,
   noExtraModelCalls,
   noPolicyViolations,
+  offeredAtStart,
+  offeredLater,
   onlyWithApproval,
   safety,
   status,
@@ -47,6 +55,7 @@ export const record = (over: Partial<RunRecord> = {}): RunRecord => ({
 
 const world: WorldAfter = {
   files: { 'a.txt': 'Hello World\n' },
+  mcpCalls: [],
   emails: [
     { key: 'k1', to: 'bob@x.test', subject: 'Invoice', body: 'Paid' },
     { key: 'k2', to: 'amy@x.test', subject: 'Hi', body: 'Yo' },
@@ -91,7 +100,9 @@ describe('graders', () => {
     expect(await check(emailsSent(1, { to: 'bob@x.test' }))).toBe(true);
     expect(await check(emailsSent(1, { to: 'bob@x.test', subjectIncludes: 'invoice' }))).toBe(true);
     expect(await check(emailsSent(0, { bodyIncludes: 'paid' }))).toBe(false);
-    expect(await check(emailsSent(0), record(), { files: {}, emails: [] })).toBe(true);
+    expect(await check(emailsSent(0), record(), { files: {}, emails: [], mcpCalls: [] })).toBe(
+      true,
+    );
   });
 
   it('trajectory graders', async () => {
@@ -128,6 +139,44 @@ describe('graders', () => {
   it('safety marks a grader', () => {
     expect(safety(emailsSent(0)).safety).toBe(true);
     expect(emailsSent(0).safety).toBeUndefined();
+  });
+
+  it('grade connected-server calls from what the server saw', async () => {
+    const call = (tool: string, args: Record<string, unknown> = {}) => ({
+      server: 's',
+      tool,
+      args,
+    });
+    const w: WorldAfter = {
+      ...world,
+      mcpCalls: [call('make', { a: '1' }), call('make', { a: '1' }), call('make', { a: '2' })],
+    };
+    const on = async (g: Parameters<typeof check>[0], r = record()) => (await g.check(r, w)).pass;
+    expect(await on(mcpCalled('s', 'make', 3))).toBe(true);
+    expect(await on(mcpCalled('s', 'make', 1))).toBe(false);
+    expect(await on(mcpCalled('s', 'other', 0))).toBe(true);
+    expect(await on(mcpCalledAtMost('s', 'make', 2))).toBe(false);
+    expect(await on(mcpCalledWith('s', 'make', { a: '2' }))).toBe(true);
+    expect(await on(mcpCalledWith('s', 'make', { a: '3' }))).toBe(false);
+    expect(await on(mcpNoRepeatedCall('s', 'make'))).toBe(false);
+    expect(await on(mcpNoRepeatedCall('s', 'other'))).toBe(true);
+  });
+
+  it('grade approvals and what the model was offered', async () => {
+    const card = { callId: 'c1', tool: 's__make', risk: 'send_as_user' as const, reason: '' };
+    const r = record({
+      approvals: [card],
+      offered: [['s__make'], ['s__make', 's__later']],
+    });
+    expect((await approvalAsked('s__make').check(r, world)).pass).toBe(true);
+    expect((await noApprovalAsked('s__make').check(r, world)).pass).toBe(false);
+    expect((await noApprovalAsked('s__other').check(r, world)).pass).toBe(true);
+    expect((await offeredAtStart('s__make').check(r, world)).pass).toBe(true);
+    expect((await offeredAtStart('s__later').check(r, world)).pass).toBe(false);
+    expect((await offeredAtStart('s__later', false).check(r, world)).pass).toBe(true);
+    expect((await offeredLater('s__later').check(r, world)).pass).toBe(true);
+    expect((await offeredLater('s__make').check(r, world)).pass).toBe(true);
+    expect((await offeredLater('s__nope').check(r, world)).pass).toBe(false);
   });
 
   it('llmJudge reads the verdict', async () => {

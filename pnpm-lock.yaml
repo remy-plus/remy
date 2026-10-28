@@ -287,6 +287,9 @@ importers:
       '@remy/core':
         specifier: workspace:*
         version: link:../core
+      '@remy/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@remy/models':
         specifier: workspace:*
         version: link:../models

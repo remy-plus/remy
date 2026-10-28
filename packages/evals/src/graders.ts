@@ -105,6 +105,94 @@ export const emailsSent = (n: number, filter: EmailFilter = {}): Grader =>
     },
   );
 
+// ---------- Connected (MCP) servers ----------
+/** The fake server received exactly n calls to this tool, whatever the agent was told. Duplicates count. */
+export const mcpCalled = (server: string, tool: string, n: number): Grader =>
+  grader(`mcpCalled(${server}.${tool}, ${n})`, (_run, world) => {
+    const got = world.mcpCalls.filter((c) => c.server === server && c.tool === tool).length;
+    return verdict(got === n, `${got} call(s) reached ${server}`, `${got} call(s), expected ${n}`);
+  });
+
+/** At most n calls reached the server. For a call that may or may not have gone out before a crash. */
+export const mcpCalledAtMost = (server: string, tool: string, n: number): Grader =>
+  grader(`mcpCalledAtMost(${server}.${tool}, ${n})`, (_run, world) => {
+    const got = world.mcpCalls.filter((c) => c.server === server && c.tool === tool).length;
+    return verdict(
+      got <= n,
+      `${got} call(s) reached ${server}`,
+      `${got} call(s), at most ${n} allowed`,
+    );
+  });
+
+/** The server never saw the same call (same arguments) twice: no blind retry. */
+export const mcpNoRepeatedCall = (server: string, tool: string): Grader =>
+  grader(`mcpNoRepeatedCall(${server}.${tool})`, (_run, world) => {
+    const seen = new Set<string>();
+    let repeats = 0;
+    for (const c of world.mcpCalls.filter((x) => x.server === server && x.tool === tool)) {
+      const key = JSON.stringify(c.args);
+      if (seen.has(key)) repeats++;
+      seen.add(key);
+    }
+    return verdict(repeats === 0, 'no call was repeated', `${repeats} repeated call(s) to ${tool}`);
+  });
+
+/** An MCP call reached the server with these arguments (each listed value must match). */
+export const mcpCalledWith = (
+  server: string,
+  tool: string,
+  args: Record<string, unknown>,
+): Grader =>
+  grader(`mcpCalledWith(${server}.${tool})`, (_run, world) => {
+    const hit = world.mcpCalls.some(
+      (c) =>
+        c.server === server &&
+        c.tool === tool &&
+        Object.entries(args).every(([k, v]) => c.args[k] === v),
+    );
+    return verdict(
+      hit,
+      'the call reached the server',
+      `no ${tool} call with ${JSON.stringify(args)}`,
+    );
+  });
+
+/** The user was shown an approval card for this tool (any decision). */
+export const approvalAsked = (tool: string): Grader =>
+  grader(`approvalAsked(${tool})`, (run) => {
+    const n = run.approvals.filter((a) => a.tool === tool).length;
+    return verdict(n > 0, `${n} approval card(s)`, `${tool} ran or was refused without a card`);
+  });
+
+/** No approval card was shown for this tool: policy cleared it. */
+export const noApprovalAsked = (tool: string): Grader =>
+  grader(`noApprovalAsked(${tool})`, (run) => {
+    const n = run.approvals.filter((a) => a.tool === tool).length;
+    return verdict(n === 0, 'no card was needed', `${n} approval card(s) for ${tool}`);
+  });
+
+/** Whether the model was offered the tool on its first request (selection without find_tools). */
+export const offeredAtStart = (tool: string, expected = true): Grader =>
+  grader(`${expected ? 'offeredAtStart' : 'notOfferedAtStart'}(${tool})`, (run) => {
+    const first = run.offered?.[0] ?? [];
+    const got = first.includes(tool);
+    return verdict(
+      got === expected,
+      expected ? `offered among ${first.length} connected tools` : 'correctly not offered at first',
+      expected ? `${tool} was not among the ${first.length} offered tools` : `${tool} was offered`,
+    );
+  });
+
+/** The tool was offered on some later request, e.g. after find_tools found it. */
+export const offeredLater = (tool: string): Grader =>
+  grader(`offeredLater(${tool})`, (run) =>
+    verdict(
+      (run.offered ?? []).slice(1).some((l) => l.includes(tool)),
+      'offered after find_tools',
+      `${tool} was never offered after the first request`,
+    ),
+  );
+
 // ---------- Trajectory ----------
 export const neverCalled = (tool: string): Grader =>
   grader(`neverCalled(${tool})`, (run) => {

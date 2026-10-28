@@ -7,9 +7,12 @@ import {
   type FetchResult,
   type ScopedFetch,
   type ScopedFs,
+  SELECT_THRESHOLD,
   type Tool,
   type ToolContext,
 } from '@remy/core';
+import { McpManager } from '@remy/mcp';
+import { type FakeServer, fakeServer } from '@remy/mcp/testing';
 import {
   askUser,
   calculate,
@@ -29,7 +32,7 @@ import {
   writeFile,
 } from '@remy/tools';
 import { z } from 'zod';
-import type { EvalCase, MockEmail, SentEmail, WorldAfter } from './types.ts';
+import type { EvalCase, McpServerSpec, MockEmail, SentEmail, WorldAfter } from './types.ts';
 
 export function fixtureFetch(web: Record<string, string>): ScopedFetch {
   return {
@@ -131,6 +134,66 @@ export function inboxTools(inbox: MockEmail[], sent: SentEmail[]): Tool[] {
   return [read, send];
 }
 
+export interface McpWorld {
+  tools: Tool[];
+  calls: () => WorldAfter['mcpCalls'];
+  close: () => Promise<void>;
+}
+
+/**
+ * Starts the case's fake MCP servers in-process and loads their tools through the real adapter
+ * (`McpManager` over the in-memory transport), so classification, naming, output trust and failure
+ * mapping are exactly what a connected server gets. A server with `trustHints` is configured the way
+ * a catalog entry is; any other is configured like a hand-added one.
+ */
+export async function createMcpWorld(specs: McpServerSpec[]): Promise<McpWorld> {
+  const fakes = new Map<string, FakeServer>();
+  const servers: Record<string, { command: string; trustHints?: boolean }> = {};
+  for (const spec of specs) {
+    const fake: FakeServer = fakeServer(
+      spec.tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        ...(t.annotations && { annotations: t.annotations }),
+        inputSchema: {
+          type: 'object' as const,
+          properties: Object.fromEntries(
+            Object.entries(t.params ?? {}).map(([k, d]) => [k, { type: 'string', description: d }]),
+          ),
+          required: Object.keys(t.params ?? {}),
+        },
+      })),
+      async (name) => {
+        const r = spec.tools.find((t) => t.name === name)?.result;
+        if (r?.dies) {
+          // The process goes away while handling the call. The call was received, the reply never is.
+          await fake.crash();
+          return { content: [{ type: 'text', text: '' }] };
+        }
+        return {
+          content: [{ type: 'text', text: r?.output ?? 'ok' }],
+          ...(r?.isError && { isError: true }),
+        };
+      },
+    );
+    fakes.set(spec.name, fake);
+    servers[spec.name] = { command: 'fake-mcp', ...(spec.trustHints && { trustHints: true }) };
+  }
+  const manager = new McpManager(servers, (name) => (fakes.get(name) as FakeServer).options);
+  const loaded = await manager.loadTools();
+  if (loaded.errors.length)
+    throw new Error(`fake MCP server failed: ${loaded.errors.map((e) => e.error).join('; ')}`);
+  for (const spec of specs) if (spec.signsOutAfterListing) await fakes.get(spec.name)?.signOut();
+  return {
+    tools: loaded.tools,
+    calls: () =>
+      [...fakes].flatMap(([server, f]) =>
+        f.calls.map((c) => ({ server, tool: c.name, args: c.args })),
+      ),
+    close: () => manager.closeAll(),
+  };
+}
+
 export interface World {
   dir: string;
   tools: Tool[];
@@ -192,6 +255,14 @@ export async function createWorld(c: EvalCase): Promise<World> {
   ];
   const allowTools = [...new Set([...(c.tools ?? useful), 'finish', 'ask_user'])];
 
+  const mcp = c.world.mcp?.length ? await createMcpWorld(c.world.mcp) : undefined;
+  if (mcp) {
+    tools.push(...mcp.tools);
+    allowTools.push(...mcp.tools.map((t) => t.name));
+    // With many connected tools the runtime adds find_tools and offers a subset.
+    if (mcp.tools.length > SELECT_THRESHOLD) allowTools.push('find_tools');
+  }
+
   const net = fixtureFetch(web);
   return {
     dir,
@@ -201,8 +272,11 @@ export async function createWorld(c: EvalCase): Promise<World> {
     async after() {
       const files: Record<string, string> = {};
       await walk(fs, '.', files);
-      return { files, emails: [...sent] };
+      return { files, emails: [...sent], mcpCalls: mcp?.calls() ?? [] };
     },
-    cleanup: () => rm(dir, { recursive: true, force: true }),
+    async cleanup() {
+      await mcp?.close();
+      await rm(dir, { recursive: true, force: true });
+    },
   };
 }

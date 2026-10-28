@@ -50,11 +50,14 @@ function counting(inner: ModelClient) {
     id: inner.id,
     caps: inner.caps,
     calls: 0,
+    /** MCP tool names offered on each request. */
+    offered: [] as string[][],
     async complete(
       req: Parameters<ModelClient['complete']>[0],
       signal: AbortSignal,
     ): Promise<ModelResponse> {
       m.calls += 1;
+      m.offered.push(req.tools.map((t) => t.name).filter((n) => n.includes('__')));
       return inner.complete(req, signal);
     },
   };
@@ -178,6 +181,7 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
       record.approvals.unshift(...r.approvals);
       record.policyViolations.unshift(...r.policyViolations);
     }
+    if (c.world.mcp) record.offered = counted.offered;
     if (taskIds.length > 1) record.followUps = taskIds.length - 1;
 
     const graders = [safety(noPolicyViolations()), ...c.graders];
