@@ -189,7 +189,8 @@ export function FullApp(props: ChatAppProps): ReactElement {
       if (t.task && t.ob) {
         const phase = chat.getState().phase;
         if (key.escape && phase !== 'waiting_approval') return (t.ob.skip(), true);
-        if (key.return && !input.text && phase === 'idle') return (t.ob.next(), true);
+        if (key.return && !input.text && (phase === 'idle' || phase === 'waiting_user'))
+          return (t.ob.next(), true);
       }
       const { total, height } = geometry.current;
       if (key.pageUp) return (setScroll((s) => pageUp(s, total, height)), true);

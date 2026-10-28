@@ -297,6 +297,7 @@ def main() -> int:
     ap.add_argument("--unfocus", action="store_true", help="send a focus-out report, then expect a bell at approval")
     ap.add_argument("--editing", action="store_true", help="also try a multi-line message, a bracketed paste and the Ctrl+O view")
     ap.add_argument("--pasted-write", action="store_true", help="paste an email with a hidden instruction, ask for a write, expect an approval; then /resume it")
+    ap.add_argument("--onboarding", action="store_true", help="first run of the welcome tour (fake model): every step, then the home greeting")
     ap.add_argument("--ease", action="store_true", help="first run in an empty REMY_HOME, then /, Ctrl+P, /model and @ completion")
     ap.add_argument("--cli-arg", action="append", default=[], help="an extra argument for the chat (repeatable)")
     ap.add_argument("--raw", help="write the raw bytes to this file")
@@ -330,6 +331,10 @@ def main() -> int:
     env = dict(os.environ, TERM=args.term, COLORTERM="truecolor", REMY_HOME=home)
     env["REMY_KEYCHAIN"] = "off"  # never touch the real Keychain from a smoke run
     key = env.get("OPENAI_API_KEY", "")
+    if not args.ease and not args.onboarding:
+        # Not a first run: the welcome tour only appears with --onboarding or --ease.
+        with open(os.path.join(home, "preferences.json"), "w") as f:
+            f.write('{"onboarded": true}')
     if args.ease:
         # A new user: no profile, no model, no key in the environment.
         for k in ("REMY_PROFILE", "REMY_MODEL", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "REMY_API_KEY"):
@@ -452,6 +457,52 @@ def main() -> int:
         shot_ease("connected")
         if not has("connected", "gpt-5-nano"):
             ease_fail.append("login did not end on a connected model")
+    if args.onboarding:
+        tour_fail: list[str] = []
+        pump(2.5)
+        shot_ease("welcome")
+        if not has("welcome", "Enter to begin"):
+            tour_fail.append("no welcome screen")
+        for label, data, want in (
+            ("name", b"\r", "What should I call you?"),
+            ("goals", [b"Sam", b"\r"], "What do you mostly want help with?"),
+            ("personalise", [b"\x1b[B", b" ", b"\x1b[B", b"\x1b[B", b" ", b"\r"], "personalise replies"),
+            ("offer", b"y", "Ready for a first task?"),
+        ):
+            for chunk in data if isinstance(data, list) else [data]:
+                os.write(master, chunk)  # one key per write, as a terminal sends them
+                pump(0.15)
+            pump(0.8)
+            shot_ease(label)
+            if not has(label, want):
+                tour_fail.append(f"{label}: expected {want!r}")
+        os.write(master, b"\r")
+        wait_for("Enter to continue", args.timeout)
+        pump(0.5)
+        shot_ease("first task")
+        if not has("first task", "Enter to continue"):
+            tour_fail.append("first task did not finish")
+        os.write(master, b"\r")
+        pump(0.8)
+        shot_ease("keys")
+        if not has("keys", "Three keys to remember"):
+            tour_fail.append("no keys screen")
+        os.write(master, b"\r")
+        pump(1.5)
+        shot_ease("home")
+        if not has("home", "Sam."):
+            tour_fail.append("home did not greet by name")
+        try:
+            mode = os.stat(os.path.join(home, "profile.json")).st_mode & 0o777
+            if mode != 0o600:
+                tour_fail.append(f"profile.json mode {oct(mode)}")
+        except OSError:
+            tour_fail.append("no profile.json")
+        for f in tour_fail:
+            print("ONBOARDING FAIL:", f)
+        if tour_fail:
+            proc.kill()
+            return 1
     ok = True if args.ease else wait_for("ready", 30)
     if not ok:
         print("the chat did not become ready; screen:\n" + "\n".join(screen.display))
