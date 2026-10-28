@@ -52,8 +52,8 @@ export type Item =
   | { kind: 'question'; text: string }
   | { kind: 'tool'; line: ToolLine }
   | { kind: 'plan'; steps: PlanStep[] }
-  | { kind: 'note'; text: string }
-  | { kind: 'error'; text: string };
+  | { kind: 'note'; text: string; model?: string; ms?: number; stopped?: boolean }
+  | { kind: 'error'; text: string; model?: string; ms?: number };
 
 /** One resumable task in the `/resume` picker. */
 export interface SessionRow {
@@ -550,6 +550,12 @@ export function createChat(deps: ChatDeps): Chat {
     await api.submit(next);
   }
 
+  /** The model and elapsed time of the turn in flight, for the footer under a failed or stopped turn. */
+  const turnMeta = () => ({
+    ...(s.model && { model: s.model }),
+    ...(s.turnStartedAt !== undefined && { ms: Date.now() - s.turnStartedAt }),
+  });
+
   async function end(succeeded: boolean, ...items: Item[]) {
     running = false;
     settle(succeeded);
@@ -609,12 +615,18 @@ export function createChat(deps: ChatDeps): Chat {
             text:
               explainModelError(o.reason ?? '') ??
               `${(o.reason ?? 'The task could not finish').replace(/\.$/, '')}. Send your message again, or see what happened: remy show ${id}`,
+            ...turnMeta(),
           });
-        return await end(false, { kind: 'note', text: `Cancelled. ${o.reason ?? ''}`.trim() });
+        return await end(false, {
+          kind: 'note',
+          text: `Cancelled. ${o.reason ?? ''}`.trim(),
+          stopped: true,
+          ...turnMeta(),
+        });
       }
     } catch (e) {
       if (my !== gen) return; // interrupted: the stopped run fails when it loses its lease
-      await end(false, { kind: 'error', text: friendlyError(e) });
+      await end(false, { kind: 'error', text: friendlyError(e), ...turnMeta() });
     }
   }
 
@@ -936,11 +948,14 @@ export function createChat(deps: ChatDeps): Chat {
       if (s.phase === 'idle') return;
       const id = current?.id;
       const dropped = s.queue.length;
+      const meta = turnMeta();
       gen++;
       running = false;
       settle();
       commit({
         kind: 'note',
+        stopped: true,
+        ...meta,
         text:
           (id ? `Stopped. Continue with: remy resume ${id}` : 'Stopped before the task began.') +
           (dropped

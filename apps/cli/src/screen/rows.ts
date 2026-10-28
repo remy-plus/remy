@@ -182,29 +182,41 @@ function errorRows(text: string, width: number): Row[] {
   return [mk(''), ...text.split('\n').flatMap((l) => wrapPlain(l, inner).map(mk)), mk('')];
 }
 
+/** The muted line under a turn's last item: model, time taken and, when cut short, "stopped". */
+function withFooter(
+  body: Row[],
+  item: { model?: string; ms?: number; stopped?: boolean },
+  theme: Theme,
+): Row[] {
+  if (!item.ms) return body;
+  const parts = [
+    item.model,
+    `${Math.max(1, Math.round(item.ms / 1000))}s`,
+    item.stopped && 'stopped',
+  ];
+  const who = parts.filter(Boolean);
+  return [
+    ...body,
+    BLANK,
+    row([{ text: `▣ ${who.join(` ${theme.symbols.dot} `)}`, role: 'muted' }]),
+  ];
+}
+
 /** Rows for one finished item, without the blank row that separates it from the one above. */
 export function itemRows(item: Item, width: number, theme: Theme): Row[] {
   switch (item.kind) {
     case 'user':
       return userRows(item.text, width);
-    case 'reply': {
-      const body = markdownRows(item.text, width);
-      if (!item.ms) return body;
-      const who = [item.model, `${Math.max(1, Math.round(item.ms / 1000))}s`].filter(Boolean);
-      return [
-        ...body,
-        BLANK,
-        row([{ text: `▣ ${who.join(` ${theme.symbols.dot} `)}`, role: 'muted' }]),
-      ];
-    }
+    case 'reply':
+      return withFooter(markdownRows(item.text, width), item, theme);
     case 'text':
       return markdownRows(item.text, width);
     case 'question':
       return markdownRows(`${theme.symbols.waiting} ${item.text}`, width);
     case 'note':
-      return markdownRows(item.text, width, 'muted');
+      return withFooter(markdownRows(item.text, width, 'muted'), item, theme);
     case 'error':
-      return errorRows(item.text, width);
+      return withFooter(errorRows(item.text, width), item, theme);
     case 'tool':
       return toolRows(item.line, width, theme);
     case 'plan':

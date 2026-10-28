@@ -49,6 +49,23 @@ describe('rows', () => {
     expect(text(itemRows({ kind: 'reply', text: 'Done.' }, 60, theme))).toEqual(['   Done.']);
   });
 
+  it('ends an error or a stopped turn with the same footer', () => {
+    const err = itemRows(
+      { kind: 'error', text: 'No luck.', model: 'gpt-5-nano', ms: 4000 },
+      60,
+      theme,
+    );
+    expect(text(err).at(-1)).toBe('   ▣ gpt-5-nano · 4s');
+    const stopped = itemRows(
+      { kind: 'note', text: 'Stopped.', model: 'gpt-5-nano', ms: 4000, stopped: true },
+      60,
+      theme,
+    );
+    expect(text(stopped).at(-1)).toBe('   ▣ gpt-5-nano · 4s · stopped');
+    expect(stopped.at(-1)?.spans[0]?.role).toBe('muted');
+    expect(text(itemRows({ kind: 'note', text: 'Hi.' }, 60, theme))).toEqual(['   Hi.']);
+  });
+
   it('shows a tool call on one line with a two-wide glyph', () => {
     expect(text(toolRows(tool({}), 60, theme))).toEqual(['   → read src/a.ts']);
     const run = tool({ tool: 'run_command', verb: 'run', target: 'pnpm test', state: 'running' });

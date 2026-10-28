@@ -254,10 +254,12 @@ describe('chat controller', () => {
     await chat.interrupt();
     const [task] = await store.listTasks();
     expect(chat.getState().phase).toBe('idle');
-    expect(chat.getState().items.at(-1)).toEqual({
+    expect(chat.getState().items.at(-1)).toMatchObject({
       kind: 'note',
       text: `Stopped. Continue with: remy resume ${task?.taskId}`,
+      stopped: true,
     });
+    expect((chat.getState().items.at(-1) as { ms?: number }).ms).toBeGreaterThanOrEqual(0);
     release();
     await run;
     expect(replies(chat)).toEqual([]);
