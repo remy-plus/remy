@@ -12,7 +12,9 @@ import {
   createElement as h,
   type ReactElement,
   type ReactNode,
+  useCallback,
   useMemo,
+  useRef,
   useSyncExternalStore,
 } from 'react';
 import { ApprovalCard } from './approval-ui.ts';
@@ -24,6 +26,8 @@ import type { InputMode, InputState } from './input.ts';
 import { useFrame, useSettled } from './live-hooks.ts';
 import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
 import type { Onboarding } from './onboarding-flow.ts';
+import { TaskStrip } from './onboarding-ui.ts';
+import { NO_TOUR, TourView } from './onboarding-view.ts';
 import { Overlay } from './overlay-ui.ts';
 import { Menu, menuRows } from './picker.ts';
 import type { ThemeChoice } from './prefs.ts';
@@ -665,9 +669,27 @@ export function ChatApp(props: ChatAppProps): ReactElement {
   const { columns, rows } = useWindowSize();
   const { write } = useStdout();
   const mode = props.inputMode ?? 'multi';
-  const k = useChatKeys({ ...props, state, mode });
+  const tourStore = props.onboarding ?? NO_TOUR;
+  const tour = useSyncExternalStore(tourStore.subscribe, tourStore.getState);
+  const taskStep = tour?.step === 'task';
+  const tourRef = useRef<{ ob?: Onboarding; task: boolean }>({ task: false });
+  tourRef.current = { ob: props.onboarding, task: taskStep };
+  // During the first task: Enter on an empty prompt moves on, Esc ends the tour.
+  const onKey = useCallback(
+    (_ch: string, key: { escape?: boolean; return?: boolean }, input: { text: string }) => {
+      const t = tourRef.current;
+      if (!t.task || !t.ob) return false;
+      const phase = chat.getState().phase;
+      if (key.escape && phase !== 'waiting_approval') return (t.ob.skip(), true);
+      if (key.return && !input.text && phase === 'idle') return (t.ob.next(), true);
+      return false;
+    },
+    [chat],
+  );
+  const k = useChatKeys({ ...props, state, mode, paused: Boolean(tour) && !taskStep, onKey });
   const { input, expanded, noting, viewing, setViewing, menu, menuItems, at, slashQuery, atQuery } =
     k;
+  const onTourScreen = Boolean(tour) && !taskStep;
 
   const showPrompt = state.phase !== 'waiting_approval' || noting;
   // Prompt (with its blank line above) and the footer.
@@ -726,8 +748,24 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           onCancel: () => chat.closePicker(),
         })
       : null,
-    state.overlay ? h(Overlay, { chat, state, theme, onTranscript: () => setViewing(true) }) : null,
-    viewing
+    tour && props.onboarding && onTourScreen
+      ? h(TourView, {
+          tour: props.onboarding,
+          state: tour,
+          frame: { theme, columns, rows, inline: true },
+        })
+      : null,
+    state.overlay
+      ? h(Overlay, {
+          chat,
+          state,
+          theme,
+          onTranscript: () => setViewing(true),
+          ...(props.profile && { profile: props.profile }),
+          touring: Boolean(tour),
+        })
+      : null,
+    viewing || onTourScreen
       ? null
       : h(Live, {
           state,
@@ -739,10 +777,11 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           expanded,
           noting,
         }),
-    showPrompt && !viewing && !state.picker && !state.overlay
+    taskStep && !viewing ? h(TaskStrip, { theme, running: state.phase === 'running' }) : null,
+    showPrompt && !viewing && !state.picker && !state.overlay && !onTourScreen
       ? h(Prompt, { value: input, theme, columns })
       : null,
-    menu && !viewing && !state.picker && !state.overlay
+    menu && !viewing && !state.picker && !state.overlay && !onTourScreen
       ? h(Menu, {
           items: menuItems,
           at,
@@ -751,7 +790,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           query: slashQuery ?? atQuery ?? '',
         })
       : null,
-    viewing
+    viewing || onTourScreen
       ? null
       : h(Footer, {
           state,
