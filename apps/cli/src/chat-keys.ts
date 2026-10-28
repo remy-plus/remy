@@ -210,12 +210,19 @@ export function useChatKeys(o: ChatKeysOptions) {
       recall.current = -1;
       return setInput(EMPTY_INPUT);
     }
-    if (key.return) {
+    // Send now: stop the running turn and send this message in its place. Alt+Enter where the
+    // terminal sends it as Esc+Enter, Ctrl+S everywhere (raw mode has no flow control).
+    const sendNow = (key.return && key.meta) || (key.ctrl && ch === 's');
+    if (key.ctrl && ch === 's' && state.phase !== 'running') return;
+    if (key.return || sendNow) {
       const sent = mode === 'multi' ? pressEnter(input) : { send: input.text, pasted: [] };
       if ('state' in sent) return setInput(sent.state);
+      if (sendNow && !sent.send.trim()) return;
       recall.current = -1;
       setInput(EMPTY_INPUT);
-      return void chat.submit(sent.send, sent.pasted);
+      return void (sendNow
+        ? chat.sendNow(sent.send, sent.pasted)
+        : chat.submit(sent.send, sent.pasted));
     }
     if (key.upArrow || key.downArrow) {
       // In a several-line message the arrows move between lines; history is for the ends.

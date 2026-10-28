@@ -243,6 +243,11 @@ export interface Chat {
   approve(granted: boolean, note?: string): Promise<void>;
   /** Stops the running task. It stays resumable. */
   interrupt(): Promise<void>;
+  /**
+   * Interrupts the running task and sends this message in its place. Messages already queued
+   * keep their place behind it. With no task running it is a plain `submit`.
+   */
+  sendNow(text: string, pasted?: string[]): Promise<void>;
   /** A key was pressed: streamed text shows up in short frames for a moment, so typing stays instant. */
   noteInput(): void;
   /** The messages the user has sent, oldest first, for recall. */
@@ -259,6 +264,7 @@ export const HELP_TEXT = [
   '',
   'Keys',
   '  Enter     send; while Remy works, the message waits its turn',
+  '  Ctrl+S    while Remy works: stop it and send this message now (also Alt+Enter)',
   '  /         commands as you type; Tab completes',
   '  Ctrl+P    command palette: every command, filtered as you type',
   '  @         attach a workspace file: @notes.txt',
@@ -556,6 +562,35 @@ export function createChat(deps: ChatDeps): Chat {
       turnStartedAt: undefined,
       items: [...s.items, ...out],
     });
+  }
+
+  /**
+   * Stops the running turn. `forSend` is a send-now: the queue stays and the note says why it stopped.
+   */
+  async function halt(forSend: boolean) {
+    if (s.phase === 'idle') return;
+    const id = current?.id;
+    const dropped = forSend ? 0 : s.queue.length;
+    const meta = turnMeta();
+    gen++;
+    running = false;
+    settle();
+    commit({
+      kind: 'note',
+      stopped: true,
+      ...meta,
+      text:
+        (id
+          ? forSend
+            ? `Stopped to send your message. Continue the earlier task with: remy resume ${id}`
+            : `Stopped. Continue with: remy resume ${id}`
+          : 'Stopped before the task began.') +
+        (dropped
+          ? ` ${dropped} queued ${dropped === 1 ? 'message was' : 'messages were'} dropped.`
+          : ''),
+    });
+    if (!forSend) set({ queue: [] });
+    if (id) await deps.release(id).catch(() => {});
   }
 
   /** Starts the next queued message, if any. */
@@ -978,26 +1013,15 @@ export function createChat(deps: ChatDeps): Chat {
       }
     },
 
-    async interrupt() {
-      if (s.phase === 'idle') return;
-      const id = current?.id;
-      const dropped = s.queue.length;
-      const meta = turnMeta();
-      gen++;
-      running = false;
-      settle();
-      commit({
-        kind: 'note',
-        stopped: true,
-        ...meta,
-        text:
-          (id ? `Stopped. Continue with: remy resume ${id}` : 'Stopped before the task began.') +
-          (dropped
-            ? ` ${dropped} queued ${dropped === 1 ? 'message was' : 'messages were'} dropped.`
-            : ''),
-      });
-      set({ queue: [] });
-      if (id) await deps.release(id).catch(() => {});
+    interrupt: () => halt(false),
+
+    async sendNow(text, pasted) {
+      if (s.phase === 'idle') return api.submit(text, pasted);
+      // The queue stays as it is, so it drains behind this message when its task ends.
+      await halt(true);
+      await api.submit(text, pasted);
+      // A /command finishes at once and starts no task, so nothing else would send the queue.
+      await drain();
     },
   };
   return api;

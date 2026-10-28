@@ -391,7 +391,10 @@ export function hintsFor(
   if (c.menu === 'file') return '↑↓ choose · Tab attach';
   switch (c.phase) {
     case 'running':
-      return 'Enter queue · Ctrl+C stop';
+      // Send now only shows once there is something to send.
+      return c.hasInput
+        ? 'Enter queue · Ctrl+S send now · Ctrl+C stop'
+        : 'Enter queue · Ctrl+C stop';
     case 'waiting_approval':
       return 'y approve · n deny · e say why';
     case 'waiting_user':

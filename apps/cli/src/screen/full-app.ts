@@ -19,6 +19,7 @@ import type { ChatAppProps } from '../chat-ui.ts';
 import { EXAMPLES } from '../examples.ts';
 import { examplesFor, tipsFor } from '../goals.ts';
 import { greeting } from '../greeting.ts';
+import { splitHint } from '../hints.ts';
 import { type InputState, withText } from '../input.ts';
 import {
   currentMatch,
@@ -76,6 +77,7 @@ function StatusRow(p: {
   workspace?: string;
   contextPct?: number;
   costUsd?: number;
+  hasInput?: boolean;
 }): ReactElement {
   const { theme } = p;
   const muted = theme.props('muted');
@@ -108,7 +110,11 @@ function StatusRow(p: {
         { wrap: 'truncate-end', ...muted },
         p.working && s.left.length >= lead ? s.left.slice(SCAN_WIDTH) : s.left,
       ),
-      s.hint ? h(Text, null, h(Text, muted, ' · '), 'esc', h(Text, muted, ' interrupt')) : null,
+      ...splitHint(s.hint).flatMap(([key, label], i) => [
+        h(Text, { key: `d${i}`, ...muted }, ' · '),
+        h(Text, { key: `k${i}` }, key),
+        label ? h(Text, { key: `l${i}`, ...muted }, ` ${label}`) : null,
+      ]),
     ),
     s.right
       ? h(
@@ -481,6 +487,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
                   ? Math.min(100, (state.contextTokens / state.contextWindow) * 100)
                   : undefined,
               costUsd: state.costUsd,
+              hasInput: k.input.text.length > 0,
             })
           : null,
       ),

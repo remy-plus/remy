@@ -58,3 +58,16 @@ describe('statusLine', () => {
     expect(s.left.length + s.right.length + 2).toBeLessThanOrEqual(50);
   });
 });
+
+describe('status line send-now hint', () => {
+  const working = { spinner: '⠋', narration: 'Reading' };
+  it('adds ctrl+s send now to the hint when something is typed', () => {
+    const s = statusLine({ width: 100, workspace: '/w', working, hasInput: true });
+    expect(s.hint).toBe('esc interrupt · ctrl+s send now');
+    expect(statusLine({ width: 100, workspace: '/w', working }).hint).toBe('esc interrupt');
+  });
+  it('falls back to the short hint when the width is tight', () => {
+    const s = statusLine({ width: 36, workspace: '/w', working, hasInput: true });
+    expect(s.hint).not.toContain('send now');
+  });
+});

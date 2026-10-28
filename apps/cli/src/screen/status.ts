@@ -11,11 +11,13 @@ export interface StatusInput {
   contextPct?: number;
   /** Spend of this conversation in US dollars; hidden at zero. */
   costUsd?: number;
+  /** Something is typed, so "send now" is worth mentioning while a task runs. */
+  hasInput?: boolean;
 }
 
 export interface Status {
   left: string;
-  /** The "esc interrupt" hint, kept apart so it can be styled. */
+  /** The "esc interrupt" hint (and "ctrl+s send now" when there is input), kept apart so it can be styled. */
   hint: string;
   right: string;
 }
@@ -47,7 +49,9 @@ export function statusLine(i: StatusInput): Status {
     ['ctrl+p commands'],
     [],
   ].map((parts) => parts.filter(Boolean).join(SEP));
-  const hint = i.working ? 'esc interrupt' : '';
+  const hints = i.working
+    ? [...(i.hasInput ? ['esc interrupt · ctrl+s send now'] : []), 'esc interrupt', '']
+    : [''];
   const base = i.working
     ? `${i.working.spinner} ${i.working.narration}`
     : i.workspace
@@ -56,7 +60,7 @@ export function statusLine(i: StatusInput): Status {
   const need = (left: string, h: string, right: string) =>
     strWidth(left) + (h ? strWidth(SEP) + strWidth(h) : 0) + (right ? GAP + strWidth(right) : 0);
   for (const right of rights) {
-    for (const h of [hint, ''])
+    for (const h of hints)
       if (need(base, h, right) <= i.width) return { left: base, hint: h, right };
   }
   // Nothing fits whole: keep the right side and give the left what is left, if that is worth showing.
