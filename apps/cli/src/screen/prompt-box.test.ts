@@ -1,3 +1,5 @@
+import { Writable } from 'node:stream';
+import { render as inkRender } from 'ink';
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -49,5 +51,29 @@ describe('PromptBox', () => {
     expect(frame(props({ model: undefined, provider: undefined })).at(-1)).toContain(
       'not connected',
     );
+  });
+});
+
+describe('real cursor', () => {
+  it('shows the terminal cursor at the prompt position on a TTY and not the drawn mark', async () => {
+    let out = '';
+    const stdout = Object.assign(
+      new Writable({
+        write(chunk, _e, cb) {
+          out += String(chunk);
+          cb();
+        },
+      }),
+      { isTTY: true, columns: 60, rows: 20 },
+    );
+    const app = inkRender(h(PromptBox, props({ value: withText('hello') })), {
+      stdout: stdout as never,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(out).toContain('\x1b[?25h');
+    expect(out).not.toContain('▌');
+    app.unmount();
   });
 });
