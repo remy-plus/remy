@@ -259,4 +259,40 @@ describe('FullApp', () => {
     expect(m.frame()).toContain('Research the three best standing desks');
     m.app.unmount();
   });
+  it('scrolls by half pages with ctrl+u and ctrl+d and jumps with home and end', async () => {
+    const answer = Array.from({ length: 40 }, (_, i) => `line number ${i}`).join('\n\n');
+    const m = await open(new ScriptedModelClient([done(answer)]));
+    await m.send('long one');
+    await until(() => m.chat.getState().phase === 'idle');
+    await tick();
+    expect(m.frame()).toContain('line number 39');
+    m.app.stdin.write('\x1b[H'); // home
+    await tick();
+    expect(m.frame()).toContain('long one');
+    expect(m.frame()).not.toContain('line number 39');
+    m.app.stdin.write('\x04'); // ctrl+d: half page down
+    await tick();
+    expect(m.frame()).not.toContain('long one');
+    m.app.stdin.write('\x15'); // ctrl+u: and back up
+    await tick();
+    expect(m.frame()).toContain('long one');
+    m.app.stdin.write('\x1b[F'); // end
+    await tick();
+    expect(m.frame()).toContain('line number 39');
+    m.app.unmount();
+  });
+
+  it('opens the whole conversation with ctrl+o and returns on escape', async () => {
+    const m = await open(new ScriptedModelClient([done('Four.')]));
+    await m.send('2+2');
+    await until(() => m.chat.getState().phase === 'idle');
+    m.app.stdin.write('\x0f');
+    await tick();
+    expect(m.frame()).toContain('scroll');
+    expect(m.frame()).not.toContain('ctrl+p commands');
+    m.app.stdin.write('\x1b');
+    await tick(80);
+    expect(m.frame()).toContain('ctrl+p commands');
+    m.app.unmount();
+  });
 });
