@@ -389,7 +389,9 @@ def main() -> int:
     def seen(w: str, line: str) -> bool:
         # The full screen has no "ready" word: idle is the status row without "esc interrupt".
         if w == "ready" and args.mode == "full":
-            return "ctrl+p commands" in line and "esc interrupt" not in line
+            # Idle is the session's status row, or the home screen's footer (workspace and version).
+            home = re.search(r"\bv\d+\.\d+\.\d+\s*$", line) is not None
+            return ("ctrl+p commands" in line or home) and "esc interrupt" not in line
         return w in line
 
     def wait_for(word: str, timeout: float, *more: str) -> bool:
@@ -676,7 +678,12 @@ def main() -> int:
         prompt_rows = [i for i, l in enumerate(mode_shots["startup"]) if "\u2503" in l or "ctrl+p commands" in l]
         if not startup_alt:
             failures.append("full mode: startup was not on the alternate screen")
-        if not prompt_rows or max(prompt_rows) < rows_ - 5:
+        # The home screen centres the prompt and ends with a footer line holding the version.
+        start = mode_shots["startup"]
+        on_home = any("\u2503" in l for l in start) and any(
+            re.search(r"\bv\d+\.\d+\.\d+\s*$", l) for l in start[-2:]
+        )
+        if not on_home and (not prompt_rows or max(prompt_rows) < rows_ - 5):
             failures.append(f"full mode: no prompt area in the bottom 5 rows (rows {prompt_rows})")
         # The reply is on the live screen, not only in scrollback.
         turn_text = "\n".join(mode_shots["turn"])
