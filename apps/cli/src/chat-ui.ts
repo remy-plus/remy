@@ -47,6 +47,7 @@ import { clip, type MdLine, renderMarkdown, type Span, strWidth, wrapPlain } fro
 import { applyMention, atToken } from './mentions.ts';
 import { Menu, menuRows, Picker, type PickItem } from './picker.ts';
 import { SessionPicker } from './session-picker.ts';
+import { spanProps } from './span-style.ts';
 import {
   captureStray,
   createNotifier,
@@ -133,17 +134,6 @@ export function useSettled(value: string, ms: number): string {
 
 /** Text props for a muted look that still works with colors off. */
 const mutedProps = (theme: Theme) => theme.props('muted');
-
-function spanProps(sp: Span, theme: Theme) {
-  return {
-    ...(sp.bold && { bold: true }),
-    ...(sp.italic && { italic: true }),
-    ...(sp.dim && mutedProps(theme)),
-    ...(sp.faint && theme.props('faint')),
-    // Without colours, inline code is set apart by weight.
-    ...(sp.code && (theme.level === 'none' ? { bold: true } : theme.props('code'))),
-  };
-}
 
 function Rich(p: { lines: MdLine[]; theme: Theme; wrap?: 'wrap' | 'truncate-end' }) {
   return h(
