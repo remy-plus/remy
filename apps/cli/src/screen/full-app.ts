@@ -17,6 +17,14 @@ import type { ChatState } from '../chat.ts';
 import { useChatKeys } from '../chat-keys.ts';
 import type { ChatAppProps } from '../chat-ui.ts';
 import { EXAMPLES } from '../examples.ts';
+import { type InputState, withText } from '../input.ts';
+import {
+  currentMatch,
+  SEARCH_START,
+  type SearchKey,
+  type SearchState,
+  searchKey,
+} from '../input-history.ts';
 import { useFrame, useSettled } from '../live-hooks.ts';
 import { Menu, menuRows } from '../picker.ts';
 import { APPROVAL_ROWS, approvalHeight, narrate, reasoningTitle } from '../transcript.ts';
@@ -99,19 +107,35 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const [scroll, setScroll] = useState<Scroll>(SCROLL_START);
   const geometry = useRef({ total: 0, height: 1 });
 
+  const [search, setSearch] = useState<SearchState | undefined>();
+  const searchRef = useRef<SearchState | undefined>(undefined);
+  const setInputRef = useRef<((i: InputState) => void) | undefined>(undefined);
   const onKey = useCallback(
     (
       ch: string,
-      key: {
+      key: SearchKey & {
         pageUp?: boolean;
         pageDown?: boolean;
         home?: boolean;
         end?: boolean;
-        ctrl?: boolean;
-        escape?: boolean;
       },
       input: { text: string },
     ) => {
+      // Ctrl+R: reverse search through what was sent before. Enter takes the match to edit.
+      const find = searchRef.current;
+      if (find) {
+        const step = searchKey(find, chat.history(), ch, key);
+        if ('accept' in step) setInputRef.current?.(withText(step.accept));
+        const next = 'state' in step ? step.state : undefined;
+        searchRef.current = next;
+        setSearch(next);
+        return true;
+      }
+      if (key.ctrl && ch === 'r' && chat.getState().phase === 'idle' && chat.history().length) {
+        searchRef.current = SEARCH_START;
+        setSearch(SEARCH_START);
+        return true;
+      }
       const { total, height } = geometry.current;
       if (key.pageUp) return (setScroll((s) => pageUp(s, total, height)), true);
       if (key.pageDown) return (setScroll((s) => pageDown(s, total, height)), true);
@@ -133,8 +157,22 @@ export function FullApp(props: ChatAppProps): ReactElement {
     notifier: props.notifier,
     onKey,
   });
-  const { input, expanded, noting, viewing, setViewing, menu, menuItems, at, slashQuery, atQuery } =
-    k;
+  setInputRef.current = k.setInput;
+  const {
+    input: typed,
+    expanded,
+    noting,
+    viewing,
+    setViewing,
+    menu,
+    menuItems,
+    at,
+    slashQuery,
+    atQuery,
+  } = k;
+  // While searching, the prompt shows the match instead of what was typed.
+  const match = search ? currentMatch(search, chat.history()) : undefined;
+  const input = search ? withText(match ?? '') : typed;
 
   // The live turn.
   const busy = state.phase === 'running';
@@ -261,6 +299,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
             placeholder: placeholderFor(state),
             model,
             provider,
+            search: search?.query,
           }),
         ),
       }),
@@ -301,6 +340,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
               placeholder: placeholderFor(state),
               model,
               provider,
+              search: search?.query,
             })
           : null,
         showPrompt

@@ -21,6 +21,8 @@ export interface PromptBoxProps {
   placeholder: string;
   model?: string;
   provider?: string;
+  /** Reverse history search under way (Ctrl+R): its query shows in the meta row. */
+  search?: string;
 }
 
 /** Rows the box takes: a padding row, the text, a gap, and the meta row. */
@@ -85,8 +87,11 @@ export function PromptBox(p: PromptBoxProps): ReactElement {
     h(
       BoxRow,
       { theme, width: p.width, focused: p.focused },
-      h(Text, null, meta[0]),
-      meta[1] ? h(Text, muted, ` ${theme.symbols.dot} ${meta[1]}`) : null,
+      p.search === undefined ? h(Text, null, meta[0]) : null,
+      p.search === undefined && meta[1] ? h(Text, muted, ` ${theme.symbols.dot} ${meta[1]}`) : null,
+      p.search !== undefined
+        ? h(Text, muted, `search: ${p.search}${theme.symbols.cursor}  enter accept · esc cancel`)
+        : null,
     ),
   );
 }

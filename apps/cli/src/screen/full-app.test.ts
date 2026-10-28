@@ -424,4 +424,35 @@ describe('FullApp', () => {
     expect(narrow.frame()).not.toContain('CONTEXT');
     narrow.app.unmount();
   });
+
+  it('searches the history with ctrl+r; enter accepts the match, esc cancels', async () => {
+    const m = await open(new ScriptedModelClient([done('One.'), done('Two.')]));
+    await m.send('alpha question');
+    await until(() => m.chat.getState().phase === 'idle');
+    await m.send('beta request');
+    await until(() => m.chat.getState().items.filter((i) => i.kind === 'reply').length === 2);
+    await tick();
+    m.app.stdin.write('\x12'); // ctrl+r
+    await tick();
+    expect(m.frame()).toContain('search: ');
+    expect(m.frame()).toContain('┃  beta request');
+    m.app.stdin.write('alp');
+    await tick();
+    expect(m.frame()).toContain('search: alp');
+    expect(m.frame()).toContain('┃  alpha question');
+    m.app.stdin.write('\r');
+    await tick();
+    expect(m.frame()).not.toContain('search: ');
+    expect(m.chat.getState().items.filter((i) => i.kind === 'user').length).toBe(2);
+    expect(m.frame()).toContain('┃  alpha question▌');
+    m.app.stdin.write('\x1b');
+    await tick();
+    m.app.stdin.write('\x12');
+    await tick();
+    m.app.stdin.write('\x1b');
+    await tick();
+    expect(m.frame()).not.toContain('search: ');
+    expect(m.frame()).toContain('Ask anything…');
+    m.app.unmount();
+  });
 });
