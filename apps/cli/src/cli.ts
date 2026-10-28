@@ -61,7 +61,9 @@ import {
   SUGGESTED_MODELS,
   saveLogin,
 } from './login.ts';
+import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
+import { createProfileStore, profileContext } from './profile.ts';
 import { createTheme, detectColor } from './theme.ts';
 
 export interface CliDeps {
@@ -622,6 +624,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       if (!/needs a model first|needs an API key|No model is chosen/.test(String(e))) throw e;
     }
     let active = first;
+    // Name and goals reach the user's own model as one line, only when they agreed.
+    const profile = createProfileStore(home);
     // The runtime holds this stand-in, so /model can swap the real client under it.
     const model: ModelClient = {
       get id() {
@@ -630,9 +634,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       get caps() {
         return active?.caps ?? DEFAULT_CAPS;
       },
-      complete(...a) {
+      complete(req, ...a) {
         if (!active) throw new Error('No model is connected. Run /login.');
-        return active.complete(...a);
+        const note = profileContext(profile.get());
+        return active.complete(note ? { ...req, system: `${req.system}\n\n${note}` } : req, ...a);
       },
     };
     // One workspace for the whole conversation, so files made in one turn are there in the next.
@@ -711,7 +716,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       env.REMY_SCREEN === 'minimal' ||
       env.REMY_SCREEN === 'classic' ||
       (Boolean(prefs.minimal) && env.REMY_SCREEN !== 'full');
+    let onboarding: Onboarding | undefined;
     const chat = createChat({
+      profileEnabled: true,
+      startTour: () => onboarding?.start(),
       theme: prefs.theme ?? 'auto',
       saveTheme: (choice) => savePrefs(home, { theme: choice }),
       newClears: !minimal,
@@ -737,6 +745,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         },
       },
     });
+    onboarding = createOnboarding({
+      chat,
+      profile,
+      markDone: () => void savePrefs(home, { onboarded: true }),
+      scratchDir: () =>
+        join(home, 'workspaces', `tour_${randomUUID().replaceAll('-', '').slice(0, 12)}`),
+    });
+    if (!prefs.onboarded) onboarding.start();
     const { runChat } = await import('./chat-ui.ts');
     const { probeTerminal } = await import('./terminal.ts');
     // One quick question to the terminal before the screen opens: frame sync and light or dark.
@@ -745,6 +761,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       createTheme(level, choice === 'auto' ? probe.background : choice);
     await runChat({
       chat,
+      profile,
+      onboarding,
       sync: probe.sync,
       env,
       onStray: debug ? (stream, text) => debug.write('stray', { stream, text }) : undefined,
