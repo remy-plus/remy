@@ -1,6 +1,6 @@
 // The tour's controller: holds the step state, drives the chat for the login, model and first-task
 // steps, and saves the profile when it ends. The screens only render `getState()` and call back.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Chat } from './chat.ts';
 import { type FirstTask, firstTaskFor } from './goals.ts';
@@ -50,9 +50,11 @@ export interface Onboarding {
 export function createOnboarding(deps: OnboardingDeps): Onboarding {
   const { chat, profile } = deps;
   let st: OnboardingState | undefined;
-  /** Transcript length when the model step opened: a longer one means a model was picked. */
-  let baseline = 0;
   let ending = false;
+  /** The first task's scratch folder, removed when the tour ends. */
+  let scratch: string | undefined;
+  /** Whether the conversation was empty when the tour began: only then is it cleared at the end. */
+  let freshChat = true;
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const fn of listeners) fn();
@@ -75,11 +77,14 @@ export function createOnboarding(deps: OnboardingDeps): Onboarding {
       deps.markDone();
       if (s.taskRan) {
         if (chat.getState().phase !== 'idle') await chat.interrupt();
-        // The first task was practice: the home screen starts clean.
-        await chat.runCommand('new');
+        // The first task was practice: the home screen starts clean, unless /tour was replayed
+        // over a conversation the user wants to keep.
+        if (freshChat) await chat.runCommand('new');
       }
       chat.closeOverlay();
     } finally {
+      if (scratch) rmSync(scratch, { recursive: true, force: true });
+      scratch = undefined;
       st = undefined;
       ending = false;
       notify();
@@ -93,10 +98,7 @@ export function createOnboarding(deps: OnboardingDeps): Onboarding {
       return;
     }
     if (next.step === 'provider') chat.openOverlay('login');
-    if (next.step === 'model') {
-      baseline = chat.getState().items.length;
-      chat.openOverlay('model');
-    }
+    if (next.step === 'model') chat.openOverlay('model');
     notify();
   }
 
@@ -115,9 +117,9 @@ export function createOnboarding(deps: OnboardingDeps): Onboarding {
         else void finish();
       }
     } else if (st.step === 'model' && !panelOpen) {
-      // The list closed: a note was added when a model was picked; closing without one is Esc.
-      if (cs.items.length > baseline) go();
-      else void finish();
+      // The list closed, picked or not (Esc): the tour goes on, and skips the first task when
+      // there is still no model to run it.
+      go();
     }
   }
   chat.subscribe(reconcile);
@@ -133,6 +135,7 @@ export function createOnboarding(deps: OnboardingDeps): Onboarding {
       // The login panel the chat opens on its own belongs to the tour from here.
       chat.closeOverlay();
       ending = false;
+      freshChat = chat.getState().items.length === 0;
       st = initialState(p && { name: p.name, goals: p.goals, personalise: p.personalise });
       notify();
     },
@@ -152,6 +155,7 @@ export function createOnboarding(deps: OnboardingDeps): Onboarding {
       if (!st) return;
       const task = firstTaskFor(st.goals);
       const dir = deps.scratchDir();
+      scratch = dir;
       mkdirSync(dir, { recursive: true });
       for (const f of task.files) {
         const path = join(dir, f.path);

@@ -98,8 +98,9 @@ describe('the tour with a provider already connected', () => {
       personalise: false,
     });
     expect(t.markDone).toHaveBeenCalledOnce();
-    // The practice task is stopped and the home screen starts clean.
+    // The practice task is stopped, its folder removed and the home screen starts clean.
     expect(t.calls.slice(1)).toEqual(['interrupt', 'cmd:new']);
+    expect(existsSync(t.scratch)).toBe(false);
   });
 
   it('can pass the task over and still see the keys, leaving the conversation alone', async () => {
@@ -121,7 +122,7 @@ describe('the tour with a provider already connected', () => {
     expect(existsSync(t.scratch)).toBe(false);
   });
 
-  it('Esc in the model list skips the rest', async () => {
+  it('Esc in the model list keeps the current model and carries on', () => {
     const t = setup({ model: 'm', saved: 1 });
     t.ob.start();
     t.ob.begin();
@@ -130,10 +131,20 @@ describe('the tour with a provider already connected', () => {
     t.ob.setPersonalise(true);
     expect(step(t.ob)).toBe('model');
     t.set({ overlay: undefined });
-    await settle();
-    expect(t.ob.getState()).toBeUndefined();
-    expect(t.markDone).toHaveBeenCalled();
-    expect(t.profile.get()?.name).toBe('Ana');
+    expect(step(t.ob)).toBe('offer');
+    expect(t.markDone).not.toHaveBeenCalled();
+  });
+
+  it('Esc in the model list with no model passes the first task over', () => {
+    const t = setup({ saved: 2 });
+    t.ob.start();
+    t.ob.begin();
+    t.ob.setName('Ana');
+    t.ob.setGoals([]);
+    t.ob.setPersonalise(true);
+    expect(step(t.ob)).toBe('model');
+    t.set({ overlay: undefined });
+    expect(step(t.ob)).toBe('keys');
   });
 });
 
@@ -225,5 +236,21 @@ describe('replay', () => {
     t.profile.update({ name: 'Sam', goals: ['coding'], personalise: false });
     t.ob.start();
     expect(t.ob.getState()).toMatchObject({ name: 'Sam', goals: ['coding'], personalise: false });
+  });
+
+  it('keeps the conversation it was replayed over', async () => {
+    const t = setup({ model: 'm', saved: 1 });
+    t.set({ items: [{ kind: 'user' }, { kind: 'assistant' }] });
+    t.ob.start();
+    t.ob.begin();
+    t.ob.setName('Sam');
+    t.ob.setGoals(['files']);
+    t.ob.setPersonalise(true);
+    t.set({ overlay: undefined });
+    t.ob.runTask();
+    t.ob.skip();
+    await settle();
+    expect(t.calls.slice(-1)).toEqual(['interrupt']);
+    expect(existsSync(t.scratch)).toBe(false);
   });
 });
