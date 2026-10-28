@@ -30,6 +30,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 - Build workflow (which model writes which step) is in PLAN.md.
 
 ## Status
+- 2026-10-27: project tracking moved to Notion: the private **Remy** page (https://app.notion.com/p/407c738dceac81be8732cbecf5b9d277) holds Roadmap, 0.3 Tasks, Releases, Evals, Research and Decisions databases. Keep the 0.3 Tasks board current as work lands; the repo (PLAN.md) stays the source of truth.
 - 2026-10-27: **0.2.0 shipped** (npm, GitHub release v0.2.0, site redeployed). Owner: "a good start, not great yet". Next session: hear what feels off first, then Groq baseline (needs GROQ_API_KEY), Copilot sign-in (needs a GitHub App Client ID), REA setup if wanted.
 - 2026-10-26: chat ease-of-use pass (`design/research/engineering/opencode-ease.md`): first run opens the login panel, `/model`, `/login`, `/sessions`, Ctrl+P palette, `/` autocomplete, `@file` references, errors that end with the next step. Pushed; ships in 0.2.0 (published by the owner with `npm publish`).
 - 2026-10-26: **V1 shipped (v0.1.0).** npm `@koryei/remy` (publish needs the owner's 2FA, so they run `npm publish` in apps/cli), GitHub release v0.1.0, site live on https://remy.plus (Vercel project remy-plus, deploy with `vercel deploy --prod` in apps/site; DNS on Cloudflare, DNS only). Next: 0.2 = `design/research/terminal-plan.md` + an open-weight baseline.
