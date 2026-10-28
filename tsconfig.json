@@ -4,6 +4,7 @@
     { "path": "packages/core" },
     { "path": "packages/models" },
     { "path": "packages/tools" },
+    { "path": "packages/mcp" },
     { "path": "packages/store" },
     { "path": "packages/evals" },
     { "path": "apps/cli" }
