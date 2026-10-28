@@ -2,6 +2,15 @@
 // Adding a local server is code execution, so it shows the exact command and needs a yes.
 import { isStdio, type McpServerConfig } from '@remy/mcp';
 import {
+  applyPlan,
+  type ConnectPlan,
+  planCustom,
+  planFromEntry,
+  suggestName,
+  takenNames,
+} from './connect-plan.ts';
+import { CATALOG } from './mcp-catalog.ts';
+import {
   commandLine,
   loadSaved,
   mergeServers,
@@ -17,14 +26,18 @@ import {
   parseImport,
   secretize,
 } from './mcp-import.ts';
+import { hasOAuthTokens, signIn } from './mcp-oauth.ts';
 import { SECRET_NAME, type SecretStore } from './mcp-secrets.ts';
 
 export const CONNECT_USAGE = `Usage
+  remy connect                                      Pick an app or service from a short list
   remy connect add <name> -- <command> [args...]    A local server (this runs code on your computer)
   remy connect add <name> --url <url> [--header K=V]  A remote server
+      --oauth             The server asks you to sign in in a browser (done right away)
       --env K=V           Plain environment value for a local server
       --secret KEY        Ask for a token and keep it in the Keychain (--secret-stdin to pipe it)
       --yes               Skip the question (for scripts)
+  remy connect auth <name> [--no-browser] [--force] Sign in to a remote server in your browser
   remy connect list                                 Show what is connected
   remy connect remove <name>                        Forget a server and its saved secrets
   remy connect --import [name...] [--yes]           Bring in servers from Claude Desktop or Claude Code`;
@@ -36,6 +49,9 @@ export interface ConnectFlags {
   secret?: string[] | undefined;
   'secret-stdin'?: boolean | undefined;
   yes?: boolean | undefined;
+  oauth?: boolean | undefined;
+  'no-browser'?: boolean | undefined;
+  force?: boolean | undefined;
   import?: boolean | undefined;
 }
 
@@ -61,6 +77,12 @@ export interface ConnectCtx {
   askSecret?: ((question: string) => Promise<string | null>) | undefined;
   readStdin?: (() => Promise<string>) | undefined;
   out: (line: string) => void;
+  /** Opens a sign-in page in the browser; false when it could not. Default: the system's. */
+  openUrl?: ((url: string) => Promise<boolean>) | undefined;
+  fetch?: typeof fetch | undefined;
+  signInTimeoutMs?: number | undefined;
+  /** The user's real home folder, for `~` in a chosen folder. */
+  userHome?: string | undefined;
 }
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
@@ -98,6 +120,7 @@ export function buildServer(
   if (command && flags.url) throw new Error('Give either a command (after --) or --url, not both.');
   if (command) {
     if (flags.header?.length) throw new Error('--header goes with --url.');
+    if (flags.oauth) throw new Error('--oauth goes with --url.');
     const env = { ...parsePairs(flags.env, '--env'), ...refs };
     return {
       config: {
@@ -123,7 +146,11 @@ export function buildServer(
     throw new Error('A remote server must use https://. Use http:// only for localhost.');
   const headers = { ...parsePairs(flags.header, '--header'), ...refs };
   return {
-    config: { url: flags.url, ...(Object.keys(headers).length && { headers }) },
+    config: {
+      url: flags.url,
+      ...(Object.keys(headers).length && { headers }),
+      ...(flags.oauth && { auth: 'oauth' as const }),
+    },
     secretKeys,
   };
 }
@@ -177,6 +204,139 @@ async function add(ctx: ConnectCtx): Promise<number> {
   }
   saveSaved(ctx.home, { ...saved, mcpServers: { ...saved.mcpServers, [name]: config } });
   ctx.out(`Added ${name}${stored.length ? `. Saved ${stored.join(', ')}` : ''}.`);
+  if (!isStdio(config) && config.auth === 'oauth')
+    return authenticate(ctx, name, config.url, false);
+  ctx.out('Remy connects to it the next time it starts. Check with remy connect list.');
+  return 0;
+}
+
+/** Runs the browser sign-in for one remote server and says how it went. */
+async function authenticate(
+  ctx: ConnectCtx,
+  name: string,
+  url: string,
+  force: boolean,
+): Promise<number> {
+  ctx.out(`Signing in to ${name}. Waiting for the browser; Ctrl+C stops.`);
+  const r = await signIn(
+    name,
+    url,
+    {
+      secrets: ctx.secrets,
+      ...(ctx.openUrl && { openUrl: ctx.openUrl }),
+      ...(ctx.fetch && { fetch: ctx.fetch }),
+      ...(ctx.signInTimeoutMs !== undefined && { timeoutMs: ctx.signInTimeoutMs }),
+    },
+    {
+      noBrowser: Boolean(ctx.flags['no-browser']),
+      onUrl: (link, opened) =>
+        ctx.out(
+          opened
+            ? `Opened your browser. If nothing appeared, open this link:\n  ${link}`
+            : `Open this link to sign in:\n  ${link}`,
+        ),
+    },
+    force,
+  );
+  if (!r.ok) {
+    ctx.out(`${r.message} Run remy connect auth ${name} to try again.`);
+    return 1;
+  }
+  ctx.out(
+    r.already
+      ? `${name} is already signed in. Use --force to sign in again.`
+      : `Signed in to ${name}. Remy uses it the next time it starts.`,
+  );
+  return 0;
+}
+
+async function auth(ctx: ConnectCtx): Promise<number> {
+  const name = ctx.rest[1];
+  if (!name) throw new Error('Usage: remy connect auth <name> [--no-browser] [--force]');
+  const saved = loadSaved(ctx.home);
+  const entry = saved.mcpServers[name] ?? ctx.fromConfig[name];
+  if (!entry) throw new Error(`There is no server named ${name}. Run remy connect list.`);
+  if (isStdio(entry))
+    throw new Error(`${name} runs on this computer, so there is nothing to sign in to.`);
+  if (entry.auth !== 'oauth') {
+    if (name in ctx.fromConfig && !(name in saved.mcpServers))
+      throw new Error(`Add "auth": "oauth" to ${name} in remy.config.json, then run this again.`);
+    saveSaved(ctx.home, {
+      ...saved,
+      mcpServers: { ...saved.mcpServers, [name]: { ...entry, auth: 'oauth' } },
+    });
+  }
+  if (!ctx.flags.force && hasOAuthTokens(ctx.secrets, name)) {
+    ctx.out(`${name} is already signed in. Use --force to sign in again.`);
+    return 0;
+  }
+  return authenticate(ctx, name, entry.url, Boolean(ctx.flags.force));
+}
+
+const ENTRY_WIDTH = Math.max(...CATALOG.map((e) => e.label.length), 'Custom server'.length);
+
+/** The picker in a terminal: a numbered list, then only the questions the choice needs. */
+async function pick(ctx: ConnectCtx): Promise<number> {
+  if (!ctx.isTTY || !ctx.ask) {
+    ctx.out(CONNECT_USAGE);
+    ctx.out('\nRun remy connect in a terminal to pick from a list.');
+    return 0;
+  }
+  const ask = ctx.ask;
+  const userHome = ctx.userHome ?? ctx.cwd;
+  const taken = takenNames(ctx.home, ctx.fromConfig);
+  ctx.out('What would you like to connect?');
+  for (const [i, e] of CATALOG.entries())
+    ctx.out(`  ${i + 1}  ${e.label.padEnd(ENTRY_WIDTH)}  ${e.blurb}`);
+  const custom = CATALOG.length + 1;
+  ctx.out(
+    `  ${custom}  ${'Custom server'.padEnd(ENTRY_WIDTH)}  A web address or a command you have`,
+  );
+  const answer = (await ask(`Number, or Enter to cancel: `))?.trim();
+  if (!answer) return 1;
+  const n = Number(answer);
+  if (!Number.isInteger(n) || n < 1 || n > custom)
+    throw new Error(`"${answer}" is not on the list.`);
+
+  let plan: ConnectPlan;
+  if (n === custom) {
+    const where = (await ask('Web address (https://...) or the command to run: '))?.trim();
+    if (!where) return 1;
+    const suggested = suggestName(where, taken);
+    const typed = (await ask(`Name [${suggested}]: `))?.trim();
+    plan = planCustom(where, typed || suggested, taken);
+  } else {
+    const entry = CATALOG[n - 1] as (typeof CATALOG)[number];
+    let folder: string | undefined;
+    if (entry.folder) {
+      folder = (await ask(`${entry.folder.label} [${ctx.cwd}]: `))?.trim() || ctx.cwd;
+    }
+    plan = planFromEntry(entry, {
+      taken,
+      cwd: ctx.cwd,
+      userHome,
+      ...(folder && { folder }),
+    });
+  }
+  const values: Record<string, string> = {};
+  for (const s of plan.secrets) {
+    ctx.out(`${s.label}: ${s.where}`);
+    const v = ctx.askSecret ? await ctx.askSecret(`${s.label} (hidden): `) : null;
+    if (!v?.trim()) throw new Error(`No ${s.label} was given. Nothing was added.`);
+    values[s.key] = v;
+  }
+  if (plan.command) {
+    ctx.out('Remy will run this on your computer, with your permissions, each time it starts:');
+    ctx.out(`  ${plan.command}`);
+    const yes = await ask('Add this server? [y/N] ');
+    if (yes === null || !/^y(es)?$/i.test(yes.trim())) {
+      ctx.out('Nothing was added.');
+      return 1;
+    }
+  } else if (!plan.oauth) ctx.out(`Remy will connect to ${(plan.config as { url: string }).url}.`);
+  const stored = applyPlan(plan, { home: ctx.home, secrets: ctx.secrets, values });
+  ctx.out(`Added ${plan.name}${stored.length ? `. Saved ${stored.join(', ')}` : ''}.`);
+  if (plan.oauth) return authenticate(ctx, plan.name, (plan.config as { url: string }).url, false);
   ctx.out('Remy connects to it the next time it starts. Check with remy connect list.');
   return 0;
 }
@@ -288,13 +448,17 @@ export async function connectCommand(ctx: ConnectCtx): Promise<number> {
   switch (ctx.rest[0]) {
     case 'add':
       return add(ctx);
+    case 'auth':
+      return auth(ctx);
     case 'list':
       return list(ctx);
     case 'remove':
     case 'rm':
       return remove(ctx);
+    case undefined:
+      return pick(ctx);
     default:
       ctx.out(CONNECT_USAGE);
-      return ctx.rest[0] ? 1 : 0;
+      return 1;
   }
 }

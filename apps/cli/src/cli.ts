@@ -99,6 +99,8 @@ export interface CliDeps {
   homeDir?: string;
   /** Reads a file as text for `remy connect --import`; undefined when it is missing. */
   readText?: (path: string) => string | undefined;
+  /** Opens a sign-in page in the browser; false when it could not (tests replace it). */
+  openUrl?: (url: string) => Promise<boolean>;
   /** Replaces the MCP transports (tests). */
   mcpOptions?: (name: string) => McpConnectionOptions;
   /** How long startup waits for MCP servers (tests). */
@@ -136,7 +138,8 @@ Usage
                                   Connect a provider: pick one, paste the key, done
   remy login --list               Show saved logins (never the keys)
   remy logout <provider>          Forget a saved login
-  remy connect add|list|remove    Connect apps and services through MCP servers; --import
+  remy connect [add|auth|list|remove]
+                                  Connect apps and services through MCP servers; --import
                                   brings in the ones Claude Desktop or Claude Code already use
   remy --version | help
 
@@ -160,6 +163,7 @@ Options for every command
 
 Options for connect
   --url <url>  --header K=V  --env K=V  --secret KEY  --secret-stdin  --yes  --import
+  --oauth  --no-browser  --force
   Run remy connect for the full usage.
 
 Chat
@@ -200,6 +204,9 @@ const OPTIONS = {
   'secret-stdin': { type: 'boolean' },
   yes: { type: 'boolean', short: 'y' },
   import: { type: 'boolean' },
+  oauth: { type: 'boolean' },
+  'no-browser': { type: 'boolean' },
+  force: { type: 'boolean' },
   status: { type: 'string' },
   json: { type: 'boolean' },
   debug: { type: 'boolean' },
@@ -354,6 +361,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       askSecret: deps.askSecret,
       readStdin: deps.readStdin,
       out,
+      userHome: homeDir,
+      ...(deps.openUrl && { openUrl: deps.openUrl }),
+      ...(deps.fetch && { fetch: deps.fetch }),
     });
   }
   if (!deps.store) mkdirSync(home, { recursive: true });
@@ -501,6 +511,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         secrets: secretsFor(),
         redact,
         addSecret,
+        ...(deps.openUrl && { openUrl: deps.openUrl }),
+        ...(deps.fetch && { fetch: deps.fetch }),
         ...(deps.mcpOptions && { options: deps.mcpOptions }),
         ...(deps.mcpBudgetMs !== undefined && { budgetMs: deps.mcpBudgetMs }),
         debug: (event, data) => debug?.write(event, data),

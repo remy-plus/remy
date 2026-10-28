@@ -2,7 +2,7 @@
 // dialog, the minimal picker and the plain-text list.
 import type { PickItem } from './picker.ts';
 
-export type ConnectionStatus = 'connected' | 'starting' | 'failed' | 'disabled';
+export type ConnectionStatus = 'connected' | 'starting' | 'failed' | 'disabled' | 'needs_signin';
 
 export interface ConnectionRow {
   name: string;
@@ -13,6 +13,14 @@ export interface ConnectionRow {
   tools: number;
   /** `config` entries live in remy.config.json and can be switched off but not removed here. */
   source: 'config' | 'saved';
+}
+
+/** What the browser sign-in tells the screen while it waits. */
+export interface SignInHooks {
+  signal?: AbortSignal;
+  /** The sign-in link, and whether the browser was opened with it. */
+  onUrl?: (url: string, opened: boolean) => void;
+  noBrowser?: boolean;
 }
 
 /** What the chat needs from the connected servers. */
@@ -26,6 +34,8 @@ export interface ConnectionsApi {
   allowed?(name: string): string[];
   /** Stops allowing a tool for good. Returns a line for the transcript. */
   unallow?(tool: string): string;
+  /** Signs in to a remote server in the browser. Resolves with a line for the transcript. */
+  signIn?(name: string, hooks: SignInHooks): Promise<string>;
 }
 
 const WORD: Record<ConnectionStatus, string> = {
@@ -33,6 +43,7 @@ const WORD: Record<ConnectionStatus, string> = {
   starting: 'starting',
   failed: 'failed',
   disabled: 'disabled',
+  needs_signin: 'needs sign-in',
 };
 
 const plural = (n: number) => `${n} tool${n === 1 ? '' : 's'}`;
@@ -56,6 +67,9 @@ export const connectionItems = (rows: ConnectionRow[]): PickItem[] =>
 export function connectionActions(r: ConnectionRow, allowed: string[] = []): PickItem[] {
   const on = r.status !== 'disabled';
   return [
+    ...(r.status === 'needs_signin'
+      ? [{ id: '#signin', title: 'Sign in', detail: 'opens your browser' }]
+      : []),
     ...allowed.map((tool) => ({
       id: `#unallow:${tool}`,
       title: `Always allowed: ${tool}`,

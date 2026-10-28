@@ -8,6 +8,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isStdio, type McpServerConfig, mcpServersSchema } from '@remy/mcp';
+import { forgetOAuth } from './mcp-oauth.ts';
 import type { SecretStore } from './mcp-secrets.ts';
 
 export type ServerSource = 'config' | 'saved';
@@ -171,5 +172,7 @@ export function removeSaved(
     ),
   );
   for (const ref of serverSecretRefs(entry)) if (!stillUsed.has(ref)) secrets.remove(ref);
+  // Its sign-in (tokens and registered client) goes with it.
+  forgetOAuth(secrets, name);
   return true;
 }

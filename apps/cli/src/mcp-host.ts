@@ -18,6 +18,7 @@ import {
   resolveServers,
   saveSaved,
 } from './mcp-config.ts';
+import { hasOAuthTokens, openOAuthStore, RemyOAuthProvider, signIn } from './mcp-oauth.ts';
 import type { SecretStore } from './mcp-secrets.ts';
 
 /** How long startup waits for servers before carrying on without the slow ones. */
@@ -38,6 +39,11 @@ export interface McpHostDeps {
   /** Replaces the transports (tests). */
   options?: (name: string) => McpConnectionOptions;
   budgetMs?: number;
+  /** Opens a sign-in page in the browser; false when it could not (tests replace it). */
+  openUrl?: (url: string) => Promise<boolean>;
+  fetch?: typeof fetch;
+  /** How long a browser sign-in may take (tests). */
+  signInTimeoutMs?: number;
   /** Debug records: the end of a failed local server's stderr, already redacted. */
   debug?: (event: string, data: unknown) => void;
 }
@@ -56,6 +62,7 @@ export interface McpHost extends ConnectionsApi {
 type State =
   | { phase: 'starting' }
   | { phase: 'connected'; tools: Tool[] }
+  | { phase: 'needs_signin' }
   | { phase: 'failed'; reason: string };
 
 const oneLine = (s: string, max = 100) => {
@@ -110,14 +117,35 @@ export function startMcp(deps: McpHostDeps): McpHost {
       sourceOf(server) === 'saved' ? 'saved' : 'config',
     );
 
-  const loads = Object.entries(resolved.servers).map(async ([name, config]) => {
+  /** OAuth for a remote server that signs in: stored tokens in, no browser while Remy runs. */
+  const optionsFor = (name: string, config: McpServerConfig): McpConnectionOptions => {
+    const base = deps.options?.(name) ?? {};
+    if (isStdio(config) || config.auth !== 'oauth') return base;
+    const provider = new RemyOAuthProvider({
+      server: name,
+      store: openOAuthStore(deps.secrets, name),
+      onToken: (kind, value) => deps.addSecret(`mcp:${name}.oauth.${kind}`, value),
+    });
+    return { ...base, authProvider: provider };
+  };
+
+  const startServer = async (name: string, config: McpServerConfig): Promise<void> => {
+    // Signed out: say so now instead of finding out with a failed request.
+    if (!isStdio(config) && config.auth === 'oauth' && !hasOAuthTokens(deps.secrets, name)) {
+      states.set(name, { phase: 'needs_signin' });
+      return needsSignIn(name);
+    }
     states.set(name, { phase: 'starting' });
-    const manager = new McpManager({ [name]: config }, deps.options);
+    const manager = new McpManager({ [name]: config }, () => optionsFor(name, config));
     managers.push(manager);
     try {
       const r = await manager.loadTools(stop.signal);
       const err = r.errors[0];
       if (err) {
+        if (err.needsAuth) {
+          states.set(name, { phase: 'needs_signin' });
+          return needsSignIn(name);
+        }
         const tail = manager.connection(name).stderrTail;
         if (tail && isStdio(config))
           deps.debug?.('mcp.stderr', { server: name, tail: deps.redact(tail) });
@@ -128,7 +156,13 @@ export function startMcp(deps: McpHostDeps): McpHost {
     } catch (e) {
       fail(name, e instanceof Error ? e.message : String(e), sourceOf(name));
     }
-  });
+  };
+  const needsSignIn = (name: string) => {
+    if (stop.signal.aborted) return;
+    note(`${name} needs you to sign in. Run remy connect auth ${name}, or open /connections.`);
+  };
+
+  const loads = Object.entries(resolved.servers).map(([name, config]) => startServer(name, config));
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const ready = loads.length
@@ -157,6 +191,8 @@ export function startMcp(deps: McpHostDeps): McpHost {
           ...(st?.phase === 'connected' && { reason: 'still on until Remy restarts' }),
         };
       if (!st || st.phase === 'starting') return { ...base, status: 'starting' };
+      if (st.phase === 'needs_signin')
+        return { ...base, status: 'needs_signin', reason: 'sign in to use it' };
       if (st.phase === 'failed') return { ...base, status: 'failed', reason: st.reason };
       return { ...base, status: 'connected' };
     });
@@ -182,6 +218,44 @@ export function startMcp(deps: McpHostDeps): McpHost {
       if (!removeSaved(deps.home, name, deps.secrets, deps.fromConfig))
         return `${name} is listed in remy.config.json. Remove it there, or switch it off here.`;
       return `Removed ${name}. It stops running the next time Remy starts.`;
+    },
+    async signIn(name, hooks) {
+      const found = declare().find((d) => d.name === name);
+      if (!found || isStdio(found.config))
+        return `${name} is not a remote server, so there is nothing to sign in to.`;
+      if (found.config.auth !== 'oauth') {
+        if (found.source !== 'saved')
+          return `Add "auth": "oauth" to ${name} in remy.config.json, then sign in.`;
+        const saved = loadSaved(deps.home);
+        const entry = saved.mcpServers[name];
+        if (entry)
+          saveSaved(deps.home, {
+            ...saved,
+            mcpServers: { ...saved.mcpServers, [name]: { ...entry, auth: 'oauth' } },
+          });
+      }
+      const r = await signIn(
+        name,
+        found.config.url,
+        {
+          secrets: deps.secrets,
+          addSecret: deps.addSecret,
+          ...(deps.openUrl && { openUrl: deps.openUrl }),
+          ...(deps.fetch && { fetch: deps.fetch }),
+          ...(deps.signInTimeoutMs !== undefined && { timeoutMs: deps.signInTimeoutMs }),
+        },
+        hooks,
+      );
+      if (!r.ok) return deps.redact(r.message);
+      // Bring the server up now, so its tools are there for the next step.
+      const current = resolved.servers[name] ?? found.config;
+      await startServer(name, { ...current, auth: 'oauth' } as McpServerConfig);
+      const st = states.get(name);
+      return st?.phase === 'connected'
+        ? `Signed in to ${name}. ${st.tools.length} tool${st.tools.length === 1 ? '' : 's'} ready.`
+        : st?.phase === 'failed'
+          ? `Signed in to ${name}, but it did not start: ${st.reason}`
+          : `Signed in to ${name}.`;
     },
     async close() {
       clearTimeout(timer);

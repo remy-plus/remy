@@ -16,6 +16,7 @@ import {
   type OAuthClientProvider,
   type OAuthTokens,
 } from '@remy/mcp';
+import type { SignInHooks } from './connections-view.ts';
 import type { SecretStore } from './mcp-secrets.ts';
 
 /** How long a sign-in may take before Remy stops waiting. */
@@ -348,14 +349,6 @@ export interface SignInDeps {
   addSecret?: (name: string, value: string) => void;
   fetch?: typeof fetch;
   timeoutMs?: number;
-}
-
-export interface SignInHooks {
-  signal?: AbortSignal;
-  /** Print the link instead of opening the browser. */
-  noBrowser?: boolean;
-  /** The sign-in link, and whether the browser was opened with it. */
-  onUrl?: (url: string, opened: boolean) => void;
 }
 
 export type SignInResult =

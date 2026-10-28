@@ -1027,6 +1027,19 @@ export function createChat(deps: ChatDeps): Chat {
           if (line) commit({ kind: 'note', text: line });
           return line;
         },
+        ...(base.signIn && {
+          async signIn(name, hooks) {
+            const line = await (base.signIn as NonNullable<ConnectionsApi['signIn']>)(name, {
+              ...hooks,
+              onUrl(url, opened) {
+                hooks.onUrl?.(url, opened);
+                if (!opened) commit({ kind: 'note', text: `Open this link to sign in: ${url}` });
+              },
+            });
+            if (line) commit({ kind: 'note', text: line });
+            return line;
+          },
+        }),
       };
     },
     async runCommand(name) {
