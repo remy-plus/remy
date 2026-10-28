@@ -3,6 +3,7 @@ import {
   createRuntime,
   DEFAULT_BUDGET,
   defineTool,
+  fold,
   type ModelRequest,
   type ModelResponse,
   type Runtime,
@@ -155,5 +156,63 @@ describe('tool selection in the runtime', () => {
     await rt.advance(await rt.start('create a github issue', config));
     expect(names(model.requests[0] as ModelRequest)).not.toContain('calendar__list_events');
     expect(ran).toEqual(['calendar__list_events']);
+  });
+
+  it('hints at find_tools only when a subset is on offer', async () => {
+    const few = new ScriptedModelClient([reply('finish', { answer: 'ok' })]);
+    const small = new ToolRegistry([...builtin(), ...mcpTools().slice(0, 12)]);
+    const rtSmall = make(small, new MemoryEventStore(), few);
+    await rtSmall.advance(await rtSmall.start('hi', config));
+    expect((few.requests[0] as ModelRequest).system).not.toContain('find_tools');
+
+    const many = new ScriptedModelClient([reply('finish', { answer: 'ok' })]);
+    const rtMany = make(
+      new ToolRegistry([...builtin(), ...mcpTools()]),
+      new MemoryEventStore(),
+      many,
+    );
+    await rtMany.advance(await rtMany.start('hi', config));
+    expect((many.requests[0] as ModelRequest).system).toContain('find_tools');
+
+    // Allowed tools without find_tools: the model cannot use it, so the prompt does not mention it.
+    const locked = new ScriptedModelClient([reply('finish', { answer: 'ok' })]);
+    const rtLocked = make(
+      new ToolRegistry([...builtin(), ...mcpTools()]),
+      new MemoryEventStore(),
+      locked,
+    );
+    const id = await rtLocked.start('hi', {
+      ...config,
+      permissions: { autoApprove: ['read'], allowTools: ['finish'] },
+    });
+    await rtLocked.advance(id);
+    expect((locked.requests[0] as ModelRequest).system).not.toContain('find_tools');
+  });
+
+  it('find_tools does not list tools the task denies or does not allow', async () => {
+    const found = async (permissions: TaskConfig['permissions']) => {
+      const model = new ScriptedModelClient([
+        reply('find_tools', { query: 'delete file' }),
+        reply('finish', { answer: 'ok' }),
+      ]);
+      const store = new MemoryEventStore();
+      const rt = make(new ToolRegistry([...builtin(), ...mcpTools()]), store, model);
+      const id = await rt.start('tidy up', { ...config, permissions });
+      await rt.advance(id);
+      const call = Object.values(fold(await store.read(id)).calls).find(
+        (c) => c.tool === 'find_tools',
+      );
+      return call?.result?.ok ? call.result.content : '';
+    };
+    expect(await found({ autoApprove: ['read'] })).toContain('drive__delete_file');
+    const denied = await found({ autoApprove: ['read'], denyTools: ['drive__delete_file'] });
+    expect(denied).not.toContain('drive__delete_file');
+    expect(denied).toContain('calendar__delete_event');
+    const allowed = await found({
+      autoApprove: ['read'],
+      allowTools: ['find_tools', 'finish', 'calendar__delete_event'],
+    });
+    expect(allowed).not.toContain('drive__delete_file');
+    expect(allowed).toContain('calendar__delete_event');
   });
 });

@@ -13,7 +13,7 @@ import {
 } from './next.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
-import { createFindTools, needsSelection, selectToolNames } from './select.ts';
+import { createFindTools, FIND_TOOLS_HINT, needsSelection, selectToolNames } from './select.ts';
 import { type CallState, fold, reduce, type TaskState } from './state.ts';
 import {
   type Clock,
@@ -146,8 +146,15 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     return t;
   }
 
+  /** The task's allow and deny lists as a test on one tool name. */
+  const permitsFor = (s: TaskState) => {
+    const { allowTools, denyTools } = s.config.permissions;
+    return (n: string) => (!allowTools || allowTools.includes(n)) && !denyTools?.includes(n);
+  };
+
   const ctxFor = (s: TaskState, c: CallState, signal: AbortSignal): ToolContext => ({
     ...deps.capabilities(s.config),
+    permits: permitsFor(s),
     taskId: s.taskId,
     callId: c.callId,
     idempotencyKey: idempotencyKey(s.taskId, c.callId),
@@ -163,7 +170,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       const signal = new AbortController().signal;
 
       const callModel = async (s: TaskState) => {
-        const { allowTools, denyTools } = s.config.permissions;
+        const permits = permitsFor(s);
         // With many selectable (MCP) tools, find_tools joins the registry and each step offers a subset.
         if (needsSelection(tools) && !tools.get(FIND_TOOLS)) tools.add(createFindTools(tools));
         const names = selectToolNames(
@@ -172,13 +179,18 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
           tools
             .list()
             .map((t) => t.name)
-            .filter((n) => (!allowTools || allowTools.includes(n)) && !denyTools?.includes(n)),
+            .filter(permits),
         );
         const t0 = clock.now();
         let res: Awaited<ReturnType<ModelClient['complete']>>;
         try {
           deps.onModelStart?.();
-          const system = deps.systemPrompt ?? SYSTEM_PROMPT;
+          const base = deps.systemPrompt ?? SYSTEM_PROMPT;
+          // Only when the model is really offered a subset and has find_tools to widen it.
+          const system =
+            needsSelection(tools) && names.includes(FIND_TOOLS)
+              ? `${base}\n\n${FIND_TOOLS_HINT}`
+              : base;
           const specs = tools.specs(names);
           const maxOutputTokens = deps.maxOutputTokens ?? 2048;
           const baseBudget = toolResultBudgetChars({

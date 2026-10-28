@@ -321,7 +321,7 @@ const ALIAS_THEME: Record<string, ThemeChoice> = {
 };
 
 /** Tools that are plumbing, not work worth a status line. */
-const QUIET_TOOLS = new Set(['finish', 'ask_user', 'update_plan']);
+const QUIET_TOOLS = new Set(['finish', 'ask_user', 'update_plan', 'find_tools']);
 
 const STATUSES = new Set(['pending', 'doing', 'done']);
 

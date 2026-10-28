@@ -88,6 +88,10 @@ export function rank(docs: Doc[], query: string, limit: number): string[] {
 const docOf = (t: Tool): Doc => ({ name: t.name, text: t.description });
 const selectableTools = (tools: ToolRegistry) => tools.list().filter((t) => t.selectable);
 
+/** Added to the system prompt when a step is offered a subset of the connected tools. */
+export const FIND_TOOLS_HINT =
+  'Only some of the connected tools are listed. If none of them fits the task, call find_tools with a few words about what you want to do; the tools it finds become available on your next step.';
+
 /** True when selection is active: more selectable tools than the threshold. */
 export const needsSelection = (tools: ToolRegistry): boolean =>
   selectableTools(tools).length > SELECT_THRESHOLD;
@@ -134,8 +138,10 @@ export function createFindTools(tools: ToolRegistry): Tool {
     timeoutMs: 5_000,
     maxOutputChars: 4_000,
     preview: ({ query }) => `Search tools: ${query}`,
-    async execute({ query }) {
-      const names = rank(selectableTools(tools).map(docOf), query, FIND_TOOLS_LIMIT);
+    async execute({ query }, ctx) {
+      // Tools the task may not call are not listed: their names and descriptions stay hidden.
+      const visible = selectableTools(tools).filter((t) => ctx.permits?.(t.name) ?? true);
+      const names = rank(visible.map(docOf), query, FIND_TOOLS_LIMIT);
       if (!names.length)
         return {
           ok: true,

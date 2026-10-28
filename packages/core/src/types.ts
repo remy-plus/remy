@@ -312,6 +312,11 @@ export interface ToolContext {
   net: ScopedFetch;
   secrets: SecretReader;
   clock: Clock;
+  /**
+   * Whether this task's allow and deny lists let the model use a tool. Set by the runtime; tools that
+   * list other tools (find_tools) use it so they do not reveal what the task cannot call.
+   */
+  permits?: (tool: string) => boolean;
 }
 
 /** Name of the built-in tool that searches selectable tools. Its results feed `TaskState.discovered`. */
