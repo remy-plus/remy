@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+Remy connects to your apps.
+
+- **Connections through MCP.** `remy connect` (or `/connect`) offers GitHub, Notion, Linear, Sentry, a folder of files, memory and web pages, and asks only for what each needs: a browser sign-in, a token or a folder. `remy connect add` adds any other server, local or remote, and `remy connect --import` brings in the ones Claude Desktop or Claude Code already use. Tokens stay in the Keychain.
+- **`/connections`.** Every server with its status and tool count; turn one off, sign in again, or remove it.
+- **The right tools for each step.** With many tools connected, each step offers the model the 12 most relevant, and it can search for the rest.
+- **Always allow.** `a` on an approval card lets one tool write or send without asking from then on, never for deletes or payments, and never in a task that has seen untrusted content. `/approvals` and `remy approvals` list and undo them.
+- **Safe by default.** A connection's tool asks before it acts unless its server is on the built-in list and marks it read-only. What a connection returns is untrusted. A server that fails mid-action is never retried blindly. A new `connections` eval suite (17 cases) holds all of this at 100%.
+
 ## 0.4.1 (2026-10-28)
 
 Typing stays instant while Remy streams, and you can cut in.

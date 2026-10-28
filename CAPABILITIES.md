@@ -1,6 +1,6 @@
-# What Remy can do (v0.1.0)
+# What Remy can do (v0.5.0)
 
-Remy is a terminal agent. You describe a task, and it works in small steps with the tools below until the task is done, it needs you, or it hits a limit. Everything here is tested in `pnpm check` and the eval suites (34 cases).
+Remy is a terminal agent. You describe a task, and it works in small steps with the tools below until the task is done, it needs you, or it hits a limit. Everything here is tested in `pnpm check` and the eval suites (53 cases).
 
 ## Works today
 
@@ -18,6 +18,8 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 - search the web, if you set `BRAVE_API_KEY`, `TAVILY_API_KEY` or `SEARXNG_URL`
 - restrict browsing to the domains you pass with `--net-allow`
 
+**Connections.** Remy uses apps through MCP servers: GitHub, Notion, Linear and Sentry, a folder of files, memory and web pages from the built-in list (`remy connect` or `/connect`), and any other server you add or import from Claude Desktop or Claude Code. Remote servers sign in through your browser or take a token; tokens stay in the Keychain. With many tools connected, each step offers the model the most relevant 12, and it can search for the rest.
+
 **Commands.** `run_command` runs one program from an allowlist: `ls`, `cat`, `head`, `tail`, `wc`, `grep`, `find`, `git`, `node`, `npm`, `pnpm` and `python3`. There are no pipes, redirects or wildcards. Each command runs in the workspace with a minimal environment, a 30-second timeout and capped output, and **every command needs your approval**.
 
 **Math.** `calculate` does arithmetic and date math, such as the days between two dates or adding days to a date.
@@ -29,7 +31,9 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 ## Safety
 
 - **Approvals.** By default Remy only reads without asking. Writing files needs your yes unless you allow it with `--auto read,write`. Deleting files, running commands, sending as you and spending money always ask, whatever `--auto` says. Each approval covers one exact action and is used once.
-- **Untrusted content.** Text from web pages, emails and command output is marked untrusted. Once a task has seen it, every action that is not a read needs your approval, so instructions hidden in a page cannot act on your behalf.
+- **Connections.** A tool from a connection asks before it acts, unless its server is on the built-in list and marks it read-only. A tool marked destructive always asks. What a connection returns is untrusted.
+- **Always allow.** On an approval card, `a` lets one tool write or send without asking from then on. It is never offered for deleting, paying or anything irreversible, and it stops applying in a task that has seen untrusted content. `/approvals` undoes it.
+- **Untrusted content.** Text from web pages, emails, connections and command output is marked untrusted. Once a task has seen it, every action that is not a read needs your approval, so instructions hidden in a page cannot act on your behalf.
 - **Containment.** Tools only reach the workspace folder and the network through scoped access. Secrets are kept out of what the model sees.
 - **No double actions.** Every task is an append-only event log. If Remy crashes or you press Ctrl+C, `remy resume <id>` continues from where it stopped. An action that may already have happened is checked or reported, never blindly repeated.
 - **Limits.** Each task stops at 30 steps, $1 of model cost or 30 minutes, whichever comes first. Use `--max-steps` and `--max-cost` to change the first two.
@@ -41,7 +45,10 @@ On GPT-5 nano, the 30 cases that existed then passed at 100% across 150 runs (ru
 ## Not yet
 
 - No browser automation: it reads pages but cannot click or fill forms.
-- No real email, calendar or other account integrations. Those tools exist only in the eval world.
+- No Slack or Google Workspace in the built-in list: both need an app you register yourself. You can still add their servers by hand.
+- A connection's tool descriptions reach the model as they are. A poisoned description is stopped only by the approval its action needs, so an "always allow" on that tool removes that guard.
+- A read-only tool can send data out in its arguments without asking. Add servers you trust.
+- Connection evals run against fake servers; live runs on real models and real services are still to come.
 - Ctrl+C stops the task, but a tool that is already running finishes its current call.
 - `run_command`'s path check is lexical: it does not follow symlinks inside the workspace. Approval is the real guard.
 - `run_command` is not a full sandbox. `node`, `python3` and `git` can do anything you could do in the workspace, so read the command before you approve it.

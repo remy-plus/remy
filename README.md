@@ -7,7 +7,7 @@
 
 Remy is an open-source AI agent that completes digital tasks through plain conversation. You say what you need, it does the work, and it asks before anything that sends as you, spends money, or can't be undone.
 
-> Status: Phase 0, an early prototype. Remy runs from the command line and does research, web reading and file work. The web app, integrations and browser automation are on the [roadmap](PLAN.md#product-roadmap-after-phase-0).
+> Status: early. Remy runs in the terminal and does research, web reading and file work, and connects to apps such as GitHub, Notion and Linear through MCP servers. Long tasks, a local browser and scheduled work are next on the [roadmap](PLAN.md#capability-track-0509-in-the-terminal-decided-2026-10-28).
 
 ## What makes it different
 
@@ -51,6 +51,12 @@ Plain `remy` in a terminal opens the chat full screen, on a calm home screen wit
 ```sh
 pnpm remy run "Summarize https://example.com in three bullet points"
 ```
+
+### Connections
+
+Remy reaches your apps through [MCP](https://modelcontextprotocol.io) servers. `remy connect` (or `/connect` in the chat) offers a short list: GitHub, Notion, Linear, Sentry, a folder of files, memory and web pages. Pick one and Remy asks only for what it needs: a sign-in in your browser, a token, or a folder. `remy connect add <name> -- <command>` or `--url <url>` adds any other server, and `remy connect --import` brings in the servers Claude Desktop or Claude Code already use, after showing you the list. Tokens go in the Keychain; a server that runs on your machine is shown with its exact command before it is added. `/connections` shows each server, its status and tool count, and turns servers off and on.
+
+Tools from a connection ask before they act unless the server marks them read-only and is on the list above. What a connection returns is treated as untrusted, like a web page. On an approval card, `a` always allows that tool from then on (writes and sends only, never deletes or payments); `/approvals` or `remy approvals` lists and removes those.
 
 Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Web search is enabled when `BRAVE_API_KEY`, `TAVILY_API_KEY` or `SEARXNG_URL` is set.
 
