@@ -61,6 +61,8 @@ export interface ChatAppProps {
   version?: string;
   /** Print the one-line header: after /clear. */
   compactHeader?: boolean;
+  /** The minimal screen: no wordmark, one quiet header line and one quiet footer line. */
+  minimal?: boolean;
   /** Called after /clear: the host wipes the screen and mounts the app again. */
   onClear?: () => void;
   /** Rings when Remy waits and the window is not focused. */
@@ -72,8 +74,11 @@ export interface ChatAppProps {
 }
 
 export interface RunOptions extends Omit<ChatAppProps, 'onClear' | 'compactHeader' | 'notifier'> {
-  /** `classic` keeps the scrollback UI of 0.2; the default is the full screen on a terminal. */
-  screen?: 'full' | 'classic';
+  /**
+   * `minimal` is the scrollback UI without the wordmark; `classic` is its old name. The default is
+   * the full screen on a terminal.
+   */
+  screen?: 'full' | 'minimal' | 'classic';
   /** The terminal answered the synchronized-output query; without it frames are not wrapped. */
   sync?: boolean;
   /** Stray console and stderr writes while the screen is up: they go here, not onto the screen. */
@@ -125,6 +130,8 @@ function Header(p: {
   model?: string;
   workspace?: string;
   compact?: boolean;
+  /** One quiet line, no wordmark. */
+  minimal?: boolean;
 }) {
   const { theme } = p;
   const { turn, indent, lead } = theme.space;
@@ -132,6 +139,12 @@ function Header(p: {
   const info = [p.model, p.workspace && shortPath(p.workspace)]
     .filter(Boolean)
     .join(` ${theme.symbols.dot} `);
+  if (p.minimal)
+    return h(
+      Box,
+      { paddingLeft: indent, marginTop: turn },
+      h(Text, { ...muted, wrap: 'truncate-end' }, info || 'not connected'),
+    );
   if (p.compact || p.columns < WORDMARK_WIDTH + 4)
     return h(
       Box,
@@ -392,6 +405,8 @@ function Footer(p: {
   hasInput: boolean;
   noting: boolean;
   menu?: 'slash' | 'file';
+  /** Model and state only, all quiet. */
+  minimal?: boolean;
 }) {
   const { state, theme } = p;
   const unconnected = !p.model;
@@ -409,9 +424,9 @@ function Footer(p: {
   const room = p.columns - theme.space.indent * 2;
   const join = (parts: string[]) => parts.filter(Boolean).join(` ${theme.symbols.dot} `);
   const name = p.model ?? 'not connected';
-  const tries = [[contextPart(state), costPart(state)], [costPart(state)], []].map((figures) =>
-    join(figures),
-  );
+  const tries = (
+    p.minimal ? [[]] : [[contextPart(state), costPart(state)], [costPart(state)], []]
+  ).map((figures) => join(figures));
   const fits = (figures: string) =>
     strWidth(join([name, figures, word])) + (hint ? FOOTER_GAP + strWidth(hint) : 0) <= room;
   const figures = tries.find(fits) ?? '';
@@ -425,7 +440,7 @@ function Footer(p: {
       h(
         Text,
         null,
-        h(Text, unconnected ? mutedProps(theme) : null, name),
+        h(Text, unconnected || p.minimal ? mutedProps(theme) : null, name),
         figures ? h(Text, mutedProps(theme), ` ${theme.symbols.dot} ${figures}`) : null,
         word
           ? h(Text, attention ? null : mutedProps(theme), ` ${theme.symbols.dot} ${word}`)
@@ -679,6 +694,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
               model: props.subtitle,
               workspace: props.workspace,
               compact: props.compactHeader,
+              minimal: props.minimal,
             }),
     }),
     viewing
@@ -736,6 +752,7 @@ export function ChatApp(props: ChatAppProps): ReactElement {
           hasInput: input.text.length > 0,
           noting,
           menu,
+          minimal: props.minimal,
         }),
   );
 }
@@ -745,9 +762,10 @@ const CLEAR_SCREEN = '\x1b[2J\x1b[3J\x1b[H';
 /** Opens the chat on the terminal and resolves when the user quits. */
 export async function runChat(props: RunOptions): Promise<void> {
   const { sync = false, onStray, env = process.env, screen, ...appProps } = props;
-  const full =
-    (screen ?? (env.REMY_SCREEN === 'classic' ? 'classic' : 'full')) === 'full' &&
-    Boolean(process.stdout.isTTY);
+  const chosen =
+    screen ?? (env.REMY_SCREEN === 'minimal' || env.REMY_SCREEN === 'classic' ? 'minimal' : 'full');
+  const full = chosen === 'full' && Boolean(process.stdout.isTTY);
+  if (chosen !== 'full') appProps.minimal ??= true;
   appProps.inputMode ??= env.REMY_INPUT === 'single' ? 'single' : 'multi';
   const stdout = gateSync(process.stdout, sync);
   const notifier = createNotifier(env, process.stdin, process.stdout);
