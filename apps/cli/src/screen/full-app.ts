@@ -114,8 +114,13 @@ function StatusRow(p: {
 }
 
 export function FullApp(props: ChatAppProps): ReactElement {
-  const { chat, theme } = props;
+  const { chat } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
+  const { themeFor } = props;
+  const theme = useMemo(
+    () => (themeFor ? themeFor(state.theme) : props.theme),
+    [themeFor, state.theme, props.theme],
+  );
   const { columns, rows } = useWindowSize();
   const [sidebarOn, setSidebarOn] = useState(true);
   const layout = computeLayout(columns, rows, {

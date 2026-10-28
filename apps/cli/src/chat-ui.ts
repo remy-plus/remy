@@ -8,7 +8,13 @@
 //     frame as tall as the terminal makes Ink clear and reprint everything, so the streaming
 //     text is cut to the tail that fits.
 import { Box, render, Static, Text, useStdout, useWindowSize } from 'ink';
-import { createElement as h, type ReactElement, type ReactNode, useSyncExternalStore } from 'react';
+import {
+  createElement as h,
+  type ReactElement,
+  type ReactNode,
+  useMemo,
+  useSyncExternalStore,
+} from 'react';
 import { ApprovalCard } from './approval-ui.ts';
 import type { Chat, ChatState, Item } from './chat.ts';
 import { APPROVAL_SETTLE_MS, useChatKeys } from './chat-keys.ts';
@@ -19,6 +25,7 @@ import { useFrame, useSettled } from './live-hooks.ts';
 import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
 import { Overlay } from './overlay-ui.ts';
 import { Menu, menuRows } from './picker.ts';
+import type { ThemeChoice } from './prefs.ts';
 import { FullApp } from './screen/full-app.ts';
 import { SessionPicker } from './session-picker.ts';
 import { spanProps } from './span-style.ts';
@@ -42,6 +49,8 @@ import { TAGLINE, WORDMARK, WORDMARK_WIDTH } from './wordmark.ts';
 export interface ChatAppProps {
   chat: Chat;
   theme: Theme;
+  /** The theme for a choice; the app uses it when the user picks one with /theme. */
+  themeFor?: (choice: ThemeChoice) => Theme;
   /** No animation: the thinking indicator and running tools show a still mark. */
   reducedMotion: boolean;
   /** The model in use, shown in the header and footer. */
@@ -622,8 +631,13 @@ function Live(p: {
 }
 
 export function ChatApp(props: ChatAppProps): ReactElement {
-  const { chat, theme } = props;
+  const { chat } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
+  const { themeFor } = props;
+  const theme = useMemo(
+    () => (themeFor ? themeFor(state.theme) : props.theme),
+    [themeFor, state.theme, props.theme],
+  );
   const { columns, rows } = useWindowSize();
   const { write } = useStdout();
   const mode = props.inputMode ?? 'multi';

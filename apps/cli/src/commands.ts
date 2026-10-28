@@ -16,6 +16,11 @@ export const COMMANDS: CommandInfo[] = [
   { name: 'new', summary: 'Start a fresh conversation' },
   { name: 'clear', summary: 'Clear the screen and start fresh' },
   { name: 'thinking', summary: "Show or hide the model's reasoning summary" },
+  {
+    name: 'theme',
+    summary: 'Switch between light and dark, or follow the terminal',
+    aliases: ['light', 'dark', 'day', 'night'],
+  },
   { name: 'help', summary: 'List commands and keys' },
   { name: 'exit', summary: 'Quit', aliases: ['quit'], keys: 'Ctrl+D' },
 ];

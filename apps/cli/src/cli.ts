@@ -61,6 +61,7 @@ import {
   SUGGESTED_MODELS,
   saveLogin,
 } from './login.ts';
+import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createTheme, detectColor } from './theme.ts';
 
 export interface CliDeps {
@@ -699,7 +700,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       },
     };
     let registry: ToolRegistry | undefined;
+    const prefs = loadPrefs(home);
     const chat = createChat({
+      theme: prefs.theme ?? 'auto',
+      saveTheme: (choice) => savePrefs(home, { theme: choice }),
       newClears: !flags.classic && env.REMY_SCREEN !== 'classic',
       runtime: (hooks) => {
         const made = makeRuntime(file, { model, hooks });
@@ -725,12 +729,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const { probeTerminal } = await import('./terminal.ts');
     // One quick question to the terminal before the screen opens: frame sync and light or dark.
     const probe = await probeTerminal(env, process.stdin, process.stdout);
+    const themeFor = (choice: ThemeChoice) =>
+      createTheme(level, choice === 'auto' ? probe.background : choice);
     await runChat({
       chat,
       sync: probe.sync,
       env,
       onStray: debug ? (stream, text) => debug.write('stray', { stream, text }) : undefined,
-      theme: createTheme(level, probe.background),
+      theme: themeFor(prefs.theme ?? 'auto'),
+      themeFor,
       reducedMotion: Boolean(flags['reduced-motion']) || env.REMY_REDUCED_MOTION === '1',
       ...(flags.classic && { screen: 'classic' as const }),
       ...(first && { subtitle: first.id }),

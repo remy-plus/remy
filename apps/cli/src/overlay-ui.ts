@@ -4,7 +4,16 @@ import type { Chat, ChatState, ModelChoice } from './chat.ts';
 import { COMMANDS } from './commands.ts';
 import { LoginFlow } from './login-ui.ts';
 import { Picker, type PickItem } from './picker.ts';
+import type { ThemeChoice } from './prefs.ts';
 import type { Theme } from './theme.ts';
+
+/** The rows of the theme picker; the one in use is marked. */
+export const themeItems = (current: ThemeChoice): PickItem[] =>
+  [
+    { id: 'auto', title: 'Auto', detail: 'follows your terminal' },
+    { id: 'light', title: 'Light', detail: 'for a light terminal' },
+    { id: 'dark', title: 'Dark', detail: 'for a dark terminal' },
+  ].map((i) => ({ ...i, detail: `${i.detail}${i.id === current ? ' · in use' : ''}` }));
 
 const choiceId = (c: ModelChoice) => `${c.provider}\t${c.model}`;
 
@@ -57,6 +66,15 @@ export function Overlay(p: {
       onCancel: close,
     });
   }
+  if (state.overlay === 'theme')
+    return h(Picker, {
+      title: 'Theme',
+      items: themeItems(state.theme),
+      theme,
+      max: 3,
+      onPick: (item) => chat.setTheme(item.id as ThemeChoice),
+      onCancel: close,
+    });
   const items: PickItem[] = [
     ...COMMANDS.map((c) => ({
       id: c.name,

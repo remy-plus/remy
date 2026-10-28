@@ -19,6 +19,7 @@ import { COMMANDS, findCommand } from './commands.ts';
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
+import { isThemeChoice, type ThemeChoice } from './prefs.ts';
 import {
   changedPaths,
   type FileTouch,
@@ -107,7 +108,7 @@ export interface FilesApi {
   read(path: string): Promise<string | undefined>;
 }
 
-export type Overlay = 'login' | 'model' | 'palette';
+export type Overlay = 'login' | 'model' | 'palette' | 'theme';
 
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
@@ -162,6 +163,8 @@ export interface ChatState {
   model?: string;
   /** A panel that takes over the input: the login, the model list or the command palette. */
   overlay?: Overlay;
+  /** The colour theme in use: `auto` follows the terminal. */
+  theme: ThemeChoice;
 }
 
 export interface RuntimeHooks {
@@ -194,6 +197,10 @@ export interface ChatDeps {
   frameMs?: number;
   /** `/new` empties the transcript (the full-screen app returns to its home screen). */
   newClears?: boolean;
+  /** The saved theme choice at the start. Default `auto`. */
+  theme?: ThemeChoice;
+  /** Saves the theme choice for next time; false when it could not be written. */
+  saveTheme?: (choice: ThemeChoice) => boolean;
 }
 
 export interface Chat {
@@ -206,6 +213,8 @@ export interface Chat {
   openOverlay(which: Overlay): void;
   /** Closes the panel; with `only`, just when that panel is the one open. */
   closeOverlay(only?: Overlay): void;
+  /** Applies a theme at once and saves it. */
+  setTheme(choice: ThemeChoice): void;
   /** Runs a command by name, as if typed (the palette uses this). */
   runCommand(name: string): Promise<void>;
   providers(): ProviderChoice[];
@@ -252,6 +261,14 @@ export const HELP_TEXT = [
   'Commands',
   ...COMMANDS.map((c) => `  /${c.name.padEnd(9)} ${c.summary}`),
 ].join('\n');
+
+/** `/day` and `/night` are `/theme light` and `/theme dark`; `/light` and `/dark` name the theme. */
+const ALIAS_THEME: Record<string, ThemeChoice> = {
+  light: 'light',
+  day: 'light',
+  dark: 'dark',
+  night: 'dark',
+};
 
 /** Tools that are plumbing, not work worth a status line. */
 const QUIET_TOOLS = new Set(['finish', 'ask_user', 'update_plan']);
@@ -316,6 +333,7 @@ const initial = (): ChatState => ({
   reasoning: '',
   showThinking: false,
   clears: 0,
+  theme: 'auto',
 });
 
 /** Finished tool lines beyond this many leave the live area at once. */
@@ -330,6 +348,7 @@ export function createChat(deps: ChatDeps): Chat {
     ...initial(),
     contextWindow: deps.contextWindow,
     ...(deps.model && { model: deps.model }),
+    ...(deps.theme && { theme: deps.theme }),
     // With no model yet, the chat opens on the login panel.
     ...(deps.connect && !deps.model && { overlay: 'login' as const }),
   };
@@ -767,6 +786,15 @@ export function createChat(deps: ChatDeps): Chat {
         kind: 'note',
         text: on ? 'Showing thinking when the model shares it.' : 'Thinking detail is off.',
       });
+    } else if (name === 'theme') {
+      const word = ALIAS_THEME[typed] ?? args[0]?.toLowerCase();
+      if (!word) return void set({ overlay: 'theme' });
+      if (!isThemeChoice(word))
+        return void commit({
+          kind: 'error',
+          text: `There is no theme "${word}". Use /theme auto, light or dark.`,
+        });
+      api.setTheme(word);
     } else if (name === 'exit') set({ wantsExit: true });
     else commit({ kind: 'error', text: `There is no command /${typed}. Type / to see them.` });
   }
@@ -813,6 +841,15 @@ export function createChat(deps: ChatDeps): Chat {
     openOverlay: (which) => set({ overlay: which }),
     closeOverlay: (only) => {
       if (!only || s.overlay === only) set({ overlay: undefined });
+    },
+    setTheme(choice) {
+      const saved = deps.saveTheme?.(choice) ?? false;
+      set({ theme: choice, overlay: undefined });
+      const label = choice === 'auto' ? 'auto (follows your terminal)' : choice;
+      commit({
+        kind: 'note',
+        text: saved ? `Theme: ${label}. Saved for next time.` : `Theme: ${label}. Not saved.`,
+      });
     },
     async runCommand(name) {
       set({ overlay: undefined });

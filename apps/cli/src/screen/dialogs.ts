@@ -5,6 +5,8 @@ import { createElement as h, type ReactElement, useState } from 'react';
 import { type Chat, type ChatState, type ModelChoice, shortId } from '../chat.ts';
 import { COMMANDS } from '../commands.ts';
 import { LoginFlow } from '../login-ui.ts';
+import { themeItems } from '../overlay-ui.ts';
+import type { ThemeChoice } from '../prefs.ts';
 import { ageWord, stateWord } from '../session-picker.ts';
 import type { Theme } from '../theme.ts';
 import { Dialog, type DialogSizeName, dialogSize } from './dialog.ts';
@@ -27,6 +29,7 @@ const GROUPS: Record<string, string> = {
   model: 'Model',
   login: 'Model',
   thinking: 'View',
+  theme: 'View',
   help: 'Help',
 };
 
@@ -159,6 +162,15 @@ export function Dialogs(p: {
       onClose: close,
     });
   }
+  if (state.overlay === 'theme')
+    return h(ListDialog, {
+      ...frame,
+      title: 'Theme',
+      size: 'small',
+      items: themeItems(state.theme).map((i) => ({ ...i, group: undefined })),
+      onPick: (item) => chat.setTheme(item.id as ThemeChoice),
+      onClose: close,
+    });
   if (state.overlay === 'palette')
     return h(ListDialog, {
       ...frame,
