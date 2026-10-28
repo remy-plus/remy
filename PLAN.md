@@ -387,6 +387,31 @@ Work packages, in order. Sonnet writes the code, Opus reviews and merges, and `p
 2. **More providers**: one adapter over a unified LLM library (Pi's `pi-ai` or the Vercel AI SDK, chosen on native Anthropic and Gemini support, tools, streaming, size and license) for APIs that are not OpenAI-compatible. The thin OpenAI-compatible client stays for the rest.
 3. **Subscription sign-in** (Claude, ChatGPT, Copilot, Gemini) only where the provider's terms allow third-party apps. Research in `design/research/subscription-login.md` decides; nothing is built that would put users' accounts at risk.
 
+## 0.3: full-screen terminal (decided 2026-10-27)
+
+Owner verdict on 0.2: "not as smooth as OpenCode"; wants centered, clean, structured, every element useful. Specs: `design/research/engineering/opencode-layout.md`. We take OpenCode's structure, not its look: Remy's palette, voice and calm stay.
+
+**Architecture.** Stay on Ink 8 (Node 22+, no native binary, tests carry over); OpenTUI 0.7 needs Node 26.4+, is pre-1.0 and means a rewrite. Ink 8 gives `alternateScreen`, `incrementalRendering`, `maxFps`, absolute positioning, `backgroundColor`, `useCursor`, `useBoxMetrics`. Full-screen is the default; `--classic` (or `REMY_SCREEN=classic`) keeps the 0.2 scrollback UI unchanged. The chat controller (`chat.ts`) is shared; only the view differs.
+
+New code lives in `apps/cli/src/screen/`. Pure functions carry the logic and get unit tests; components stay thin:
+- `layout.ts`: sizes from terminal size (content width, sidebar inline/overlay/none, prompt max rows, home widths).
+- `rows.ts`: transcript items and live state to pre-wrapped styled rows, cached per item and width. The viewport needs row counts, so Remy wraps text itself instead of asking Ink.
+- `scroll.ts`: scroll state (`top`, `sticky`), page/half-page/home/end, clamping, stay-at-bottom unless the user scrolled up.
+- Components: `Viewport`, `PromptBox`, `Home`, `Session`, `Sidebar`, `Dialog`, `FullApp`.
+
+**Phases** (Sonnet writes, Opus reviews and merges; one concern per commit, `pnpm check` green on each):
+- **A. Foundation.** Theme tokens (`panel`, `element`, `bar`, `barActive`); `layout.ts`; `scroll.ts`; `rows.ts` for user, assistant, tool, error, plan items; key handling pulled out of `ChatApp` into a shared hook; `runChat` picks full-screen or classic; `--classic` flag and env; alternate screen with incremental rendering and a frame cap.
+- **B. Session screen.** Viewport with sticky bottom and PgUp/PgDn, Ctrl+U/D, Home/End; user messages as a panel with a left bar; assistant text indented with markdown; tool rows with icons (muted when done, live spinner when running, error colour on failure, strikethrough when denied); block bodies only for edits and commands, collapsed to 10 lines; thinking as one line; a per-turn footer (model · time); approval and questions replace the prompt in the bottom slot.
+- **C. Prompt box.** Left bar plus panel, 1 to max(6, rows/3) lines, placeholder with an example, a meta row (model · provider), a row below (working status and "esc interrupt", or workspace on the left; context, cost, "ctrl+p commands" on the right); autocomplete pops up above the box.
+- **D. Home.** Centered wordmark, prompt (max 75 wide), one tip line, footer (workspace, version). The first message moves to the session screen.
+- **E. Dialogs.** A centered panel (60/88/116 wide, top at rows/4) for the palette, model picker, sessions, login and the transcript search; title with "esc" at right, search field, grouped list.
+- **F. Sidebar.** Inline at >120 columns (42 wide), else toggled as an overlay: title, context and cost, plan, files touched.
+- **G. Input feel.** The real terminal cursor, word moves and deletes, Ctrl+A/E/K/U/W, undo, paste markers at 3+ lines or 150+ characters, history search.
+- **H. Streaming and motion.** Coalesce text deltas to the frame rate, an 80 ms spinner, no layout shift while streaming, a calm fade for the prompt meta.
+- **I. Ship.** pty smoke and screenshots for both modes, docs, CHANGELOG, 0.3.0.
+
+Also researched with REA once its tools load: Claude Code's shipped bundle (its full-screen mode and input handling), recorded in `design/research/engineering/claude-code.md`.
+
 ## Product roadmap after Phase 0
 
 Each phase keeps the Phase 0 interfaces. Its exit criteria include "no regression in the eval suite", and the suite grows with every capability.
