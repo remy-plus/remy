@@ -91,6 +91,12 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
         return opts.live ? undefined : `asked you: ${truncate(ev.question, 120)}`;
       case 'user.answered':
         return `you answered: ${truncate(ev.answer, 120)}`;
+      case 'budget.exhausted':
+        return `paused at the ${ev.limit} limit after ${ev.steps} steps and $${ev.costUsd.toFixed(2)}`;
+      case 'budget.extended':
+        return `continued by ${ev.by}: now up to ${ev.maxSteps} steps and $${ev.maxCostUsd.toFixed(2)}`;
+      case 'progress':
+        return st.dim(`progress: ${ev.text}`);
       case 'task.cancel_requested':
         return `cancel requested by ${ev.by}`;
       case 'task.finished':

@@ -575,3 +575,65 @@ describe('full transcript view', () => {
     app.unmount();
   });
 });
+
+describe('pause card', () => {
+  const w = (name: string) => call('write_file', { path: name, content: 'x' });
+  const small = (dir0: string): Partial<ChatDeps> => ({
+    config: (context) => ({
+      model: 'm',
+      permissions: { autoApprove: ['read', 'write'] },
+      budget: { ...DEFAULT_BUDGET, maxSteps: 1 },
+      workspaceDir: dir0,
+      context,
+    }),
+  });
+  const paused = async () => {
+    const app = mount(
+      new ScriptedModelClient([w('a.txt'), call('finish', { answer: 'All done.' })]),
+      ['read', 'write'],
+      0,
+      undefined,
+      small(dir),
+    );
+    await type(app, 'make two files');
+    await until(() => app.chat.getState().phase === 'paused');
+    return app;
+  };
+
+  it('asks calmly and shows the keys', async () => {
+    const app = await paused();
+    await until(() => frame(app).includes('y continue'));
+    expect(frame(app)).toContain('Paused after 1 step and $0.00. Continue for 1 more steps?');
+    expect(frame(app)).toContain('y continue');
+    expect(frame(app)).not.toContain('!');
+    app.unmount();
+  });
+
+  it('never continues on Enter or other keys', async () => {
+    const app = await paused();
+    app.stdin.write('\r');
+    app.stdin.write('x');
+    await new Promise((r) => setTimeout(r, 60));
+    expect(app.chat.getState().phase).toBe('paused');
+    app.unmount();
+  });
+
+  it('continues on y, with the original budget again', async () => {
+    const app = await paused();
+    app.stdin.write('y');
+    await until(() => app.chat.getState().items.some((i) => i.kind === 'reply'));
+    expect(
+      app.chat.getState().items.some((i) => i.kind === 'reply' && i.text === 'All done.'),
+    ).toBe(true);
+    app.unmount();
+  });
+
+  it('leaves the task paused on n and says how to continue', async () => {
+    const app = await paused();
+    app.stdin.write('n');
+    await until(() => app.chat.getState().phase === 'idle');
+    const notes = app.chat.getState().items.flatMap((i) => (i.kind === 'note' ? [i.text] : []));
+    expect(notes.some((t) => t.includes('remy continue task_'))).toBe(true);
+    app.unmount();
+  });
+});

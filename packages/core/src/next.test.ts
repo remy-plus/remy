@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash } from './hash.ts';
 import { isQuestion, nextAction } from './next.ts';
+import { PLAN_GATE_PREFIX } from './plan.ts';
 import { fold } from './state.ts';
 import { DEFAULT_BUDGET, type Event } from './types.ts';
 
@@ -145,9 +146,9 @@ describe('nextAction', () => {
       kind: 'finish',
       status: 'cancelled',
     });
-    expect(nextAction(st(), T0 + DEFAULT_BUDGET.maxWallMs + 1)).toMatchObject({
-      kind: 'finish',
-      status: 'failed',
+    expect(nextAction(st(), T0 + DEFAULT_BUDGET.maxWallMs + 1)).toEqual({
+      kind: 'exhaust',
+      limit: 'time',
     });
     const same = (id: string, step: number) => [
       resp(step, call(id, 'read_file', { p: 'same' })),
@@ -195,5 +196,124 @@ describe('nextAction', () => {
 
   it('is done after the task finishes', () => {
     expect(next({ type: 'task.finished', status: 'failed' })).toEqual({ kind: 'done' });
+  });
+});
+
+const exhausted: Event = {
+  type: 'budget.exhausted',
+  limit: 'steps',
+  steps: 1,
+  costUsd: 0.4,
+  elapsedMs: 5,
+};
+const extended: Event = {
+  type: 'budget.extended',
+  maxSteps: 60,
+  maxCostUsd: 2,
+  maxWallMs: DEFAULT_BUDGET.maxWallMs,
+  by: 'user',
+};
+const stepsTo = (n: number): Event[] =>
+  Array.from({ length: n }, (_, i) => [
+    resp(i + 1, call(`c${i}`, 'read_file', { p: i })),
+    allow(`c${i}`),
+    started(`c${i}`),
+    done(`c${i}`),
+  ]).flat();
+
+describe('pause and extend', () => {
+  const small = (...events: Event[]) =>
+    fold(
+      [
+        {
+          ...created,
+          config: {
+            ...(created as { config: object }).config,
+            budget: { ...DEFAULT_BUDGET, maxSteps: 2 },
+          },
+        } as Event,
+        ...events,
+      ].map((event, i) => ({ taskId: 't', seq: i + 1, at: new Date(T0).toISOString(), event })),
+    );
+
+  it('exhausts at the step and cost limits instead of failing', () => {
+    expect(nextAction(small(...stepsTo(2)), T0)).toEqual({ kind: 'exhaust', limit: 'steps' });
+    const pricey = {
+      ...(resp(1, call('c', 'read_file')) as object),
+      costUsd: 1,
+    } as Event;
+    expect(next(pricey, allow('c'), started('c'), done('c'))).toEqual({
+      kind: 'exhaust',
+      limit: 'cost',
+    });
+  });
+
+  it('pauses on budget.exhausted and waits', () => {
+    const s = small(...stepsTo(2), exhausted);
+    expect(s.status).toBe('paused');
+    expect(s.pause).toMatchObject({ limit: 'steps', steps: 1 });
+    expect(nextAction(s, T0)).toEqual({ kind: 'pause' });
+  });
+
+  it('runs again after budget.extended, with the new limits', () => {
+    const s = small(...stepsTo(2), exhausted, extended);
+    expect(s.status).toBe('running');
+    expect(s.pause).toBeUndefined();
+    expect(s.config.budget.maxSteps).toBe(60);
+    expect(s.initialBudget.maxSteps).toBe(2);
+    expect(nextAction(s, T0)).toEqual({ kind: 'call_model' });
+  });
+
+  it('only allows extend while paused and exhaust while running', () => {
+    expect(() => next(extended)).toThrow(/not allowed while running/);
+    expect(() => next(exhausted, exhausted)).toThrow(/not allowed while paused/);
+  });
+
+  it('can be cancelled while paused', () => {
+    const s = small(...stepsTo(2), exhausted, { type: 'task.cancel_requested', by: 'u' });
+    expect(nextAction(s, T0)).toMatchObject({ kind: 'finish', status: 'cancelled' });
+  });
+});
+
+describe('progress and the plan gate', () => {
+  it('asks for a progress note at every tenth step, once', () => {
+    expect(next(...stepsTo(9))).toEqual({ kind: 'call_model' });
+    expect(next(...stepsTo(10))).toEqual({ kind: 'progress' });
+    expect(next(...stepsTo(10), { type: 'progress', step: 10, text: 'x' })).toEqual({
+      kind: 'call_model',
+    });
+  });
+
+  const plan = (status: string) => [
+    resp(1, call('p', 'update_plan', { steps: [{ text: 'Do it', status }] })),
+    allow('p'),
+    started('p'),
+    done('p'),
+  ];
+  const fin = (id = 'f', step = 2) => [resp(step, call(id, 'finish', { answer: 'a' })), allow(id)];
+
+  it('gates finish while a plan step is open', () => {
+    expect(next(...plan('doing'), ...fin())).toEqual({ kind: 'gate_finish', callId: 'f' });
+    expect(next(...plan('done'), ...fin())).toEqual({ kind: 'execute', callId: 'f' });
+    expect(next(...plan('skipped'), ...fin())).toEqual({ kind: 'execute', callId: 'f' });
+    expect(next(...fin('f', 1))).toEqual({ kind: 'execute', callId: 'f' });
+  });
+
+  it('gates only once', () => {
+    const gated: Event = {
+      type: 'tool.completed',
+      callId: 'f',
+      result: {
+        ok: false,
+        error: `${PLAN_GATE_PREFIX}\n- Do it (doing)`,
+        retryable: false,
+        phase: 'before_effect',
+      },
+      latencyMs: 0,
+    };
+    expect(next(...plan('doing'), ...fin(), gated, ...fin('g', 3))).toEqual({
+      kind: 'execute',
+      callId: 'g',
+    });
   });
 });

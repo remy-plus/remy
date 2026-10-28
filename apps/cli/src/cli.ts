@@ -11,6 +11,7 @@ import {
   DEFAULT_BUDGET,
   type EventStore,
   fold,
+  LONG_BUDGET,
   type ModelClient,
   RISKS,
   type Risk,
@@ -73,6 +74,7 @@ import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
+import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
 import { stdoutGate } from './stream.ts';
@@ -116,6 +118,7 @@ const STATUSES: TaskStatus[] = [
   'running',
   'waiting_approval',
   'waiting_user',
+  'paused',
   'succeeded',
   'failed',
   'cancelled',
@@ -127,6 +130,9 @@ Usage
   remy                            Open the chat (in a terminal)
   remy run "<prompt>" [options]   Start a task and run it
   remy resume <id>                Continue a task that stopped
+  remy continue <id> [--steps n] [--cost usd]
+                                  Give a paused task more budget and carry on
+                                  (default: the original budget again)
   remy approve <id> [--always | --deny [--note "<why>"]]
                                   Answer a pending approval, then continue; a note
                                   goes to the model with the denial; --always also
@@ -154,6 +160,7 @@ Options for run
   --workspace <dir>     Folder the task may read and write (default ~/.remy/workspaces/<id>)
   --max-steps <n>       Step budget (default ${DEFAULT_BUDGET.maxSteps})
   --max-cost <usd>      Cost budget (default ${DEFAULT_BUDGET.maxCostUsd})
+  --long                A bigger budget for long jobs: ${LONG_BUDGET.maxSteps} steps, $${LONG_BUDGET.maxCostUsd}, 4 hours
   --net-allow <hosts>   Only allow these domains. Example: example.com,docs.example.com
 
 Options for every command
@@ -197,6 +204,9 @@ const OPTIONS = {
   workspace: { type: 'string' },
   'max-steps': { type: 'string' },
   'max-cost': { type: 'string' },
+  steps: { type: 'string' },
+  cost: { type: 'string' },
+  long: { type: 'boolean' },
   'net-allow': { type: 'string' },
   list: { type: 'boolean' },
   'key-stdin': { type: 'boolean' },
@@ -284,6 +294,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     ![
       'run',
       'resume',
+      'continue',
       'approve',
       'answer',
       'cancel',
@@ -608,8 +619,16 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   }
   type Rt = ReturnType<typeof makeRuntime>['runtime'];
 
-  const followUp = (id: string, o: Extract<RunOutcome, { status: `waiting_${string}` }>) => {
-    if (o.status === 'waiting_approval') {
+  const followUp = async (
+    id: string,
+    o: Extract<RunOutcome, { status: `waiting_${string}` | 'paused' }>,
+  ) => {
+    if (o.status === 'paused') {
+      const s = await makeRuntime(cfg(), { model: false }).runtime.state(id);
+      out(st.bold(pauseQuestion(o, defaultMore(s)).replace(/ Continue.*$/, '')));
+      out(`Continue: ${st.accent(continueCommand(id))}`);
+      out(st.dim(`More or less: remy continue ${id} --steps <n> --cost <usd>`));
+    } else if (o.status === 'waiting_approval') {
       out(`${st.bold('Approval needed:')} ${o.request.preview}`);
       out(st.dim(`Risk: ${o.request.risk}. Why: ${o.request.reason}`));
       out(`Approve: ${st.accent(`remy approve ${id}`)}`);
@@ -623,7 +642,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   async function finishLine(
     rt: Rt,
     id: string,
-    o: Exclude<RunOutcome, { status: `waiting_${string}` }>,
+    o: Exclude<RunOutcome, { status: `waiting_${string}` | 'paused' }>,
   ) {
     if (o.status === 'succeeded') out(o.answer?.trim() || 'Done.');
     else if (o.status === 'failed') out(`Failed: ${o.reason ?? 'the task could not finish.'}`);
@@ -650,9 +669,24 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     active = id;
     for (;;) {
       const o = await advanceWhenFree(rt, id);
+      if (o.status === 'paused') {
+        const s = await rt.state(id);
+        if (!deps.isTTY || !deps.ask) {
+          await followUp(id, o);
+          return 0;
+        }
+        out();
+        const a = await deps.ask(`${pauseQuestion(o, defaultMore(s))} [y/N] `);
+        if (a === null || !/^y(es)?$/i.test(a.trim())) {
+          await followUp(id, o);
+          return 0;
+        }
+        await rt.extend(id, moreFor(s, {}), 'user');
+        continue;
+      }
       if (o.status === 'waiting_approval' || o.status === 'waiting_user') {
         if (!deps.isTTY || !deps.ask) {
-          followUp(id, o);
+          await followUp(id, o);
           return 0;
         }
         if (o.status === 'waiting_approval') {
@@ -670,7 +704,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             );
           const a = await deps.ask(can ? 'Approve? [y/N/a] ' : 'Approve? [y/N] ');
           if (a === null) {
-            followUp(id, o);
+            await followUp(id, o);
             return 0;
           }
           const always = can && /^a(lways)?$/i.test(a.trim());
@@ -685,7 +719,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(`${st.bold('Question:')} ${o.question}`);
           const a = await deps.ask('> ');
           if (a === null || !a.trim()) {
-            followUp(id, o);
+            await followUp(id, o);
             return 0;
           }
           await rt.answer(id, a.trim());
@@ -726,6 +760,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     };
     const maxSteps = num(flags['max-steps'], '--max-steps');
     const maxCostUsd = num(flags['max-cost'], '--max-cost');
+    const long = flags.long ? LONG_BUDGET : undefined;
     const netAllow = list(flags['net-allow']) ?? file.netAllow;
     const always = standingNames();
     return {
@@ -738,6 +773,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       budget: {
         ...DEFAULT_BUDGET,
         ...file.budget,
+        ...(long && { ...long }),
         ...(maxSteps && { maxSteps }),
         ...(maxCostUsd && { maxCostUsd }),
       },
@@ -1026,6 +1062,33 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       case 'resume':
         need(1, 'remy resume <id>');
         return await resumeFlow(rest[0] as string);
+
+      case 'continue': {
+        need(1, 'remy continue <id> [--steps n] [--cost usd]');
+        const id = rest[0] as string;
+        const num = (v: string | undefined, name: string) => {
+          if (v === undefined) return undefined;
+          const n = Number(v);
+          if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number.`);
+          return n;
+        };
+        const steps = num(flags.steps, '--steps');
+        const costUsd = num(flags.cost, '--cost');
+        return await resumeFlow(id, async (rt) => {
+          const s = await rt.state(id);
+          if (s.status !== 'paused') throw new Error(`Task ${id} is not paused (${s.status}).`);
+          const more = moreFor(s, {
+            ...(steps !== undefined && { steps }),
+            ...(costUsd !== undefined && { costUsd }),
+          });
+          await rt.extend(id, more, 'user');
+          const bits = [
+            more.steps && `${more.steps} more steps`,
+            more.costUsd && `$${more.costUsd.toFixed(2)} more`,
+          ].filter(Boolean);
+          out(st.dim(`Continuing ${id} with ${bits.join(' and ') || 'more time'}.`));
+        });
+      }
 
       case 'approve': {
         need(1, 'remy approve <id> [--always | --deny [--note "<why>"]]');

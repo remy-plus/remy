@@ -23,6 +23,7 @@ import { CONNECT_HELP, type ConnectionsApi, plainConnections } from './connectio
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
+import { defaultMore, type More, pauseQuestion } from './pause.ts';
 import { isThemeChoice, type ThemeChoice } from './prefs.ts';
 import { bodyMessage, explainTooLarge, providerName } from './provider-error.ts';
 import {
@@ -123,7 +124,7 @@ export type Overlay =
   | 'connections'
   | 'connect';
 
-export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
+export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user' | 'paused';
 
 export interface ChatState {
   phase: Phase;
@@ -140,6 +141,8 @@ export interface ChatState {
   approval?: ApprovalRequest;
   approvalView?: ApprovalView;
   question?: string;
+  /** While paused: the question the card asks and what a yes adds. */
+  pause?: { question: string; more: Required<More> };
   taskId?: string;
   /** Messages typed while a task ran; they start in order once it ends. */
   queue: string[];
@@ -268,6 +271,8 @@ export interface Chat {
   resume(taskId: string): Promise<void>;
   /** Answers the pending approval. A denial may carry a note the model reads; `always` also saves a standing approval for the tool. */
   approve(granted: boolean, note?: string, always?: boolean): Promise<void>;
+  /** Answers the pause card: yes gives the task more budget, no leaves it paused (`remy continue`). */
+  continueRun(yes: boolean): Promise<void>;
   /** Stops the running task. It stays resumable. */
   interrupt(): Promise<void>;
   /**
@@ -334,7 +339,13 @@ export function parsePlan(args: unknown): PlanStep[] | undefined {
     if (typeof s?.text !== 'string') continue;
     out.push({
       text: s.text,
-      status: STATUSES.has(s.status as string) ? (s.status as PlanStep['status']) : 'pending',
+      // A skipped step is settled, so it shows as done.
+      status:
+        s.status === 'skipped'
+          ? 'done'
+          : STATUSES.has(s.status as string)
+            ? (s.status as PlanStep['status'])
+            : 'pending',
     });
   }
   return out.length ? out : undefined;
@@ -505,6 +516,10 @@ export function createChat(deps: ChatDeps): Chat {
       case 'approval.requested':
         setTool(ev.callId, { state: 'waiting_approval' });
         break;
+      case 'progress':
+        flush(true);
+        set({ items: [...s.items, { kind: 'note', text: ev.text }] });
+        break;
       case 'approval.resolved':
         setTool(
           ev.callId,
@@ -586,6 +601,7 @@ export function createChat(deps: ChatDeps): Chat {
       approval: undefined,
       approvalView: undefined,
       question: undefined,
+      pause: undefined,
       retrying: undefined,
       turnStartedAt: undefined,
       items: [...s.items, ...out],
@@ -660,6 +676,14 @@ export function createChat(deps: ChatDeps): Chat {
               deps.effectOf?.(c?.tool ?? ''),
             ),
           });
+          return;
+        }
+        if (o.status === 'paused') {
+          flush(true);
+          const more = defaultMore(await runtime.state(id));
+          const question = pauseQuestion(o, more);
+          commit({ kind: 'note', text: question });
+          set({ phase: 'paused', thinking: false, pause: { question, more }, approval: undefined });
           return;
         }
         if (o.status === 'waiting_user') {
@@ -788,7 +812,7 @@ export function createChat(deps: ChatDeps): Chat {
     }
   }
 
-  const RESUMABLE: TaskStatus[] = ['running', 'waiting_approval', 'waiting_user'];
+  const RESUMABLE: TaskStatus[] = ['running', 'waiting_approval', 'waiting_user', 'paused'];
 
   async function openPicker() {
     const all = (await deps.listTasks?.()) ?? [];
@@ -1151,6 +1175,28 @@ export function createChat(deps: ChatDeps): Chat {
       running = true;
       try {
         await runtime.approve(id, a.callId, a.argsHash, granted, 'user', note, keep);
+        await drive(id, my);
+      } catch (e) {
+        if (my !== gen) return;
+        await end(false, { kind: 'error', text: friendlyError(e) });
+      }
+    },
+
+    async continueRun(yes) {
+      const p = s.pause;
+      if (s.phase !== 'paused' || !p || !current) return;
+      const my = gen;
+      const id = current.id;
+      if (!yes)
+        return await end(false, {
+          kind: 'note',
+          text: `Left paused. Continue any time with: remy continue ${id}`,
+          ...turnMeta(),
+        });
+      set({ phase: 'running', pause: undefined, thinking: true });
+      running = true;
+      try {
+        await runtime.extend(id, p.more, 'user');
         await drive(id, my);
       } catch (e) {
         if (my !== gen) return;

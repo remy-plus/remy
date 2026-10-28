@@ -60,6 +60,7 @@ import { Viewport } from './viewport.ts';
 export function placeholderFor(state: ChatState, examples: readonly string[] = EXAMPLES): string {
   if (state.phase === 'waiting_user') return 'Type your answer…';
   if (state.phase === 'waiting_approval') return 'Say why, then Enter…';
+  if (state.phase === 'paused') return 'y to continue, n to stop here';
   const sent = state.items.filter((i) => i.kind === 'user').length;
   return `Ask anything… "${examples[sent % examples.length]}"`;
 }

@@ -19,6 +19,7 @@ const STATE_WORDS: Record<string, string> = {
   running: 'interrupted',
   waiting_approval: 'needs approval',
   waiting_user: 'has a question',
+  paused: 'paused, out of budget',
 };
 export const stateWord = (status: string) => STATE_WORDS[status] ?? status;
 

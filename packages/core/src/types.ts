@@ -79,6 +79,17 @@ export interface ConversationTurn {
   answer: string;
 }
 
+/** What `--long` sets: for big jobs the user expects to take a while. */
+export const LONG_BUDGET: Budget = {
+  maxSteps: 200,
+  maxCostUsd: 5,
+  maxWallMs: 4 * 60 * 60_000,
+  maxCallsPerStep: 4,
+};
+
+/** A progress note is recorded every this many steps. */
+export const PROGRESS_EVERY = 10;
+
 export const DEFAULT_BUDGET: Budget = {
   maxSteps: 30,
   maxCostUsd: 1,
@@ -91,6 +102,8 @@ export type TaskStatus =
   | 'running'
   | 'waiting_approval'
   | 'waiting_user'
+  /** The budget ran out. The task waits for `budget.extended` (or a cancel) instead of failing. */
+  | 'paused'
   | 'succeeded'
   | 'failed'
   | 'cancelled';
@@ -148,6 +161,24 @@ export type Event =
   | { type: 'user.asked'; question: string; callId?: string }
   | { type: 'user.answered'; answer: string; pasted?: string[] }
   | { type: 'task.cancel_requested'; by: string }
+  /** A limit ran out. What was spent is recorded so the pause card can say it. */
+  | {
+      type: 'budget.exhausted';
+      limit: 'steps' | 'cost' | 'time';
+      steps: number;
+      costUsd: number;
+      elapsedMs: number;
+    }
+  /** The user raised the limits. These are the new absolute limits, not increments. */
+  | {
+      type: 'budget.extended';
+      maxSteps: number;
+      maxCostUsd: number;
+      maxWallMs: number;
+      by: string;
+    }
+  /** A quiet one-line status, recorded every few steps on long tasks. */
+  | { type: 'progress'; step: number; text: string }
   | { type: 'task.finished'; status: FinalStatus; answer?: string; reason?: string };
 
 export type EventType = Event['type'];
@@ -356,6 +387,7 @@ export interface ApprovalRequest {
 export type RunOutcome =
   | { status: 'waiting_approval'; request: ApprovalRequest }
   | { status: 'waiting_user'; question: string }
+  | { status: 'paused'; limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number }
   | { status: FinalStatus; answer?: string; reason?: string };
 
 export interface Runtime {
@@ -375,4 +407,13 @@ export interface Runtime {
   /** `pasted`: segments of the answer the user pasted. They are untrusted and taint the task. */
   answer(taskId: string, answer: string, pasted?: string[]): Promise<void>;
   cancel(taskId: string, by: string): Promise<void>;
+  /**
+   * Raises the limits of a paused task by these amounts (`wallMs` counts from now) and lets it run
+   * again. Call `advance` afterwards.
+   */
+  extend(
+    taskId: string,
+    more: { steps?: number; costUsd?: number; wallMs?: number },
+    by?: string,
+  ): Promise<void>;
 }

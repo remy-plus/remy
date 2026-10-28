@@ -379,7 +379,7 @@ describe('runtime', () => {
     expect(model.calls).toBe(3);
   });
 
-  it('enforces the step budget', async () => {
+  it('pauses at the step budget', async () => {
     const { rt } = setup([
       [{ tool: 'read_web', args: { url: '1' } }],
       [{ tool: 'read_web', args: { url: '2' } }],
@@ -387,20 +387,21 @@ describe('runtime', () => {
     ]);
     const id = await rt.start('go', config(['read'], { maxSteps: 2 }));
     expect(await drive(rt, id)).toMatchObject({
-      status: 'failed',
-      reason: expect.stringContaining('2 steps'),
+      status: 'paused',
+      limit: 'steps',
+      steps: 2,
     });
   });
 
-  it('enforces the cost budget', async () => {
+  it('pauses at the cost budget', async () => {
     const { rt } = setup([
       [{ tool: 'read_web', args: { url: '1' } }],
       [{ tool: 'read_web', args: { url: '2' } }],
     ]);
     const id = await rt.start('go', config(['read'], { maxCostUsd: 0.0001 }));
     expect(await drive(rt, id)).toMatchObject({
-      status: 'failed',
-      reason: expect.stringContaining('cost'),
+      status: 'paused',
+      limit: 'cost',
     });
   });
 

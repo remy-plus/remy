@@ -2,6 +2,7 @@
 // state that exists in memory is always one the event log could have produced.
 import {
   type ApprovalRequest,
+  type Budget,
   type Event,
   type EventType,
   FIND_TOOLS,
@@ -60,6 +61,12 @@ export interface TaskState {
   modelAttempts: number;
   pendingApproval?: ApprovalRequest;
   pendingQuestion?: { question: string; callId?: string };
+  /** Set while status is `paused`: which limit ran out and what was spent. */
+  pause?: { limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number; elapsedMs: number };
+  /** The budget the task started with; `remy continue` offers it again by default. */
+  initialBudget: Budget;
+  /** The step of the last progress note (0: none yet). */
+  progressAt: number;
   cancelRequested: boolean;
   final?: { status: FinalStatus; answer?: string; reason?: string };
 }
@@ -68,7 +75,7 @@ export class InvalidTransitionError extends Error {
   override name = 'InvalidTransitionError';
 }
 
-const OPEN: TaskStatus[] = ['running', 'waiting_approval', 'waiting_user'];
+const OPEN: TaskStatus[] = ['running', 'waiting_approval', 'waiting_user', 'paused'];
 
 const ALLOWED_FROM: Record<Exclude<EventType, 'task.created'>, TaskStatus[]> = {
   'model.responded': ['running'],
@@ -82,6 +89,9 @@ const ALLOWED_FROM: Record<Exclude<EventType, 'task.created'>, TaskStatus[]> = {
   'tool.reconciled': ['running'],
   'user.asked': ['running'],
   'user.answered': ['waiting_user'],
+  'budget.exhausted': ['running'],
+  'budget.extended': ['paused'],
+  progress: ['running'],
   'task.cancel_requested': OPEN,
   'task.finished': OPEN,
 };
@@ -112,7 +122,9 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
     return {
       taskId: stored.taskId,
       prompt: e.prompt,
-      config: e.config,
+      config: { ...e.config, budget: { ...e.config.budget } },
+      initialBudget: { ...e.config.budget },
+      progressAt: 0,
       status: 'running',
       seq: 1,
       createdAt: Date.parse(stored.at),
@@ -286,6 +298,23 @@ function on(s: TaskState, e: Event) {
       s.status = 'running';
       return;
     }
+    case 'budget.exhausted':
+      s.pause = { limit: e.limit, steps: e.steps, costUsd: e.costUsd, elapsedMs: e.elapsedMs };
+      s.status = 'paused';
+      return;
+    case 'budget.extended':
+      s.config.budget = {
+        ...s.config.budget,
+        maxSteps: e.maxSteps,
+        maxCostUsd: e.maxCostUsd,
+        maxWallMs: e.maxWallMs,
+      };
+      s.pause = undefined;
+      s.status = 'running';
+      return;
+    case 'progress':
+      s.progressAt = e.step;
+      return;
     case 'task.cancel_requested':
       s.cancelRequested = true;
       return;
@@ -294,6 +323,7 @@ function on(s: TaskState, e: Event) {
       s.final = { status: e.status, answer: e.answer, reason: e.reason };
       s.pendingApproval = undefined;
       s.pendingQuestion = undefined;
+      s.pause = undefined;
       return;
   }
 }

@@ -361,6 +361,7 @@ const STATE_WORD: Record<ChatState['phase'], string> = {
   running: 'working',
   waiting_approval: 'needs approval',
   waiting_user: 'needs your answer',
+  paused: 'paused',
 };
 
 /** What the footer offers right now. */
@@ -403,6 +404,8 @@ export function hintsFor(
         : 'y approve · n deny · e say why';
     case 'waiting_user':
       return 'Enter answer · Ctrl+C stop';
+    case 'paused':
+      return 'y continue · n leave it paused';
     default:
       if (c.unconnected) return '/login connect a model · Ctrl+P menu';
       if (c.hasInput) return 'Enter send · Esc clear';
@@ -463,7 +466,10 @@ function Footer(p: {
   const fits = (figures: string) =>
     strWidth(join([name, figures, word])) + (hint ? FOOTER_GAP + strWidth(hint) : 0) <= room;
   const figures = tries.find(fits) ?? '';
-  const attention = state.phase === 'waiting_approval' || state.phase === 'waiting_user';
+  const attention =
+    state.phase === 'waiting_approval' ||
+    state.phase === 'waiting_user' ||
+    state.phase === 'paused';
   return h(
     Box,
     { paddingLeft: theme.space.indent },

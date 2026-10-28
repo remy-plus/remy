@@ -7,8 +7,11 @@ export function nextStatus(current: TaskStatus, event: Event): TaskStatus {
       return 'waiting_approval';
     case 'user.asked':
       return 'waiting_user';
+    case 'budget.exhausted':
+      return 'paused';
     case 'approval.resolved':
     case 'user.answered':
+    case 'budget.extended':
       return 'running';
     case 'task.finished':
       return event.status;

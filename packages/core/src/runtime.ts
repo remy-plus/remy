@@ -11,6 +11,7 @@ import {
   MAX_TOOL_ATTEMPTS,
   nextAction,
 } from './next.ts';
+import { openPlanSteps, planGateMessage, progressLine } from './plan.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
 import { createFindTools, FIND_TOOLS_HINT, needsSelection, selectToolNames } from './select.ts';
@@ -136,6 +137,13 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       return { status: 'waiting_approval', request: s.pendingApproval };
     if (s.status === 'waiting_user' && s.pendingQuestion)
       return { status: 'waiting_user', question: s.pendingQuestion.question };
+    if (s.status === 'paused' && s.pause)
+      return {
+        status: 'paused',
+        limit: s.pause.limit,
+        steps: s.pause.steps,
+        costUsd: s.pause.costUsd,
+      };
     if (s.final) return { ...s.final };
     throw new Error(`task ${s.taskId} is still running`);
   }
@@ -390,6 +398,36 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
           case 'call_model':
             await callModel(s);
             break;
+          case 'exhaust':
+            await commit([
+              {
+                type: 'budget.exhausted',
+                limit: a.limit,
+                steps: s.step,
+                costUsd: s.costUsd,
+                elapsedMs: clock.now() - s.createdAt,
+              },
+            ]);
+            break;
+          case 'progress':
+            await commit([{ type: 'progress', step: s.step, text: progressLine(s) }]);
+            break;
+          case 'gate_finish':
+            if (!c) break;
+            await commit([
+              {
+                type: 'tool.completed',
+                callId: c.callId,
+                result: {
+                  ok: false,
+                  error: planGateMessage(openPlanSteps(s)),
+                  retryable: false,
+                  phase: 'before_effect',
+                },
+                latencyMs: 0,
+              },
+            ]);
+            break;
           case 'decide': {
             if (!c) break;
             const tool = tools.get(c.tool);
@@ -503,6 +541,25 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       await withLease(taskId, async ({ state, commit }) => {
         if (!state().pendingQuestion) throw new Error('the task is not waiting for an answer');
         await commit([{ type: 'user.answered', answer, ...(pasted?.length && { pasted }) }]);
+      });
+    },
+
+    async extend(taskId, more, by = 'user') {
+      await withLease(taskId, async ({ state, commit }) => {
+        const s = state();
+        if (s.status !== 'paused') throw new Error('the task is not paused');
+        const b = s.config.budget;
+        const elapsed = clock.now() - s.createdAt;
+        await commit([
+          {
+            type: 'budget.extended',
+            maxSteps: b.maxSteps + (more.steps ?? 0),
+            maxCostUsd: b.maxCostUsd + (more.costUsd ?? 0),
+            // Time is counted from now, so a long pause does not eat the new allowance.
+            maxWallMs: more.wallMs ? elapsed + more.wallMs : Math.max(b.maxWallMs, elapsed),
+            by,
+          },
+        ]);
       });
     },
 

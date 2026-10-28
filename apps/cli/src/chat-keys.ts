@@ -101,9 +101,15 @@ export function useChatKeys(o: ChatKeysOptions) {
     if (card) cardSince.current = Date.now();
   }, [card]);
 
+  const pausedSince = useRef(0);
+  const pauseQ = state.pause?.question;
+  useEffect(() => {
+    if (pauseQ) pausedSince.current = Date.now();
+  }, [pauseQ]);
+
   // The full view hides the live area, so it gives way when Remy needs an answer.
   useEffect(() => {
-    if (state.phase === 'waiting_approval' || state.phase === 'waiting_user') setViewing(false);
+    if (state.phase !== 'idle' && state.phase !== 'running') setViewing(false);
   }, [state.phase]);
 
   // Autocomplete under the prompt: commands after a `/`, workspace files after an `@`.
@@ -178,6 +184,13 @@ export function useChatKeys(o: ChatKeysOptions) {
       if (input.text) return setInput(EMPTY_INPUT);
       return void quit();
     }
+    if (state.phase === 'paused') {
+      // Like an approval: single keys, never Enter, and not for the first moment.
+      if (Date.now() - pausedSince.current < (o.approvalSettleMs ?? APPROVAL_SETTLE_MS)) return;
+      if (/^y$/i.test(ch)) void chat.continueRun(true);
+      else if (/^n$/i.test(ch)) void chat.continueRun(false);
+      return;
+    }
     if (state.phase === 'waiting_approval') {
       if (noting) {
         if (key.escape) {
@@ -243,7 +256,8 @@ export function useChatKeys(o: ChatKeysOptions) {
   // card or the full view swallows it, so pasted text can never answer a question.
   usePaste(
     (text) => {
-      if (viewing || (state.phase === 'waiting_approval' && !noting)) return;
+      if (viewing || state.phase === 'paused' || (state.phase === 'waiting_approval' && !noting))
+        return;
       setInput((cur) => pasteInput(cur, text));
     },
     { isActive: mode === 'multi' && !state.overlay && !o.paused },

@@ -119,6 +119,12 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
             );
           } else if (o.status === 'waiting_user')
             await rt.answer(taskId, answers.shift() ?? NO_MORE_ANSWERS);
+          // Nobody is there to say "continue", so a pause ends the run as the old limit did.
+          else if (o.status === 'paused')
+            return {
+              status: 'failed',
+              reason: `Stopped: reached the ${o.limit} limit after ${o.steps} steps.`,
+            };
           else return o;
         } catch (e) {
           if (e instanceof Crash) {

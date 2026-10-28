@@ -1,6 +1,7 @@
 export * from './hash.ts';
 export * from './messages.ts';
 export * from './next.ts';
+export * from './plan.ts';
 export * from './policy.ts';
 export * from './registry.ts';
 export * from './runtime.ts';

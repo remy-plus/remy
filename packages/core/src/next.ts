@@ -1,13 +1,20 @@
 // nextAction(state) decides the runner's next move from persisted state alone, so a crash
 // anywhere is recovered by re-reading the events and asking again. Pure.
+import { openPlanSteps, planGateUsed } from './plan.ts';
 import { type CallState, isTerminal, type TaskState } from './state.ts';
-import type { FinalStatus } from './types.ts';
+import { type FinalStatus, PROGRESS_EVERY } from './types.ts';
 
 export type Action =
   | { kind: 'done' }
   | { kind: 'pause' }
   | { kind: 'finish'; status: FinalStatus; answer?: string; reason?: string }
   | { kind: 'call_model' }
+  /** A limit ran out: pause the task (the user can extend it). */
+  | { kind: 'exhaust'; limit: 'steps' | 'cost' | 'time' }
+  /** Record a one-line progress note. */
+  | { kind: 'progress' }
+  /** `finish` while the plan has open steps: answer it with a tool error, once. */
+  | { kind: 'gate_finish'; callId: string }
   | { kind: 'decide'; callId: string }
   | { kind: 'request_approval'; callId: string }
   | { kind: 'execute'; callId: string }
@@ -34,8 +41,7 @@ export function nextAction(s: TaskState, now: number): Action {
   if (isTerminal(s.status)) return { kind: 'done' };
   if (s.cancelRequested) return { kind: 'finish', status: 'cancelled', reason: 'Cancelled.' };
   if (s.status !== 'running') return { kind: 'pause' };
-  if (now - s.createdAt > s.config.budget.maxWallMs)
-    return fail('Stopped: the task ran past its time budget.');
+  if (now - s.createdAt > s.config.budget.maxWallMs) return { kind: 'exhaust', limit: 'time' };
 
   const calls = currentCalls(s);
   for (const c of calls) {
@@ -48,6 +54,8 @@ export function nextAction(s: TaskState, now: number): Action {
       return { kind: c.userAnswer === undefined ? 'ask_user' : 'answer_call', callId: c.callId };
     if (c.attempts > 0 && c.userAnswer !== undefined)
       return { kind: 'resolve_uncertain', callId: c.callId };
+    if (c.tool === 'finish' && !planGateUsed(s) && openPlanSteps(s).length)
+      return { kind: 'gate_finish', callId: c.callId };
     return { kind: 'execute', callId: c.callId };
   }
 
@@ -74,9 +82,10 @@ export function nextAction(s: TaskState, now: number): Action {
       return fail(`Stopped: repeated the same ${c.tool} call ${n} times without progress.`);
   }
   const { maxSteps, maxCostUsd } = s.config.budget;
-  if (s.step >= maxSteps) return fail(`Stopped: reached the limit of ${maxSteps} steps.`);
-  if (s.costUsd >= maxCostUsd)
-    return fail(`Stopped: reached the cost limit of $${maxCostUsd.toFixed(2)}.`);
+  if (s.step >= maxSteps) return { kind: 'exhaust', limit: 'steps' };
+  if (s.costUsd >= maxCostUsd) return { kind: 'exhaust', limit: 'cost' };
+  if (s.step > 0 && s.step % PROGRESS_EVERY === 0 && s.progressAt < s.step)
+    return { kind: 'progress' };
   return { kind: 'call_model' };
 }
 

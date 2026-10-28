@@ -410,3 +410,91 @@ describe('--debug', () => {
     expect(r.out).toContain('--debug');
   });
 });
+
+describe('long runs', () => {
+  const read2 = (n: number) => call('write_file', { path: `f${n}.txt`, content: 'x' });
+  const auto = ['--auto', 'read,write', '--max-steps', '1'];
+
+  it('prints the continue command when a run pauses off a terminal', async () => {
+    const h = harness({ model: new ScriptedModelClient([read2(1), done]) });
+    const r = await h.run('run', 'two files', ...auto);
+    const id = taskIdOf(r.out);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('Paused after 1 step and $0.00.');
+    expect(r.out).toContain(`remy continue ${id}`);
+    expect(r.out).not.toContain('Failed');
+    expect(r.out).not.toContain('!');
+  });
+
+  it('continue gives the original budget again and finishes', async () => {
+    const h = harness({ model: new ScriptedModelClient([read2(1), done]) });
+    const id = taskIdOf((await h.run('run', 'two files', ...auto)).out);
+    const r = await h.run('continue', id);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('Continuing');
+    expect(r.out).toContain('Wrote a.txt.');
+    const s = fold(await h.store.read(id));
+    expect(s.config.budget.maxSteps).toBe(2);
+  });
+
+  it('continue --steps and --cost set exactly what is added', async () => {
+    const h = harness({ model: new ScriptedModelClient([read2(1), done]) });
+    const id = taskIdOf((await h.run('run', 'two files', ...auto)).out);
+    await h.run('continue', id, '--steps', '5', '--cost', '2');
+    const s = fold(await h.store.read(id));
+    expect(s.config.budget.maxSteps).toBe(6);
+    expect(s.config.budget.maxCostUsd).toBe(3);
+  });
+
+  it('continue rejects bad numbers and tasks that are not paused', async () => {
+    const h = harness({ model: new ScriptedModelClient([write, done]) });
+    const id = taskIdOf((await h.run('run', 'write a file')).out);
+    expect((await h.run('continue', id)).err).toContain('is not paused');
+    expect((await h.run('continue', id, '--steps', 'zero')).err).toContain(
+      '--steps must be a positive number',
+    );
+    expect((await h.run('continue')).err).toContain('Usage: remy continue');
+  });
+
+  it('asks on a terminal and continues after y', async () => {
+    const asked: string[] = [];
+    const h = harness({
+      model: new ScriptedModelClient([read2(1), done]),
+      isTTY: true,
+      ask: async (q) => {
+        asked.push(q);
+        return 'y';
+      },
+    });
+    const r = await h.run('run', 'two files', ...auto);
+    expect(asked).toEqual(['Paused after 1 step and $0.00. Continue for 1 more steps? [y/N] ']);
+    expect(r.out).toContain('Wrote a.txt.');
+  });
+
+  it('leaves the task paused on a terminal when the answer is not y', async () => {
+    const h = harness({
+      model: new ScriptedModelClient([read2(1), done]),
+      isTTY: true,
+      ask: async () => '',
+    });
+    const r = await h.run('run', 'two files', ...auto);
+    expect(r.out).toContain('remy continue');
+    expect(fold(await h.store.read(taskIdOf(r.out))).status).toBe('paused');
+  });
+
+  it('--long sets 200 steps, $5 and 4 hours', async () => {
+    const h = harness({ model: new ScriptedModelClient([done]) });
+    const id = taskIdOf((await h.run('run', 'quick', '--long')).out);
+    const b = fold(await h.store.read(id)).config.budget;
+    expect([b.maxSteps, b.maxCostUsd, b.maxWallMs]).toEqual([200, 5, 4 * 60 * 60_000]);
+  });
+
+  it('show lists the pause and the extension', async () => {
+    const h = harness({ model: new ScriptedModelClient([read2(1), done]) });
+    const id = taskIdOf((await h.run('run', 'two files', ...auto)).out);
+    await h.run('continue', id);
+    const r = await h.run('show', id);
+    expect(r.out).toContain('paused at the steps limit after 1 steps');
+    expect(r.out).toContain('continued by user');
+  });
+});
