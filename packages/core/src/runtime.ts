@@ -13,12 +13,14 @@ import {
 } from './next.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
+import { createFindTools, needsSelection, selectToolNames } from './select.ts';
 import { type CallState, fold, reduce, type TaskState } from './state.ts';
 import {
   type Clock,
   ConcurrencyError,
   type Event,
   type EventStore,
+  FIND_TOOLS,
   type IdGen,
   type Lease,
   type ModelClient,
@@ -162,10 +164,16 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
 
       const callModel = async (s: TaskState) => {
         const { allowTools, denyTools } = s.config.permissions;
-        const names = tools
-          .list()
-          .map((t) => t.name)
-          .filter((n) => (!allowTools || allowTools.includes(n)) && !denyTools?.includes(n));
+        // With many selectable (MCP) tools, find_tools joins the registry and each step offers a subset.
+        if (needsSelection(tools) && !tools.get(FIND_TOOLS)) tools.add(createFindTools(tools));
+        const names = selectToolNames(
+          tools,
+          s,
+          tools
+            .list()
+            .map((t) => t.name)
+            .filter((n) => (!allowTools || allowTools.includes(n)) && !denyTools?.includes(n)),
+        );
         const t0 = clock.now();
         let res: Awaited<ReturnType<ModelClient['complete']>>;
         try {

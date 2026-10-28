@@ -299,8 +299,16 @@ export interface ToolContext {
   clock: Clock;
 }
 
+/** Name of the built-in tool that searches selectable tools. Its results feed `TaskState.discovered`. */
+export const FIND_TOOLS = 'find_tools';
+
 export interface Tool<A = unknown> {
   name: string;
+  /**
+   * Selectable tools (e.g. from MCP servers) are offered to the model only when relevant to the task
+   * once there are many of them; see `selectToolNames`. Absent or false: always offered.
+   */
+  selectable?: boolean;
   description: string;
   args: z.ZodType<A>;
   risk: Risk;

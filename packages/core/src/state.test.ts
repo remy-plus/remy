@@ -278,3 +278,29 @@ describe('reducer', () => {
     expect(s.status).toBe('cancelled');
   });
 });
+
+describe('discovered tools', () => {
+  const found = (tool: string, data: unknown): Event[] => [
+    responded(1, call('c1', tool, { query: 'q' })),
+    { type: 'policy.decided', callId: 'c1', decision: { kind: 'allow' } },
+    { type: 'tool.started', callId: 'c1', idempotencyKey: 'k', attempt: 1 },
+    {
+      type: 'tool.completed',
+      callId: 'c1',
+      result: { ok: true, content: 'x', trust: 'trusted', data },
+      latencyMs: 1,
+    },
+  ];
+
+  it('collects names find_tools returned, without duplicates', () => {
+    const s = fold(log(created, ...found('find_tools', { names: ['a__x', 'b__y', 'a__x'] })));
+    expect(s.discovered).toEqual(['a__x', 'b__y']);
+  });
+
+  it('is empty without find_tools, and ignores malformed data or other tools', () => {
+    expect(fold(log(created)).discovered).toEqual([]);
+    expect(fold(log(created, ...found('find_tools', { names: 'nope' }))).discovered).toEqual([]);
+    expect(fold(log(created, ...found('find_tools', undefined))).discovered).toEqual([]);
+    expect(fold(log(created, ...found('read_file', { names: ['a__x'] }))).discovered).toEqual([]);
+  });
+});

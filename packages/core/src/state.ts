@@ -1,17 +1,18 @@
 // TaskState = fold(events). The reducer is pure and rejects invalid transitions, so a
 // state that exists in memory is always one the event log could have produced.
-import type {
-  ApprovalRequest,
-  Event,
-  EventType,
-  FinalStatus,
-  PlannedCall,
-  PolicyDecision,
-  StoredEvent,
-  TaskConfig,
-  TaskStatus,
-  ToolResult,
-  Usage,
+import {
+  type ApprovalRequest,
+  type Event,
+  type EventType,
+  FIND_TOOLS,
+  type FinalStatus,
+  type PlannedCall,
+  type PolicyDecision,
+  type StoredEvent,
+  type TaskConfig,
+  type TaskStatus,
+  type ToolResult,
+  type Usage,
 } from './types.ts';
 
 export interface CallState extends PlannedCall {
@@ -49,6 +50,8 @@ export interface TaskState {
   calls: Record<string, CallState>;
   log: LogEntry[];
   tainted: boolean;
+  /** Selectable tools that `find_tools` returned, oldest first. They stay offered for the rest of the task. */
+  discovered: string[];
   usage: Usage;
   costUsd: number;
   /** Failed model attempts for the next step. Reset on each response. */
@@ -114,6 +117,7 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
       step: 0,
       calls: {},
       log: [{ kind: 'user', text: e.prompt }],
+      discovered: [],
       tainted: (e.config.pasted?.length ?? 0) > 0,
       usage: { inTokens: 0, outTokens: 0 },
       costUsd: 0,
@@ -143,6 +147,12 @@ function setResult(s: TaskState, call: CallState, result: ToolResult) {
   call.result = result;
   call.inFlight = false;
   if (result.ok && result.trust === 'untrusted') s.tainted = true;
+  if (result.ok && call.tool === FIND_TOOLS) {
+    const names = (result.data as { names?: unknown } | undefined)?.names;
+    if (Array.isArray(names))
+      for (const n of names)
+        if (typeof n === 'string' && !s.discovered.includes(n)) s.discovered.push(n);
+  }
   s.log.push({ kind: 'result', callId: call.callId });
 }
 

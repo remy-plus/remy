@@ -169,6 +169,7 @@ export function toTools(
       name,
       description: capText(`${about} (via ${serverName})`, MAX_DESCRIPTION_CHARS),
       args: argsSchema(t.inputSchema),
+      selectable: true,
       risk,
       effect,
       outputTrust: 'untrusted',
