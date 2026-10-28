@@ -414,9 +414,26 @@ Notes from the build: Ctrl+D and Ctrl+U scroll half a page when the prompt is em
 
 Also researched with REA once its tools load: Claude Code's shipped bundle (its full-screen mode and input handling), recorded in `design/research/engineering/claude-code.md`.
 
+## Capability track: 0.5–0.9 in the terminal (decided 2026-10-28)
+
+Owner's goal: Remy should do "pretty much anything, only limited by the model's intelligence", like J.A.R.V.I.S., and the harness itself should push toward AGI/ASI (research wanted). First jobs, all wanted: email and calendar, research and shopping, coding and files, routines.
+
+**Decision:** build capability in the terminal before the web app. Remy runs on the user's machine, so it can use a real browser, local files and apps without the cloud infrastructure Phase 1 needs. Phase 1 (web app) moves after 0.9 and reuses everything below through the same `Runtime` interface. The safety rules do not change: longer unattended runs come from standing approvals and risk classes, never from weaker gates. Each release ships only when its eval suite passes and safety and recovery stay at 100%.
+
+| Release | Capability | Pulled forward from |
+|---|---|---|
+| **0.4.1** | Terminal feel: input-priority frame pacing, stdout backpressure, send now vs queue (`design/research/engineering/claude-code-terminal.md`) | — |
+| **0.5 Connections** | MCP client wrapped as `Tool`s (unclassified tools default to `send_as_user` + `unsafe_to_retry`), `remy connect` and a connections panel, tokens in the Keychain, dynamic tool selection (10–20 tools per step), standing approvals ("always allow calendar adds") | Phase 2 |
+| **0.6 Long tasks + memory** | Plan, act, verify loop with checkpoints; larger budgets with progress reports; background tasks you can leave and resume; memory beyond the profile (facts and preferences learned with consent, viewable and editable) | Phases 1, 5 |
+| **0.7 Local browser** | Playwright on the user's machine (accessibility tree first, vision fallback), take-over for logins and CAPTCHAs, browser actions classified by risk (submit = `write`+, checkout = `spend_money`) | Phase 3 |
+| **0.8 Proactive** | Schedules and triggers run as ordinary tasks, a small local daemon, notifications when Remy finishes or needs you | Phase 3 |
+| **0.9 Skills + sub-agents** | Procedures distilled from successful runs, retrieved as tools; child tasks on the same runtime for parallel work | Phase 5 |
+
+**Research alongside (the AGI track, in `research/`):** the harness is the experiment. Start with what the event log and evals already give us: measure where tasks fail on cheap models, test harness changes (verification steps, planning, tool selection) against pass^k, and publish what works. Model training waits until there is enough consented trajectory data.
+
 ## Product roadmap after Phase 0
 
-Each phase keeps the Phase 0 interfaces. Its exit criteria include "no regression in the eval suite", and the suite grows with every capability.
+Order changed 2026-10-28: the capability track above comes first; Phase 1 follows 0.9. Each phase keeps the Phase 0 interfaces. Its exit criteria include "no regression in the eval suite", and the suite grows with every capability.
 
 **Phase 1: Web app MVP.** `store-postgres` (same `EventStore` contract and same tests), a Hono server exposing the `Runtime` API, streaming over SSE, a worker pool (leases already exist; pg-boss only for wake-ups and scheduling), and a Next.js PWA with chat, live timeline, approval cards, and a model picker (BYO key / OpenRouter / Ollama URL). Auth. User memory v1 (view/edit). Code sandbox (E2B) as a tool with `risk: write`. *Exit:* a non-technical tester finishes tasks unaided, and killing a worker mid-task loses nothing.
 

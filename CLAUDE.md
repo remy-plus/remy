@@ -5,7 +5,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 **The full architecture and phased plan live in `PLAN.md`. Read it before starting work, and keep it updated when decisions change.**
 
 ## Decisions so far
-- **Surface:** V1 is a terminal app (Ink), tracked in `V1.md` (decided 2026-10-25). Web app + PWA (Next.js) come after V1; voice and desktop later.
+- **Surface:** V1 is a terminal app (Ink), tracked in `V1.md` (decided 2026-10-25). Capability first (decided 2026-10-28): 0.5 connections (MCP) → 0.6 long tasks + memory → 0.7 local browser → 0.8 proactive → 0.9 skills + sub-agents, all in the terminal; the web app + PWA (Next.js) follows 0.9; voice and desktop later. See PLAN.md "Capability track".
 - **Execution:** all routes, most reliable first: API/MCP integrations → cloud browser (DOM first, vision fallback) → device agent on the user's machine (Phase 4).
 - **Stack:** TypeScript end to end, pnpm workspaces. Phase 0: CLI + SQLite (built-in `node:sqlite`) + zod + vitest + Biome, no server/queue/Docker. Phase 1 adds Postgres (same `EventStore` interface), Hono, Next.js PWA, worker pool. Python only for the future `research/` track.
 - **Models:** users pick their own. Phase 0 uses a thin in-house OpenAI-compatible client behind `ModelClient` (covers OpenRouter, Ollama, vLLM, Groq, OpenAI); Vercel AI SDK optional later. Testing uses cheap or free open-weight models, so the weak-model adapter (constrained JSON tool calls, few tools per step) matters.
@@ -30,6 +30,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 - Build workflow (which model writes which step) is in PLAN.md.
 
 ## Status
+- 2026-10-28 (evening): roadmap reordered to capability first (owner: "pretty much anything, only limited by the model's intelligence"; wants AGI research too). 0.4.1 (terminal feel, from the Claude Code study) being built by one agent. Owner to run the live eval for the fallback rule.
 - 2026-10-28: **0.4.0 shipped** (npm `@koryei/remy@0.4.0` verified with a clean install; Notion Releases and Daily reports updated). Onboarding tour, real first task, profile, `/profile`, `/tour`, plus the morning fixes: token-budgeted tool results, plain provider errors, try-alternatives-before-asking, stopped plans. 890 tests, replay 36/36. Owner tested the tour with a real key. GitHub release v0.4.0 published (the owner runs `gh release create`; auto mode blocks it). Publishing needs `pnpm -C apps/cli bundle` first (no prepack script).
 - 2026-10-28: 0.4.0 onboarding built on branch `onboarding-0.4`, unreleased (tour, local profile, `/profile`, `/tour`; report in `docs/reports/0.4-onboarding.md`). Needs owner review, a live pass with a real key, version bump and release.
 - 2026-10-27: **0.3.0 shipped** (npm `@koryei/remy@0.3.0` verified, GitHub release v0.3.0; site unchanged). Bin path must stay `release/remy.js` without `./` (newer npm drops it). Next: **0.4.0 = personalised onboarding** (Notion Ideas: name, goals, real first task from their answers, local /profile).
