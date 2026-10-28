@@ -16,6 +16,7 @@ import {
   type TaskSummary,
 } from '@remy/core';
 import { COMMANDS, findCommand } from './commands.ts';
+import { CONNECT_HELP, type ConnectionsApi, plainConnections } from './connections-view.ts';
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
@@ -110,7 +111,7 @@ export interface FilesApi {
   read(path: string): Promise<string | undefined>;
 }
 
-export type Overlay = 'login' | 'model' | 'palette' | 'theme' | 'profile';
+export type Overlay = 'login' | 'model' | 'palette' | 'theme' | 'profile' | 'connections';
 
 export type Phase = 'idle' | 'running' | 'waiting_approval' | 'waiting_user';
 
@@ -192,6 +193,10 @@ export interface ChatDeps {
   /** The model in use at the start; none means the chat opens on the login panel. */
   model?: string;
   connect?: ConnectApi;
+  /** The connected tool servers, for /connections. */
+  connections?: ConnectionsApi;
+  /** Settles when connected servers have had their start budget; sending waits for it. */
+  ready?: () => Promise<void>;
   files?: FilesApi;
   /** A tool's effect, for telling whether an approval can be taken back. */
   effectOf?: (tool: string) => Effect | undefined;
@@ -227,6 +232,10 @@ export interface Chat {
   closeOverlay(only?: Overlay): void;
   /** Applies a theme at once and saves it. */
   setTheme(choice: ThemeChoice): void;
+  /** A quiet note for the transcript from outside the chat; held back while the home screen shows. */
+  notify(text: string): void;
+  /** The connected servers with every change noted in the transcript. */
+  connections(): ConnectionsApi;
   /** Runs a command by name, as if typed (the palette uses this). */
   runCommand(name: string): Promise<void>;
   providers(): ProviderChoice[];
@@ -281,7 +290,7 @@ export const HELP_TEXT = [
   '  v         show the whole action',
   '',
   'Commands',
-  ...COMMANDS.map((c) => `  /${c.name.padEnd(9)} ${c.summary}`),
+  ...COMMANDS.map((c) => `  /${c.name.padEnd(12)} ${c.summary}`),
 ].join('\n');
 
 /** `/day` and `/night` are `/theme light` and `/theme dark`; `/light` and `/dark` name the theme. */
@@ -708,6 +717,12 @@ export function createChat(deps: ChatDeps): Chat {
     return { prompt, pasted: blocks.filter(Boolean), notes };
   }
 
+  /** Notes that arrived while the home screen showed wait for the first message. */
+  const held: string[] = [];
+  const flushHeld = () => {
+    if (held.length) commit(...held.splice(0).map((text): Item => ({ kind: 'note', text })));
+  };
+
   async function start(text: string, folder?: string) {
     if (deps.connect && !s.model) {
       // Keep the message; it is sent once a model is connected.
@@ -720,6 +735,7 @@ export function createChat(deps: ChatDeps): Chat {
     calls.clear();
     current = undefined;
     commit({ kind: 'user', text });
+    flushHeld();
     if (!s.title) set({ title: sessionTitle(text, pastedFor.get(text)) });
     set({
       phase: 'running',
@@ -732,6 +748,7 @@ export function createChat(deps: ChatDeps): Chat {
       taskCostUsd: 0,
     });
     try {
+      if (deps.ready) await deps.ready();
       const typedPaste = pastedFor.get(text);
       pastedFor.delete(text);
       const files = await attach(text);
@@ -784,6 +801,7 @@ export function createChat(deps: ChatDeps): Chat {
     set({ picker: undefined });
     const my = ++gen;
     try {
+      if (deps.ready) await deps.ready();
       const events = (await deps.readEvents?.(id)) ?? [];
       if (!events.length) return commit({ kind: 'error', text: `There is no task ${id}.` });
       const st = fold(events);
@@ -855,6 +873,16 @@ export function createChat(deps: ChatDeps): Chat {
       const hit = wanted ? deps.connect.models().find((m) => m.model === wanted) : undefined;
       if (name === 'model' && hit) return api.chooseModel(hit.provider, hit.model);
       set({ overlay: name });
+    } else if (name === 'connect') {
+      commit({ kind: 'note', text: CONNECT_HELP });
+    } else if (name === 'connections') {
+      if (!deps.connections)
+        return void commit({ kind: 'note', text: 'There are no connections here.' });
+      const rows = deps.connections.list();
+      // A plain list when asked for, and when there is nothing to open a panel for.
+      if (args[0] === 'list' || !rows.length)
+        return void commit({ kind: 'note', text: plainConnections(rows) });
+      set({ overlay: 'connections' });
     } else if (name === 'thinking') {
       const on = !s.showThinking;
       set({ showThinking: on });
@@ -949,6 +977,28 @@ export function createChat(deps: ChatDeps): Chat {
         kind: 'note',
         text: saved ? `Theme: ${label}. Saved for next time.` : `Theme: ${label}. Not saved.`,
       });
+    },
+    notify(text) {
+      if (s.phase === 'idle' && !s.items.length) held.push(text);
+      else commit({ kind: 'note', text });
+    },
+    connections() {
+      const inner = deps.connections;
+      const empty: ConnectionsApi = { list: () => [], setEnabled: () => '', remove: () => '' };
+      const base = inner ?? empty;
+      return {
+        list: () => base.list(),
+        setEnabled(name, enabled) {
+          const line = base.setEnabled(name, enabled);
+          if (line) commit({ kind: 'note', text: line });
+          return line;
+        },
+        remove(name) {
+          const line = base.remove(name);
+          if (line) commit({ kind: 'note', text: line });
+          return line;
+        },
+      };
     },
     async runCommand(name) {
       set({ overlay: undefined });

@@ -129,8 +129,8 @@ describe('/model, /login and /sessions', () => {
     await chat.submit('/login');
     expect(chat.getState().overlay).toBe('login');
     chat.closeOverlay();
-    await chat.submit('/connect');
-    expect(chat.getState().overlay).toBe('login');
+    await chat.submit('/models');
+    expect(chat.getState().overlay).toBe('model');
   });
 
   it('switches by name and keeps the conversation going', async () => {

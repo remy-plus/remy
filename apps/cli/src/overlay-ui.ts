@@ -2,6 +2,8 @@
 import { createElement as h, type ReactElement } from 'react';
 import type { Chat, ChatState, ModelChoice } from './chat.ts';
 import { COMMANDS } from './commands.ts';
+import { useConnections } from './connections-flow.ts';
+import type { ConnectionsApi } from './connections-view.ts';
 import { defaultModelFor } from './login.ts';
 import { LoginFlow } from './login-ui.ts';
 import { cheapChoice } from './onboarding.ts';
@@ -20,6 +22,19 @@ export const themeItems = (current: ThemeChoice): PickItem[] =>
   ].map((i) => ({ ...i, detail: `${i.detail}${i.id === current ? ' · in use' : ''}` }));
 
 const choiceId = (c: ModelChoice) => `${c.provider}\t${c.model}`;
+
+function ConnectionsPicker(p: { api: ConnectionsApi; theme: Theme; onClose: () => void }) {
+  const view = useConnections(p.api, p.onClose);
+  return h(Picker, {
+    key: view.title,
+    title: view.title,
+    items: view.items,
+    theme: p.theme,
+    max: 8,
+    onPick: (item) => view.pick(item.id),
+    onCancel: view.back,
+  });
+}
 
 /** The login, model and palette panels. Each takes over the prompt until it closes. */
 export function Overlay(p: {
@@ -75,6 +90,12 @@ export function Overlay(p: {
       onCancel: close,
     });
   }
+  if (state.overlay === 'connections')
+    return h(ConnectionsPicker, {
+      api: chat.connections(),
+      theme,
+      onClose: () => chat.closeOverlay('connections'),
+    });
   if (state.overlay === 'profile' && p.profile)
     return h(ProfilePanel, {
       profile: p.profile,

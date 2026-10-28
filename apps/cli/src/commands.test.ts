@@ -13,7 +13,8 @@ describe('commands', () => {
 
   it('matches aliases and summaries', () => {
     expect(matchCommands('resume')[0]?.name).toBe('sessions');
-    expect(matchCommands('connect')[0]?.name).toBe('login');
+    expect(matchCommands('connect')[0]?.name).toBe('connect');
+    expect(matchCommands('connec').map((c) => c.name)).toContain('connections');
     expect(matchCommands('reasoning').map((c) => c.name)).toContain('thinking');
   });
 

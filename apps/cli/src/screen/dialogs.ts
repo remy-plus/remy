@@ -4,6 +4,8 @@ import { useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
 import { type Chat, type ChatState, type ModelChoice, shortId } from '../chat.ts';
 import { COMMANDS } from '../commands.ts';
+import { useConnections } from '../connections-flow.ts';
+import type { ConnectionsApi } from '../connections-view.ts';
 import { defaultModelFor } from '../login.ts';
 import { LoginFlow } from '../login-ui.ts';
 import { cheapChoice } from '../onboarding.ts';
@@ -33,6 +35,8 @@ const GROUPS: Record<string, string> = {
   exit: 'Session',
   model: 'Model',
   login: 'Model',
+  connect: 'Tools',
+  connections: 'Tools',
   thinking: 'View',
   theme: 'View',
   minimal: 'View',
@@ -52,6 +56,7 @@ export function paletteItems(): DialogItem[] {
   return [
     ...by('Session'),
     ...by('Model'),
+    ...by('Tools'),
     ...by('View'),
     { id: '#sidebar', title: 'Show or hide the sidebar', detail: 'Ctrl+B', group: 'View' },
     { id: '#transcript', title: 'Read the whole conversation', detail: 'Ctrl+O', group: 'View' },
@@ -101,6 +106,29 @@ export function ListDialog(p: {
       ...(p.placeholder && { placeholder: p.placeholder }),
     }),
   );
+}
+
+/** The connections dialog: servers, then what to do with one. */
+function ConnectionsDialog(p: {
+  api: ConnectionsApi;
+  theme: Theme;
+  columns: number;
+  rows: number;
+  onClose: () => void;
+}): ReactElement {
+  const view = useConnections(p.api, p.onClose);
+  return h(ListDialog, {
+    key: view.title,
+    theme: p.theme,
+    columns: p.columns,
+    rows: p.rows,
+    title: view.title,
+    size: 'medium',
+    items: view.items,
+    ...(view.placeholder && { placeholder: view.placeholder }),
+    onPick: (item) => view.pick(item.id),
+    onClose: view.back,
+  });
 }
 
 /** The login, model, palette and session dialogs, in place of the classic panels. */
@@ -178,6 +206,12 @@ export function Dialogs(p: {
       onClose: close,
     });
   }
+  if (state.overlay === 'connections')
+    return h(ConnectionsDialog, {
+      api: chat.connections(),
+      ...frame,
+      onClose: () => chat.closeOverlay('connections'),
+    });
   if (state.overlay === 'profile' && p.profile)
     return h(ProfilePanel, {
       profile: p.profile,

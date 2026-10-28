@@ -367,6 +367,44 @@ describe('FullApp', () => {
     }),
   };
 
+  it('opens /connections as a centered dialog and switches a server off', async () => {
+    const calls: string[] = [];
+    const m = await open(new ScriptedModelClient([]), {
+      deps: {
+        connections: {
+          list: () => [
+            { name: 'github', kind: 'local', status: 'connected', tools: 4, source: 'saved' },
+            {
+              name: 'notion',
+              kind: 'remote',
+              status: 'failed',
+              reason: 'no route',
+              tools: 0,
+              source: 'saved',
+            },
+          ],
+          setEnabled: (name, on) => (calls.push(`${on ? 'on' : 'off'} ${name}`), ''),
+          remove: () => '',
+        },
+      },
+    });
+    await m.send('/connections');
+    await until(() => m.chat.getState().overlay === 'connections');
+    await tick();
+    const f = m.frame();
+    expect(f).toContain('Connections');
+    expect(f).toContain('github');
+    expect(f).toContain('connected · 4 tools');
+    expect(f).toContain('failed · no route');
+    m.app.stdin.write('\r');
+    await tick();
+    expect(m.frame()).toContain('Switch off');
+    m.app.stdin.write('\r');
+    await tick();
+    expect(calls).toEqual(['off github']);
+    m.app.unmount();
+  });
+
   it('opens the palette as a centered dialog, grouped, and filters as you type', async () => {
     const m = await open(new ScriptedModelClient([]), { deps: { connect } });
     m.app.stdin.write('\x10'); // ctrl+p
@@ -380,7 +418,7 @@ describe('FullApp', () => {
     expect(lines[title]).toContain('esc');
     // Centered: the title starts well in from the left edge.
     expect((lines[title] as string).search(/\S/)).toBeGreaterThanOrEqual(6);
-    for (const g of ['Session', 'Model', 'View', 'Help']) expect(f).toContain(g);
+    for (const g of ['Session', 'Model', 'Tools', 'View']) expect(f).toContain(g);
     m.app.stdin.write('think');
     await tick();
     expect(m.frame()).toContain('/thinking');

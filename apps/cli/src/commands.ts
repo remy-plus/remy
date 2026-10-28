@@ -11,7 +11,9 @@ export interface CommandInfo {
 
 export const COMMANDS: CommandInfo[] = [
   { name: 'model', summary: 'Switch the model', aliases: ['models'] },
-  { name: 'login', summary: 'Connect a provider or replace a key', aliases: ['connect'] },
+  { name: 'login', summary: 'Connect a provider or replace a key' },
+  { name: 'connect', summary: 'Add an app or service Remy can use' },
+  { name: 'connections', summary: 'See connected apps; switch them off or remove them' },
   { name: 'sessions', summary: 'Pick up an unfinished task', aliases: ['resume'] },
   { name: 'new', summary: 'Start a fresh conversation' },
   { name: 'clear', summary: 'Clear the screen and start fresh' },
