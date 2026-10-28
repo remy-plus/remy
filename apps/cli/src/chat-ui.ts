@@ -7,54 +7,27 @@
 //   - The live area holds only the active turn and is kept shorter than the screen. A
 //     frame as tall as the terminal makes Ink clear and reprint everything, so the streaming
 //     text is cut to the tail that fits.
-import {
-  Box,
-  render,
-  Static,
-  Text,
-  useApp,
-  useInput,
-  usePaste,
-  useStdout,
-  useWindowSize,
-} from 'ink';
+import { Box, render, Static, Text, useStdout, useWindowSize } from 'ink';
 import {
   createElement as h,
   type ReactElement,
   type ReactNode,
-  useCallback,
   useEffect,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
 import type { Chat, ChatState, Item, ModelChoice } from './chat.ts';
-import { COMMANDS, matchCommands } from './commands.ts';
+import { APPROVAL_SETTLE_MS, useChatKeys } from './chat-keys.ts';
+import { COMMANDS } from './commands.ts';
 import { Hints } from './hints.ts';
-import {
-  EMPTY_INPUT,
-  editInput,
-  type InputMode,
-  type InputState,
-  moveLine,
-  pasteInput,
-  pressEnter,
-  recallInput,
-  withText,
-} from './input.ts';
+import type { InputMode, InputState } from './input.ts';
 import { LoginFlow } from './login-ui.ts';
-import { clip, type MdLine, renderMarkdown, type Span, strWidth, wrapPlain } from './markdown.ts';
-import { applyMention, atToken } from './mentions.ts';
+import { clip, type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
 import { Menu, menuRows, Picker, type PickItem } from './picker.ts';
 import { SessionPicker } from './session-picker.ts';
 import { spanProps } from './span-style.ts';
-import {
-  captureStray,
-  createNotifier,
-  gateSync,
-  isFocusReport,
-  type Notifier,
-} from './terminal.ts';
+import { captureStray, createNotifier, gateSync, type Notifier } from './terminal.ts';
 import { SPINNER_MS, type Theme } from './theme.ts';
 import {
   APPROVAL_ROWS,
@@ -161,8 +134,7 @@ function Row(p: { theme: Theme; lead?: ReactNode; marginTop?: number; children?:
   );
 }
 
-/** How long a new approval card ignores y / n / e / v, so type-ahead cannot answer it. */
-export const APPROVAL_SETTLE_MS = 500;
+export { APPROVAL_SETTLE_MS };
 
 const home = process.env.HOME;
 const shortPath = (p: string) => {
@@ -854,192 +826,12 @@ function Overlay(p: {
 export function ChatApp(props: ChatAppProps): ReactElement {
   const { chat, theme } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
-  const { exit } = useApp();
   const { columns, rows } = useWindowSize();
-  const [input, setInput] = useState<InputState>(EMPTY_INPUT);
-  const mode = props.inputMode ?? 'multi';
-  const recall = useRef(-1);
-  const seenClears = useRef(state.clears);
-  const [expanded, setExpanded] = useState(false);
-  const [noting, setNoting] = useState(false);
-  const [viewing, setViewing] = useState(false);
   const { write } = useStdout();
-  const [menuAt, setMenuAt] = useState(0);
-  const [files, setFiles] = useState<string[]>([]);
-  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
-  const approvalId = state.approval?.callId;
-
-  // Each approval starts collapsed, with no note under way.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the id is the trigger, not a value read
-  useEffect(() => {
-    setExpanded(false);
-    setNoting(false);
-  }, [approvalId]);
-
-  const quit = useCallback(async () => {
-    await chat.interrupt();
-    // Let the last frame (the "Stopped" line) print before Ink shuts down.
-    setTimeout(exit, 30);
-  }, [chat, exit]);
-
-  useEffect(() => {
-    if (state.wantsExit) void quit();
-  }, [state.wantsExit, quit]);
-
-  useEffect(() => {
-    if (state.clears === seenClears.current) return;
-    seenClears.current = state.clears;
-    props.onClear?.();
-  }, [state.clears, props.onClear]);
-
-  const { notifier } = props;
-  useEffect(() => {
-    if (state.phase === 'waiting_approval' || state.phase === 'waiting_user')
-      notifier?.attention(state.phase);
-  }, [state.phase, notifier]);
-
-  // Keys typed just before a card appears must not answer it, so the card ignores
-  // approval keys until it has been on screen for a moment.
-  const cardSince = useRef(0);
-  const card = state.phase === 'waiting_approval' ? state.approvalView : undefined;
-  useEffect(() => {
-    if (card) cardSince.current = Date.now();
-  }, [card]);
-
-  // The full view hides the live area, so it gives way when Remy needs an answer.
-  useEffect(() => {
-    if (state.phase === 'waiting_approval' || state.phase === 'waiting_user') setViewing(false);
-  }, [state.phase]);
-
-  // Autocomplete under the prompt: commands after a `/`, workspace files after an `@`.
-  const idle = state.phase === 'idle';
-  const slashQuery =
-    idle && /^\/[^\s]*$/.test(input.text) && !state.overlay ? input.text.slice(1) : undefined;
-  const slashItems: PickItem[] =
-    slashQuery === undefined
-      ? []
-      : matchCommands(slashQuery).map((c) => ({
-          id: c.name,
-          title: `/${c.name}`,
-          detail: c.summary,
-        }));
-  const tok =
-    state.phase !== 'waiting_approval' && !state.overlay && !slashQuery
-      ? atToken(input.text, input.cursor)
-      : undefined;
-  const atQuery = tok?.query;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the query is the trigger
-  useEffect(() => {
-    if (atQuery === undefined) return setFiles([]);
-    let live = true;
-    void chat.completeFiles(atQuery).then((f) => live && setFiles(f));
-    return () => {
-      live = false;
-    };
-  }, [atQuery]);
-  const fileItems: PickItem[] =
-    tok && hiddenFor !== input.text ? files.map((f) => ({ id: f, title: f })) : [];
-  const menu: 'slash' | 'file' | undefined = slashItems.length
-    ? 'slash'
-    : fileItems.length
-      ? 'file'
-      : undefined;
-  const menuItems = menu === 'slash' ? slashItems : fileItems;
-  const at = Math.min(menuAt, Math.max(0, menuItems.length - 1));
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new query starts at the top
-  useEffect(() => setMenuAt(0), [slashQuery, atQuery]);
-
-  useInput((ch, key) => {
-    // The transcript view, the pickers and the panels read their own keys.
-    if (viewing || state.picker || state.overlay) return;
-    if (key.ctrl && ch === 'p' && idle) return chat.openOverlay('palette');
-    if (menu) {
-      if (key.upArrow || key.downArrow) {
-        const n = menuItems.length;
-        return setMenuAt((i) => (i + (key.upArrow ? -1 : 1) + n) % n);
-      }
-      const pick = menuItems[at];
-      if (pick && (key.tab || key.return)) {
-        if (menu === 'slash') {
-          if (key.tab) return setInput(withText(`${pick.title} `));
-          recall.current = -1;
-          setInput(EMPTY_INPUT);
-          return void chat.submit(pick.title);
-        }
-        const done = applyMention(input.text, input.cursor, pick.id);
-        return setInput((cur) => ({ ...cur, ...done }));
-      }
-      if (key.escape && menu === 'file') return setHiddenFor(input.text);
-    }
-    // Focus reports are for the notifier, not the editor.
-    if (isFocusReport(ch)) return;
-    if (key.ctrl && ch === 'd') return void quit();
-    if (key.ctrl && ch === 'o' && state.phase !== 'waiting_approval') return setViewing(true);
-    if (key.ctrl && ch === 'c') {
-      if (state.phase !== 'idle') return void chat.interrupt();
-      if (input.text) return setInput(EMPTY_INPUT);
-      return void quit();
-    }
-    if (state.phase === 'waiting_approval') {
-      if (noting) {
-        if (key.escape) {
-          setNoting(false);
-          return setInput(EMPTY_INPUT);
-        }
-        if (key.return) {
-          // An empty note does nothing: `n` is the plain denial.
-          const sent = mode === 'multi' ? pressEnter(input) : { send: input.text };
-          if ('state' in sent) return setInput(sent.state);
-          const note = sent.send.trim();
-          if (!note) return;
-          setNoting(false);
-          setInput(EMPTY_INPUT);
-          return void chat.approve(false, note);
-        }
-        return setInput((cur) => editInput(cur, ch, key, mode));
-      }
-      // Single keys only, and never Enter: a pasted or stray character cannot approve.
-      if (Date.now() - cardSince.current < (props.approvalSettleMs ?? APPROVAL_SETTLE_MS)) return;
-      if (/^y$/i.test(ch)) void chat.approve(true);
-      else if (/^n$/i.test(ch)) void chat.approve(false);
-      else if (/^e$/i.test(ch)) {
-        setInput(EMPTY_INPUT);
-        setNoting(true);
-      } else if (/^v$/i.test(ch)) setExpanded((x) => !x);
-      return;
-    }
-    if (key.escape) {
-      recall.current = -1;
-      return setInput(EMPTY_INPUT);
-    }
-    if (key.return) {
-      const sent = mode === 'multi' ? pressEnter(input) : { send: input.text, pasted: [] };
-      if ('state' in sent) return setInput(sent.state);
-      recall.current = -1;
-      setInput(EMPTY_INPUT);
-      return void chat.submit(sent.send, sent.pasted);
-    }
-    if (key.upArrow || key.downArrow) {
-      // In a several-line message the arrows move between lines; history is for the ends.
-      const moved = mode === 'multi' ? moveLine(input, key.upArrow ? -1 : 1) : undefined;
-      if (moved) return setInput(moved);
-      const past = chat.history();
-      const next = Math.min(past.length - 1, Math.max(-1, recall.current + (key.upArrow ? 1 : -1)));
-      recall.current = next;
-      return setInput(next < 0 ? EMPTY_INPUT : recallInput(past[past.length - 1 - next] as string));
-    }
-    setInput((cur) => editInput(cur, ch, key, mode));
-  });
-
-  // Bracketed paste: a big paste becomes one marker. Only the prompt takes it; an approval
-  // card or the full view swallows it, so pasted text can never answer a question.
-  usePaste(
-    (text) => {
-      if (viewing || (state.phase === 'waiting_approval' && !noting)) return;
-      setInput((cur) => pasteInput(cur, text));
-    },
-    { isActive: mode === 'multi' && !state.overlay },
-  );
+  const mode = props.inputMode ?? 'multi';
+  const k = useChatKeys({ ...props, state, mode });
+  const { input, expanded, noting, viewing, setViewing, menu, menuItems, at, slashQuery, atQuery } =
+    k;
 
   const showPrompt = state.phase !== 'waiting_approval' || noting;
   // Prompt (with its blank line above) and the footer.
