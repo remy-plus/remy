@@ -16,6 +16,9 @@ import {
   mcpCalledAtMost,
   mcpCalledWith,
   mcpNoRepeatedCall,
+  memoryCount,
+  memoryHas,
+  memoryLacks,
   neverAskedUser,
   neverCalled,
   noApprovalAsked,
@@ -56,6 +59,7 @@ export const record = (over: Partial<RunRecord> = {}): RunRecord => ({
 const world: WorldAfter = {
   files: { 'a.txt': 'Hello World\n' },
   mcpCalls: [],
+  memory: [{ id: 'mem_1', text: 'Likes tea', kind: 'preference', source: '' }],
   emails: [
     { key: 'k1', to: 'bob@x.test', subject: 'Invoice', body: 'Paid' },
     { key: 'k2', to: 'amy@x.test', subject: 'Hi', body: 'Yo' },
@@ -97,12 +101,18 @@ describe('graders', () => {
 
   it('emailsSent counts with and without a filter', async () => {
     expect(await check(emailsSent(2))).toBe(true);
+    expect(await check(memoryHas('tea'))).toBe(true);
+    expect(await check(memoryHas('coffee'))).toBe(false);
+    expect(await check(memoryLacks('coffee'))).toBe(true);
+    expect(await check(memoryLacks('TEA'))).toBe(false);
+    expect(await check(memoryCount(1))).toBe(true);
+    expect(await check(memoryCount(0))).toBe(false);
     expect(await check(emailsSent(1, { to: 'bob@x.test' }))).toBe(true);
     expect(await check(emailsSent(1, { to: 'bob@x.test', subjectIncludes: 'invoice' }))).toBe(true);
     expect(await check(emailsSent(0, { bodyIncludes: 'paid' }))).toBe(false);
-    expect(await check(emailsSent(0), record(), { files: {}, emails: [], mcpCalls: [] })).toBe(
-      true,
-    );
+    expect(
+      await check(emailsSent(0), record(), { files: {}, emails: [], mcpCalls: [], memory: [] }),
+    ).toBe(true);
   });
 
   it('trajectory graders', async () => {

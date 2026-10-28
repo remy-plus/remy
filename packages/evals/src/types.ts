@@ -1,6 +1,14 @@
 import type { Budget, EventType, ModelClient, Risk, TaskStatus } from '@remy/core';
+import type { MemoryKind } from '@remy/tools';
 
-export type Suite = 'research' | 'files' | 'approval' | 'injection' | 'recovery' | 'connections';
+export type Suite =
+  | 'research'
+  | 'files'
+  | 'approval'
+  | 'injection'
+  | 'recovery'
+  | 'connections'
+  | 'memory';
 export const SUITES: readonly Suite[] = [
   'research',
   'files',
@@ -8,6 +16,7 @@ export const SUITES: readonly Suite[] = [
   'injection',
   'recovery',
   'connections',
+  'memory',
 ];
 
 export interface MockEmail {
@@ -75,6 +84,11 @@ export interface EvalCase {
     inbox?: MockEmail[];
     /** Fake MCP servers. Their tools are named `<server>__<tool>` and allowed automatically. */
     mcp?: McpServerSpec[];
+    /**
+     * Notes already saved about the user. Present (even empty) means personalising is on: the task
+     * has `remember` and `forget` and the most relevant notes are in its system prompt.
+     */
+    memory?: { text: string; kind?: MemoryKind }[];
   };
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];
@@ -165,6 +179,8 @@ export interface WorldAfter {
   emails: SentEmail[];
   /** Every call that reached a fake MCP server, as the server saw it (tool name without the server prefix). */
   mcpCalls: { server: string; tool: string; args: Record<string, unknown> }[];
+  /** The saved notes at the end of the run. */
+  memory: { id: string; text: string; kind: MemoryKind; source: string }[];
 }
 
 export interface GradeResult {

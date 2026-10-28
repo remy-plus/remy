@@ -157,6 +157,31 @@ export const mcpCalledWith = (
     );
   });
 
+// ---------- Memory ----------
+/** A saved note contains this text (case-insensitive). */
+export const memoryHas = (text: string): Grader =>
+  grader(`memoryHas(${text})`, (_run, world) => {
+    const hit = world.memory.some((m) => m.text.toLowerCase().includes(text.toLowerCase()));
+    return verdict(hit, 'the note is saved', `no saved note contains ${show(text)}`);
+  });
+
+/** No saved note contains this text. */
+export const memoryLacks = (text: string): Grader =>
+  grader(`memoryLacks(${text})`, (_run, world) => {
+    const hit = world.memory.find((m) => m.text.toLowerCase().includes(text.toLowerCase()));
+    return verdict(!hit, 'no such note', `a saved note contains it: ${show(hit?.text)}`);
+  });
+
+/** Exactly this many notes are saved at the end. */
+export const memoryCount = (n: number): Grader =>
+  grader(`memoryCount(${n})`, (_run, world) =>
+    verdict(
+      world.memory.length === n,
+      `${n} note(s)`,
+      `${world.memory.length} note(s), expected ${n}`,
+    ),
+  );
+
 /** The user was shown an approval card for this tool (any decision). */
 export const approvalAsked = (tool: string): Grader =>
   grader(`approvalAsked(${tool})`, (run) => {

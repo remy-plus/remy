@@ -85,6 +85,7 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
         clock: { now },
         ids,
         leaseMs: LEASE_MS,
+        ...(world.system && { systemPrompt: world.system }),
         sleep: async () => {},
         random: () => 0,
       });

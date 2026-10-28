@@ -8,6 +8,7 @@ import {
   type ScopedFetch,
   type ScopedFs,
   SELECT_THRESHOLD,
+  SYSTEM_PROMPT,
   type Tool,
   type ToolContext,
 } from '@remy/core';
@@ -16,6 +17,7 @@ import { type FakeServer, fakeServer } from '@remy/mcp/testing';
 import {
   askUser,
   calculate,
+  createMemoryTools,
   createScopedFs,
   createWebSearch,
   deleteFile,
@@ -24,7 +26,10 @@ import {
   finish,
   htmlToText,
   listFiles,
+  type MemoryEntry,
+  type MemoryPort,
   makeDir,
+  memoryBlock,
   moveFile,
   readFile,
   type SearchProvider,
@@ -198,6 +203,8 @@ export interface World {
   dir: string;
   tools: Tool[];
   allowTools: string[];
+  /** A system prompt that replaces the default (notes about the user), when the case has memory. */
+  system?: string;
   capabilities: () => Pick<ToolContext, 'fs' | 'net' | 'secrets'>;
   after: () => Promise<WorldAfter>;
   cleanup: () => Promise<void>;
@@ -250,10 +257,36 @@ export async function createWorld(c: EvalCase): Promise<World> {
         ]
       : []),
     ...(c.world.inbox ? ['email_read', 'email_send'] : []),
+    ...(c.world.memory ? ['remember', 'forget'] : []),
     'calculate',
     'update_plan',
   ];
   const allowTools = [...new Set([...(c.tools ?? useful), 'finish', 'ask_user'])];
+
+  const notes: MemoryEntry[] = (c.world.memory ?? []).map((m, i) => ({
+    id: `mem_s${i + 1}`,
+    text: m.text,
+    kind: m.kind ?? 'preference',
+    source: '',
+    created: `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+  }));
+  const memoryPort: MemoryPort = {
+    enabled: () => true,
+    list: () => notes,
+    add({ text, kind, source }) {
+      const same = notes.find((n) => n.text.toLowerCase() === text.toLowerCase());
+      if (same) return { status: 'exists', entry: same };
+      const entry = { id: `mem_n${notes.length + 1}`, text, kind, source, created: '2026-02-01' };
+      notes.push(entry);
+      return { status: 'added', entry };
+    },
+    remove(id) {
+      const at = notes.findIndex((n) => n.id === id);
+      if (at >= 0) notes.splice(at, 1);
+      return at >= 0;
+    },
+  };
+  if (c.world.memory) tools.push(...createMemoryTools(memoryPort));
 
   const mcp = c.world.mcp?.length ? await createMcpWorld(c.world.mcp) : undefined;
   if (mcp) {
@@ -268,11 +301,19 @@ export async function createWorld(c: EvalCase): Promise<World> {
     dir,
     tools,
     allowTools,
+    ...(c.world.memory && {
+      system: `${SYSTEM_PROMPT}\n\n${memoryBlock(notes, c.prompt)}`,
+    }),
     capabilities: () => ({ fs, net, secrets: { get: () => undefined } }),
     async after() {
       const files: Record<string, string> = {};
       await walk(fs, '.', files);
-      return { files, emails: [...sent], mcpCalls: mcp?.calls() ?? [] };
+      return {
+        files,
+        emails: [...sent],
+        mcpCalls: mcp?.calls() ?? [],
+        memory: notes.map(({ id, text, kind, source }) => ({ id, text, kind, source })),
+      };
     },
     async cleanup() {
       await mcp?.close();
