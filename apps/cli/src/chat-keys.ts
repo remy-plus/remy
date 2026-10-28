@@ -29,6 +29,8 @@ export interface ChatKeysOptions {
   /** Overrides `APPROVAL_SETTLE_MS` (tests use 0). */
   approvalSettleMs?: number;
   notifier?: Notifier;
+  /** The tour has the screen: the prompt reads no keys and takes no paste. */
+  paused?: boolean;
   onClear?: () => void;
   /** Called when the theme changes after the first render. */
   onRetheme?: () => void;
@@ -144,7 +146,7 @@ export function useChatKeys(o: ChatKeysOptions) {
 
   useInput((ch, key) => {
     // The transcript view, the pickers and the panels read their own keys.
-    if (viewing || state.picker || state.overlay) return;
+    if (o.paused || viewing || state.picker || state.overlay) return;
     if (o.onKey?.(ch, key, input)) return;
     if (key.ctrl && ch === 'p' && idle) return chat.openOverlay('palette');
     if (menu) {
@@ -232,7 +234,7 @@ export function useChatKeys(o: ChatKeysOptions) {
       if (viewing || (state.phase === 'waiting_approval' && !noting)) return;
       setInput((cur) => pasteInput(cur, text));
     },
-    { isActive: mode === 'multi' && !state.overlay },
+    { isActive: mode === 'multi' && !state.overlay && !o.paused },
   );
   return {
     input,

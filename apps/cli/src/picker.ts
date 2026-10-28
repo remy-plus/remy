@@ -144,6 +144,8 @@ export function Picker(p: {
   /** Rows made from what was typed, shown after the matches (for example "Use this model id"). */
   extra?: (query: string) => PickItem[];
   empty?: string;
+  /** The item highlighted when the picker opens. */
+  initialId?: string;
   /** Rows shown at once. */
   max?: number;
   onPick: (item: PickItem, query: string) => void;
@@ -151,7 +153,12 @@ export function Picker(p: {
 }): ReactElement {
   const { theme } = p;
   const [query, setQuery] = useState('');
-  const [at, setAt] = useState(0);
+  const [at, setAt] = useState(() =>
+    Math.max(
+      0,
+      p.items.findIndex((i) => i.id === p.initialId),
+    ),
+  );
   const shown = [
     ...filterItems(p.items, query),
     ...(query.trim() ? (p.extra?.(query.trim()) ?? []) : []),

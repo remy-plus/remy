@@ -23,6 +23,7 @@ import { Hints } from './hints.ts';
 import type { InputMode, InputState } from './input.ts';
 import { useFrame, useSettled } from './live-hooks.ts';
 import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts';
+import type { Onboarding } from './onboarding-flow.ts';
 import { Overlay } from './overlay-ui.ts';
 import { Menu, menuRows } from './picker.ts';
 import type { ThemeChoice } from './prefs.ts';
@@ -76,6 +77,8 @@ export interface ChatAppProps {
   approvalSettleMs?: number;
   /** The local profile: the home greeting, the example requests and the tips follow it. */
   profile?: ProfileStore;
+  /** The welcome tour; while it runs it has the screen. */
+  onboarding?: Onboarding;
 }
 
 export interface RunOptions

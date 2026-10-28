@@ -4,9 +4,13 @@ import { useInput } from 'ink';
 import { createElement as h, type ReactElement, useState } from 'react';
 import { type Chat, type ChatState, type ModelChoice, shortId } from '../chat.ts';
 import { COMMANDS } from '../commands.ts';
+import { defaultModelFor } from '../login.ts';
 import { LoginFlow } from '../login-ui.ts';
+import { cheapChoice } from '../onboarding.ts';
 import { themeItems } from '../overlay-ui.ts';
 import type { ThemeChoice } from '../prefs.ts';
+import type { ProfileStore } from '../profile.ts';
+import { ProfilePanel } from '../profile-ui.ts';
 import { ageWord, stateWord } from '../session-picker.ts';
 import type { Theme } from '../theme.ts';
 import { Dialog, type DialogSizeName, dialogSize } from './dialog.ts';
@@ -16,6 +20,7 @@ import {
   type DialogState,
   dialogKey,
   initialDialogState,
+  shownItems,
 } from './dialog-list.ts';
 
 const choiceId = (c: ModelChoice) => `${c.provider}\t${c.model}`;
@@ -63,12 +68,17 @@ export function ListDialog(p: {
   rows: number;
   size?: DialogSizeName;
   placeholder?: string;
+  /** The item highlighted when the dialog opens. */
+  initialId?: string;
   /** Rows made from what was typed, shown with the matches (for example "Use this model id"). */
   extra?: (query: string) => DialogItem[];
   onPick: (item: DialogItem) => void;
   onClose: () => void;
 }): ReactElement {
-  const [st, setSt] = useState<DialogState>(initialDialogState);
+  const [st, setSt] = useState<DialogState>(() => {
+    const at = p.initialId ? shownItems(p.items, '').findIndex((i) => i.id === p.initialId) : -1;
+    return at > 0 ? { query: '', at } : initialDialogState;
+  });
   const size = p.size ?? 'medium';
   const all = [...p.items, ...(st.query.trim() ? (p.extra?.(st.query.trim()) ?? []) : [])];
   useInput((ch, key) => {
@@ -102,6 +112,9 @@ export function Dialogs(p: {
   rows: number;
   onTranscript: () => void;
   onSidebar: () => void;
+  profile?: ProfileStore;
+  /** The tour is on: the model list highlights a cheap default. */
+  touring?: boolean;
 }): ReactElement | null {
   const { chat, state, theme, columns, rows } = p;
   const close = () => chat.closeOverlay();
@@ -145,9 +158,11 @@ export function Dialogs(p: {
       { id: '#login', title: 'Connect another provider', detail: '/login' },
     ];
     const provider = choices.find((c) => c.model === state.model)?.provider ?? choices[0]?.provider;
+    const cheap = p.touring ? cheapChoice(choices, state.model, defaultModelFor) : undefined;
     return h(ListDialog, {
       ...frame,
-      title: 'Switch model',
+      title: p.touring ? 'Pick a model' : 'Switch model',
+      ...(cheap && { initialId: choiceId(cheap) }),
       items,
       placeholder: 'Search models',
       extra: (q) =>
@@ -163,6 +178,13 @@ export function Dialogs(p: {
       onClose: close,
     });
   }
+  if (state.overlay === 'profile' && p.profile)
+    return h(ProfilePanel, {
+      profile: p.profile,
+      theme,
+      dialog: { columns, rows },
+      onClose: () => chat.closeOverlay('profile'),
+    });
   if (state.overlay === 'theme')
     return h(ListDialog, {
       ...frame,

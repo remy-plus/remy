@@ -22,6 +22,8 @@ export interface FrameProps {
   rows: number;
   /** The minimal screen: left aligned, no wordmark. */
   inline?: boolean;
+  /** Only the question, for a caller that supplies the frame (the /profile dialog). */
+  bare?: boolean;
 }
 
 /** Widest a question is drawn. */
@@ -45,6 +47,7 @@ function Mark(p: { theme: Theme; columns: number; rows: number }): ReactElement 
 /** The frame every step sits in: centred on the screen, or in the flow of the terminal. */
 export function Shell(p: FrameProps & { mark?: boolean; children?: ReactNode }): ReactElement {
   const width = Math.max(20, Math.min(CONTENT_MAX, p.columns - 4));
+  if (p.bare) return h(Box, { flexDirection: 'column' }, p.children);
   if (p.inline)
     return h(
       Box,

@@ -212,3 +212,25 @@ export function yesNoKey(value: boolean, input: string, key: StepKey): YesNoStep
     return { state: !value };
   return { state: value };
 }
+
+// ---------- the model step ----------
+
+/**
+ * The model to highlight in the tour's list: the default of the provider in use (they are the
+ * cheap ones), then of any other connected provider, else the model in use, else the first.
+ */
+export function cheapChoice<T extends { provider: string; model: string }>(
+  choices: readonly T[],
+  active: string | undefined,
+  defaultFor: (provider: string) => string | undefined,
+): T | undefined {
+  const inUse = choices.find((c) => c.model === active);
+  const ordered = inUse
+    ? [
+        inUse,
+        ...choices.filter((c) => c.provider === inUse.provider && c !== inUse),
+        ...choices.filter((c) => c.provider !== inUse.provider),
+      ]
+    : [...choices];
+  return ordered.find((c) => c.model === defaultFor(c.provider)) ?? inUse ?? choices[0];
+}

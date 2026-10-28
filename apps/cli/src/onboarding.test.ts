@@ -3,6 +3,7 @@ import {
   advance,
   applies,
   CUSTOM_ROW,
+  cheapChoice,
   type Facts,
   goalsKey,
   goalsOf,
@@ -170,5 +171,26 @@ describe('yes or no question', () => {
     expect(yesNoKey(true, '', { rightArrow: true })).toEqual({ state: false });
     expect(yesNoKey(false, '', { return: true })).toEqual({ state: false, done: false });
     expect(yesNoKey(true, 'x', {})).toEqual({ state: true });
+  });
+});
+
+describe('the model to highlight', () => {
+  const defaults: Record<string, string> = { openai: 'gpt-5-nano', anthropic: 'claude-haiku-5-5' };
+  const defaultFor = (p: string) => defaults[p];
+  const list = [
+    { provider: 'openai', model: 'gpt-4o' },
+    { provider: 'openai', model: 'gpt-5-nano' },
+    { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    { provider: 'anthropic', model: 'claude-haiku-5-5' },
+  ];
+  it('picks the cheap default of the provider in use', () => {
+    expect(cheapChoice(list, 'gpt-4o', defaultFor)?.model).toBe('gpt-5-nano');
+    expect(cheapChoice(list, 'claude-sonnet-5-5', defaultFor)?.model).toBe('claude-haiku-5-5');
+  });
+  it('falls back to the model in use, then the first', () => {
+    expect(cheapChoice(list, 'gpt-4o', () => undefined)?.model).toBe('gpt-4o');
+    expect(cheapChoice(list, undefined, () => undefined)?.model).toBe('gpt-4o');
+    expect(cheapChoice(list, undefined, defaultFor)?.model).toBe('gpt-5-nano');
+    expect(cheapChoice([], undefined, defaultFor)).toBeUndefined();
   });
 });

@@ -2,9 +2,13 @@
 import { createElement as h, type ReactElement } from 'react';
 import type { Chat, ChatState, ModelChoice } from './chat.ts';
 import { COMMANDS } from './commands.ts';
+import { defaultModelFor } from './login.ts';
 import { LoginFlow } from './login-ui.ts';
+import { cheapChoice } from './onboarding.ts';
 import { Picker, type PickItem } from './picker.ts';
 import type { ThemeChoice } from './prefs.ts';
+import type { ProfileStore } from './profile.ts';
+import { ProfilePanel } from './profile-ui.ts';
 import type { Theme } from './theme.ts';
 
 /** The rows of the theme picker; the one in use is marked. */
@@ -23,6 +27,9 @@ export function Overlay(p: {
   state: ChatState;
   theme: Theme;
   onTranscript: () => void;
+  profile?: ProfileStore;
+  /** The tour is on: the model list highlights a cheap default. */
+  touring?: boolean;
 }): ReactElement | null {
   const { chat, state, theme } = p;
   const close = () => chat.closeOverlay();
@@ -48,8 +55,10 @@ export function Overlay(p: {
       { id: '#login', title: 'Connect another provider', detail: '/login' },
     ];
     const provider = choices.find((c) => c.model === state.model)?.provider ?? choices[0]?.provider;
+    const cheap = p.touring ? cheapChoice(choices, state.model, defaultModelFor) : undefined;
     return h(Picker, {
-      title: 'Switch model',
+      title: p.touring ? 'Pick a model' : 'Switch model',
+      ...(cheap && { initialId: choiceId(cheap) }),
       items,
       theme,
       empty: 'No saved logins. Run /login to connect a provider.',
@@ -66,6 +75,12 @@ export function Overlay(p: {
       onCancel: close,
     });
   }
+  if (state.overlay === 'profile' && p.profile)
+    return h(ProfilePanel, {
+      profile: p.profile,
+      theme,
+      onClose: () => chat.closeOverlay('profile'),
+    });
   if (state.overlay === 'theme')
     return h(Picker, {
       title: 'Theme',
