@@ -8,6 +8,7 @@ import {
   fold,
   ModelError,
   type RemyRuntime,
+  type Risk,
   type RunOutcome,
   type StoredEvent,
   TaskBusyError,
@@ -15,6 +16,7 @@ import {
   type TaskStatus,
   type TaskSummary,
 } from '@remy/core';
+import { type ApprovalsStore, plainApprovals } from './approvals.ts';
 import { COMMANDS, findCommand } from './commands.ts';
 import { CONNECT_HELP, type ConnectionsApi, plainConnections } from './connections-view.ts';
 import { truncate } from './format.ts';
@@ -195,6 +197,10 @@ export interface ChatDeps {
   connect?: ConnectApi;
   /** The connected tool servers, for /connections. */
   connections?: ConnectionsApi;
+  /** Standing approvals ("always allow"), for the `a` key and /approvals. */
+  approvals?: ApprovalsStore;
+  /** A tool's risk, for listing standing approvals. */
+  riskOf?: (tool: string) => Risk | undefined;
   /** Settles when connected servers have had their start budget; sending waits for it. */
   ready?: () => Promise<void>;
   files?: FilesApi;
@@ -248,8 +254,8 @@ export interface Chat {
   completeFiles(query: string): Promise<string[]>;
   /** Picks up an unfinished task from the store and carries on with it. */
   resume(taskId: string): Promise<void>;
-  /** Answers the pending approval. A denial may carry a note the model reads. */
-  approve(granted: boolean, note?: string): Promise<void>;
+  /** Answers the pending approval. A denial may carry a note the model reads; `always` also saves a standing approval for the tool. */
+  approve(granted: boolean, note?: string, always?: boolean): Promise<void>;
   /** Stops the running task. It stays resumable. */
   interrupt(): Promise<void>;
   /**
@@ -286,6 +292,7 @@ export const HELP_TEXT = [
   '  Ctrl+C    stop the running task (resume it later); on an empty prompt, quit',
   '  Ctrl+D    quit',
   '  y / n     approve once or deny when Remy asks',
+  '  a         approve and always allow that tool (writes and sends only; undo with /approvals)',
   '  e         deny and say why; Remy reads your note',
   '  v         show the whole action',
   '',
@@ -875,6 +882,22 @@ export function createChat(deps: ChatDeps): Chat {
       set({ overlay: name });
     } else if (name === 'connect') {
       commit({ kind: 'note', text: CONNECT_HELP });
+    } else if (name === 'approvals') {
+      if (!deps.approvals)
+        return void commit({ kind: 'note', text: 'There are no standing approvals here.' });
+      if (args[0] === 'remove' && args[1]) {
+        const gone = deps.approvals.remove(args[1]);
+        return void commit({
+          kind: 'note',
+          text: gone
+            ? `${args[1]} asks again from now on. A task already running keeps what it started with.`
+            : `${args[1]} is not on the list.`,
+        });
+      }
+      commit({
+        kind: 'note',
+        text: `${plainApprovals(deps.approvals.load(), (t) => deps.riskOf?.(t))}\nRemove one with /approvals remove <tool>.`,
+      });
     } else if (name === 'connections') {
       if (!deps.connections)
         return void commit({ kind: 'note', text: 'There are no connections here.' });
@@ -998,6 +1021,12 @@ export function createChat(deps: ChatDeps): Chat {
           if (line) commit({ kind: 'note', text: line });
           return line;
         },
+        allowed: (name) => base.allowed?.(name) ?? [],
+        unallow(tool) {
+          const line = base.unallow?.(tool) ?? '';
+          if (line) commit({ kind: 'note', text: line });
+          return line;
+        },
       };
     },
     async runCommand(name) {
@@ -1047,11 +1076,27 @@ export function createChat(deps: ChatDeps): Chat {
       return completePaths(deps.files, query);
     },
 
-    async approve(granted, note) {
+    async approve(granted, note, always) {
       const a = s.approval;
       if (s.phase !== 'waiting_approval' || !a || !current) return;
       const my = gen;
       const id = current.id;
+      // "Always" saves first; if that fails the call is still approved, once, and the user is told.
+      const tool = s.approvalView?.always;
+      if (always && granted && tool && deps.approvals) {
+        try {
+          deps.approvals.add(tool, a.risk);
+          commit({
+            kind: 'note',
+            text: `Always allowing ${tool}, in any task. Undo with /approvals.`,
+          });
+        } catch (e) {
+          commit({
+            kind: 'error',
+            text: `${friendlyError(e)} Approved this once instead.`,
+          });
+        }
+      }
       set({ phase: 'running', approval: undefined, approvalView: undefined, thinking: true });
       running = true;
       try {

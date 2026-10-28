@@ -51,6 +51,21 @@ describe('connections panel logic', () => {
     expect(connectionActions(row('a', { source: 'config' }))[1]?.id).toBe('#config');
   });
 
+  it("lists a server's always-allowed tools as actions that stop allowing them", () => {
+    const acts = connectionActions(row('github'), ['github__create_issue']);
+    expect(acts[0]).toMatchObject({
+      id: '#unallow:github__create_issue',
+      title: 'Always allowed: github__create_issue',
+    });
+    expect(connectionActions(row('github')).some((x) => x.id.startsWith('#unallow'))).toBe(false);
+    const stage: Stage = { kind: 'actions', name: 'github' };
+    expect(stepConnections(stage, '#unallow:github__create_issue', rows)).toEqual({
+      stage,
+      effect: { type: 'unallow', name: 'github__create_issue' },
+    });
+    expect(viewOf(stage, rows, ['github__x']).items[0]?.id).toBe('#unallow:github__x');
+  });
+
   it('walks list, actions, confirm, and back out with Esc', () => {
     let stage: Stage = { kind: 'list' };
     const step = (pick: string) => {

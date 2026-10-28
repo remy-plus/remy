@@ -75,6 +75,15 @@ export function ApprovalCard(p: {
         { wrap: 'truncate-end', ...muted },
         fit(`Approval covers exactly this call (${view.shortHash}).`),
       ),
+      view.always && !p.noting
+        ? h(
+            Text,
+            { wrap: 'truncate-end', ...muted },
+            fit(
+              `a approves this and every later ${view.always} call, in any task. Undo: /approvals`,
+            ),
+          )
+        : null,
       p.noting
         ? h(
             Text,
@@ -86,6 +95,7 @@ export function ApprovalCard(p: {
             { wrap: 'truncate-end' },
             ...key('y', 'approve once', true),
             gap,
+            ...(view.always ? [...key('a', 'always allow'), gap] : []),
             ...key('n', 'deny'),
             gap,
             ...key('e', 'deny and say why'),

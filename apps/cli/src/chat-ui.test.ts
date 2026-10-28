@@ -14,8 +14,9 @@ import { createScopedFetch, createScopedFs, deleteFile, finish, writeFile } from
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createChat, releaseLease } from './chat.ts';
-import { ChatApp, contextPart, costPart, promptRows } from './chat-ui.ts';
+import { openApprovals } from './approvals.ts';
+import { type ChatDeps, createChat, releaseLease } from './chat.ts';
+import { ChatApp, contextPart, costPart, hintsFor, promptRows } from './chat-ui.ts';
 import { createTheme } from './theme.ts';
 
 const usage = { inTokens: 10, outTokens: 5 };
@@ -36,6 +37,7 @@ function mount(
   autoApprove: ('read' | 'write')[] = ['read'],
   settle = 0,
   inputMode?: 'single' | 'multi',
+  extra: Partial<ChatDeps> = {},
 ) {
   const store = new MemoryEventStore();
   const chat = createChat({
@@ -60,6 +62,7 @@ function mount(
       context,
     }),
     release: releaseLease(store, 'ui-test'),
+    ...extra,
   });
   const app = render(
     h(ChatApp, {
@@ -281,6 +284,82 @@ describe('chat screen', () => {
     expect(f).toContain('e deny and say why');
     expect(count(f, 'Delete a.txt')).toBe(1);
     app.unmount();
+  });
+
+  describe('always allow', () => {
+    const alwaysApp = (steps: ModelResponse[], settle = 0) => {
+      const approvals = openApprovals(dir);
+      const app = mount(new ScriptedModelClient(steps), ['read'], settle, undefined, { approvals });
+      return { app, approvals };
+    };
+    const write = call('write_file', { path: 'a.txt', content: 'x' });
+
+    it('a approves the call and saves the standing approval, saying where to undo it', async () => {
+      const { app, approvals } = alwaysApp([write, call('finish', { answer: 'Wrote a.txt.' })]);
+      await type(app, 'write a file');
+      await until(() => app.chat.getState().phase === 'waiting_approval');
+      const f = frame(app);
+      expect(f).toContain('a always allow');
+      expect(f).toContain('every later write_file call, in any task. Undo: /approvals');
+      app.stdin.write('a');
+      await until(() => app.chat.getState().phase === 'idle');
+      expect(approvals.names()).toEqual(['write_file']);
+      expect(frame(app)).toContain('Wrote a.txt.');
+      expect(frame(app)).toContain(
+        'Always allowing write_file, in any task. Undo with /approvals.',
+      );
+      app.unmount();
+    });
+
+    it('is not offered for an irreversible action, and a does nothing there', async () => {
+      const { app, approvals } = alwaysApp([
+        call('delete_file', { path: 'a.txt' }),
+        call('finish', { answer: 'Left it.' }),
+      ]);
+      await type(app, 'delete it');
+      await until(() => app.chat.getState().phase === 'waiting_approval');
+      expect(app.chat.getState().approvalView?.always).toBeUndefined();
+      expect(frame(app)).not.toContain('always allow');
+      app.stdin.write('a');
+      await new Promise((r) => setTimeout(r, 40));
+      expect(app.chat.getState().phase).toBe('waiting_approval');
+      expect(approvals.names()).toEqual([]);
+      app.unmount();
+    });
+
+    it('ignores a in the first moment a card is up', async () => {
+      const { app, approvals } = alwaysApp([write, call('finish', { answer: 'ok' })], 200);
+      await type(app, 'write a file');
+      await until(() => app.chat.getState().phase === 'waiting_approval');
+      app.stdin.write('a');
+      await new Promise((r) => setTimeout(r, 40));
+      expect(app.chat.getState().phase).toBe('waiting_approval');
+      expect(approvals.names()).toEqual([]);
+      await new Promise((r) => setTimeout(r, 220));
+      app.stdin.write('a');
+      await until(() => app.chat.getState().phase === 'idle');
+      expect(approvals.names()).toEqual(['write_file']);
+      app.unmount();
+    });
+
+    it('the minimal footer names a only when it is offered', () => {
+      expect(hintsFor({ phase: 'waiting_approval', hasInput: false, canAlways: true })).toContain(
+        'a always',
+      );
+      expect(hintsFor({ phase: 'waiting_approval', hasInput: false })).not.toContain('always');
+    });
+
+    it('/approvals lists and removes', async () => {
+      const { app, approvals } = alwaysApp([]);
+      approvals.add('write_file', 'write');
+      await type(app, '/approvals');
+      await until(() => frame(app).includes('write_file'));
+      expect(frame(app)).toContain('Remove one with /approvals remove <tool>.');
+      await type(app, '/approvals remove write_file');
+      await until(() => frame(app).includes('asks again from now on'));
+      expect(approvals.names()).toEqual([]);
+      app.unmount();
+    });
   });
 
   it('Enter and other keys never approve', async () => {

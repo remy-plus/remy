@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fold, type ModelResponse } from '@remy/core';
@@ -88,7 +88,7 @@ describe('remy run', () => {
     });
     const r = await h.run('run', 'write a file');
     expect(r.code).toBe(0);
-    expect(asked).toEqual(['Approve? [y/N] ']);
+    expect(asked).toEqual(['Approve? [y/N/a] ']);
     expect(r.out).toContain('Approval needed:');
     expect(r.out).toContain('Wrote a.txt.');
   });
@@ -117,6 +117,119 @@ describe('remy run', () => {
     // The model reads the note as the result of the denied call.
     const result = Object.values(fold(stored).calls).find((c) => c.tool === 'write_file')?.result;
     expect(JSON.stringify(result)).toContain('declined this action and said: use b.txt instead');
+  });
+
+  describe('standing approvals', () => {
+    const remove = call('delete_file', { path: 'a.txt' });
+    const allowedFile = () => JSON.parse(readFileSync(join(home, 'approvals.json'), 'utf8'));
+
+    it('approve --always saves the tool, and the next task skips the approval', async () => {
+      const h = harness({ model: new ScriptedModelClient([write, done, write, done]) });
+      const id = taskIdOf((await h.run('run', 'write a file')).out);
+      const r = await h.run('approve', id, '--always');
+      expect(r.code).toBe(0);
+      expect(r.out).toContain('Always allowing write_file. Undo: remy approvals remove write_file');
+      expect(Object.keys(allowedFile().alwaysAllow)).toEqual(['write_file']);
+      // A new task: no card, the call is allowed by the standing approval and says so.
+      const second = await h.run('run', 'write it again');
+      expect(second.out).not.toContain('Approval needed:');
+      expect(second.out).toContain('Wrote a.txt.');
+      const events = (await h.store.read(taskIdOf(second.out))).map((e) => e.event);
+      expect(events.some((e) => e.type === 'approval.requested')).toBe(false);
+      expect(events.find((e) => e.type === 'policy.decided')).toMatchObject({
+        decision: { kind: 'allow', via: 'standing' },
+      });
+      const shown = await h.run('show', taskIdOf(second.out));
+      expect(shown.out).toContain('you always allow write_file');
+    });
+
+    it('approve --always refuses an irreversible action and leaves the approval waiting', async () => {
+      const h = harness({ model: new ScriptedModelClient([remove, done]) });
+      const id = taskIdOf((await h.run('run', 'delete a file')).out);
+      expect(await h.run('approve', id, '--always')).toMatchObject({
+        code: 1,
+        err: expect.stringMatching(/cannot be undone/),
+      });
+      expect((await h.store.read(id)).some((e) => e.event.type === 'approval.resolved')).toBe(
+        false,
+      );
+    });
+
+    it('refuses --always with --deny', async () => {
+      const h = harness({ model: new ScriptedModelClient([write, done]) });
+      const id = taskIdOf((await h.run('run', 'write a file')).out);
+      expect(await h.run('approve', id, '--always', '--deny')).toMatchObject({
+        code: 1,
+        err: expect.stringMatching(/cannot go together/),
+      });
+    });
+
+    it('offers a on a terminal for writes only, and saves it', async () => {
+      const asked: string[] = [];
+      const answers = ['a'];
+      const h = harness({
+        model: new ScriptedModelClient([write, done]),
+        isTTY: true,
+        ask: async (q) => {
+          asked.push(q);
+          return answers.shift() ?? null;
+        },
+      });
+      const r = await h.run('run', 'write a file');
+      expect(r.out).toContain('a approves and always allows write_file');
+      expect(asked).toEqual(['Approve? [y/N/a] ']);
+      expect(Object.keys(allowedFile().alwaysAllow)).toEqual(['write_file']);
+      const d = harness({
+        model: new ScriptedModelClient([remove, call('finish', { answer: 'Kept it.' })]),
+        isTTY: true,
+        ask: async (q) => {
+          asked.push(q);
+          return 'a'; // "a" is not an answer here: it counts as no
+        },
+      });
+      await d.run('run', 'delete a file');
+      expect(asked.at(-1)).toBe('Approve? [y/N] ');
+      expect(Object.keys(allowedFile().alwaysAllow)).toEqual(['write_file']);
+    });
+
+    it('ignores a hand-edited entry for an irreversible tool', async () => {
+      writeFileSync(
+        join(home, 'approvals.json'),
+        JSON.stringify({ alwaysAllow: { delete_file: {}, write_file: {} } }),
+      );
+      const h = harness({ model: new ScriptedModelClient([remove, done]) });
+      const r = await h.run('run', 'delete a file');
+      expect(r.out).toContain('Approval needed:');
+    });
+
+    it('a damaged file turns standing approvals off with one note', async () => {
+      writeFileSync(join(home, 'approvals.json'), '{nope');
+      const h = harness({ model: new ScriptedModelClient([write, done]) });
+      const r = await h.run('run', 'write a file');
+      expect(r.out).toContain('Approval needed:');
+      expect(r.err).toContain('approvals.json could not be read');
+    });
+
+    it('remy approvals lists and removes', async () => {
+      const h = harness({ model: new ScriptedModelClient([]) });
+      expect((await h.run('approvals')).out).toContain('Nothing is allowed for good');
+      writeFileSync(
+        join(home, 'approvals.json'),
+        JSON.stringify({ alwaysAllow: { write_file: {}, delete_file: {} } }),
+      );
+      const list = (await h.run('approvals', 'list')).out;
+      expect(list).toContain('write_file');
+      expect(list).toContain('delete_file (ignored: this tool always asks)');
+      expect((await h.run('approvals', 'remove', 'write_file')).out).toContain('asks again');
+      expect(await h.run('approvals', 'remove', 'write_file')).toMatchObject({
+        code: 1,
+        err: expect.stringMatching(/not on the list/),
+      });
+      expect(await h.run('approvals', 'nonsense')).toMatchObject({
+        code: 1,
+        err: expect.stringMatching(/remy approvals list/),
+      });
+    });
   });
 
   it('refuses --note without --deny', async () => {

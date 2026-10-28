@@ -14,7 +14,9 @@ export type Stage =
   | { kind: 'actions'; name: string }
   | { kind: 'confirm'; name: string };
 
-export type Effect = { type: 'enable' | 'disable' | 'remove'; name: string } | { type: 'close' };
+export type Effect =
+  | { type: 'enable' | 'disable' | 'remove' | 'unallow'; name: string }
+  | { type: 'close' };
 
 /** A pick (or Esc, as `back`) moves between stages and may ask for a change. */
 export function stepConnections(
@@ -32,6 +34,8 @@ export function stepConnections(
   if (stage.kind === 'actions') {
     if (pick === '#disable') return { stage: list, effect: { type: 'disable', name: stage.name } };
     if (pick === '#enable') return { stage: list, effect: { type: 'enable', name: stage.name } };
+    if (pick.startsWith('#unallow:'))
+      return { stage, effect: { type: 'unallow', name: pick.slice('#unallow:'.length) } };
     if (pick === '#remove') return { stage: { kind: 'confirm', name: stage.name } };
     return { stage: pick === '#back' ? list : stage };
   }
@@ -51,6 +55,7 @@ export interface ConnectionsView {
 export function viewOf(
   stage: Stage,
   rows: ConnectionRow[],
+  allowed: string[] = [],
 ): Omit<ConnectionsView, 'pick' | 'back'> {
   if (stage.kind === 'list')
     return {
@@ -71,7 +76,7 @@ export function viewOf(
   return {
     title: stage.name,
     placeholder: '',
-    items: row ? connectionActions(row) : [{ id: '#back', title: 'Back' }],
+    items: row ? connectionActions(row, allowed) : [{ id: '#back', title: 'Back' }],
   };
 }
 
@@ -81,9 +86,12 @@ export function useConnections(api: ConnectionsApi, onClose: () => void): Connec
   const step = (pick: string) => {
     const r = stepConnections(stage, pick, api.list());
     if (r.effect?.type === 'close') return onClose();
-    if (r.effect?.type === 'remove') api.remove(r.effect.name);
+    if (r.effect?.type === 'unallow') api.unallow?.(r.effect.name);
+    else if (r.effect?.type === 'remove') api.remove(r.effect.name);
     else if (r.effect) api.setEnabled(r.effect.name, r.effect.type === 'enable');
-    setStage(r.stage);
+    // A fresh object, so the actions list redraws without the tool just removed.
+    setStage(r.effect?.type === 'unallow' ? { ...r.stage } : r.stage);
   };
-  return { ...viewOf(stage, api.list()), pick: step, back: () => step('back') };
+  const allowed = stage.kind === 'actions' ? (api.allowed?.(stage.name) ?? []) : [];
+  return { ...viewOf(stage, api.list(), allowed), pick: step, back: () => step('back') };
 }

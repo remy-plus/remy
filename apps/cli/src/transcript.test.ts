@@ -139,6 +139,14 @@ describe('describeApproval', () => {
     );
     expect(del.reversible).toBe(false);
   });
+  it('offers "always allow" only for write and send_as_user', () => {
+    expect(describeApproval('write_file', {}, req).always).toBe('write_file');
+    expect(describeApproval('github__post', {}, { ...req, risk: 'send_as_user' }).always).toBe(
+      'github__post',
+    );
+    for (const risk of ['spend_money', 'irreversible', 'read'] as const)
+      expect(describeApproval('t', {}, { ...req, risk }).always).toBeUndefined();
+  });
   it('keeps every row and counts what the collapsed card hides', () => {
     const content = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n');
     const v = describeApproval('write_file', { path: 'a', content }, req);
@@ -150,7 +158,8 @@ describe('describeApproval', () => {
     expect(closed.hidden).toBe(6);
     expect(approvalRows(v, true, 40)).toEqual({ shown: v.rows, hidden: 0 });
     expect(approvalRows(v, true, 8).shown).toHaveLength(7);
-    expect(approvalHeight(v, false)).toBe(5 + 1 + 6);
+    // Border, title, risk, binding, keys and the "always" line, around the rows.
+    expect(approvalHeight(v, false)).toBe(5 + 1 + 6 + 1);
   });
 });
 

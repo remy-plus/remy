@@ -14,6 +14,7 @@ export const COMMANDS: CommandInfo[] = [
   { name: 'login', summary: 'Connect a provider or replace a key' },
   { name: 'connect', summary: 'Add an app or service Remy can use' },
   { name: 'connections', summary: 'See connected apps; switch them off or remove them' },
+  { name: 'approvals', summary: 'See the tools you always allow; stop allowing one' },
   { name: 'sessions', summary: 'Pick up an unfinished task', aliases: ['resume'] },
   { name: 'new', summary: 'Start a fresh conversation' },
   { name: 'clear', summary: 'Clear the screen and start fresh' },

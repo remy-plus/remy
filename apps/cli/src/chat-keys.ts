@@ -199,7 +199,10 @@ export function useChatKeys(o: ChatKeysOptions) {
       // Single keys only, and never Enter: a pasted or stray character cannot approve.
       if (Date.now() - cardSince.current < (o.approvalSettleMs ?? APPROVAL_SETTLE_MS)) return;
       if (/^y$/i.test(ch)) void chat.approve(true);
-      else if (/^n$/i.test(ch)) void chat.approve(false);
+      // Only a card that offers it: an irreversible or paid action never shows `a`.
+      else if (/^a$/i.test(ch)) {
+        if (state.approvalView?.always) void chat.approve(true, undefined, true);
+      } else if (/^n$/i.test(ch)) void chat.approve(false);
       else if (/^e$/i.test(ch)) {
         setInput(EMPTY_INPUT);
         setNoting(true);

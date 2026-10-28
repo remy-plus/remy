@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import {
   type ApprovalRequest,
   type ConversationTurn,
+  canStandingAllow,
   createRuntime,
   DEFAULT_BUDGET,
   type EventStore,
@@ -44,6 +45,7 @@ import {
   updatePlan,
   writeFile,
 } from '@remy/tools';
+import { type ApprovalsStore, openApprovals, plainApprovals } from './approvals.ts';
 import {
   type ConnectApi,
   createChat,
@@ -120,9 +122,12 @@ Usage
   remy                            Open the chat (in a terminal)
   remy run "<prompt>" [options]   Start a task and run it
   remy resume <id>                Continue a task that stopped
-  remy approve <id> [--deny [--note "<why>"]]
+  remy approve <id> [--always | --deny [--note "<why>"]]
                                   Answer a pending approval, then continue; a note
-                                  goes to the model with the denial
+                                  goes to the model with the denial; --always also
+                                  allows that tool for good (writes and sends only)
+  remy approvals [list|remove <tool>]
+                                  See the tools you always allow, or stop allowing one
   remy answer <id> "<text>"       Answer a pending question, then continue
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
@@ -203,6 +208,7 @@ const OPTIONS = {
   // Hidden alias of --minimal, kept for one release.
   classic: { type: 'boolean' },
   deny: { type: 'boolean' },
+  always: { type: 'boolean' },
   note: { type: 'string' },
   version: { type: 'boolean', short: 'v' },
   help: { type: 'boolean', short: 'h' },
@@ -276,6 +282,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'login',
       'logout',
       'connect',
+      'approvals',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -291,6 +298,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       deps.credentials ??
       openCredentials({ home, ...(env.REMY_KEYCHAIN === 'off' && { platform: 'linux' as const }) });
     return creds;
+  };
+
+  let standingStore: ApprovalsStore | undefined;
+  let standingWarned = false;
+  const standing = () => {
+    standingStore ??= openApprovals(home);
+    return standingStore;
+  };
+  /** Tool names the user always allows. A damaged file turns them off, with one note. */
+  const standingNames = (): string[] => {
+    const s = standing().load();
+    if (s.note && !standingWarned) {
+      standingWarned = true;
+      deps.err(`${st.dim(s.note)}\n`);
+    }
+    return s.entries.map((e) => e.tool);
   };
 
   let secretStore: SecretStore | undefined;
@@ -622,12 +645,25 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out();
           out(`${st.bold('Approval needed:')} ${r.preview}`);
           out(st.dim(`Risk: ${r.risk}. Why: ${r.reason}`));
-          const a = await deps.ask('Approve? [y/N] ');
+          const tool = (await rt.state(id)).calls[r.callId]?.tool ?? '';
+          const can = canStandingAllow(r.risk) && tool !== '';
+          if (can)
+            out(
+              st.dim(
+                `a approves and always allows ${tool}, in any task. Undo: remy approvals remove ${tool}`,
+              ),
+            );
+          const a = await deps.ask(can ? 'Approve? [y/N/a] ' : 'Approve? [y/N] ');
           if (a === null) {
             followUp(id, o);
             return 0;
           }
-          await rt.approve(id, r.callId, r.argsHash, /^y(es)?$/i.test(a.trim()), 'user');
+          const always = can && /^a(lways)?$/i.test(a.trim());
+          if (always) {
+            standing().add(tool, r.risk);
+            out(st.dim(`Always allowing ${tool}.`));
+          }
+          await rt.approve(id, r.callId, r.argsHash, always || /^y(es)?$/i.test(a.trim()), 'user');
         } else {
           out();
           out(`${st.bold('Question:')} ${o.question}`);
@@ -675,9 +711,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const maxSteps = num(flags['max-steps'], '--max-steps');
     const maxCostUsd = num(flags['max-cost'], '--max-cost');
     const netAllow = list(flags['net-allow']) ?? file.netAllow;
+    const always = standingNames();
     return {
       model: modelId,
-      permissions: { autoApprove, ...(netAllow && { netAllow }) },
+      permissions: {
+        autoApprove,
+        ...(netAllow && { netAllow }),
+        ...(always.length && { standing: always }),
+      },
       budget: {
         ...DEFAULT_BUDGET,
         ...file.budget,
@@ -844,6 +885,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         return made.runtime;
       },
       effectOf: (tool) => registry?.get(tool)?.effect,
+      riskOf: (tool) => registry?.get(tool)?.risk,
+      approvals: standing(),
       config: (context) => taskConfig(file, model.id, workspace, context),
       listTasks: () => store.listTasks(),
       readEvents: (id) => store.read(id),
@@ -854,6 +897,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         list: () => mcp?.list() ?? [],
         setEnabled: (name, on) => mcp?.setEnabled(name, on) ?? '',
         remove: (name) => mcp?.remove(name) ?? '',
+        allowed: (server) =>
+          standing()
+            .names()
+            .filter((n) => n.startsWith(`${server}__`)),
+        unallow: (tool) =>
+          standing().remove(tool)
+            ? `${tool} asks again from now on.`
+            : `${tool} is not on the list.`,
       } satisfies ConnectionsApi,
       ready: () => mcp?.ready ?? Promise.resolve(),
       files: {
@@ -925,14 +976,21 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         return await resumeFlow(rest[0] as string);
 
       case 'approve': {
-        need(1, 'remy approve <id> [--deny [--note "<why>"]]');
+        need(1, 'remy approve <id> [--always | --deny [--note "<why>"]]');
         const id = rest[0] as string;
         const note = flags.note?.trim();
+        if (flags.always && flags.deny) throw new Error('--always and --deny cannot go together.');
         if (note && !flags.deny)
           throw new Error('--note goes with --deny: say why you are denying.');
         return await resumeFlow(id, async (rt) => {
           const p = (await rt.state(id)).pendingApproval;
           if (!p) throw new Error(`Task ${id} has no approval waiting.`);
+          if (flags.always) {
+            // Saved before approving, so a refusal leaves the approval waiting.
+            const tool = (await rt.state(id)).calls[p.callId]?.tool ?? '';
+            standing().add(tool, p.risk);
+            out(st.dim(`Always allowing ${tool}. Undo: remy approvals remove ${tool}`));
+          }
           await rt.approve(id, p.callId, p.argsHash, !flags.deny, 'user', note);
           out(
             st.dim(
@@ -940,6 +998,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             ),
           );
         });
+      }
+
+      case 'approvals': {
+        const sub = rest[0] ?? 'list';
+        if (sub === 'remove') {
+          need(2, 'remy approvals remove <tool>');
+          const tool = rest[1] as string;
+          if (!standing().remove(tool)) throw new Error(`${tool} is not on the list.`);
+          out(`${tool} asks again from now on.`);
+          return 0;
+        }
+        if (sub !== 'list')
+          throw new Error('Use remy approvals list or remy approvals remove <tool>.');
+        const { tools } = makeRuntime(cfg(), { model: false });
+        out(plainApprovals(standing().load(), (t) => tools.get(t)?.risk));
+        return 0;
       }
 
       case 'answer': {

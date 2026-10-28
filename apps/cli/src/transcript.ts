@@ -1,6 +1,6 @@
 // What the chat shows, as pure functions: tool summaries, approval cards, which tool lines
 // are done enough to leave the live area, and how tall the live area may be. No Ink here.
-import type { ApprovalRequest, Effect, ToolResult } from '@remy/core';
+import { type ApprovalRequest, canStandingAllow, type Effect, type ToolResult } from '@remy/core';
 import { fmtMs, truncate } from './format.ts';
 
 export type ToolState = 'waiting_approval' | 'running' | 'ok' | 'failed' | 'denied';
@@ -224,6 +224,8 @@ export interface ApprovalView {
   reversible: boolean;
   /** Rows hidden in the collapsed card. */
   more: number;
+  /** The tool the user may allow for good with `a`; absent when its risk rules that out. */
+  always?: string;
 }
 
 /** Rows the collapsed approval card shows. */
@@ -260,6 +262,7 @@ export function describeApproval(
     shortHash: req.argsHash.slice(0, 6),
     reversible,
     more: Math.max(0, v.rows.length - APPROVAL_ROWS),
+    ...(tool && canStandingAllow(req.risk) && { always: tool }),
   };
 }
 
@@ -321,10 +324,10 @@ export function approvalRows(
   return { shown, hidden: v.rows.length - shown.length };
 }
 
-/** Rows the card takes: border, title, action rows, a "more" line, risk, binding and keys. */
+/** Rows the card takes: border, title, action rows, a "more" line, risk, binding, "always" and keys. */
 export const approvalHeight = (v: ApprovalView, expanded = false, room?: number) => {
   const { shown, hidden } = approvalRows(v, expanded, room);
-  return shown.length + (hidden ? 1 : 0) + 6;
+  return shown.length + (hidden ? 1 : 0) + 6 + (v.always ? 1 : 0);
 };
 
 /**

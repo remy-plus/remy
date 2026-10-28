@@ -22,6 +22,10 @@ export interface ConnectionsApi {
   setEnabled(name: string, enabled: boolean): string;
   /** Forgets a saved server and its secrets. Returns a line for the transcript. */
   remove(name: string): string;
+  /** Tools of this server the user always allows (full tool names). */
+  allowed?(name: string): string[];
+  /** Stops allowing a tool for good. Returns a line for the transcript. */
+  unallow?(tool: string): string;
 }
 
 const WORD: Record<ConnectionStatus, string> = {
@@ -49,9 +53,14 @@ export const connectionItems = (rows: ConnectionRow[]): PickItem[] =>
   }));
 
 /** What can be done to one server. Config-file servers cannot be removed from here. */
-export function connectionActions(r: ConnectionRow): PickItem[] {
+export function connectionActions(r: ConnectionRow, allowed: string[] = []): PickItem[] {
   const on = r.status !== 'disabled';
   return [
+    ...allowed.map((tool) => ({
+      id: `#unallow:${tool}`,
+      title: `Always allowed: ${tool}`,
+      detail: 'Enter stops allowing it; Remy asks each time again',
+    })),
     on
       ? { id: '#disable', title: 'Switch off', detail: 'takes effect the next time Remy starts' }
       : { id: '#enable', title: 'Switch on', detail: 'takes effect the next time Remy starts' },

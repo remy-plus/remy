@@ -376,6 +376,8 @@ export interface HintContext {
   unconnected?: boolean;
   /** Nothing has been said yet. */
   fresh?: boolean;
+  /** The approval card offers `a` (always allow). */
+  canAlways?: boolean;
 }
 
 /** Context-aware key hints for the footer. */
@@ -396,7 +398,9 @@ export function hintsFor(
         ? 'Enter queue · Ctrl+S send now · Ctrl+C stop'
         : 'Enter queue · Ctrl+C stop';
     case 'waiting_approval':
-      return 'y approve · n deny · e say why';
+      return c.canAlways
+        ? 'y approve · a always · n deny · e say why'
+        : 'y approve · n deny · e say why';
     case 'waiting_user':
       return 'Enter answer · Ctrl+C stop';
     default:
@@ -447,6 +451,7 @@ function Footer(p: {
     overlay: Boolean(state.overlay),
     unconnected,
     fresh: !state.items.some((i) => i.kind === 'user'),
+    canAlways: Boolean(state.approvalView?.always),
   });
   // On a narrow terminal the figures go first and the key hints last: hints are what unblocks.
   const room = p.columns - theme.space.indent * 2;
