@@ -324,6 +324,32 @@ describe('runtime', () => {
     });
   });
 
+  it('retries a too-large request once with less, then fails plainly', async () => {
+    const t = setup([]);
+    let n = 0;
+    t.model.complete = async () => {
+      n += 1;
+      if (n === 1) throw new ModelError('HTTP 413: Request too large', false, { tooLarge: true });
+      return { text: 'ok', calls: [], usage: { inTokens: 1, outTokens: 1 } };
+    };
+    const id = await t.rt.start('go', config());
+    expect(await drive(t.rt, id)).toMatchObject({ status: 'succeeded' });
+    expect(n).toBe(2);
+
+    const stuck = setup([]);
+    let m = 0;
+    stuck.model.complete = async () => {
+      m += 1;
+      throw new ModelError('HTTP 413: Request too large', false, { tooLarge: true });
+    };
+    const id2 = await stuck.rt.start('go', config());
+    expect(await drive(stuck.rt, id2)).toMatchObject({
+      status: 'failed',
+      reason: expect.stringContaining('still too large'),
+    });
+    expect(m).toBe(2);
+  });
+
   it('waits out a rate limit for as long as the provider asks, with more patience than a glitch', async () => {
     const slept: number[] = [];
     const t = setup([], { sleep: async (ms) => void slept.push(ms) });

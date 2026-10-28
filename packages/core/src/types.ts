@@ -243,14 +243,17 @@ export class ModelError extends Error {
   readonly rateLimited: boolean;
   /** How long the provider asked us to wait, when it said. */
   readonly retryAfterMs?: number;
+  /** The request itself was bigger than the provider accepts (HTTP 413, or a tokens-per-minute cap smaller than the request). Sending less can help. */
+  readonly tooLarge: boolean;
   constructor(
     message: string,
     retryable: boolean,
-    rate?: { rateLimited: true; retryAfterMs?: number },
+    rate?: { rateLimited?: true; retryAfterMs?: number; tooLarge?: true },
   ) {
     super(message);
     this.retryable = retryable;
     this.rateLimited = rate?.rateLimited ?? false;
+    this.tooLarge = rate?.tooLarge ?? false;
     if (rate?.retryAfterMs !== undefined) this.retryAfterMs = rate.retryAfterMs;
   }
 }
