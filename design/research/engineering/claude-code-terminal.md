@@ -9,12 +9,14 @@ Method: Claude Code 2.1.312 (arm64 Mach-O built with Bun) holds its JavaScript b
 - **Synchronized output (DEC 2026) is auto-detected, not assumed (V).** A decision function: tmux answers for itself (`if(i.TMUX) return {likely:false}`), `CLAUDE_CODE_FORCE_SYNC_OUTPUT` forces it, JetBrains is special-cased, otherwise a cached terminal-capability probe (`synchronizedOutput` state `settled` or `likely`). The result is reported in session telemetry as `syncOutput`. Frames are wrapped in `ESC[?2026h ... ESC[?2026l`.
 - **Alternate screen is the default, with opt-outs (V).** Env vars: `CLAUDE_CODE_NO_FLICKER` (on/off), `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN`, `CLAUDE_CODE_DISABLE_MOUSE`, `CLAUDE_CODE_SCROLL_SPEED`, and a `/tui fullscreen` command. There is a sticky auto-disable "after repeated failed starts" (string: `recorded sticky auto-disable, honoured at REPL mount`) and a `win_ssh_auto_off` reason. Mouse is SGR (1006). Scroll box exists (`JP` with `stickyScroll` prop).
 - **Frame pacing is adaptive (V).** `scheduleFrame()`:
+
   ```
   let n=this.pacerNow(), u=n-this.lastPacedFrameAt,
       f=n<this.inputPriorityUntil ? zEs : Mh;
   if(u>=f){this.queuePacedFrame();return}
   ... setTimeout(() => this.queuePacedFrame(), max(0, lastPacedFrameAt+f-n))
   ```
+
   Constants in the bundle: `zEs=4` (ms between frames right after a keypress), `GEs=50` (ms the input-priority window lasts, set as `inputPriorityUntil=pacerNow()+GEs`), `VEs=16384`. The normal interval `Mh` is a minified name I could not resolve to one value; the engineer's public figure is about 16 ms (P). Meaning: typing gets a 4 ms path for 50 ms after each key, while streamed tokens render at the slower base rate.
 - **Backpressure (V).** `queuePacedFrame()` checks `nonBlockingStdout.queuedBytes() > VEs` (16 KiB); if the pipe is backed up it sets `frameHeldForBacklog` and retries after a short timer instead of writing another frame. Output goes through a `nonBlockingStdout` wrapper with `flush()` on exit. This is what stops slow SSH links from lagging behind the stream.
 - **Streaming path (V).** The API layer has a "headless plain delta fast path" for `text_delta` and `input_json_delta`, and flags like `api_stream_delta_merge` and `api_stream_text_delivery` (feature gates, behaviour not visible). Deltas are merged before reaching React; I found no per-token render.
@@ -61,18 +63,18 @@ From `terminal.ts`: DEC 2026 probe (DECRQM) and OSC 11 query, focus events, sync
 
 ## What Remy should take (ranked)
 
-| # | Take | User-visible effect | Size | Remy files |
-|---|------|--------------------|------|------------|
-| 1 | Input-priority frame pacing: base interval for stream frames, ~4 ms for 50 ms after each key | Typing never lags behind a streaming reply | S | `screen/full-app.ts`, `stream.ts`, `live-hooks.ts` |
-| 2 | Stdout backpressure: skip or delay a frame while the write queue exceeds ~16 KiB | No lag or stale frames over SSH or slow terminals | S-M | `terminal.ts`, `screen/full-app.ts` |
-| 3 | Queue input while a turn runs, with "send now" (interrupt and send) distinct from "queue" | Owner can type the next instruction without waiting or losing it | M | `chat.ts`, `chat-keys.ts`, `screen/prompt-box.ts` |
-| 4 | Paste placeholders `[Pasted text #1 +N lines]` backed by a cache, flagged untrusted | Big pastes stay readable; recalled prompts still send the full text | M | `input.ts`, `input-history.ts`, `screen/prompt-box.ts`, `chat.ts` |
-| 5 | Keybindings as a data table with contexts, chords and a user file; hints derived from the resolved binding | Remappable keys, hints always match, fewer hard-coded branches | M-L | `chat-keys.ts`, `prefs.ts`, `hints.ts` |
-| 6 | DEC 2031 theme push (`ESC[?2031h`, reply `ESC[?997;1n` dark or `2n` light) next to the OSC 11 probe | Theme follows the OS live without a restart | S | `terminal.ts`, `theme.ts`, `theme-command` |
-| 7 | One mode registry that reasserts bracketed paste, mouse, alt screen and focus after suspend or reattach | Ctrl+Z / fg and tmux reattach do not leave a broken screen | S-M | `terminal.ts`, `screen/full-app.ts` |
-| 8 | Auto-fallback to `--minimal` after repeated failed starts, plus an env opt-out for alt screen and mouse | A broken terminal never traps the owner in a blank UI | S | `main.ts`, `prefs.ts`, `cli.ts` |
-| 9 | Tip scheduler with persisted history (show least recently shown, context-triggered, one dim line, opt-out) | Features get discovered without a tour | S | `screen/tips.ts`, `prefs.ts` |
-| 10 | Notification channel setting (auto, bell, OSC for iTerm2/kitty/ghostty, off) fired when blocked on approval or done while unfocused | Owner can leave the window and still hear when Remy needs them | S-M | `terminal.ts`, `chat.ts`, `prefs.ts` |
+| #   | Take                                                                                                                                | User-visible effect                                                 | Size | Remy files                                                        |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---- | ----------------------------------------------------------------- |
+| 1   | Input-priority frame pacing: base interval for stream frames, ~4 ms for 50 ms after each key                                        | Typing never lags behind a streaming reply                          | S    | `screen/full-app.ts`, `stream.ts`, `live-hooks.ts`                |
+| 2   | Stdout backpressure: skip or delay a frame while the write queue exceeds ~16 KiB                                                    | No lag or stale frames over SSH or slow terminals                   | S-M  | `terminal.ts`, `screen/full-app.ts`                               |
+| 3   | Queue input while a turn runs, with "send now" (interrupt and send) distinct from "queue"                                           | Owner can type the next instruction without waiting or losing it    | M    | `chat.ts`, `chat-keys.ts`, `screen/prompt-box.ts`                 |
+| 4   | Paste placeholders `[Pasted text #1 +N lines]` backed by a cache, flagged untrusted                                                 | Big pastes stay readable; recalled prompts still send the full text | M    | `input.ts`, `input-history.ts`, `screen/prompt-box.ts`, `chat.ts` |
+| 5   | Keybindings as a data table with contexts, chords and a user file; hints derived from the resolved binding                          | Remappable keys, hints always match, fewer hard-coded branches      | M-L  | `chat-keys.ts`, `prefs.ts`, `hints.ts`                            |
+| 6   | DEC 2031 theme push (`ESC[?2031h`, reply `ESC[?997;1n` dark or `2n` light) next to the OSC 11 probe                                 | Theme follows the OS live without a restart                         | S    | `terminal.ts`, `theme.ts`, `theme-command`                        |
+| 7   | One mode registry that reasserts bracketed paste, mouse, alt screen and focus after suspend or reattach                             | Ctrl+Z / fg and tmux reattach do not leave a broken screen          | S-M  | `terminal.ts`, `screen/full-app.ts`                               |
+| 8   | Auto-fallback to `--minimal` after repeated failed starts, plus an env opt-out for alt screen and mouse                             | A broken terminal never traps the owner in a blank UI               | S    | `main.ts`, `prefs.ts`, `cli.ts`                                   |
+| 9   | Tip scheduler with persisted history (show least recently shown, context-triggered, one dim line, opt-out)                          | Features get discovered without a tour                              | S    | `screen/tips.ts`, `prefs.ts`                                      |
+| 10  | Notification channel setting (auto, bell, OSC for iTerm2/kitty/ghostty, off) fired when blocked on approval or done while unfocused | Owner can leave the window and still hear when Remy needs them      | S-M  | `terminal.ts`, `chat.ts`, `prefs.ts`                              |
 
 Also worth a later look, not ranked: a terminal title that follows the session name, reserved toast rows so layout never jumps, and a diff panel with a noise filter for approvals.
 
