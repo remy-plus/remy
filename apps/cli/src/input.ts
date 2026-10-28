@@ -7,6 +7,8 @@ export interface InputState {
   cursor: number;
   /** Large pastes by id. The text holds a marker for each; `expandPastes` swaps them back. */
   pastes: Record<number, string>;
+  /** The last text cut by a kill key (Ctrl+W/U/K, Alt+D, Alt+Backspace); Ctrl+Y puts it back. */
+  kill?: string;
 }
 
 export const EMPTY_INPUT: InputState = { text: '', cursor: 0, pastes: {} };
@@ -107,6 +109,12 @@ const cut = (st: InputState, from: number, to: number): InputState => ({
   cursor: from,
 });
 
+/** Cuts a range and remembers it for Ctrl+Y. */
+const kill = (st: InputState, from: number, to: number): InputState => ({
+  ...cut(st, from, to),
+  kill: st.text.slice(from, to),
+});
+
 /** Where a word delete from `at` stops: past spaces, then past the word. */
 function wordStart(text: string, at: number): number {
   let i = at;
@@ -168,7 +176,7 @@ export function editInput(
     return { ...st, cursor: wordEnd(text, cursor) };
   if (multi && key.meta && !key.ctrl && input === 'd') {
     const to = wordEnd(text, cursor);
-    return to === cursor ? st : { ...st, text: text.slice(0, cursor) + text.slice(to) };
+    return to === cursor ? st : kill(st, cursor, to);
   }
   if (key.leftArrow) return { ...st, cursor: Math.max(0, cursor - 1) };
   if (key.rightArrow) return { ...st, cursor: Math.min(text.length, cursor + 1) };
@@ -178,16 +186,17 @@ export function editInput(
     return { ...st, cursor: multi ? lineEnd(text, cursor) : text.length };
   if (key.ctrl && input === 'u') {
     const from = multi ? lineStart(text, cursor) : 0;
-    return cursor === from ? st : cut(st, from, cursor);
+    return cursor === from ? st : kill(st, from, cursor);
   }
   if (multi && key.ctrl && input === 'k') {
     const end = lineEnd(text, cursor);
     // At the end of a line, Ctrl+K joins the next one.
     const to = end === cursor && end < text.length ? end + 1 : end;
-    return to === cursor ? st : { ...st, text: text.slice(0, cursor) + text.slice(to) };
+    return to === cursor ? st : kill(st, cursor, to);
   }
+  if (multi && key.ctrl && input === 'y') return st.kill ? insert(st, st.kill) : st;
   if (multi && ((key.ctrl && input === 'w') || (key.meta && (key.backspace || key.delete)))) {
-    return cursor === 0 ? st : cut(st, wordStart(text, cursor), cursor);
+    return cursor === 0 ? st : kill(st, wordStart(text, cursor), cursor);
   }
   // Ctrl+J: a line feed that is not Enter.
   if (multi && ((key.ctrl && input === 'j') || (!key.return && input === '\n')))

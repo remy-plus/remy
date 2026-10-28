@@ -106,6 +106,23 @@ describe('word moves', () => {
   });
 });
 
+describe('kill and yank', () => {
+  it('Ctrl+Y puts back the last Ctrl+K, Ctrl+U, Ctrl+W or Alt+D cut', () => {
+    const k = editInput(at('one two', 3), 'k', { ctrl: true });
+    expect(k.kill).toBe(' two');
+    expect(editInput(editInput(k, '', { home: true }), 'y', { ctrl: true }).text).toBe(' twoone');
+    const u = editInput(at('ab\ncd', 5), 'u', { ctrl: true });
+    expect(u).toMatchObject({ text: 'ab\n', kill: 'cd' });
+    expect(editInput(withText('x yy'), 'w', { ctrl: true }).kill).toBe('yy');
+    expect(editInput(at('a bb c', 1), 'd', { meta: true }).kill).toBe(' bb');
+    expect(editInput(u, 'y', { ctrl: true })).toMatchObject({ text: 'ab\ncd', cursor: 5 });
+  });
+
+  it('Ctrl+Y with nothing killed does nothing', () => {
+    expect(editInput(withText('a'), 'y', { ctrl: true })).toEqual(withText('a'));
+  });
+});
+
 describe('paste', () => {
   it('keeps a small paste as it is, newlines included', () => {
     const s = pasteInput(withText('> '), 'a\r\nb');
