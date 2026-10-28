@@ -2,7 +2,7 @@
 // the model sees them truncated, with untrusted content fenced.
 import type { ToolRegistry } from './registry.ts';
 import type { TaskState } from './state.ts';
-import type { ConversationTurn, Message, ToolResult } from './types.ts';
+import type { ConversationTurn, Message, ModelCaps, ToolResult } from './types.ts';
 
 export const SYSTEM_PROMPT = `You are Remy, an agent that completes digital tasks for the user.
 
@@ -12,6 +12,9 @@ If you need information only the user has, call ask_user. Never guess at irrever
 Ask only when the task cannot continue without the answer, and ask through ask_user: a reply
 without a tool call ends the task. If a page is missing or the user declines an action, say so
 and finish.
+If a source fails, is blocked, or returns unusable content, try alternatives yourself first: a web search,
+other sites, review roundups. Then answer as well as you can and say briefly what you could not reach.
+Ask only when the user's intent is unclear or an action needs approval.
 Open items (emails, pages, files) before summarizing them; titles and snippets are not the content.
 Never repeat a call that already succeeded: use its result.
 For a task with three or more steps, call update_plan with the steps first and keep it current.
@@ -58,11 +61,73 @@ export function renderContext(turns: ConversationTurn[] | undefined): Message[] 
   ]);
 }
 
-export function buildMessages(s: TaskState, tools: ToolRegistry): Message[] {
-  return [...renderContext(s.config.context), ...buildLogMessages(s, tools)];
+/** Rough size of text in tokens; deliberately pessimistic for code and markup. */
+const CHARS_PER_TOKEN = 3.5;
+/** Tool results are never shortened below this many characters of text. */
+export const MIN_RESULT_CHARS = 300;
+const MIN_BUDGET_CHARS = 1500;
+
+export interface BudgetInput {
+  caps: Pick<ModelCaps, 'contextTokens' | 'contextWindow' | 'tpm'>;
+  system: string;
+  toolSpecsChars: number;
+  maxOutputTokens: number;
 }
 
-function buildLogMessages(s: TaskState, tools: ToolRegistry): Message[] {
+/**
+ * How many characters of tool results may go to the model in one request. Tool results get at most
+ * 40% of the context window and, when the provider caps tokens per minute (`tpm`), whatever is left
+ * of that cap after the system prompt, tool specs, output allowance and a share for the conversation.
+ */
+export function toolResultBudgetChars(b: BudgetInput): number {
+  const window = b.caps.contextWindow ?? b.caps.contextTokens;
+  let tokens = window * 0.4;
+  if (b.caps.tpm) {
+    const fixed = (b.system.length + b.toolSpecsChars) / CHARS_PER_TOKEN + b.maxOutputTokens;
+    tokens = Math.min(tokens, (b.caps.tpm * 0.85 - fixed) * 0.7);
+  }
+  return Math.max(MIN_BUDGET_CHARS, Math.floor(tokens * CHARS_PER_TOKEN));
+}
+
+export interface BuildOptions {
+  /** Total characters of tool-result text to send; older results are shortened first. */
+  toolBudgetChars?: number;
+}
+
+export function buildMessages(
+  s: TaskState,
+  tools: ToolRegistry,
+  opts: BuildOptions = {},
+): Message[] {
+  return [...renderContext(s.config.context), ...buildLogMessages(s, tools, opts)];
+}
+
+function buildLogMessages(s: TaskState, tools: ToolRegistry, opts: BuildOptions): Message[] {
+  // Each result renders with its own cap; over budget, the oldest are shortened first.
+  const caps = new Map<string, number>();
+  const rendered = new Map<string, string>();
+  const render = (callId: string) => {
+    const c = s.calls[callId];
+    if (!c?.result) throw new Error(`result entry without a result: ${callId}`);
+    const max = caps.get(callId) ?? tools.get(c.tool)?.maxOutputChars ?? 4000;
+    caps.set(callId, max);
+    rendered.set(callId, renderResult(c.result, c.tool, max));
+  };
+  const resultIds = s.log.flatMap((e) => (e.kind === 'result' ? [e.callId] : []));
+  for (const id of resultIds) render(id);
+  const budget = opts.toolBudgetChars;
+  if (budget !== undefined) {
+    const total = () => [...rendered.values()].reduce((n, t) => n + t.length, 0);
+    for (const id of resultIds) {
+      const over = total() - budget;
+      if (over <= 0) break;
+      const r = s.calls[id]?.result;
+      const len = r?.ok ? r.content.length : 0;
+      const cur = Math.min(caps.get(id) ?? 0, len);
+      caps.set(id, Math.max(MIN_RESULT_CHARS, cur - over - 80)); // 80: the truncation marker
+      render(id);
+    }
+  }
   return s.log.map((entry): Message => {
     if (entry.kind === 'user')
       return {
@@ -76,14 +141,11 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry): Message[] {
       });
       return { role: 'assistant', content: entry.text, ...(calls.length ? { calls } : {}) };
     }
-    const c = s.calls[entry.callId];
-    if (!c?.result) throw new Error(`result entry without a result: ${entry.callId}`);
-    const max = tools.get(c.tool)?.maxOutputChars ?? 4000;
     return {
       role: 'tool',
-      callId: c.callId,
-      tool: c.tool,
-      content: renderResult(c.result, c.tool, max),
+      callId: entry.callId,
+      tool: s.calls[entry.callId]?.tool ?? '',
+      content: rendered.get(entry.callId) ?? '',
     };
   });
 }

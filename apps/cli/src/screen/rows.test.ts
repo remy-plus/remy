@@ -153,6 +153,19 @@ describe('rows', () => {
     expect(text(rows)).toEqual(['   ● find', '   ○ write']);
   });
 
+  it('adds a muted note under a stopped plan', () => {
+    const rows = itemRows(
+      {
+        kind: 'plan',
+        steps: [{ text: 'find', status: 'pending' }],
+        note: 'plan stopped at step 1 of 1',
+      },
+      40,
+      theme,
+    );
+    expect(text(rows)).toEqual(['   ○ find', '   plan stopped at step 1 of 1']);
+  });
+
   it('fits spans with an ellipsis', () => {
     const out = fitSpans([{ text: 'abcdef' }, { text: 'ghij' }], 8);
     expect(out.map((s) => s.text).join('')).toBe('abcdefg…');

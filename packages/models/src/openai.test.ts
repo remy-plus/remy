@@ -159,6 +159,37 @@ describe('createOpenAIClient', () => {
     expect(err).toMatchObject({ retryable: true, rateLimited: true, retryAfterMs: 7000 });
   });
 
+  it('flags a request that is over the provider limit, not just a busy key', async () => {
+    const body = (status: number, message: string) =>
+      new Response(JSON.stringify({ error: { message } }), { status });
+    const run = async (r: Response) =>
+      make(() => r)
+        .client.complete(req, sig())
+        .catch((e) => e);
+    expect(
+      await run(body(413, 'Request too large for model. Limit 8000, Requested 17786')),
+    ).toMatchObject({
+      tooLarge: true,
+      retryable: false,
+    });
+    expect(
+      await run(
+        body(
+          429,
+          'Rate limit reached: tokens per minute (TPM): Limit 8000, Used 0, Requested 17786',
+        ),
+      ),
+    ).toMatchObject({ tooLarge: true, rateLimited: true });
+    expect(
+      await run(
+        body(
+          429,
+          'Rate limit reached: tokens per minute (TPM): Limit 8000, Used 7000, Requested 2000',
+        ),
+      ),
+    ).toMatchObject({ tooLarge: false, rateLimited: true });
+  });
+
   it('reads Retry-After as seconds or a date, else X-RateLimit-Reset in seconds or ms', () => {
     const now = Date.parse('2026-10-27T00:00:00Z');
     const at = (h: Record<string, string>) => retryAfterMs(new Headers(h), now);

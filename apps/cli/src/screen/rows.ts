@@ -220,23 +220,28 @@ export function itemRows(item: Item, width: number, theme: Theme): Row[] {
     case 'tool':
       return toolRows(item.line, width, theme);
     case 'plan':
-      return item.steps.map((s) =>
-        row(
-          fitSpans(
-            [
-              {
-                text: `${theme.symbols[s.status === 'done' ? 'done' : s.status === 'doing' ? 'doing' : 'todo']} `,
-                role: s.status === 'done' ? 'accent' : 'muted',
-              },
-              {
-                text: s.text,
-                ...(s.status === 'pending' && { role: 'muted' as Role }),
-                ...(s.status === 'doing' && { bold: true }),
-              },
-            ],
-            width - TEXT_INDENT,
+      return [
+        ...item.steps.map((s) =>
+          row(
+            fitSpans(
+              [
+                {
+                  text: `${theme.symbols[s.status === 'done' ? 'done' : s.status === 'doing' ? 'doing' : 'todo']} `,
+                  role: s.status === 'done' ? 'accent' : 'muted',
+                },
+                {
+                  text: s.text,
+                  ...(s.status === 'pending' && { role: 'muted' as Role }),
+                  ...(s.status === 'doing' && { bold: true }),
+                },
+              ],
+              width - TEXT_INDENT,
+            ),
           ),
         ),
-      );
+        ...(item.note
+          ? [row(fitSpans([{ text: item.note, role: 'muted' as Role }], width - TEXT_INDENT))]
+          : []),
+      ];
   }
 }

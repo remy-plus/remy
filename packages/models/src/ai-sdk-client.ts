@@ -34,7 +34,7 @@ import {
   ModelError,
   type ModelResponse,
 } from '@remy/core';
-import { REASONING_MIN_OUTPUT_TOKENS, retryAfterMs } from './openai.ts';
+import { httpError, REASONING_MIN_OUTPUT_TOKENS } from './openai.ts';
 import type { RawRequest } from './types.ts';
 
 export type AiSdkKind = 'anthropic' | 'google';
@@ -93,13 +93,8 @@ function toModelError(e: unknown, signal: AbortSignal, timeout: AbortSignal, ms:
   if (timeout.aborted) return new ModelError(`timed out after ${ms}ms`, true);
   if (APICallError.isInstance(e)) {
     const detail = (e.responseBody ?? e.message).slice(0, 500);
-    if (e.statusCode === 429)
-      return new ModelError(`HTTP 429: ${detail}`, true, {
-        rateLimited: true,
-        retryAfterMs: retryAfterMs(new Headers(e.responseHeaders), Date.now()),
-      });
     if (e.statusCode !== undefined)
-      return new ModelError(`HTTP ${e.statusCode}: ${detail}`, e.statusCode >= 500);
+      return httpError(e.statusCode, detail, new Headers(e.responseHeaders));
   }
   return new ModelError(`network error: ${e instanceof Error ? e.message : String(e)}`, true);
 }

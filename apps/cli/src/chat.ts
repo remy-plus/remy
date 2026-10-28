@@ -20,6 +20,7 @@ import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
 import { isThemeChoice, type ThemeChoice } from './prefs.ts';
+import { bodyMessage, explainTooLarge, providerName } from './provider-error.ts';
 import {
   changedPaths,
   type FileTouch,
@@ -34,6 +35,7 @@ import {
   describeApproval,
   flushTools,
   type PlanStep,
+  stopPlan,
   summarizeTool,
   type ToolLine,
   type ToolState,
@@ -51,7 +53,7 @@ export type Item =
   | { kind: 'text'; text: string }
   | { kind: 'question'; text: string }
   | { kind: 'tool'; line: ToolLine }
-  | { kind: 'plan'; steps: PlanStep[] }
+  | { kind: 'plan'; steps: PlanStep[]; note?: string }
   | { kind: 'note'; text: string; model?: string; ms?: number; stopped?: boolean }
   | { kind: 'error'; text: string; model?: string; ms?: number };
 
@@ -302,11 +304,13 @@ export function parsePlan(args: unknown): PlanStep[] | undefined {
 
 /** A model failure in plain words, ending with the one thing to do. Undefined when unknown. */
 export function explainModelError(msg: string): string | undefined {
+  const large = explainTooLarge(msg);
+  if (large) return large;
   const m = msg.toLowerCase();
   if (/http (401|403)\b|invalid api key|incorrect api key|unauthorized|api_key_invalid/.test(m))
     return 'The key was rejected. Run /login to replace it.';
   if (/http 429|rate limit|too many requests/.test(m))
-    return 'The provider is rate limiting this key. Wait a minute and send your message again, or switch with /model.';
+    return `${providerName(msg)} is rate-limiting this key. Wait a minute and send your message again, or switch with /model.`;
   if (/insufficient_quota|exceeded your current quota|http 402|out of credit/.test(m))
     return 'The account is out of credit. Add credit with the provider, or switch with /model.';
   if (/http 404|model_not_found|does not exist|not found/.test(m) && /model/.test(m))
@@ -322,10 +326,10 @@ export function friendlyError(e: unknown): string {
   const known = explainModelError(msg);
   if (known) return known;
   if (e instanceof ModelError)
-    return `The model did not answer: ${truncate(msg, 160)}. Send your message again, or switch with /model.`;
+    return `The model did not answer: ${truncate(bodyMessage(msg), 160)}. Send your message again, or switch with /model.`;
   if (e instanceof TaskBusyError)
     return 'Another run holds this task. Wait a few seconds, then send your message again.';
-  return `${truncate(msg, 200)}. Send your message again, or run /help.`;
+  return `${truncate(bodyMessage(msg), 200)}. Send your message again, or run /help.`;
 }
 
 const initial = (): ChatState => ({
@@ -454,7 +458,7 @@ export function createChat(deps: ChatDeps): Chat {
           thinking: false,
           streaming: '',
           retrying: ev.retryable
-            ? `${explainModelError(ev.error)?.split('. ')[0] ?? `The model call failed (${truncate(ev.error, 80)})`}. Trying again.`
+            ? `${explainModelError(ev.error)?.split('. ')[0] ?? `The model call failed (${truncate(bodyMessage(ev.error), 80)})`}. Trying again.`
             : undefined,
         });
         break;
@@ -531,7 +535,7 @@ export function createChat(deps: ChatDeps): Chat {
     const plan = s.plan;
     // A finished plan is covered by the answer. Anything else is worth keeping.
     if (plan && plan.length > 1 && !(succeeded && plan.every((p) => p.status === 'done')))
-      out.push({ kind: 'plan', steps: plan });
+      out.push({ kind: 'plan', ...stopPlan(plan) });
     set({
       phase: 'idle',
       thinking: false,
@@ -620,7 +624,7 @@ export function createChat(deps: ChatDeps): Chat {
             kind: 'error',
             text:
               explainModelError(o.reason ?? '') ??
-              `${(o.reason ?? 'The task could not finish').replace(/\.$/, '')}. Send your message again, or see what happened: remy show ${id}`,
+              `${bodyMessage(o.reason ?? 'The task could not finish').replace(/\.$/, '')}. Send your message again, or see what happened: remy show ${id}`,
             ...turnMeta(),
           });
         return await end(false, {

@@ -2,7 +2,7 @@
 // or finishes. PLAN.md "The runner" and "Persistence, recovery, retries, duplicate protection".
 import { randomUUID } from 'node:crypto';
 import { argsHash, idempotencyKey } from './hash.ts';
-import { buildMessages, fencePasted, SYSTEM_PROMPT } from './messages.ts';
+import { buildMessages, fencePasted, SYSTEM_PROMPT, toolResultBudgetChars } from './messages.ts';
 import {
   type Action,
   MAX_MODEL_ATTEMPTS,
@@ -170,18 +170,51 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         let res: Awaited<ReturnType<ModelClient['complete']>>;
         try {
           deps.onModelStart?.();
-          res = await model.complete(
-            {
-              system: deps.systemPrompt ?? SYSTEM_PROMPT,
-              messages: buildMessages(s, tools),
-              tools: tools.specs(names),
-              maxOutputTokens: deps.maxOutputTokens ?? 2048,
-              temperature: 0,
-            },
-            signal,
-            deps.onText,
-            deps.onReasoning,
-          );
+          const system = deps.systemPrompt ?? SYSTEM_PROMPT;
+          const specs = tools.specs(names);
+          const maxOutputTokens = deps.maxOutputTokens ?? 2048;
+          const baseBudget = toolResultBudgetChars({
+            caps: model.caps,
+            system,
+            toolSpecsChars: JSON.stringify(specs).length,
+            maxOutputTokens,
+          });
+          // A request the provider calls too large is retried once with tool results halved.
+          let toolBudgetChars = baseBudget;
+          for (let shrunk = false; ; shrunk = true) {
+            try {
+              res = await model.complete(
+                {
+                  system,
+                  messages: buildMessages(s, tools, { toolBudgetChars }),
+                  tools: specs,
+                  maxOutputTokens,
+                  temperature: 0,
+                },
+                signal,
+                deps.onText,
+                deps.onReasoning,
+              );
+              break;
+            } catch (e) {
+              if (shrunk || !(e instanceof ModelError && e.tooLarge)) {
+                if (shrunk && e instanceof ModelError && e.tooLarge)
+                  throw new ModelError(
+                    `the request is still too large after shortening tool results (${e.message})`,
+                    e.rateLimited,
+                    e.rateLimited
+                      ? {
+                          rateLimited: true,
+                          ...(e.retryAfterMs ? { retryAfterMs: e.retryAfterMs } : {}),
+                        }
+                      : undefined,
+                  );
+                throw e;
+              }
+              toolBudgetChars = Math.max(500, Math.floor(baseBudget / 2));
+              deps.onModelStart?.();
+            }
+          }
           // Nothing to act on or report: a glitch, not an answer.
           if (!res.text?.trim() && res.calls.length === 0)
             throw new ModelError('the model returned an empty reply', true);

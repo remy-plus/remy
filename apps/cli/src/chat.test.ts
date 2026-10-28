@@ -463,6 +463,20 @@ describe('resume', () => {
     expect(resumeBanner('task_7c2e1a', undefined)).toBe('Resuming 7c2e.');
   });
 
+  it('shows a plan left unfinished as stopped, with no step in progress', async () => {
+    const h = harness(new ScriptedModelClient([plan, write]), ['read']);
+    await h.chat.submit('tidy my notes');
+    await h.chat.interrupt();
+    const item = h.chat.getState().items.find((i) => i.kind === 'plan');
+    expect(item).toMatchObject({ note: 'plan stopped at step 3 of 4' });
+    expect(item?.kind === 'plan' && item.steps.map((s) => s.status)).toEqual([
+      'done',
+      'done',
+      'pending',
+      'pending',
+    ]);
+  });
+
   it('lists unfinished tasks, resumes one after a restart and finishes it', async () => {
     const first = harness(new ScriptedModelClient([plan, write]), ['read']);
     await first.chat.submit('tidy my notes');

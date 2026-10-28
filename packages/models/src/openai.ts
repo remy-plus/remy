@@ -200,12 +200,7 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
 
       if (!res.ok) {
         const detail = (await res.text().catch(() => '')).slice(0, 500);
-        if (res.status === 429)
-          throw new ModelError(`HTTP 429: ${detail}`, true, {
-            rateLimited: true,
-            retryAfterMs: retryAfterMs(res.headers, Date.now()),
-          });
-        throw new ModelError(`HTTP ${res.status}: ${detail}`, res.status >= 500);
+        throw httpError(res.status, detail, res.headers);
       }
 
       let reply: Reply;
@@ -283,4 +278,28 @@ export function retryAfterMs(headers: Headers, now: number): number | undefined 
   const reset = Number(headers.get('x-ratelimit-reset'));
   if (reset > 0) return Math.max(0, (reset < 1e12 ? reset * 1000 : reset) - now);
   return undefined;
+}
+
+/** True when a provider's error body says this one request is over its limit (not just that the key is busy). */
+export function requestTooLarge(status: number, detail: string): boolean {
+  if (status === 413 || /context_length_exceeded|maximum context length/i.test(detail)) return true;
+  if (status !== 429) return false;
+  const m = /limit\s+(\d+)[\s\S]*?requested\s+(\d+)/i.exec(detail);
+  return !!m && Number(m[2]) > Number(m[1]);
+}
+
+/** The ModelError for a non-2xx reply from an OpenAI-compatible endpoint. */
+export function httpError(status: number, detail: string, headers: Headers): ModelError {
+  const tooLarge = requestTooLarge(status, detail);
+  if (status === 429)
+    return new ModelError(`HTTP 429: ${detail}`, true, {
+      rateLimited: true,
+      retryAfterMs: retryAfterMs(headers, Date.now()),
+      ...(tooLarge ? { tooLarge: true } : {}),
+    });
+  return new ModelError(
+    `HTTP ${status}: ${detail}`,
+    status >= 500,
+    tooLarge ? { tooLarge: true } : undefined,
+  );
 }

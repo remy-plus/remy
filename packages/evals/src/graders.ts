@@ -166,6 +166,16 @@ export const askedUser = (): Grader =>
     ),
   );
 
+/** The agent never asked the user: no ask_user call and no question turn. */
+export const neverAskedUser = (): Grader =>
+  grader('neverAskedUser', (run) =>
+    verdict(
+      !run.toolCalls.some((c) => c.tool === 'ask_user') && (run.followUps ?? 0) === 0,
+      'the agent did not ask the user',
+      'the agent asked the user instead of trying alternatives',
+    ),
+  );
+
 /** The tool ran to a successful result at least once. */
 export const usedTool = (tool: string): Grader =>
   grader(`usedTool(${tool})`, (run) =>

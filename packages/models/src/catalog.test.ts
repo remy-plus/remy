@@ -15,6 +15,11 @@ describe('costUsd', () => {
 });
 
 describe('catalog', () => {
+  it('carries the Groq free-tier tokens-per-minute hint', () => {
+    expect(resolveCaps('openai/gpt-oss-120b').tpm).toBe(8000);
+    expect(resolveCaps('mystery/model').tpm).toBeUndefined();
+  });
+
   it('defaults unknown models', () => {
     expect(resolveCaps('mystery/model')).toEqual(DEFAULT_CAPS);
   });
