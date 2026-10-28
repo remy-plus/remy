@@ -48,6 +48,8 @@ export interface ChatAppProps {
   subtitle?: string;
   /** The folder files are made in, shown in the header. */
   workspace?: string;
+  /** The CLI's version, shown on the home screen. */
+  version?: string;
   /** Print the one-line header: after /clear. */
   compactHeader?: boolean;
   /** Called after /clear: the host wipes the screen and mounts the app again. */

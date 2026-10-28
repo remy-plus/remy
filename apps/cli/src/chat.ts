@@ -192,6 +192,8 @@ export interface ChatDeps {
   effectOf?: (tool: string) => Effect | undefined;
   /** Streamed text reaches subscribers at most once per this many ms. Default 16; 0 is per delta. */
   frameMs?: number;
+  /** `/new` empties the transcript (the full-screen app returns to its home screen). */
+  newClears?: boolean;
 }
 
 export interface Chat {
@@ -739,8 +741,11 @@ export function createChat(deps: ChatDeps): Chat {
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
       turns = [];
-      set({ title: undefined, filesTouched: undefined });
-      commit({ kind: 'note', text: 'Started a new conversation.' });
+      if (deps.newClears) set({ items: [], title: undefined, filesTouched: undefined });
+      else {
+        set({ title: undefined, filesTouched: undefined });
+        commit({ kind: 'note', text: 'Started a new conversation.' });
+      }
     } else if (name === 'clear') {
       turns = [];
       // The screen wipes itself and prints the header again; the transcript starts empty.

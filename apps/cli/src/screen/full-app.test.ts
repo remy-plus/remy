@@ -74,6 +74,7 @@ function mount(
       subtitle: 'test-model',
       workspace: '/work/proj',
       approvalSettleMs: 0,
+      version: '1.2.3',
     }),
   );
   const resize = async (cols: number, rows: number) => {
@@ -99,24 +100,39 @@ async function open(model: ModelClient, opts: Parameters<typeof mount>[1] = {}) 
 }
 
 describe('FullApp', () => {
-  it('shows the empty session at 100x30 with the prompt and status under it', async () => {
+  it('opens on the home screen at 100x30 with the prompt, a tip and the footer', async () => {
     const m = await open(new ScriptedModelClient([]));
-    const lines = m.frame().split('\n');
-    expect(lines.length).toBeLessThanOrEqual(30);
-    expect(m.frame()).toContain('REMY');
-    expect(m.frame()).toContain('Ask anything…');
-    expect(m.frame()).toContain('test-model');
-    expect(m.frame()).toContain('/work/proj');
-    expect(m.frame()).toContain('ctrl+p commands');
-    // No header row and no footer bar: the prompt box is at the bottom.
-    expect(lines.at(-2)).toContain('ctrl+p commands');
+    const f = m.frame();
+    expect(f.split('\n').length).toBeLessThanOrEqual(30);
+    expect(f).toContain('Ask anything…');
+    expect(f).toContain('test-model');
+    expect(f).toContain('Tip ');
+    expect(f).toContain('/work/proj');
+    expect(f).toContain('v1.2.3');
+    // Centred: the prompt is not on the last rows.
+    expect(f.split('\n').findIndex((l) => l.includes('Ask anything…'))).toBeLessThan(20);
     m.app.unmount();
   });
 
   it('fits an 80x24 terminal', async () => {
     const m = await open(new ScriptedModelClient([]), { size: [80, 24] });
     expect(m.frame().split('\n').length).toBeLessThanOrEqual(24);
+    expect(m.frame()).toContain('Ask anything…');
+    expect(m.frame()).toContain('v1.2.3');
+    m.app.unmount();
+  });
+
+  it('leaves home on the first message and returns on /clear and /new', async () => {
+    const m = await open(new ScriptedModelClient([done('Four.')]));
+    await m.send('what is 2+2');
+    await until(() => m.chat.getState().items.some((i) => i.kind === 'reply'));
+    await tick();
+    expect(m.frame()).not.toContain('Tip ');
     expect(m.frame()).toContain('ctrl+p commands');
+    await m.send('/clear');
+    await tick();
+    expect(m.frame()).toContain('Tip ');
+    expect(m.frame()).not.toContain('Four.');
     m.app.unmount();
   });
 

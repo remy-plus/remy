@@ -24,6 +24,7 @@ import { SessionPicker } from '../session-picker.ts';
 import { APPROVAL_ROWS, approvalHeight, narrate, reasoningTitle } from '../transcript.ts';
 import { TranscriptView } from '../transcript-view.ts';
 import { buildRows, createRowCache, type LiveInput } from './compose.ts';
+import { Home } from './home.ts';
 import { introRows } from './intro.ts';
 import { computeLayout } from './layout.ts';
 import { PromptBox, promptBoxRows } from './prompt-box.ts';
@@ -38,6 +39,7 @@ import {
   toTop,
 } from './scroll.ts';
 import { statusLine } from './status.ts';
+import { pickTip } from './tips.ts';
 import { Viewport } from './viewport.ts';
 
 /** Rows reserved for a login, model or session panel in the bottom slot. */
@@ -204,6 +206,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
     if (last?.kind === 'user') setScroll(toBottom());
   }, [last]);
 
+  const tip = useMemo(() => pickTip(Math.floor(Date.now() / 86_400_000)), []);
   const provider = useMemo(() => {
     try {
       return chat.models().find((c) => c.model === state.model)?.provider;
@@ -223,6 +226,31 @@ export function FullApp(props: ChatAppProps): ReactElement {
 
   const model = state.model ?? props.subtitle;
   const query = slashQuery ?? atQuery ?? '';
+  // Nothing said yet: the home screen, with the prompt in its middle. The first message leaves it.
+  if (state.items.length === 0 && state.phase === 'idle' && !panelOpen)
+    return h(Home, {
+      theme,
+      columns,
+      rows,
+      version: props.version ?? '',
+      workspace: props.workspace ?? process.cwd(),
+      tip,
+      prompt: h(
+        Box,
+        { flexDirection: 'column' },
+        menu ? h(Menu, { items: menuItems, at, theme, indent: 1, query }) : null,
+        h(PromptBox, {
+          value: input,
+          theme,
+          width: layout.homePromptWidth,
+          maxRows: layout.promptMaxRows,
+          focused: true,
+          placeholder: placeholderFor(state),
+          model,
+          provider,
+        }),
+      ),
+    });
   return h(
     Box,
     { flexDirection: 'column', width: columns, height: rows, paddingX: 2, paddingBottom: 1 },

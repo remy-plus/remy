@@ -700,6 +700,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     };
     let registry: ToolRegistry | undefined;
     const chat = createChat({
+      newClears: !flags.classic && env.REMY_SCREEN !== 'classic',
       runtime: (hooks) => {
         const made = makeRuntime(file, { model, hooks });
         registry = made.tools;
@@ -734,6 +735,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ...(flags.classic && { screen: 'classic' as const }),
       ...(first && { subtitle: first.id }),
       workspace,
+      version: version(),
     });
     return 0;
   }
