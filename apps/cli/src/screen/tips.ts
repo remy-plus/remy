@@ -12,8 +12,12 @@ export const TIPS: string[] = [
   '/new starts a fresh conversation',
 ];
 
-/** A tip for a seed (a number, such as the day or a session count); stable for the same seed. */
-export function pickTip(seed: number): string {
-  const i = Math.abs(Math.trunc(seed)) % TIPS.length;
-  return TIPS[i] as string;
+/**
+ * A tip for a seed (a number, such as the day or a session count); stable for the same seed.
+ * With tips that match the user's goals, every other seed picks one of those.
+ */
+export function pickTip(seed: number, preferred: readonly string[] = []): string {
+  const n = Math.abs(Math.trunc(seed));
+  if (preferred.length && n % 2 === 0) return preferred[(n / 2) % preferred.length] as string;
+  return TIPS[(preferred.length ? Math.floor(n / 2) : n) % TIPS.length] as string;
 }

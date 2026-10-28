@@ -26,6 +26,7 @@ import { type MdLine, renderMarkdown, strWidth, wrapPlain } from './markdown.ts'
 import { Overlay } from './overlay-ui.ts';
 import { Menu, menuRows } from './picker.ts';
 import type { ThemeChoice } from './prefs.ts';
+import type { ProfileStore } from './profile.ts';
 import { FullApp } from './screen/full-app.ts';
 import { SessionPicker } from './session-picker.ts';
 import { spanProps } from './span-style.ts';
@@ -73,6 +74,8 @@ export interface ChatAppProps {
   inputMode?: InputMode;
   /** Overrides `APPROVAL_SETTLE_MS` (tests use 0). */
   approvalSettleMs?: number;
+  /** The local profile: the home greeting, the example requests and the tips follow it. */
+  profile?: ProfileStore;
 }
 
 export interface RunOptions

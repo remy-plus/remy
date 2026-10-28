@@ -32,6 +32,39 @@ describe('tips', () => {
   });
 });
 
+describe('personalised tips', () => {
+  it('every other pick comes from the goals, the rest from the general tips', () => {
+    const mine = ['Paste a link and ask Remy to summarise the page'];
+    expect(pickTip(0, mine)).toBe(mine[0]);
+    expect(pickTip(2, mine)).toBe(mine[0]);
+    expect(TIPS).toContain(pickTip(1, mine));
+    expect(pickTip(7, [])).toBe(pickTip(7));
+  });
+});
+
+describe('home greeting', () => {
+  for (const [cols, rows] of [
+    [100, 30],
+    [80, 24],
+  ] as const) {
+    it(`greets under the wordmark at ${cols}x${rows}`, () => {
+      const out = frame(cols, rows, { greeting: 'Good evening, Sam.' });
+      const lines = out.split('\n');
+      expect(lines.length).toBeLessThanOrEqual(rows);
+      const mark = lines.findIndex((l) => l.includes(WORDMARK[5]?.trim() as string));
+      const hello = lines.findIndex((l) => l.includes('Good evening, Sam.'));
+      const prompt = lines.findIndex((l) => l.includes('> ask'));
+      expect(mark).toBeGreaterThanOrEqual(0);
+      expect(hello).toBeGreaterThan(mark);
+      expect(prompt).toBeGreaterThan(hello);
+      expect(out).toContain('Tip');
+    });
+  }
+  it('shows nothing extra without a profile', () => {
+    expect(frame(100, 30)).not.toContain('Good ');
+  });
+});
+
 describe('home', () => {
   it('shows the ctrl+p commands hint under the prompt', () => {
     const lines = frame(100, 30).split('\n');

@@ -15,6 +15,8 @@ export interface HomeProps {
   workspace: string;
   tip?: string;
   notice?: string;
+  /** `Good evening, Sam.` under the wordmark, once the user has a profile. */
+  greeting?: string;
 }
 
 /** Below this many rows the wordmark becomes one line. */
@@ -60,6 +62,14 @@ export function Home(p: HomeProps): ReactElement {
     h(Box, { flexGrow: 1, flexShrink: 1 }),
     mark,
     h(Box, { height: 1, flexShrink: 0 }),
+    p.greeting
+      ? h(
+          Box,
+          { flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: promptWidth },
+          h(Text, { wrap: 'truncate-end' }, p.greeting),
+          h(Box, { height: 1 }),
+        )
+      : null,
     h(Box, { width: promptWidth, flexShrink: 0, flexDirection: 'column' }, p.prompt),
     h(
       Box,

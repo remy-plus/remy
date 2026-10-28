@@ -17,6 +17,8 @@ import type { ChatState } from '../chat.ts';
 import { useChatKeys } from '../chat-keys.ts';
 import type { ChatAppProps } from '../chat-ui.ts';
 import { EXAMPLES } from '../examples.ts';
+import { examplesFor, tipsFor } from '../goals.ts';
+import { greeting } from '../greeting.ts';
 import { type InputState, withText } from '../input.ts';
 import {
   currentMatch,
@@ -52,12 +54,18 @@ import { pickTip } from './tips.ts';
 import { Viewport } from './viewport.ts';
 
 /** The hint in an empty prompt: an example, rotating with each message sent; or the question's cue. */
-function placeholderFor(state: ChatState): string {
+export function placeholderFor(state: ChatState, examples: readonly string[] = EXAMPLES): string {
   if (state.phase === 'waiting_user') return 'Type your answer…';
   if (state.phase === 'waiting_approval') return 'Say why, then Enter…';
   const sent = state.items.filter((i) => i.kind === 'user').length;
-  return `Ask anything… "${EXAMPLES[sent % EXAMPLES.length]}"`;
+  return `Ask anything… "${examples[sent % examples.length]}"`;
 }
+
+/** Stands in for the profile when the host passes none. */
+const NO_PROFILE = {
+  get: () => undefined,
+  subscribe: () => () => {},
+};
 
 function StatusRow(p: {
   theme: ChatAppProps['theme'];
@@ -117,6 +125,10 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const { chat } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
   const { themeFor } = props;
+  const profileStore = props.profile ?? NO_PROFILE;
+  const profile = useSyncExternalStore(profileStore.subscribe, profileStore.get);
+  const goals = profile?.goals;
+  const examples = useMemo(() => examplesFor(goals ?? []), [goals]);
   const theme = useMemo(
     () => (themeFor ? themeFor(state.theme) : props.theme),
     [themeFor, state.theme, props.theme],
@@ -242,7 +254,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
           theme,
           model: state.model ?? props.subtitle,
           workspace: props.workspace,
-          examples: EXAMPLES,
+          examples,
         });
   }, [
     state.items,
@@ -257,6 +269,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
     theme,
     state.model,
     busy,
+    examples,
   ]);
 
   // Geometry of the bottom slot decides how tall the session is.
@@ -295,7 +308,14 @@ export function FullApp(props: ChatAppProps): ReactElement {
     if (last?.kind === 'user') setScroll(toBottom());
   }, [last]);
 
-  const tip = useMemo(() => pickTip(Math.floor(Date.now() / 86_400_000)), []);
+  const tip = useMemo(
+    () => pickTip(Math.floor(Date.now() / 86_400_000), tipsFor(goals ?? [])),
+    [goals],
+  );
+  const hello = useMemo(
+    () => (profile ? greeting(new Date(), profile.name) : undefined),
+    [profile],
+  );
   const provider = useMemo(() => {
     try {
       return chat.models().find((c) => c.model === state.model)?.provider;
@@ -340,6 +360,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
         version: props.version ?? '',
         workspace: props.workspace ?? process.cwd(),
         tip,
+        greeting: hello,
         prompt: h(
           Box,
           { flexDirection: 'column' },
@@ -361,7 +382,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
             width: layout.homePromptWidth,
             maxRows: layout.promptMaxRows,
             focused: !panelOpen,
-            placeholder: placeholderFor(state),
+            placeholder: placeholderFor(state, examples),
             model,
             provider,
             search: search?.query,
@@ -412,7 +433,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
               width,
               maxRows: layout.promptMaxRows,
               focused: !panelOpen && (state.phase === 'idle' || noting),
-              placeholder: placeholderFor(state),
+              placeholder: placeholderFor(state, examples),
               model,
               provider,
               search: search?.query,

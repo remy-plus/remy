@@ -15,6 +15,8 @@ import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ChatDeps, createChat, releaseLease } from '../chat.ts';
+import type { ChatAppProps } from '../chat-ui.ts';
+import { createProfileStore } from '../profile.ts';
 import { createTheme } from '../theme.ts';
 import { FullApp } from './full-app.ts';
 
@@ -39,7 +41,12 @@ const until = async (fn: () => boolean) => {
 
 function mount(
   model: ModelClient,
-  opts: { auto?: ('read' | 'write')[]; size?: [number, number]; deps?: Partial<ChatDeps> } = {},
+  opts: {
+    auto?: ('read' | 'write')[];
+    size?: [number, number];
+    deps?: Partial<ChatDeps>;
+    props?: Partial<ChatAppProps>;
+  } = {},
 ) {
   const store = new MemoryEventStore();
   const chat = createChat({
@@ -76,6 +83,7 @@ function mount(
       workspace: '/work/proj',
       approvalSettleMs: 0,
       version: '1.2.3',
+      ...opts.props,
     }),
   );
   const resize = async (cols: number, rows: number) => {
@@ -112,6 +120,35 @@ describe('FullApp', () => {
     expect(f).toContain('v1.2.3');
     // Centred: the prompt is not on the last rows.
     expect(f.split('\n').findIndex((l) => l.includes('Ask anything…'))).toBeLessThan(20);
+    m.app.unmount();
+  });
+
+  it('greets by name and leans the examples toward the goals', async () => {
+    const profile = createProfileStore(mkdtempSync(join(tmpdir(), 'remy-prof-')));
+    profile.update({ name: 'Sam', goals: ['school'] });
+    for (const size of [
+      [100, 30],
+      [80, 24],
+    ] as [number, number][]) {
+      const m = await open(new ScriptedModelClient([]), { props: { profile }, size });
+      const f = m.frame();
+      expect(f).toMatch(/Good (morning|afternoon|evening), Sam\./);
+      expect(f).toContain('5-question quiz');
+      expect(f.split('\n').length).toBeLessThanOrEqual(size[1]);
+      m.app.unmount();
+    }
+  });
+
+  it('follows the profile when it changes', async () => {
+    const profile = createProfileStore(mkdtempSync(join(tmpdir(), 'remy-prof-')));
+    const m = await open(new ScriptedModelClient([]), { props: { profile } });
+    expect(m.frame()).not.toMatch(/Good (morning|afternoon|evening)/);
+    profile.update({ name: 'Ana', goals: [] });
+    await tick();
+    expect(m.frame()).toContain('Ana.');
+    profile.remove();
+    await tick();
+    expect(m.frame()).not.toContain('Ana');
     m.app.unmount();
   });
 
