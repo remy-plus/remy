@@ -32,7 +32,7 @@ import { buildRows, createRowCache, type LiveInput } from './compose.ts';
 import { Dialogs } from './dialogs.ts';
 import { Home } from './home.ts';
 import { introRows } from './intro.ts';
-import { computeLayout } from './layout.ts';
+import { computeLayout, SIDEBAR_MIN_COLUMNS, SIDEBAR_WIDTH } from './layout.ts';
 import { fadeColor, formatElapsed, useElapsed, useFadeIn, useThrottled } from './motion.ts';
 import { PromptBox, promptBoxRows } from './prompt-box.ts';
 import {
@@ -123,12 +123,17 @@ export function FullApp(props: ChatAppProps): ReactElement {
   );
   const { columns, rows } = useWindowSize();
   const [sidebarOn, setSidebarOn] = useState(true);
+  const [overlayOn, setOverlayOn] = useState(false);
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
   const layout = computeLayout(columns, rows, {
     sidebar: sidebarOn && (state.items.length > 0 || state.phase === 'running'),
   });
   const width = layout.contentWidth;
   const cache = useRef(createRowCache());
   const [scroll, setScroll] = useState<Scroll>(SCROLL_START);
+  const overlayRef = useRef(false);
+  overlayRef.current = overlayOn;
   const geometry = useRef({ total: 0, height: 1 });
 
   const [search, setSearch] = useState<SearchState | undefined>();
@@ -167,7 +172,12 @@ export function FullApp(props: ChatAppProps): ReactElement {
         return (setScroll((s) => halfUp(s, total, height)), true);
       if (!input.text && key.home) return (setScroll(toTop(total, height)), true);
       if (!input.text && key.end) return (setScroll(toBottom()), true);
-      if (key.ctrl && ch === 'b') return (setSidebarOn((on) => !on), true);
+      if (key.ctrl && ch === 'b') {
+        if (columnsRef.current > SIDEBAR_MIN_COLUMNS) setSidebarOn((on) => !on);
+        else setOverlayOn((on) => !on);
+        return true;
+      }
+      if (key.escape && overlayRef.current) return (setOverlayOn(false), true);
       if (key.escape && chat.getState().phase === 'running') return (void chat.interrupt(), true);
       return false;
     },
@@ -362,6 +372,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
       dialog,
     );
   const main = columns - layout.sidebarWidth;
+  const overlayWidth = Math.min(SIDEBAR_WIDTH, Math.max(20, columns - 8));
   return h(
     Box,
     { width: columns, height: rows },
@@ -426,6 +437,13 @@ export function FullApp(props: ChatAppProps): ReactElement {
     ),
     layout.sidebar === 'inline'
       ? h(Sidebar, { state, theme, height: rows, width: layout.sidebarWidth })
+      : null,
+    layout.sidebar === 'none' && overlayOn
+      ? h(
+          Box,
+          { position: 'absolute', top: 0, right: 0, width: overlayWidth, height: rows },
+          h(Sidebar, { state, theme, height: rows, width: overlayWidth }),
+        )
       : null,
     dialog,
   );

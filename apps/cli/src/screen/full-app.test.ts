@@ -425,6 +425,27 @@ describe('FullApp', () => {
     narrow.app.unmount();
   });
 
+  it('shows the sidebar as an overlay below 121 columns; ctrl+b or esc closes it', async () => {
+    const m = await open(new ScriptedModelClient([done('Four.')]), { size: [100, 30] });
+    await m.send('what is 2+2');
+    await until(() => m.chat.getState().phase === 'idle');
+    await tick();
+    expect(m.frame()).not.toContain('CONTEXT');
+    m.app.stdin.write('\x02');
+    await tick();
+    expect(m.frame()).toContain('CONTEXT');
+    m.app.stdin.write('\x02');
+    await tick();
+    expect(m.frame()).not.toContain('CONTEXT');
+    m.app.stdin.write('\x02');
+    await tick();
+    expect(m.frame()).toContain('CONTEXT');
+    m.app.stdin.write('\x1b');
+    await tick(80);
+    expect(m.frame()).not.toContain('CONTEXT');
+    m.app.unmount();
+  });
+
   it('searches the history with ctrl+r; enter accepts the match, esc cancels', async () => {
     const m = await open(new ScriptedModelClient([done('One.'), done('Two.')]));
     await m.send('alpha question');
