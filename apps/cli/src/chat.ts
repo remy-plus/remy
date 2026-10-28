@@ -35,6 +35,7 @@ import {
   describeApproval,
   flushTools,
   type PlanStep,
+  stopPlan,
   summarizeTool,
   type ToolLine,
   type ToolState,
@@ -52,7 +53,7 @@ export type Item =
   | { kind: 'text'; text: string }
   | { kind: 'question'; text: string }
   | { kind: 'tool'; line: ToolLine }
-  | { kind: 'plan'; steps: PlanStep[] }
+  | { kind: 'plan'; steps: PlanStep[]; note?: string }
   | { kind: 'note'; text: string; model?: string; ms?: number; stopped?: boolean }
   | { kind: 'error'; text: string; model?: string; ms?: number };
 
@@ -528,7 +529,7 @@ export function createChat(deps: ChatDeps): Chat {
     const plan = s.plan;
     // A finished plan is covered by the answer. Anything else is worth keeping.
     if (plan && plan.length > 1 && !(succeeded && plan.every((p) => p.status === 'done')))
-      out.push({ kind: 'plan', steps: plan });
+      out.push({ kind: 'plan', ...stopPlan(plan) });
     set({
       phase: 'idle',
       thinking: false,

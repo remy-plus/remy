@@ -8,6 +8,7 @@ import {
   flushTools,
   narrate,
   reasoningTitle,
+  stopPlan,
   streamBudget,
   summarizeTool,
   type ToolLine,
@@ -204,5 +205,22 @@ describe('thinking titles', () => {
     expect(narrate({ ...base, streaming: 'Hi', thinkingTitle: 'Planning', secs: 2 })).toBe(
       'Writing · 2s',
     );
+  });
+});
+
+describe('stopPlan', () => {
+  it('turns steps in progress back to not started and says where it stopped', () => {
+    const steps = [
+      { text: 'a', status: 'done' },
+      { text: 'b', status: 'doing' },
+      { text: 'c', status: 'pending' },
+    ] as const;
+    const out = stopPlan([...steps]);
+    expect(out.steps.map((s) => s.status)).toEqual(['done', 'pending', 'pending']);
+    expect(out.note).toBe('plan stopped at step 2 of 3');
+  });
+
+  it('leaves a finished plan alone', () => {
+    expect(stopPlan([{ text: 'a', status: 'done' }]).note).toBeUndefined();
   });
 });

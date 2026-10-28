@@ -247,7 +247,13 @@ function ToolRow(p: {
   );
 }
 
-function PlanList(p: { steps: PlanStep[]; theme: Theme; max: number; title?: string }) {
+function PlanList(p: {
+  steps: PlanStep[];
+  theme: Theme;
+  max: number;
+  title?: string;
+  note?: string;
+}) {
   const { theme } = p;
   const { shown, hidden } = windowPlan(p.steps, p.max);
   const done = p.steps.filter((s) => s.status === 'done').length;
@@ -273,6 +279,7 @@ function PlanList(p: { steps: PlanStep[]; theme: Theme; max: number; title?: str
       ),
     ),
     hidden ? h(Text, mutedProps(theme), `  ... ${hidden} more`) : null,
+    p.note ? h(Text, mutedProps(theme), p.note) : null,
   );
 }
 
@@ -318,7 +325,12 @@ function TranscriptItem(p: { item: Item; prev?: Item; theme: Theme; columns: num
         first: p.prev?.kind !== 'tool',
       });
     case 'plan':
-      return h(PlanList, { steps: item.steps, theme, max: 8 });
+      return h(PlanList, {
+        steps: item.steps,
+        theme,
+        max: 8,
+        ...(item.note && { note: item.note }),
+      });
     case 'error':
       return h(
         Row,

@@ -327,6 +327,19 @@ export const approvalHeight = (v: ApprovalView, expanded = false, room?: number)
   return shown.length + (hidden ? 1 : 0) + 6;
 };
 
+/**
+ * A plan whose turn ended: steps still in progress go back to not started, so nothing looks live.
+ * `note` says where it stopped; undefined when every step is done.
+ */
+export function stopPlan(steps: PlanStep[]): { steps: PlanStep[]; note?: string } {
+  const first = steps.findIndex((s) => s.status !== 'done');
+  if (first < 0) return { steps };
+  return {
+    steps: steps.map((s) => (s.status === 'doing' ? { ...s, status: 'pending' as const } : s)),
+    note: `plan stopped at step ${first + 1} of ${steps.length}`,
+  };
+}
+
 /** The steps to show, at most `max`, always including the one in progress. */
 export function windowPlan(steps: PlanStep[], max: number): { shown: PlanStep[]; hidden: number } {
   if (steps.length <= max) return { shown: steps, hidden: 0 };
