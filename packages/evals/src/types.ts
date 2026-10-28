@@ -42,6 +42,8 @@ export interface EvalCase {
   pasted?: string[];
   /** Risks the user pre-approved. Defaults to read only. */
   autoApprove?: Risk[];
+  /** Tool names with a standing approval ("always allow"). */
+  standing?: string[];
   faults?: Fault[];
   graders: Grader[];
   budget?: Partial<Budget>;

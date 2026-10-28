@@ -88,7 +88,11 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
 
     const base: TaskConfig = {
       model: model.id,
-      permissions: { autoApprove: c.autoApprove ?? ['read'], allowTools: world.allowTools },
+      permissions: {
+        autoApprove: c.autoApprove ?? ['read'],
+        allowTools: world.allowTools,
+        ...(c.standing && { standing: c.standing }),
+      },
       budget: { ...DEFAULT_BUDGET, ...c.budget },
       workspaceDir: world.dir,
     };

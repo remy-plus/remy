@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import type { CallState, TaskState } from './state.ts';
 import {
+  canStandingAllow,
   HIGH_RISK,
   type PlannedCall,
   type PolicyDecision,
@@ -58,10 +59,18 @@ export function decide(
       };
   }
   // 2. Task-level tool lists.
-  const { allowTools, denyTools, autoApprove } = state.config.permissions;
+  const { allowTools, denyTools, autoApprove, standing } = state.config.permissions;
   if (denyTools?.includes(tool.name)) return { kind: 'deny', reason: `${tool.name} is blocked` };
   if (allowTools && !allowTools.includes(tool.name))
     return { kind: 'deny', reason: `${tool.name} isn't allowed for this task` };
+  // 2b. A standing approval clears write and send_as_user calls, but not in a tainted task, and
+  // an entry for any other risk (a hand-edited file) is ignored.
+  if (!state.tainted && canStandingAllow(tool.risk) && standing?.includes(tool.name))
+    return {
+      kind: 'allow',
+      via: 'standing',
+      reason: `you always allow ${tool.name}`,
+    };
   // 3. High-risk actions always need a human.
   if (HIGH_RISK.includes(tool.risk))
     return { kind: 'require_approval', reason: `${label(tool.risk)} always needs your approval` };

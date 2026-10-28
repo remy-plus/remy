@@ -142,6 +142,51 @@ describe('decide', () => {
     });
   });
 
+  // Standing approvals: risk × standing × tainted × deny/allow list.
+  const standingTable: [Risk, boolean, 'none' | 'deny' | 'allow-other' | 'allow-this', string][] =
+    [];
+  for (const risk of RISKS)
+    for (const tainted of [false, true])
+      for (const list of ['none', 'deny', 'allow-other', 'allow-this'] as const) {
+        let expected = risk === 'read' ? 'allow' : 'require_approval';
+        if (list === 'deny' || list === 'allow-other') expected = 'deny';
+        else if (!tainted && (risk === 'write' || risk === 'send_as_user')) expected = 'allow';
+        standingTable.push([risk, tainted, list, expected]);
+      }
+
+  it.each(standingTable)(
+    'standing: risk=%s tainted=%s list=%s → %s',
+    (risk, tainted, list, expected) => {
+      const name = `t_${risk}`;
+      const s = state(
+        {
+          standing: [name],
+          ...(list === 'deny' && { denyTools: [name] }),
+          ...(list === 'allow-other' && { allowTools: ['other'] }),
+          ...(list === 'allow-this' && { allowTools: [name] }),
+        },
+        tainted,
+      );
+      expect(kind(risk, s)).toBe(expected);
+    },
+  );
+
+  it('standing records why the call was allowed, and covers only the named tool', () => {
+    const d = decide(planned('t_write'), mk('write'), state({ standing: ['t_write'] }));
+    expect(d).toEqual({ kind: 'allow', via: 'standing', reason: 'you always allow t_write' });
+    expect(kind('write', state({ standing: ['t_other'] }))).toBe('require_approval');
+    expect(kind('write', state({ standing: [] }))).toBe('require_approval');
+  });
+
+  it('standing is ignored for spend_money and irreversible even if listed', () => {
+    for (const risk of ['spend_money', 'irreversible'] as const)
+      expect(
+        decide(planned(`t_${risk}`), mk(risk), state({ standing: [`t_${risk}`] })),
+      ).toMatchObject({
+        kind: 'require_approval',
+      });
+  });
+
   it('defaults allow reads only', () => {
     expect(kind('read', state())).toBe('allow');
     expect(kind('write', state())).toBe('require_approval');

@@ -25,8 +25,16 @@ export type ToolResult =
       phase: 'before_effect' | 'after_effect' | 'unknown';
     };
 
+/**
+ * Risks a user may allow for good ("always allow this tool"). Never `spend_money` or
+ * `irreversible`: those ask every time, whatever the task's permissions say.
+ */
+export const STANDING_RISKS: readonly Risk[] = ['write', 'send_as_user'];
+export const canStandingAllow = (risk: Risk): boolean => STANDING_RISKS.includes(risk);
+
 export type PolicyDecision =
-  | { kind: 'allow' }
+  /** `via: 'standing'` means the user's standing approval for this tool cleared the call. */
+  | { kind: 'allow'; via?: 'standing'; reason?: string }
   | { kind: 'require_approval'; reason: string }
   | { kind: 'deny'; reason: string };
 
@@ -43,6 +51,11 @@ export interface Permissions {
   allowTools?: string[];
   denyTools?: string[];
   netAllow?: string[];
+  /**
+   * Tool names the user has allowed for good. Honoured only for `write` and `send_as_user`
+   * tools, and never in a tainted task. denyTools and allowTools still win.
+   */
+  standing?: string[];
 }
 
 export interface TaskConfig {

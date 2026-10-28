@@ -60,6 +60,8 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
       case 'model.failed':
         return `model failed (attempt ${ev.attempt}): ${truncate(ev.error, 120)}`;
       case 'policy.decided':
+        if (ev.decision.kind === 'allow' && ev.decision.via === 'standing')
+          return `allowed ${nameOf(ev.callId)} ${st.dim(`(${ev.decision.reason ?? 'standing approval'}; undo with remy approvals)`)}`;
         return ev.decision.kind === 'deny'
           ? `blocked ${nameOf(ev.callId)}: ${ev.decision.reason}`
           : undefined;
