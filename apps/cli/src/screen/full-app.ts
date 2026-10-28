@@ -37,6 +37,7 @@ import {
   topOf,
   toTop,
 } from './scroll.ts';
+import { Sidebar } from './sidebar.ts';
 import { statusLine } from './status.ts';
 import { pickTip } from './tips.ts';
 import { Viewport } from './viewport.ts';
@@ -89,7 +90,10 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const { chat, theme } = props;
   const state = useSyncExternalStore(chat.subscribe, chat.getState);
   const { columns, rows } = useWindowSize();
-  const layout = computeLayout(columns, rows, { sidebar: false });
+  const [sidebarOn, setSidebarOn] = useState(true);
+  const layout = computeLayout(columns, rows, {
+    sidebar: sidebarOn && (state.items.length > 0 || state.phase === 'running'),
+  });
   const width = layout.contentWidth;
   const cache = useRef(createRowCache());
   const [scroll, setScroll] = useState<Scroll>(SCROLL_START);
@@ -115,6 +119,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
         return (setScroll((s) => halfUp(s, total, height)), true);
       if (!input.text && key.home) return (setScroll(toTop(total, height)), true);
       if (!input.text && key.end) return (setScroll(toBottom()), true);
+      if (key.ctrl && ch === 'b') return (setSidebarOn((on) => !on), true);
       if (key.escape && chat.getState().phase === 'running') return (void chat.interrupt(), true);
       return false;
     },
@@ -222,7 +227,15 @@ export function FullApp(props: ChatAppProps): ReactElement {
   const query = slashQuery ?? atQuery ?? '';
   // Nothing said yet: the home screen, with the prompt in its middle. The first message leaves it.
   const dialog = panelOpen
-    ? h(Dialogs, { chat, state, theme, columns, rows, onTranscript: () => setViewing(true) })
+    ? h(Dialogs, {
+        chat,
+        state,
+        theme,
+        columns,
+        rows,
+        onTranscript: () => setViewing(true),
+        onSidebar: () => setSidebarOn((on) => !on),
+      })
     : null;
   if (state.items.length === 0 && state.phase === 'idle')
     return h(
@@ -253,53 +266,61 @@ export function FullApp(props: ChatAppProps): ReactElement {
       }),
       dialog,
     );
+  const main = columns - layout.sidebarWidth;
   return h(
     Box,
-    { flexDirection: 'column', width: columns, height: rows, paddingX: 2, paddingBottom: 1 },
-    h(Viewport, { rows: all, top, height, width, theme }),
+    { width: columns, height: rows },
     h(
       Box,
-      { flexDirection: 'column', flexShrink: 0, marginTop: 1, width },
-      card
-        ? h(ApprovalCard, {
-            view: card,
-            theme,
-            columns: width,
-            expanded,
-            room: cardRoom,
-            noting,
-            indent: 0,
-          })
-        : null,
-      showPrompt && menu && !panelOpen
-        ? h(Menu, { items: menuItems, at, theme, indent: 1, query })
-        : null,
-      showPrompt
-        ? h(PromptBox, {
-            value: input,
-            theme,
-            width,
-            maxRows: layout.promptMaxRows,
-            focused: !panelOpen && (state.phase === 'idle' || noting),
-            placeholder: placeholderFor(state),
-            model,
-            provider,
-          })
-        : null,
-      showPrompt
-        ? h(StatusRow, {
-            theme,
-            width,
-            working: busy ? { spinner: glyph, narration } : undefined,
-            workspace: props.workspace,
-            contextPct:
-              state.contextWindow && state.contextTokens > 0
-                ? Math.min(100, (state.contextTokens / state.contextWindow) * 100)
-                : undefined,
-            costUsd: state.costUsd,
-          })
-        : null,
+      { flexDirection: 'column', width: main, height: rows, paddingX: 2, paddingBottom: 1 },
+      h(Viewport, { rows: all, top, height, width, theme }),
+      h(
+        Box,
+        { flexDirection: 'column', flexShrink: 0, marginTop: 1, width },
+        card
+          ? h(ApprovalCard, {
+              view: card,
+              theme,
+              columns: width,
+              expanded,
+              room: cardRoom,
+              noting,
+              indent: 0,
+            })
+          : null,
+        showPrompt && menu && !panelOpen
+          ? h(Menu, { items: menuItems, at, theme, indent: 1, query })
+          : null,
+        showPrompt
+          ? h(PromptBox, {
+              value: input,
+              theme,
+              width,
+              maxRows: layout.promptMaxRows,
+              focused: !panelOpen && (state.phase === 'idle' || noting),
+              placeholder: placeholderFor(state),
+              model,
+              provider,
+            })
+          : null,
+        showPrompt
+          ? h(StatusRow, {
+              theme,
+              width,
+              working: busy ? { spinner: glyph, narration } : undefined,
+              workspace: props.workspace,
+              contextPct:
+                state.contextWindow && state.contextTokens > 0
+                  ? Math.min(100, (state.contextTokens / state.contextWindow) * 100)
+                  : undefined,
+              costUsd: state.costUsd,
+            })
+          : null,
+      ),
     ),
+    layout.sidebar === 'inline'
+      ? h(Sidebar, { state, theme, height: rows, width: layout.sidebarWidth })
+      : null,
     dialog,
   );
 }

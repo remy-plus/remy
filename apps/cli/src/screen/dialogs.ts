@@ -44,6 +44,7 @@ export function paletteItems(): DialogItem[] {
     ...by('Session'),
     ...by('Model'),
     ...by('View'),
+    { id: '#sidebar', title: 'Show or hide the sidebar', detail: 'Ctrl+B', group: 'View' },
     { id: '#transcript', title: 'Read the whole conversation', detail: 'Ctrl+O', group: 'View' },
     ...by('Help'),
   ];
@@ -96,6 +97,7 @@ export function Dialogs(p: {
   columns: number;
   rows: number;
   onTranscript: () => void;
+  onSidebar: () => void;
 }): ReactElement | null {
   const { chat, state, theme, columns, rows } = p;
   const close = () => chat.closeOverlay();
@@ -167,6 +169,10 @@ export function Dialogs(p: {
         if (item.id === '#transcript') {
           chat.closeOverlay();
           return p.onTranscript();
+        }
+        if (item.id === '#sidebar') {
+          chat.closeOverlay();
+          return p.onSidebar();
         }
         void chat.runCommand(item.id);
       },

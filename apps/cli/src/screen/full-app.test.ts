@@ -401,4 +401,27 @@ describe('FullApp', () => {
     expect(m.frame()).toContain('2+2');
     m.app.unmount();
   });
+
+  it('shows the sidebar at 140 columns once there is content, not at 100, and ctrl+b toggles it', async () => {
+    const wide = await open(new ScriptedModelClient([done('Four.')]), { size: [140, 40] });
+    expect(wide.frame()).not.toContain('CONTEXT');
+    await wide.send('what is 2+2');
+    await until(() => wide.chat.getState().phase === 'idle');
+    await tick();
+    expect(wide.frame()).toContain('CONTEXT');
+    expect(wide.frame()).toContain('what is 2+2');
+    wide.app.stdin.write('\x02'); // ctrl+b
+    await tick();
+    expect(wide.frame()).not.toContain('CONTEXT');
+    wide.app.stdin.write('\x02');
+    await tick();
+    expect(wide.frame()).toContain('CONTEXT');
+    wide.app.unmount();
+    const narrow = await open(new ScriptedModelClient([done('Four.')]), { size: [100, 30] });
+    await narrow.send('what is 2+2');
+    await until(() => narrow.chat.getState().phase === 'idle');
+    await tick();
+    expect(narrow.frame()).not.toContain('CONTEXT');
+    narrow.app.unmount();
+  });
 });

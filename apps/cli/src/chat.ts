@@ -241,6 +241,7 @@ export const HELP_TEXT = [
   '  Ctrl+W    delete a word; Ctrl+K delete to the end of the line',
   '  Up        bring back your last message',
   '  Esc       clear the input',
+  '  Ctrl+B    show or hide the sidebar (full screen, wide terminals)',
   '  Ctrl+O    read the whole conversation, with details (q to go back)',
   '  Ctrl+C    stop the running task (resume it later); on an empty prompt, quit',
   '  Ctrl+D    quit',
