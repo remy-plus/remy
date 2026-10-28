@@ -210,4 +210,53 @@ describe('FullApp', () => {
     expect(m.frame()).toContain('LATEST ANSWER');
     m.app.unmount();
   });
+  it('opens the slash menu above the prompt box', async () => {
+    const m = await open(new ScriptedModelClient([]));
+    m.app.stdin.write('/');
+    await tick();
+    const lines = m.frame().split('\n');
+    const menuAt = lines.findIndex((l) => l.includes('/model'));
+    const boxAt = lines.findIndex((l) => l.includes('┃  /'));
+    expect(menuAt).toBeGreaterThan(-1);
+    expect(boxAt).toBeGreaterThan(menuAt);
+    expect(lines.length).toBeLessThanOrEqual(30);
+    m.app.unmount();
+  });
+
+  it('shows what Remy is doing and how to stop it while a task runs', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const inner = new ScriptedModelClient([done('Finished.')]);
+    const model: ModelClient = {
+      id: 'gated',
+      caps: inner.caps,
+      complete: async (req, signal, onText) => {
+        await gate;
+        return inner.complete(req, signal, onText);
+      },
+    };
+    const m = await open(model);
+    await m.send('think hard');
+    await tick();
+    expect(m.frame()).toContain('esc interrupt');
+    expect(m.frame()).not.toContain('/work/proj');
+    release();
+    await until(() => m.chat.getState().phase === 'idle');
+    await tick();
+    expect(m.frame()).toContain('/work/proj');
+    expect(m.frame()).not.toContain('esc interrupt');
+    m.app.unmount();
+  });
+
+  it('changes the example in the placeholder after a message', async () => {
+    const m = await open(new ScriptedModelClient([done('Hi.')]));
+    expect(m.frame()).toContain('Tidy the files in this folder by type');
+    await m.send('hello');
+    await until(() => m.chat.getState().phase === 'idle');
+    await tick();
+    expect(m.frame()).toContain('Research the three best standing desks');
+    m.app.unmount();
+  });
 });

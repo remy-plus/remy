@@ -13,6 +13,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { ApprovalCard } from '../approval-ui.ts';
+import type { ChatState } from '../chat.ts';
 import { useChatKeys } from '../chat-keys.ts';
 import type { ChatAppProps } from '../chat-ui.ts';
 import { EXAMPLES } from '../examples.ts';
@@ -42,6 +43,14 @@ import { Viewport } from './viewport.ts';
 
 /** Rows reserved for a login, model or session panel in the bottom slot. */
 const PANEL_ROWS = 14;
+
+/** The hint in an empty prompt: an example, rotating with each message sent; or the question's cue. */
+function placeholderFor(state: ChatState): string {
+  if (state.phase === 'waiting_user') return 'Type your answer…';
+  if (state.phase === 'waiting_approval') return 'Say why, then Enter…';
+  const sent = state.items.filter((i) => i.kind === 'user').length;
+  return `Ask anything… "${EXAMPLES[sent % EXAMPLES.length]}"`;
+}
 
 function StatusRow(p: {
   theme: ChatAppProps['theme'];
@@ -257,7 +266,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
             width,
             maxRows: layout.promptMaxRows,
             focused: state.phase === 'idle' || noting,
-            placeholder: `Ask anything… "${EXAMPLES[0]}"`,
+            placeholder: placeholderFor(state),
             model,
             provider,
           })
