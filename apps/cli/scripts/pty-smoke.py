@@ -386,11 +386,17 @@ def main() -> int:
         rows = [l.rstrip() for l in screen.display if l.strip()]
         return rows[-1] if rows else ""
 
+    def seen(w: str, line: str) -> bool:
+        # The full screen has no "ready" word: idle is the status row without "esc interrupt".
+        if w == "ready" and args.mode == "full":
+            return "ctrl+p commands" in line and "esc interrupt" not in line
+        return w in line
+
     def wait_for(word: str, timeout: float, *more: str) -> bool:
         end = time.time() + timeout
         while time.time() < end:
             pump(0.2)
-            if any(w in last_line() for w in (word, *more)):
+            if any(seen(w, last_line()) for w in (word, *more)):
                 return True
             if proc.poll() is not None:
                 return False
@@ -667,7 +673,7 @@ def main() -> int:
         print(f"alternate screen: entered {screen.alt_enters}x, left {screen.alt_leaves}x")
         rows_ = args.rows
         # Prompt area near the bottom, once the chat is ready.
-        prompt_rows = [i for i, l in enumerate(mode_shots["startup"]) if l.lstrip().startswith("\u203a") or "ready" in l]
+        prompt_rows = [i for i, l in enumerate(mode_shots["startup"]) if "\u2503" in l or "ctrl+p commands" in l]
         if not startup_alt:
             failures.append("full mode: startup was not on the alternate screen")
         if not prompt_rows or max(prompt_rows) < rows_ - 5:
@@ -688,7 +694,8 @@ def main() -> int:
             failures.append("full mode: chat UI left on the primary screen after exit")
     elif screen.alt_enters:
         failures.append("classic mode entered the alternate screen")
-    for i, t in enumerate(turns):
+    # The scrollback checks guard classic's printed transcript; the full screen keeps no scrollback.
+    for i, t in enumerate(turns if args.mode == "classic" else []):
         if t in APPROVAL_KEYS or t.startswith("/") or (i and turns[i - 1] == "e"):  # keys and notes, not chat messages
             continue
         n = sum(1 for l in lines if re.fullmatch(r"\s*› " + re.escape(t), l))
