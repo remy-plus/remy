@@ -117,6 +117,16 @@ function wordStart(text: string, at: number): number {
   return i;
 }
 
+/** Where a word move or delete forward from `at` stops: past spaces and newlines, then past the word. */
+function wordEnd(text: string, at: number): number {
+  let i = at;
+  while (i < text.length && /\s/.test(text[i] as string)) i++;
+  const mark = markerAt(text, i, 'after');
+  if (mark) return mark[1];
+  while (i < text.length && !/\s/.test(text[i] as string)) i++;
+  return i;
+}
+
 /** Moves up or down a line, keeping the column. Undefined on the first or last line. */
 export function moveLine(st: InputState, dir: -1 | 1): InputState | undefined {
   const { text, cursor } = st;
@@ -151,6 +161,15 @@ export function editInput(
 ): InputState {
   const { text, cursor } = st;
   const multi = mode === 'multi';
+  // Word moves: Alt+B / Alt+F, and Option or Ctrl with the arrows (Ink sets `meta` for Alt).
+  if ((key.leftArrow && (key.meta || key.ctrl)) || (key.meta && !key.ctrl && input === 'b'))
+    return { ...st, cursor: wordStart(text, cursor) };
+  if ((key.rightArrow && (key.meta || key.ctrl)) || (key.meta && !key.ctrl && input === 'f'))
+    return { ...st, cursor: wordEnd(text, cursor) };
+  if (multi && key.meta && !key.ctrl && input === 'd') {
+    const to = wordEnd(text, cursor);
+    return to === cursor ? st : { ...st, text: text.slice(0, cursor) + text.slice(to) };
+  }
   if (key.leftArrow) return { ...st, cursor: Math.max(0, cursor - 1) };
   if (key.rightArrow) return { ...st, cursor: Math.min(text.length, cursor + 1) };
   if (key.home || (key.ctrl && input === 'a'))

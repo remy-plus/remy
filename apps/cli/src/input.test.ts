@@ -80,6 +80,32 @@ describe('several lines', () => {
   });
 });
 
+describe('word moves', () => {
+  const alt = (st: InputState, input: string) => editInput(st, input, { meta: true });
+
+  it('Alt+B / Alt+F and Option+arrows move by word', () => {
+    const s = at('one two  three', 14);
+    expect(alt(s, 'b').cursor).toBe(9);
+    expect(editInput(s, '', { leftArrow: true, meta: true }).cursor).toBe(9);
+    expect(alt(at('one two  three', 0), 'f').cursor).toBe(3);
+    expect(editInput(at('one two', 3), '', { rightArrow: true, meta: true }).cursor).toBe(7);
+    expect(alt(at('ab\ncd', 0), 'f').cursor).toBe(2);
+    expect(alt(at('ab\ncd', 2), 'f').cursor).toBe(5);
+    expect(alt(at('ab', 0), 'b').cursor).toBe(0);
+  });
+
+  it('treats a paste marker as one word', () => {
+    const s = pasteInput(withText('a '), big(8));
+    expect(alt(s, 'b').cursor).toBe(2);
+    expect(alt({ ...s, cursor: 2 }, 'f').cursor).toBe(s.text.length);
+  });
+
+  it('Alt+D deletes the word ahead', () => {
+    expect(alt(at('one two three', 3), 'd')).toMatchObject({ text: 'one three', cursor: 3 });
+    expect(alt(withText('end'), 'd').text).toBe('end');
+  });
+});
+
 describe('paste', () => {
   it('keeps a small paste as it is, newlines included', () => {
     const s = pasteInput(withText('> '), 'a\r\nb');
