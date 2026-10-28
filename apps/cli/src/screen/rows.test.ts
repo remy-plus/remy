@@ -96,14 +96,22 @@ describe('rows', () => {
 
   it('rewrites the recorded "more lines" marker with the key', () => {
     const rows = toolRows(
-      tool({ tool: 'write_file', verb: 'write', detail: ['a', '... 3 more lines'] }),
+      tool({ tool: 'run_command', verb: 'run', target: 'ls', detail: ['a', '... 3 more lines'] }),
       60,
       theme,
     );
     expect(text(rows).join('\n')).toContain('… 3 more lines (ctrl+o)');
   });
 
-  it('does not open a body for a read', () => {
+  it('shows the time of a slow call and not of a quick one', () => {
+    expect(rowText(toolRows(tool({ ms: 40 }), 60, theme)[0] as never)).toBe('   → read src/a.ts');
+    expect(rowText(toolRows(tool({ ms: 2400 }), 60, theme)[0] as never)).toContain('2.4s');
+  });
+
+  it('does not open a body for a read or a write', () => {
+    expect(
+      toolRows(tool({ tool: 'write_file', detail: ['Wrote 8 characters'] }), 60, theme),
+    ).toHaveLength(1);
     expect(toolRows(tool({ detail: ['x'] }), 60, theme)).toHaveLength(1);
   });
 

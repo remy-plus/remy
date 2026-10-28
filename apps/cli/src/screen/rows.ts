@@ -92,7 +92,7 @@ const TOOL_GLYPH: Record<string, string> = {
   web_search: '◈',
   calculate: '=',
 };
-const BLOCK_TOOLS = new Set(['edit_file', 'write_file', 'run_command']);
+const BLOCK_TOOLS = new Set(['edit_file', 'run_command']);
 
 /** "... 5 more lines" from the recorded detail, made into the collapsed form with the key. */
 const MORE = /^([+-] )?\.\.\. (\d+) more lines$/;
@@ -145,7 +145,9 @@ export function toolRows(
         : undefined;
   const strike = line.state === 'denied';
   const text = line.tool === 'run_command' ? line.target : `${line.verb} ${line.target}`.trimEnd();
-  const bits = toolBits(line, now);
+  // A call that took under a second needs no time beside it.
+  const quick = line.ms !== undefined && line.ms < 1000;
+  const bits = toolBits(quick ? { ...line, ms: undefined } : line, now);
   const spans: RSpan[] = [
     { text: `${mark} `, role: role ?? 'muted' },
     { text, ...(role && { role }), ...(strike && { strike }) },
