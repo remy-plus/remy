@@ -440,6 +440,7 @@ describe('FullApp', () => {
     m.app.stdin.write('\x02');
     await tick();
     expect(m.frame()).toContain('CONTEXT');
+    expect(m.frame()).toContain('┌'); // NO_COLOR theme: a line marks the overlay's edge
     m.app.stdin.write('\x1b');
     await tick(80);
     expect(m.frame()).not.toContain('CONTEXT');

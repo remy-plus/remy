@@ -114,3 +114,23 @@ describe('Dialog frames', () => {
     });
   }
 });
+
+describe('Dialog edge', () => {
+  const draw = (t: ReturnType<typeof createTheme>) => {
+    const { lastFrame, unmount } = render(
+      h(
+        Box,
+        { width: 60, height: 12 },
+        h(Dialog, { title: 'Commands', theme: t, columns: 60, rows: 12 }),
+      ),
+    );
+    const out = lastFrame() ?? '';
+    unmount();
+    return out;
+  };
+  it('draws a single-line border without a panel colour, none with truecolor', () => {
+    expect(draw(createTheme('none', 'dark'))).toContain('┌');
+    expect(draw(createTheme('basic', 'dark'))).toContain('└');
+    expect(draw(createTheme('truecolor', 'dark'))).not.toContain('┌');
+  });
+});
