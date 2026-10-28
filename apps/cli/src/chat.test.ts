@@ -11,9 +11,10 @@ import {
 import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { askUser, createScopedFetch, createScopedFs, finish, writeFile } from '@remy/tools';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type Chat,
+  type ChatDeps,
   createChat,
   friendlyError,
   parsePlan,
@@ -46,7 +47,11 @@ const withReasoning = (inner: ModelClient, thought: string): ModelClient => ({
   },
 });
 
-function harness(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read', 'write']) {
+function harness(
+  model: ModelClient,
+  autoApprove: ('read' | 'write')[] = ['read', 'write'],
+  extra: Partial<ChatDeps> = {},
+) {
   const store = new MemoryEventStore();
   const contexts: number[] = [];
   const chat: Chat = createChat({
@@ -77,6 +82,7 @@ function harness(model: ModelClient, autoApprove: ('read' | 'write')[] = ['read'
     listTasks: () => store.listTasks(),
     readEvents: (id) => store.read(id),
     release: releaseLease(store, 'chat-test'),
+    ...extra,
   });
   return { chat, store, contexts };
 }
@@ -472,5 +478,60 @@ describe('resume', () => {
     await chat.submit('/resume');
     expect(chat.getState().picker).toBeUndefined();
     expect(chat.getState().items.at(-1)).toMatchObject({ kind: 'note' });
+  });
+});
+
+describe('stream coalescing', () => {
+  /** Streams the given deltas at once, then waits for `gate` before replying. */
+  const streaming = (deltas: string[], gate: Promise<void>, answer: string): ModelClient => ({
+    id: 'scripted',
+    caps: DEFAULT_CAPS,
+    complete: async (_req, _signal, onText) => {
+      for (const d of deltas) onText?.(d);
+      await gate;
+      return { calls: [{ tool: 'finish', args: { answer } }], usage };
+    },
+  });
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('notifies once per frame and loses nothing', async () => {
+    let open: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      open = r;
+    });
+    const { chat } = harness(streaming(['Hel', 'lo ', 'wor', 'ld'], gate, 'Hello world'));
+    const seen: string[] = [];
+    chat.subscribe(() => seen.push(chat.getState().streaming));
+    const run = chat.submit('hi');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(chat.getState().streaming).toBe('');
+    seen.length = 0;
+    await vi.advanceTimersByTimeAsync(16);
+    expect(seen).toEqual(['Hello world']);
+    open();
+    await vi.advanceTimersByTimeAsync(0);
+    await run;
+    expect(replies(chat)).toEqual(['Hello world']);
+  });
+
+  it('folds waiting text in before an event acts on it', async () => {
+    const { chat } = harness({
+      id: 'scripted',
+      caps: DEFAULT_CAPS,
+      complete: async (_req, _signal, onText) => {
+        onText?.('Working on it.');
+        return { calls: [{ tool: 'write_file', args: { path: 'a.txt', content: 'x' } }], usage };
+      },
+    });
+    const run = chat.submit('go');
+    await vi.advanceTimersByTimeAsync(0);
+    // The words said beside the tool call are committed even though no frame has passed.
+    expect(chat.getState().items).toContainEqual({ kind: 'text', text: 'Working on it.' });
+    chat.interrupt();
+    await vi.advanceTimersByTimeAsync(50);
+    await run;
+    expect(chat.getState().streaming).toBe('');
   });
 });

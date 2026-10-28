@@ -19,6 +19,7 @@ import { COMMANDS, findCommand } from './commands.ts';
 import { truncate } from './format.ts';
 import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
+import { createTextBatcher, FRAME_MS } from './stream.ts';
 import {
   type ApprovalView,
   collapseFailure,
@@ -178,6 +179,8 @@ export interface ChatDeps {
   files?: FilesApi;
   /** A tool's effect, for telling whether an approval can be taken back. */
   effectOf?: (tool: string) => Effect | undefined;
+  /** Streamed text reaches subscribers at most once per this many ms. Default 16; 0 is per delta. */
+  frameMs?: number;
 }
 
 export interface Chat {
@@ -328,7 +331,12 @@ export function createChat(deps: ChatDeps): Chat {
   let running = false;
   const calls = new Map<string, { tool: string; args: unknown }>();
 
+  /** Streamed text waits here and joins the state with the next update, so order holds. */
+  const batch = createTextBatcher(deps.frameMs ?? FRAME_MS, () => set({}));
+
   const set = (patch: Partial<ChatState>) => {
+    const waiting = batch.take();
+    if (waiting) s = { ...s, streaming: s.streaming + waiting };
     s = { ...s, ...patch };
     for (const fn of listeners) fn();
   };
@@ -355,6 +363,7 @@ export function createChat(deps: ChatDeps): Chat {
   };
 
   function onEvent(e: StoredEvent) {
+    if (batch.pending) set({}); // text that came first is in the state before the event acts
     const ev = e.event;
     switch (ev.type) {
       case 'model.responded': {
@@ -447,7 +456,7 @@ export function createChat(deps: ChatDeps): Chat {
       if (running) onEvent(e);
     },
     onText: (delta) => {
-      if (running) set({ streaming: s.streaming + delta });
+      if (running) batch.push(delta);
     },
     onReasoning: (delta) => {
       if (running) set({ reasoning: (s.reasoning + delta).slice(-MAX_REASONING_CHARS) });
