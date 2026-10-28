@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+Remy gets to know you in two minutes, then greets you by name.
+
+- **A welcome tour on first run.** A calm welcome screen, then what to call you and what you mostly want help with (pick several or type your own), your provider and model (skipped when one is connected, with a cheap default highlighted), and a real first task chosen from your answers. Esc skips the rest at any step.
+- **A real first task.** Research, files, coding, work and email, or school: Remy runs a small task for real with your model in a scratch folder, in the normal session view, asking before it moves anything. You can pass it over.
+- **Three keys to remember**, then the home screen: `Good evening, Sam.`, example requests and tips that match your goals.
+- **A small local profile.** `REMY_HOME/profile.json` (owner-only) holds your name and goals. It is never logged and goes nowhere except, if you agreed, as one line of context to your own model.
+- **`/profile`** shows and edits it: name, goals, personalise on or off, delete. **`/tour`** replays the tour.
+- **Minimal mode** has the same steps as plain text.
+- Screens: `design/screens/0.4/`.
+
 ## 0.3.0 (2026-10-27)
 
 Remy takes the whole window: a calm, centered home, a conversation that scrolls inside the screen, and an input box that stays put.
