@@ -6,6 +6,7 @@ import {
   MAX_CONTEXT_CHARS,
   MAX_CONTEXT_TURNS,
   renderContext,
+  SYSTEM_PROMPT,
   toolResultBudgetChars,
 } from './messages.ts';
 import { decide } from './policy.ts';
@@ -264,5 +265,14 @@ describe('tool result budget', () => {
     expect(big).toBeGreaterThan(100_000);
     expect(groq).toBeLessThan(12_000);
     expect(groq).toBeGreaterThanOrEqual(1500);
+  });
+});
+
+describe('system prompt', () => {
+  it('tells the model to try alternatives before asking when a source fails', () => {
+    expect(SYSTEM_PROMPT).toMatch(
+      /blocked, or returns unusable content, try alternatives yourself/,
+    );
+    expect(SYSTEM_PROMPT).toMatch(/Ask only when the user's intent is unclear/);
   });
 });
