@@ -14,6 +14,13 @@ describe('preferences', () => {
     expect(savePrefs(h, { minimal: true })).toBe(true);
     expect(loadPrefs(h)).toEqual({ theme: 'light', minimal: true });
   });
+  it('remembers that onboarding is done', () => {
+    const h = home();
+    expect(loadPrefs(h).onboarded).toBeUndefined();
+    savePrefs(h, { onboarded: true });
+    savePrefs(h, { theme: 'dark' });
+    expect(loadPrefs(h)).toEqual({ onboarded: true, theme: 'dark' });
+  });
   it('ignores a damaged file and unknown values', () => {
     const h = home();
     writeFileSync(join(h, 'preferences.json'), '{nope');

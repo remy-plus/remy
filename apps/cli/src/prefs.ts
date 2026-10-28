@@ -10,6 +10,8 @@ export interface Prefs {
   theme?: ThemeChoice;
   /** The minimal screen is the default on start. */
   minimal?: boolean;
+  /** The first-run tour was finished or skipped. */
+  onboarded?: boolean;
 }
 
 export const isThemeChoice = (v: unknown): v is ThemeChoice =>
@@ -26,6 +28,7 @@ export function loadPrefs(home: string): Prefs {
     return {
       ...(isThemeChoice(raw.theme) && { theme: raw.theme }),
       ...(typeof raw.minimal === 'boolean' && { minimal: raw.minimal }),
+      ...(typeof raw.onboarded === 'boolean' && { onboarded: raw.onboarded }),
     };
   } catch {
     return {};
