@@ -52,6 +52,8 @@ export interface TaskState {
   tainted: boolean;
   /** Selectable tools that `find_tools` returned, oldest first. They stay offered for the rest of the task. */
   discovered: string[];
+  /** Tools the user chose to always allow during this task, on top of `config.permissions.standing`. */
+  alwaysAllowed: string[];
   usage: Usage;
   costUsd: number;
   /** Failed model attempts for the next step. Reset on each response. */
@@ -118,6 +120,7 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
       calls: {},
       log: [{ kind: 'user', text: e.prompt }],
       discovered: [],
+      alwaysAllowed: [],
       tainted: (e.config.pasted?.length ?? 0) > 0,
       usage: { inTokens: 0, outTokens: 0 },
       costUsd: 0,
@@ -216,6 +219,8 @@ function on(s: TaskState, e: Event) {
       if (e.argsHash !== call.argsHash)
         fail(`approval for ${e.callId} doesn't match its arguments`);
       call.approval = { argsHash: e.argsHash, granted: e.granted, by: e.by };
+      if (e.granted && e.always && !s.alwaysAllowed.includes(call.tool))
+        s.alwaysAllowed.push(call.tool);
       s.pendingApproval = undefined;
       s.status = 'running';
       if (!e.granted) {

@@ -1083,7 +1083,8 @@ export function createChat(deps: ChatDeps): Chat {
       const id = current.id;
       // "Always" saves first; if that fails the call is still approved, once, and the user is told.
       const tool = s.approvalView?.always;
-      if (always && granted && tool && deps.approvals) {
+      const keep = Boolean(always && granted && tool);
+      if (keep && tool && deps.approvals) {
         try {
           deps.approvals.add(tool, a.risk);
           commit({
@@ -1100,7 +1101,7 @@ export function createChat(deps: ChatDeps): Chat {
       set({ phase: 'running', approval: undefined, approvalView: undefined, thinking: true });
       running = true;
       try {
-        await runtime.approve(id, a.callId, a.argsHash, granted, 'user', note);
+        await runtime.approve(id, a.callId, a.argsHash, granted, 'user', note, keep);
         await drive(id, my);
       } catch (e) {
         if (my !== gen) return;

@@ -142,6 +142,16 @@ describe('decide', () => {
     });
   });
 
+  it('an "always" grant earlier in the task counts like a standing approval, but not when tainted', () => {
+    const s = (tainted: boolean, risk: Risk) => ({
+      ...state({}, tainted),
+      alwaysAllowed: [`t_${risk}`],
+    });
+    expect(kind('write', s(false, 'write'))).toBe('allow');
+    expect(kind('write', s(true, 'write'))).toBe('require_approval');
+    expect(kind('irreversible', s(false, 'irreversible'))).toBe('require_approval');
+  });
+
   // Standing approvals: risk × standing × tainted × deny/allow list.
   const standingTable: [Risk, boolean, 'none' | 'deny' | 'allow-other' | 'allow-this', string][] =
     [];

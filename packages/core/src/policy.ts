@@ -27,7 +27,8 @@ export class PolicyError extends Error {
 export function decide(
   call: PlannedCall,
   tool: Tool | undefined,
-  state: Pick<TaskState, 'config' | 'tainted'> & Partial<Pick<TaskState, 'calls'>>,
+  state: Pick<TaskState, 'config' | 'tainted'> &
+    Partial<Pick<TaskState, 'calls' | 'alwaysAllowed'>>,
 ): PolicyDecision {
   // 1. Unknown tool or invalid arguments.
   if (!tool) return { kind: 'deny', reason: `there is no tool named "${call.tool}"` };
@@ -65,7 +66,11 @@ export function decide(
     return { kind: 'deny', reason: `${tool.name} isn't allowed for this task` };
   // 2b. A standing approval clears write and send_as_user calls, but not in a tainted task, and
   // an entry for any other risk (a hand-edited file) is ignored.
-  if (!state.tainted && canStandingAllow(tool.risk) && standing?.includes(tool.name))
+  if (
+    !state.tainted &&
+    canStandingAllow(tool.risk) &&
+    (standing?.includes(tool.name) || state.alwaysAllowed?.includes(tool.name))
+  )
     return {
       kind: 'allow',
       via: 'standing',

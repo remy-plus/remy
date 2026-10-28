@@ -137,6 +137,8 @@ export type Event =
       by: string;
       /** Why a call was denied, in the user's words. The model sees it as the tool result. */
       note?: string;
+      /** Granted with "always allow": later calls of the tool in this task skip the card too. */
+      always?: boolean;
     }
   | { type: 'tool.started'; callId: string; idempotencyKey: string; attempt: number }
   | { type: 'tool.completed'; callId: string; result: ToolResult; latencyMs: number }
@@ -362,6 +364,8 @@ export interface Runtime {
     by: string,
     /** With a denial: guidance the model reads as the tool result. Ignored when granted. */
     note?: string,
+    /** With a grant: "always allow" this tool for the rest of the task (the caller saves it for later tasks). */
+    always?: boolean,
   ): Promise<void>;
   /** `pasted`: segments of the answer the user pasted. They are untrusted and taint the task. */
   answer(taskId: string, answer: string, pasted?: string[]): Promise<void>;

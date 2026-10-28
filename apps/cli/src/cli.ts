@@ -663,7 +663,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             standing().add(tool, r.risk);
             out(st.dim(`Always allowing ${tool}.`));
           }
-          await rt.approve(id, r.callId, r.argsHash, always || /^y(es)?$/i.test(a.trim()), 'user');
+          const yes = always || /^y(es)?$/i.test(a.trim());
+          await rt.approve(id, r.callId, r.argsHash, yes, 'user', undefined, always);
         } else {
           out();
           out(`${st.bold('Question:')} ${o.question}`);
@@ -991,7 +992,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             standing().add(tool, p.risk);
             out(st.dim(`Always allowing ${tool}. Undo: remy approvals remove ${tool}`));
           }
-          await rt.approve(id, p.callId, p.argsHash, !flags.deny, 'user', note);
+          await rt.approve(
+            id,
+            p.callId,
+            p.argsHash,
+            !flags.deny,
+            'user',
+            note,
+            flags.always === true,
+          );
           out(
             st.dim(
               `${flags.deny ? 'Denied' : 'Approved'}: ${p.preview}${note ? ` (${note})` : ''}`,

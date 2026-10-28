@@ -467,7 +467,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       return taskId;
     },
 
-    async approve(taskId, callId, hash, granted, by, note) {
+    async approve(taskId, callId, hash, granted, by, note, always) {
       await withLease(taskId, async ({ state, commit }) => {
         const p = state().pendingApproval;
         if (p?.callId !== callId) throw new Error(`no pending approval for ${callId}`);
@@ -481,6 +481,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             granted,
             by,
             ...(said && { note: said }),
+            ...(granted && always && { always: true }),
           },
         ]);
       });

@@ -147,6 +147,22 @@ describe('reducer', () => {
       expect(s.calls.c1?.approval?.granted).toBe(true);
     });
 
+    it('remembers an "always" grant for the rest of the task, and ignores it on a decline', () => {
+      const resolved = (granted: boolean) =>
+        fold(
+          log(...base, {
+            type: 'approval.resolved',
+            callId: 'c1',
+            argsHash: c.argsHash,
+            granted,
+            by: 'u',
+            always: true,
+          }),
+        ).alwaysAllowed;
+      expect(resolved(true)).toEqual([c.tool]);
+      expect(resolved(false)).toEqual([]);
+    });
+
     it('records a decline as the result', () => {
       const s = fold(
         log(...base, {
