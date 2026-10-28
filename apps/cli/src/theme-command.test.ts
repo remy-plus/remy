@@ -109,6 +109,26 @@ describe('/theme on screen', () => {
     app.unmount();
   });
 
+  it('classic: a theme change asks the host to reprint the transcript', async () => {
+    const chat = make({ theme: 'dark' });
+    const onRetheme = vi.fn();
+    const app = render(
+      h(ChatApp, {
+        chat,
+        theme: createTheme('none'),
+        themeFor: themeFor(),
+        reducedMotion: true,
+        onRetheme,
+      }),
+    );
+    await tick();
+    expect(onRetheme).not.toHaveBeenCalled();
+    await chat.submit('/theme light');
+    await until(() => onRetheme.mock.calls.length > 0);
+    expect(onRetheme).toHaveBeenCalledTimes(1);
+    app.unmount();
+  });
+
   it('full screen: the dialog lists the choices and a pick applies it', async () => {
     const chat = make();
     const tf = themeFor();

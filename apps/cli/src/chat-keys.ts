@@ -30,6 +30,8 @@ export interface ChatKeysOptions {
   approvalSettleMs?: number;
   notifier?: Notifier;
   onClear?: () => void;
+  /** Called when the theme changes after the first render. */
+  onRetheme?: () => void;
   /** First look at a key while the prompt is active; return true when it was handled. */
   onKey?: (
     ch: string,
@@ -45,6 +47,7 @@ export function useChatKeys(o: ChatKeysOptions) {
 
   const recall = useRef(-1);
   const seenClears = useRef(state.clears);
+  const seenTheme = useRef(state.theme);
   const [expanded, setExpanded] = useState(false);
   const [noting, setNoting] = useState(false);
   const [viewing, setViewing] = useState(false);
@@ -75,6 +78,12 @@ export function useChatKeys(o: ChatKeysOptions) {
     seenClears.current = state.clears;
     o.onClear?.();
   }, [state.clears, o.onClear]);
+
+  useEffect(() => {
+    if (state.theme === seenTheme.current) return;
+    seenTheme.current = state.theme;
+    o.onRetheme?.();
+  }, [state.theme, o.onRetheme]);
 
   const { notifier } = o;
   useEffect(() => {

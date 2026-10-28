@@ -65,6 +65,8 @@ export interface ChatAppProps {
   minimal?: boolean;
   /** Called after /clear: the host wipes the screen and mounts the app again. */
   onClear?: () => void;
+  /** Called after a theme change: the host reprints the transcript in the new colours. */
+  onRetheme?: () => void;
   /** Rings when Remy waits and the window is not focused. */
   notifier?: Notifier;
   /** `single` is the old one-line editor (REMY_INPUT=single). Default `multi`. */
@@ -73,7 +75,8 @@ export interface ChatAppProps {
   approvalSettleMs?: number;
 }
 
-export interface RunOptions extends Omit<ChatAppProps, 'onClear' | 'compactHeader' | 'notifier'> {
+export interface RunOptions
+  extends Omit<ChatAppProps, 'onClear' | 'onRetheme' | 'compactHeader' | 'notifier'> {
   /**
    * `minimal` is the scrollback UI without the wordmark; `classic` is its old name. The default is
    * the full screen on a terminal.
@@ -790,6 +793,7 @@ export async function runChat(props: RunOptions): Promise<void> {
     let compact = false;
     for (;;) {
       let restart = false;
+      let keepHeader = false;
       const app = render(
         h(ChatApp, {
           ...appProps,
@@ -800,13 +804,19 @@ export async function runChat(props: RunOptions): Promise<void> {
             // Unmount after this render finishes; the next mount prints the header again.
             setImmediate(() => app.unmount());
           },
+          // Lines already printed keep their old colours, so wipe the screen and print them again.
+          onRetheme: () => {
+            restart = true;
+            keepHeader = true;
+            setImmediate(() => app.unmount());
+          },
         }),
         { stdout, exitOnCtrlC: false, patchConsole: false },
       );
       await app.waitUntilExit();
       if (!restart) return;
       process.stdout.write(CLEAR_SCREEN);
-      compact = true;
+      if (!keepHeader) compact = true;
     }
   } finally {
     notifier.stop();
