@@ -1,4 +1,4 @@
-import type { Tool, ToolContext, ToolResult } from '@remy/core';
+import { callRisk, type Tool, type ToolContext, type ToolResult } from '@remy/core';
 import { describe, expect, it } from 'vitest';
 import type { Browser, PageElement, PageSnapshot } from './port.ts';
 import { createBrowserTools, renderSnapshot } from './tools.ts';
@@ -95,11 +95,9 @@ describe('browser tools', () => {
       browser_click: 'read',
       browser_type: 'read',
       browser_act: 'send_as_user',
-      browser_pay: 'spend_money',
       browser_show: 'read',
     });
     expect(tools.browser_act?.effect).toBe('unsafe_to_retry');
-    expect(tools.browser_pay?.effect).toBe('unsafe_to_retry');
   });
 
   it('searches through the browser and marks results untrusted', async () => {
@@ -121,9 +119,9 @@ describe('browser tools', () => {
     expect(text).toContain('[3] textbox "Email" = "a@b.test"');
     expect(text).toContain('[4] password "Password" (the user types this: browser_show)');
     expect(text).toContain('[5] submit "Sign up" (sends: browser_act)');
-    expect(text).toContain('[6] button "Buy now" (pays: browser_pay)');
+    expect(text).toContain('[6] button "Buy now" (pays: browser_act)');
     expect(text).toContain('[7] button "Show details"\n');
-    expect(text).toContain('[10] submit "Continue" (pays: browser_pay)');
+    expect(text).toContain('[10] submit "Continue" (pays: browser_act)');
     expect(text).toContain('[11] button "Delete account" (sends: browser_act)');
   });
 
@@ -146,7 +144,7 @@ describe('browser tools', () => {
     expect(signUp).toMatchObject({ ok: false, phase: 'before_effect' });
     expect(!signUp.ok && signUp.error).toContain('browser_act');
     const buy = await run('browser_click', { ref: 6 });
-    expect(!buy.ok && buy.error).toContain('browser_pay');
+    expect(!buy.ok && buy.error).toContain('pays. Use browser_act');
     expect(await run('browser_click', { ref: 11 })).toMatchObject({ ok: false });
     expect(calls).toEqual([]);
   });
@@ -173,17 +171,33 @@ describe('browser tools', () => {
     expect(calls).toEqual([]);
   });
 
-  it('acts only when the name still matches, and sends money to browser_pay', async () => {
-    const { run, calls } = setup();
+  it('acts only when the name still matches', async () => {
+    const { run, calls, browser } = setup();
+    await browser.snapshot();
     const changed = await run('browser_act', { ref: 5, name: 'Delete' });
     expect(!changed.ok && changed.error).toContain('The page changed');
-    const money = await run('browser_act', { ref: 6, name: 'Buy now' });
-    expect(!money.ok && money.error).toContain('browser_pay');
-    // A form holding a card field spends money whatever its button says.
-    expect(await run('browser_act', { ref: 10, name: 'Continue' })).toMatchObject({ ok: false });
     expect(await run('browser_act', { ref: 5, name: 'sign  UP' })).toMatchObject({ ok: true });
-    expect(await run('browser_pay', { ref: 6, name: 'Buy now' })).toMatchObject({ ok: true });
-    expect(calls).toEqual(['click 5', 'click 6']);
+    expect(calls).toEqual(['click 5']);
+  });
+
+  it('asks about a button that pays as spending money, once', async () => {
+    const { tools, run, calls, browser } = setup();
+    const act = tools.browser_act as Tool;
+    await browser.snapshot();
+    expect(callRisk(act, { ref: 5, name: 'Sign up' })).toBe('send_as_user');
+    expect(callRisk(act, { ref: 6, name: 'Buy now' })).toBe('spend_money');
+    // A form holding a card field spends money whatever its button says.
+    expect(callRisk(act, { ref: 10, name: 'Continue' })).toBe('spend_money');
+    expect(await run('browser_act', { ref: 6, name: 'Buy now' })).toMatchObject({ ok: true });
+    expect(calls).toEqual(['click 6']);
+  });
+
+  it('refuses a payment the user did not see as one', async () => {
+    const { run, calls } = setup();
+    // No snapshot yet: the approval was not for a payment, but the live button pays.
+    const r = await run('browser_act', { ref: 6, name: 'Buy now' });
+    expect(!r.ok && r.error).toContain('now spends money');
+    expect(calls).toEqual([]);
   });
 
   it('previews an action with the page and the filled form', async () => {
@@ -192,7 +206,7 @@ describe('browser tools', () => {
     expect(tools.browser_act?.preview({ ref: 5, name: 'Sign up' })).toBe(
       'Press "Sign up" on shop.test with Email: "a@b.test"',
     );
-    expect(tools.browser_pay?.preview({ ref: 6, name: 'Buy now' })).toBe(
+    expect(tools.browser_act?.preview({ ref: 6, name: 'Buy now' })).toBe(
       'Pay: press "Buy now" on shop.test',
     );
   });

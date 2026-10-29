@@ -7,7 +7,7 @@ import type { Browser, PageElement, PageSnapshot } from './port.ts';
 export const PAGE_MAX_CHARS = 4_000;
 const MAX_CONTROLS = 120;
 
-/** Names that spend money: only `browser_pay` presses these. */
+/** Names that spend money: `browser_act` asks about these as payments, every time. */
 export const MONEY_WORDS =
   /\b(buy|pay|purchase|check ?out|place (your )?order|order now|complete (your )?(purchase|order)|confirm (purchase|order|payment)|subscribe|donate|book now|reserve|upgrade|add payment)\b/i;
 /** Names that send, change or delete something: `browser_click` refuses them. */
@@ -24,7 +24,7 @@ const isMoney = (e: PageElement, page: PageSnapshot | undefined) =>
 const needs = (e: PageElement, page: PageSnapshot): string => {
   if (e.kind === 'password' || e.kind === 'card') return ' (the user types this: browser_show)';
   if (!['submit', 'button', 'link'].includes(e.kind)) return '';
-  if (isMoney(e, page)) return ' (pays: browser_pay)';
+  if (isMoney(e, page)) return ' (pays: browser_act)';
   if (e.kind === 'submit' || ACTION_WORDS.test(e.name)) return ' (sends: browser_act)';
   return '';
 };
@@ -106,7 +106,6 @@ export const BROWSER_TOOL_NAMES = [
   'browser_click',
   'browser_type',
   'browser_act',
-  'browser_pay',
   'browser_show',
 ];
 
@@ -167,7 +166,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
     ...common,
     name: 'browser_click',
     description:
-      'Click a link, tab, menu, checkbox or other control that only shows something. Buttons that send, buy, save or delete need browser_act or browser_pay.',
+      'Click a link, tab, menu, checkbox or other control that only shows something. Buttons that send, buy, save or delete need browser_act.',
     args: z.object({ ref: refArg }),
     risk: 'read',
     effect: 'none',
@@ -182,7 +181,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
         if ('ok' in e) return e;
         if (e.kind === 'submit' || ACTION_WORDS.test(e.name) || isMoney(e, browser.current()))
           return refused(
-            `[${ref}] "${e.name}" sends or changes something. Use ${isMoney(e, browser.current()) ? 'browser_pay' : 'browser_act'} instead, which asks the user.`,
+            `[${ref}] "${e.name}" ${isMoney(e, browser.current()) ? 'pays' : 'sends or changes something'}. Use browser_act instead, which asks the user.`,
           );
         return page(await browser.click(ref));
       } catch (err) {
@@ -239,8 +238,29 @@ export function createBrowserTools(browser: Browser): Tool[] {
     return fields.length ? ` with ${fields.join(', ')}` : '';
   };
 
-  const pressing = (risk: 'send_as_user' | 'spend_money') =>
-    async function execute({ ref, name }: { ref: number; name: string }): Promise<ToolResult> {
+  /** Whether the control, as the page last showed it, spends money. */
+  const pays = (ref: number) => {
+    const s = browser.current();
+    const e = s?.elements.find((x) => x.ref === ref);
+    return Boolean(e && isMoney(e, s));
+  };
+
+  const act = defineTool({
+    ...common,
+    name: 'browser_act',
+    description:
+      'Press a button that sends, posts, saves, books, buys or deletes something. The user approves it first; a payment every time.',
+    args: z.object({ ref: refArg, name: nameArg }),
+    risk: 'send_as_user',
+    // A button that pays is asked about as spending money, so one card covers it.
+    riskFor: ({ ref }) => (pays(ref) ? 'spend_money' : 'send_as_user'),
+    effect: 'unsafe_to_retry',
+    timeoutMs: 60_000,
+    preview: ({ ref, name }) =>
+      `${pays(ref) ? 'Pay: press' : 'Press'} "${name}" on ${host(browser.current()?.url)}${filled(ref)}`,
+    async execute({ ref, name }): Promise<ToolResult> {
+      // What the user approved: a payment or not, from the page they saw.
+      const approvedPay = pays(ref);
       let e: PageElement | ToolResult;
       try {
         e = await live(browser, ref);
@@ -252,10 +272,9 @@ export function createBrowserTools(browser: Browser): Tool[] {
         return refused(
           `The page changed: [${ref}] is now "${e.name}", not "${name}". Nothing was pressed. Look at the page again.`,
         );
-      const money = isMoney(e, browser.current());
-      if (risk === 'send_as_user' && money)
+      if (isMoney(e, browser.current()) && !approvedPay)
         return refused(
-          `"${e.name}" spends money. Use browser_pay, which asks the user every time.`,
+          `"${e.name}" now spends money, which was not what the user approved. Nothing was pressed. Ask again with browser_act.`,
         );
       try {
         return page(await browser.click(ref));
@@ -263,33 +282,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
         // It may have been pressed before the error: never press it again on its own.
         return failed(err, 'unknown');
       }
-    };
-
-  const act = defineTool({
-    ...common,
-    name: 'browser_act',
-    description:
-      'Press a button that sends, posts, saves, books or deletes something (not a payment). The user approves it first.',
-    args: z.object({ ref: refArg, name: nameArg }),
-    risk: 'send_as_user',
-    effect: 'unsafe_to_retry',
-    timeoutMs: 45_000,
-    preview: ({ ref, name }) => `Press "${name}" on ${host(browser.current()?.url)}${filled(ref)}`,
-    execute: pressing('send_as_user'),
-  });
-
-  const pay = defineTool({
-    ...common,
-    name: 'browser_pay',
-    description:
-      'Press a button that spends money (buy, pay, order, subscribe, book). The user approves it every time.',
-    args: z.object({ ref: refArg, name: nameArg }),
-    risk: 'spend_money',
-    effect: 'unsafe_to_retry',
-    timeoutMs: 60_000,
-    preview: ({ ref, name }) =>
-      `Pay: press "${name}" on ${host(browser.current()?.url)}${filled(ref)}`,
-    execute: pressing('spend_money'),
+    },
   });
 
   const show = defineTool({
@@ -325,7 +318,6 @@ export function createBrowserTools(browser: Browser): Tool[] {
     click,
     type,
     act,
-    pay,
     show,
   ];
 }

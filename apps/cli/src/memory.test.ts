@@ -255,7 +255,7 @@ describe('web search', () => {
     expect(req?.system).toContain(BROWSER_HINT);
     expect(req?.system).not.toContain(NO_SEARCH_HINT);
     expect(req?.tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(['web_search', 'browser_open', 'browser_act', 'browser_pay']),
+      expect.arrayContaining(['web_search', 'browser_open', 'browser_act', 'browser_show']),
     );
   });
 
