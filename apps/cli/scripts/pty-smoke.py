@@ -317,6 +317,7 @@ def main() -> int:
     ap.add_argument("--ease", action="store_true", help="first run in an empty REMY_HOME, then /, Ctrl+P, /model and @ completion")
     ap.add_argument("--cli-arg", action="append", default=[], help="an extra argument for the chat (repeatable)")
     ap.add_argument("--raw", help="write the raw bytes to this file")
+    ap.add_argument("--latency", type=int, default=0, help="after the turns, type this many keys one by one and report how long each takes to reach the screen")
     ap.add_argument("--home", help="use this REMY_HOME (kept) instead of a fresh temporary one, e.g. to test a second launch")
     ap.add_argument("--expect-start", action="append", default=[], help="text the first screen must show (repeatable)")
     ap.add_argument("--shot", help="write PREFIX.png (final screen) and PREFIX-all.png (scrollback plus screen), coloured, via headless Chrome")
@@ -686,6 +687,29 @@ def main() -> int:
     pump(0.3)
     mode_shots["turn"] = [l.rstrip() for l in screen.display]
     in_alt_before_exit = screen.in_alt
+    if args.latency:
+        # Key to first output byte: the time the app takes to redraw for one keypress.
+        lat = []
+        for i in range(args.latency):
+            ch = b"abcdefghij"[i % 10:i % 10 + 1]
+            t0 = time.time()
+            os.write(master, ch)
+            while True:
+                r, _, _ = select.select([master], [], [], 1.0)
+                if not r:
+                    break
+                data = os.read(master, 65536)
+                raw.extend(data)
+                screen.feed(data)
+                break
+            lat.append((time.time() - t0) * 1000)
+            pump(0.08)  # a fast typist: about 12 keys a second
+        for _ in range(args.latency):
+            os.write(master, b"\x7f")
+        pump(0.5)
+        lat.sort()
+        pct = lambda q: lat[min(len(lat) - 1, int(q * len(lat)))]
+        print(f"keypress latency: p50 {pct(0.5):.1f} ms, p95 {pct(0.95):.1f} ms, max {lat[-1]:.1f} ms over {len(lat)} keys")
     for step in (args.seq or "").split(","):
         step = step.strip()
         if not step:
