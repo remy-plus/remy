@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 (unreleased)
+## 0.6.0 (2026-10-28)
 
 Remy keeps going on big jobs, works while you are away, and remembers what you tell it.
 
@@ -9,7 +9,7 @@ Remy keeps going on big jobs, works while you are away, and remembers what you t
 - **Memory.** With personalise on in your profile, Remy can save short notes about you (preferences, facts, how you like things done), always with your approval, and uses the five most relevant in each task. `/memory` and `remy memory` show, edit and forget them. A web page cannot save a note on its own.
 - Fixed: `remy list` no longer fails with "database is locked" while another Remy process is writing.
 
-## 0.5.0 (unreleased)
+## 0.5.0 (2026-10-28, published as part of 0.6.0)
 
 Remy connects to your apps.
 
