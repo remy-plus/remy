@@ -130,8 +130,13 @@ describe('ScopedFetch', () => {
     expect((await net({ allow: ['public.test'] }).get(url('/page'))).status).toBe(200);
   });
 
-  it('caps response size', async () => {
-    await expect(net({ maxBytes: 1000 }).get(url('/big'))).rejects.toThrow(/too large/i);
+  it('cuts a response at the size limit and says so, instead of failing', async () => {
+    const r = await net({ maxBytes: 1000 }).get(url('/big'));
+    expect(r.status).toBe(200);
+    expect(Buffer.byteLength(r.body)).toBeLessThanOrEqual(1000);
+    expect(r.body.length).toBeGreaterThan(0);
+    expect(r.truncated).toBe(true);
+    expect((await net().get(url('/missing'))).truncated).toBeUndefined();
   });
 
   it('returns non-2xx responses instead of throwing', async () => {

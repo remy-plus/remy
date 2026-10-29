@@ -1,7 +1,7 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ModelResponse } from '@remy/core';
+import { type ModelResponse, NO_SEARCH_HINT } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { MEMORY_MAX_ENTRIES } from '@remy/tools';
@@ -137,10 +137,10 @@ describe('use follows the profile', () => {
 const usage = { inTokens: 10, outTokens: 5 };
 const finish: ModelResponse = { calls: [{ tool: 'finish', args: { answer: 'Done.' } }], usage };
 
-function harness(model: ScriptedModelClient) {
+function harness(model: ScriptedModelClient, env: Record<string, string> = {}) {
   const o = { out: '', err: '' };
   const deps: CliDeps = {
-    env: { REMY_HOME: home },
+    env: { REMY_HOME: home, ...env },
     cwd: home,
     out: (s) => {
       o.out += s;
@@ -244,5 +244,21 @@ describe('remy memory', () => {
     expect((await h.run('memory', 'forget', 'mem_zzz')).err).toContain('no saved note mem_zzz');
     expect((await h.run('memory', 'forget')).err).toContain('Usage');
     expect((await h.run('memory', 'wat')).err).toContain('Use remy memory');
+  });
+});
+
+describe('web search', () => {
+  it('tells the model search is off, so it does not guess page addresses', async () => {
+    const model = new ScriptedModelClient([finish]);
+    await harness(model).run('run', 'find the best budget laptops');
+    expect(model.requests[0]?.system).toContain(NO_SEARCH_HINT);
+    expect(model.requests[0]?.tools.map((t) => t.name)).not.toContain('web_search');
+  });
+
+  it('leaves the hint out when a search key is set', async () => {
+    const model = new ScriptedModelClient([finish]);
+    await harness(model, { TAVILY_API_KEY: 'tvly-test' }).run('run', 'find laptops');
+    expect(model.requests[0]?.system).not.toContain('Web search is not set up');
+    expect(model.requests[0]?.tools.map((t) => t.name)).toContain('web_search');
   });
 });

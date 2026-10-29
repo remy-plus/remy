@@ -337,6 +337,8 @@ export interface FetchResult {
   status: number;
   contentType: string;
   body: string;
+  /** The body stopped at the size limit; what is there is the start of the page. */
+  truncated?: boolean;
 }
 
 export interface ScopedFetch {

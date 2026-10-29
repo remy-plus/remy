@@ -144,56 +144,67 @@ export function createScopedFetch(opts: ScopedFetchOptions = {}): ScopedFetch {
   };
 
   const hop = (url: URL, signal: AbortSignal) =>
-    new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>(
-      (resolve, reject) => {
-        const lib = url.protocol === 'https:' ? https : http;
-        const req = lib.request(
-          url,
-          {
-            method: 'GET',
-            lookup: guardedLookup,
-            signal,
-            headers: {
-              'user-agent': 'Remy/0.0 (+https://github.com/remy-plus/remy)',
-              accept: 'text/html,text/plain,application/json;q=0.9,*/*;q=0.5',
-            },
+    new Promise<{
+      status: number;
+      headers: http.IncomingHttpHeaders;
+      body: string;
+      truncated?: boolean;
+    }>((resolve, reject) => {
+      const lib = url.protocol === 'https:' ? https : http;
+      const req = lib.request(
+        url,
+        {
+          method: 'GET',
+          lookup: guardedLookup,
+          signal,
+          headers: {
+            'user-agent': 'Remy/0.0 (+https://github.com/remy-plus/remy)',
+            accept: 'text/html,text/plain,application/json;q=0.9,*/*;q=0.5',
           },
-          (res) => {
-            const status = res.statusCode ?? 0;
-            if (REDIRECTS.has(status) && res.headers.location) {
-              res.resume();
-              return resolve({ status, headers: res.headers, body: '' });
-            }
-            const declared = Number(res.headers['content-length']);
-            if (declared > maxBytes) {
-              req.destroy();
-              return reject(
-                new NetError(`Response too large: ${declared} bytes (limit ${maxBytes})`),
-              );
-            }
-            const chunks: Buffer[] = [];
-            let size = 0;
-            res.on('data', (c: Buffer) => {
-              size += c.length;
-              if (size > maxBytes) {
-                req.destroy();
-                reject(new NetError(`Response too large (limit ${maxBytes} bytes)`));
-              } else chunks.push(c);
+        },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          if (REDIRECTS.has(status) && res.headers.location) {
+            res.resume();
+            return resolve({ status, headers: res.headers, body: '' });
+          }
+          // Past the limit the body is cut, not refused: big pages (news, reviews) are mostly
+          // scripts and markup, and the text worth reading is near the start.
+          const chunks: Buffer[] = [];
+          let size = 0;
+          let done = false;
+          const finish = (truncated: boolean) => {
+            if (done) return;
+            done = true;
+            resolve({
+              status,
+              headers: res.headers,
+              body: Buffer.concat(chunks).toString('utf8'),
+              ...(truncated && { truncated }),
             });
-            res.on('end', () =>
-              resolve({
-                status,
-                headers: res.headers,
-                body: Buffer.concat(chunks).toString('utf8'),
-              }),
-            );
-            res.on('error', (e) => reject(e));
-          },
-        );
-        req.on('error', (e) => reject(e));
-        req.end();
-      },
-    );
+          };
+          res.on('data', (c: Buffer) => {
+            if (done) return;
+            const room = maxBytes - size;
+            if (c.length >= room) {
+              chunks.push(c.subarray(0, room));
+              size = maxBytes;
+              finish(true);
+              req.destroy();
+              return;
+            }
+            size += c.length;
+            chunks.push(c);
+          });
+          res.on('end', () => finish(false));
+          res.on('error', (e) => {
+            if (!done) reject(e);
+          });
+        },
+      );
+      req.on('error', (e) => reject(e));
+      req.end();
+    });
 
   return {
     async get(rawUrl, o = {}): Promise<FetchResult> {
@@ -245,6 +256,7 @@ export function createScopedFetch(opts: ScopedFetchOptions = {}): ScopedFetch {
           status: res.status,
           contentType: String(res.headers['content-type'] ?? ''),
           body: res.body,
+          ...(res.truncated && { truncated: true }),
         };
       }
     },
