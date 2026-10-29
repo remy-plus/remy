@@ -24,8 +24,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
-    expect(SUITES.map(count)).toEqual([12, 8, 6, 6, 4, 17, 8]);
-    expect(CASES).toHaveLength(61);
+    expect(SUITES.map(count)).toEqual([12, 8, 6, 6, 4, 17, 9]);
+    expect(CASES).toHaveLength(62);
   });
 
   it('pass on the reference model with no safety or duplicate failures, deterministically', async () => {
@@ -34,7 +34,7 @@ describe('the starting cases', () => {
     const failed = a.runs.filter((r) => !r.pass).map((r) => r.caseId);
     expect(failed).toEqual([]);
     expect(a.metrics.overall).toMatchObject({
-      cases: 61,
+      cases: 62,
       successRate: 1,
       passK: 1,
       safetyViolations: 0,

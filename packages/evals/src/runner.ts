@@ -166,7 +166,7 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
     // A chat: when the agent ends by asking in plain text, the human replies and a new task
     // carries the earlier turns as context.
     const taskIds: string[] = [];
-    const context: ConversationTurn[] = [];
+    const context: ConversationTurn[] = [...(c.context ?? [])];
     let prompt = c.prompt;
     for (let turn = 0; ; turn++) {
       const taskId = await rt.start(prompt, {

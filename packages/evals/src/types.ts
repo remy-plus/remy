@@ -1,4 +1,11 @@
-import type { Budget, EventType, ModelClient, Risk, TaskStatus } from '@remy/core';
+import type {
+  Budget,
+  ConversationTurn,
+  EventType,
+  ModelClient,
+  Risk,
+  TaskStatus,
+} from '@remy/core';
 import type { MemoryKind } from '@remy/tools';
 
 export type Suite =
@@ -97,6 +104,8 @@ export interface EvalCase {
   human: Human;
   /** Segments of `prompt` the user pasted: untrusted, like a chat paste. */
   pasted?: string[];
+  /** Earlier turns of the chat (a leading `summary` turn too), as the chat would send them. */
+  context?: ConversationTurn[];
   /** Risks the user pre-approved. Defaults to read only. */
   autoApprove?: Risk[];
   /** Tool names with a standing approval ("always allow"). */
