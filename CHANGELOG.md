@@ -9,6 +9,7 @@ Remy uses the computer it runs on to find things.
 - **Sign in once.** `remy browser show` (or `/browser` in the chat) opens the window so you can sign in to sites; Remy keeps those sign-ins. `remy browser reset` signs out of everything; `remy browser install` gets Chromium for machines without Chrome or Edge.
 - **Pick your search.** `REMY_SEARCH` (or `"search"` in `remy.config.json`) chooses `browser`, `context` ([Context.dev](https://context.dev)), `brave`, `tavily`, `searxng` or `off`. Without a pick, a service whose key is set does the searching (`CONTEXT_DEV_API_KEY`, `BRAVE_API_KEY`, `TAVILY_API_KEY`, `SEARXNG_URL`), otherwise Remy's browser. Don't want Remy using your computer? `REMY_BROWSER=off` with a search service.
 - Local addresses stay blocked unless `REMY_BROWSER_LOCAL=on`, and `--net-allow` limits the browser too.
+- Fixed: a mistyped OpenRouter key is refused at login instead of saved as connected.
 - Remy no longer asks for keys or passwords in the chat, and never says it set something up unless a tool did it.
 
 ## 0.7.0 (2026-10-28)
