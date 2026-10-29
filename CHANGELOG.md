@@ -5,6 +5,7 @@
 Remy costs less to run.
 
 - **Prompt caching that works.** Providers bill input they have seen before at a half or a tenth of the price, but only when each request starts exactly like the last. Remy now keeps that start fixed: memory notes no longer change the system prompt, the tools offered only grow during a task, older tool results are shortened once instead of a little on every step, and earlier chat turns drop in blocks. Claude models get the cache markers Anthropic needs, directly and through OpenRouter.
+- **Remy knows the moment.** Each message carries the local date and time, your background tasks and your connected apps, so "what's running?" or "what day is it?" needs no lookup.
 - **See the savings.** `remy show` and the sidebar show how much of the input came from the cache, and cached input is priced at its real rate.
 
 ## 0.6.0 (2026-10-28)
