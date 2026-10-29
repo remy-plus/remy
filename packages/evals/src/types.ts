@@ -89,6 +89,8 @@ export interface EvalCase {
      * has `remember` and `forget` and the most relevant notes are in its system prompt.
      */
     memory?: { text: string; kind?: MemoryKind }[];
+    /** Past tasks of the user, for `recall` (needs `memory`). `tainted`: it read untrusted content. */
+    history?: { prompt: string; answer: string; date?: string; tainted?: boolean }[];
   };
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];

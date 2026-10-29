@@ -18,9 +18,11 @@ import {
   askUser,
   calculate,
   createMemoryTools,
+  createRecallTool,
   createScopedFs,
   createWebSearch,
   deleteFile,
+  type Episode,
   editFile,
   fetchUrl,
   finish,
@@ -257,7 +259,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
         ]
       : []),
     ...(c.world.inbox ? ['email_read', 'email_send'] : []),
-    ...(c.world.memory ? ['remember', 'forget'] : []),
+    ...(c.world.memory ? ['remember', 'forget', 'recall'] : []),
     'calculate',
     'update_plan',
   ];
@@ -286,7 +288,17 @@ export async function createWorld(c: EvalCase): Promise<World> {
       return at >= 0;
     },
   };
-  if (c.world.memory) tools.push(...createMemoryTools(memoryPort));
+  if (c.world.memory) {
+    tools.push(...createMemoryTools(memoryPort));
+    const history: Episode[] = (c.world.history ?? []).map((h, i) => ({
+      taskId: `task_past${i + 1}`,
+      date: h.date ?? `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+      prompt: h.prompt,
+      answer: h.answer,
+      tainted: h.tainted ?? false,
+    }));
+    tools.push(createRecallTool(memoryPort, async () => history));
+  }
 
   const mcp = c.world.mcp?.length ? await createMcpWorld(c.world.mcp) : undefined;
   if (mcp) {
