@@ -3,6 +3,7 @@ import { createElement as h } from 'react';
 import { describe, expect, it } from 'vitest';
 import { createTheme } from '../theme.ts';
 import {
+  browserLine,
   contextBar,
   contextLines,
   Sidebar,
@@ -148,5 +149,23 @@ describe('Sidebar', () => {
     expect(out).toContain('CONTEXT');
     expect(out).not.toContain('PLAN');
     expect(out).not.toContain('FILES');
+  });
+});
+
+describe('browser', () => {
+  it('says whether the window shows and which page it is on', () => {
+    expect(browserLine({ visible: false, page: 'https://shop.test/rye' })).toBe(
+      'Hidden · shop.test/rye',
+    );
+    expect(browserLine({ visible: true, page: 'https://shop.test/' })).toBe('Shown · shop.test');
+    expect(browserLine({ visible: false, page: 'about:blank' })).toBe('Hidden');
+    expect(browserLine({ visible: true })).toBe('Shown');
+  });
+
+  it('appears once the browser has been used', () => {
+    expect(frame(base, 30)).not.toContain('BROWSER');
+    const out = frame({ ...base, browser: { visible: false, page: 'https://shop.test/rye' } }, 30);
+    expect(out).toContain('BROWSER');
+    expect(out).toContain('Hidden · shop.test/rye');
   });
 });

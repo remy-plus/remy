@@ -1,4 +1,4 @@
-// The sidebar of the full-screen terminal: session title, context, plan and files, model at the
+// The sidebar of the full-screen terminal: session title, context, browser, plan and files, model at the
 // foot. Pure props in, one column out; sections that do not fit the height drop from the bottom.
 import { Box, Text } from 'ink';
 import { createElement as h, memo, type ReactElement } from 'react';
@@ -17,6 +17,7 @@ export type SidebarState = Pick<
   | 'budgetUsd'
   | 'plan'
   | 'filesTouched'
+  | 'browser'
   | 'model'
 >;
 
@@ -90,6 +91,12 @@ export function contextLines(s: SidebarState): { tokens: string; cost: string } 
   return { tokens: `${s.contextTokens.toLocaleString('en-US')} tokens${pct}${cached}`, cost };
 }
 
+/** "Hidden · shop.test/rye": whether the window shows, and the page without its scheme. */
+export function browserLine(b: NonNullable<SidebarState['browser']>): string {
+  const page = b.page?.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return `${b.visible ? 'Shown' : 'Hidden'}${page && page !== 'about:blank' ? ` · ${page}` : ''}`;
+}
+
 export interface SidebarProps {
   state: SidebarState;
   theme: Theme;
@@ -155,6 +162,18 @@ function SidebarView(p: SidebarProps): ReactElement {
       barRow,
     ),
   });
+
+  if (state.browser)
+    sections.push({
+      key: 'browser',
+      rows: 2,
+      node: h(
+        Box,
+        { key: 'browser', flexDirection: 'column' },
+        heading('Browser'),
+        h(Text, { key: 'b', wrap: 'truncate-end' }, browserLine(state.browser)),
+      ),
+    });
 
   const plan = state.plan ?? [];
   if (plan.length > 0) {
