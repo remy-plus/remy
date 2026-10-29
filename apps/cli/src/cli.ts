@@ -29,11 +29,13 @@ import {
   braveSearch,
   calculate,
   createMemoryTools,
+  createRecallTool,
   createRedactor,
   createScopedFetch,
   createScopedFs,
   createWebSearch,
   deleteFile,
+  type Episode,
   editFile,
   fetchUrl,
   finish,
@@ -73,7 +75,11 @@ import { connectCommand } from './connect.ts';
 import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from './connect-plan.ts';
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
-import { openConversation, savedTurns, summarizeTurns } from './conversation.ts';
+import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
+
+/** Past tasks `recall` searches. */
+const MAX_EPISODES = 300;
+
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
@@ -593,6 +599,36 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return mcp;
   }
 
+  /** Finished tasks never change, so each one is read and folded once per process. */
+  const episodeCache = new Map<string, Episode | null>();
+  /** The user's succeeded tasks, newest first (at most `MAX_EPISODES`), for `recall`. */
+  async function pastTasks(exclude: string): Promise<Episode[]> {
+    const done = (await store.listTasks({ status: 'succeeded' }))
+      .filter((t) => t.taskId !== exclude)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, MAX_EPISODES);
+    const out: Episode[] = [];
+    for (const t of done) {
+      let ep = episodeCache.get(t.taskId);
+      if (ep === undefined) {
+        const events = await store.read(t.taskId);
+        const turn = turnOf(events);
+        ep = turn
+          ? {
+              taskId: t.taskId,
+              date: t.createdAt,
+              prompt: turn.prompt,
+              answer: turn.answer,
+              tainted: fold(events).tainted,
+            }
+          : null;
+        episodeCache.set(t.taskId, ep);
+      }
+      if (ep) out.push(ep);
+    }
+    return out;
+  }
+
   /** Tasks a background worker started, newest first, with what `remy list` would call them. */
   async function backgroundTasks(): Promise<BackgroundTask[]> {
     const out: BackgroundTask[] = [];
@@ -637,7 +673,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       finish,
     ]);
     // Notes about the user: tools and recall exist only while personalising is on.
-    if (personaliseOn(home)) for (const t of createMemoryTools(memory())) tools.add(t);
+    if (personaliseOn(home)) {
+      for (const t of createMemoryTools(memory())) tools.add(t);
+      tools.add(createRecallTool(memory(), pastTasks));
+    }
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),

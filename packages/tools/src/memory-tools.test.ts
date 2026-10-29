@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   cleanMemoryText,
   createMemoryTools,
+  createRecallTool,
+  type Episode,
   MEMORY_MAX_CHARS,
   type MemoryAdd,
   type MemoryEntry,
@@ -247,5 +249,54 @@ describe('recall', () => {
     expect(q).toContain('Porto');
     expect(q).not.toContain('buy shares');
     expect(q).not.toContain('secret');
+  });
+});
+
+describe('recall tool', () => {
+  const ep = (taskId: string, prompt: string, answer: string, tainted = false): Episode => ({
+    taskId,
+    date: '2026-10-21T10:00:00.000Z',
+    prompt,
+    answer,
+    tainted,
+  });
+  const past = [
+    ep('task_inv', 'check the invoice from Acme', 'The Acme invoice is due on 3 November.'),
+    ep('task_web', 'read the Acme pricing page', 'Acme charges $20 a seat.', true),
+    ep('task_cat', 'name ideas for a cat', 'Miso, Tofu, Pixel.'),
+  ];
+
+  it('is a read tool that finds notes and past tasks, but not the current task', async () => {
+    let excluded = '';
+    const tool = createRecallTool(
+      port([note('mem_1', 'Works at Acme', 'about_you', 'now')]),
+      async (x) => {
+        excluded = x;
+        return past.slice(0, 1);
+      },
+    );
+    expect(tool).toMatchObject({ risk: 'read', effect: 'none' });
+    const r = await tool.execute({ query: 'Acme invoice' }, ctx);
+    expect(excluded).toBe('task_1');
+    expect(r).toMatchObject({ ok: true, trust: 'trusted' });
+    const text = r.ok ? r.content : '';
+    expect(text).toContain('[mem_1] "Works at Acme"');
+    expect(text).toContain('2026-10-21 task_inv: asked "check the invoice from Acme"');
+    expect(text).not.toContain('cat');
+  });
+
+  it('is untrusted when a task it returns had read untrusted content', async () => {
+    const tool = createRecallTool(port(), async () => past);
+    const r = await tool.execute({ query: 'Acme pricing seat' }, ctx);
+    expect(r).toMatchObject({ ok: true, trust: 'untrusted' });
+  });
+
+  it('says so when nothing matches, and leaves notes out with memory off', async () => {
+    const tool = createRecallTool(
+      port([note('mem_1', 'Works at Acme', 'about_you', 'now')], { on: false }),
+      async () => [],
+    );
+    const r = await tool.execute({ query: 'Acme' }, ctx);
+    expect(r).toMatchObject({ ok: true, content: 'Nothing saved or done before matches that.' });
   });
 });
