@@ -9,7 +9,7 @@ export interface VerifyOptions {
   timeoutMs?: number;
 }
 
-/** One cheap request (list models) that tells a good key from a bad one. The key is never put in a URL. */
+/** One cheap request (list models, or OpenRouter's key info) that tells a good key from a bad one. The key is never put in a URL. */
 export async function verifyKey(o: VerifyOptions): Promise<KeyCheck> {
   const base = o.baseUrl.replace(/\/+$/, '');
   const kind = o.kind ?? 'openai';
@@ -22,7 +22,11 @@ export async function verifyKey(o: VerifyOptions): Promise<KeyCheck> {
   } else if (kind === 'google') {
     if (o.key) headers['x-goog-api-key'] = o.key;
     url += '?pageSize=1';
-  } else if (o.key) headers.authorization = `Bearer ${o.key}`;
+  } else {
+    if (o.key) headers.authorization = `Bearer ${o.key}`;
+    // OpenRouter lists its models to anyone, any key; its key endpoint checks the key.
+    if (/^https?:\/\/([^/]+\.)?openrouter\.ai(\/|$)/i.test(base)) url = `${base}/key`;
+  }
   try {
     const res = await (o.fetchImpl ?? fetch)(url, {
       headers,
