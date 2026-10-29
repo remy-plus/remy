@@ -9,7 +9,9 @@ import {
   rank,
   SELECT_THRESHOLD,
   SELECT_TOP,
+  STICKY_MAX,
   selectToolNames,
+  stickyToolNames,
   tokenize,
 } from './select.ts';
 import type { TaskState } from './state.ts';
@@ -152,5 +154,39 @@ describe('find_tools', () => {
     expect(await none.execute({ query: 'read' }, {} as ToolContext)).toMatchObject({
       data: { names: [] },
     });
+  });
+});
+
+describe('stickyToolNames', () => {
+  const reg = new ToolRegistry([...builtins(), ...sixtyTools()]);
+  const sel = sixtyTools().map((t) => t.name);
+  const all = () => true;
+
+  it('keeps earlier tools in order and adds new picks at the end', () => {
+    const prev = ['read_file', 'finish', sel[0] as string, sel[1] as string];
+    const picked = ['read_file', 'finish', sel[2] as string, sel[0] as string];
+    expect(stickyToolNames(reg, prev, picked, all)).toEqual([...prev, sel[2]]);
+  });
+
+  it('drops tools no longer permitted, and starts again past the cap', () => {
+    const prev = ['finish', sel[0] as string];
+    expect(stickyToolNames(reg, prev, ['finish'], (n) => n !== sel[0])).toEqual(['finish']);
+    const many = sel.slice(0, STICKY_MAX);
+    const picked = [sel[STICKY_MAX] as string];
+    expect(stickyToolNames(reg, many, picked, all)).toEqual(picked);
+  });
+
+  it('is the pick itself on the first step', () => {
+    expect(stickyToolNames(reg, undefined, ['finish'], all)).toEqual(['finish']);
+  });
+});
+
+describe('ToolRegistry.specs', () => {
+  it('follows the order of the names it is given', () => {
+    const reg = new ToolRegistry(builtins());
+    expect(reg.specs(['ask_user', 'read_file']).map((t) => t.name)).toEqual([
+      'ask_user',
+      'read_file',
+    ]);
   });
 });

@@ -10,6 +10,8 @@ import { FIND_TOOLS, type Tool } from './types.ts';
 export const SELECT_THRESHOLD = 12;
 /** How many selectable tools a step offers from scoring. */
 export const SELECT_TOP = 12;
+/** Within a task the offered selectable tools only grow, up to this many; past it the list starts again from the current pick. */
+export const STICKY_MAX = 24;
 /** Most tools one `find_tools` call returns. */
 export const FIND_TOOLS_LIMIT = 8;
 /** Most discovered tools kept on offer (newest win) so a long task cannot grow the tool list. */
@@ -123,6 +125,25 @@ export function selectToolNames(tools: ToolRegistry, s: TaskState, candidates: s
   const docs = candidates.filter((n) => sel.has(n)).map((n) => docOf(tools.get(n) as Tool));
   for (const n of rank(docs, selectionQuery(s), SELECT_TOP)) keep.add(n);
   return candidates.filter((n) => !sel.has(n) || keep.has(n));
+}
+
+/**
+ * The tools to offer this step, keeping what was offered before in the same order and adding new
+ * picks at the end, so the tool list (the start of every request) stays byte-identical and the
+ * provider's prompt cache keeps working. Tools no longer permitted drop out. Past `STICKY_MAX`
+ * selectable tools it starts again from `picked`.
+ */
+export function stickyToolNames(
+  tools: ToolRegistry,
+  previous: string[] | undefined,
+  picked: string[],
+  permitted: (name: string) => boolean,
+): string[] {
+  if (!previous) return picked;
+  const merged = previous.filter(permitted);
+  for (const n of picked) if (!merged.includes(n)) merged.push(n);
+  const sel = new Set(selectableTools(tools).map((t) => t.name));
+  return merged.filter((n) => sel.has(n)).length > STICKY_MAX ? picked : merged;
 }
 
 /** The `find_tools` tool for a registry. Only lists our own registry, so its output is trusted. */

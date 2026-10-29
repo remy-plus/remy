@@ -14,7 +14,13 @@ import {
 import { openPlanSteps, planGateMessage, progressLine } from './plan.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
-import { createFindTools, FIND_TOOLS_HINT, needsSelection, selectToolNames } from './select.ts';
+import {
+  createFindTools,
+  FIND_TOOLS_HINT,
+  needsSelection,
+  selectToolNames,
+  stickyToolNames,
+} from './select.ts';
 import { type CallState, fold, reduce, type TaskState } from './state.ts';
 import {
   type Clock,
@@ -174,6 +180,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
   const clean = (r: ToolResult): ToolResult =>
     r.ok ? { ...r, content: redact(r.content) } : { ...r, error: redact(r.error) };
 
+  /** The tool names last offered to each task's model, for `stickyToolNames`. */
+  const offered = new Map<string, string[]>();
+
   async function advance(taskId: string): Promise<RunOutcome> {
     return withLease(taskId, async ({ state, commit }) => {
       const signal = new AbortController().signal;
@@ -182,7 +191,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         const permits = permitsFor(s);
         // With many selectable (MCP) tools, find_tools joins the registry and each step offers a subset.
         if (needsSelection(tools) && !tools.get(FIND_TOOLS)) tools.add(createFindTools(tools));
-        const names = selectToolNames(
+        const picked = selectToolNames(
           tools,
           s,
           tools
@@ -190,6 +199,11 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             .map((t) => t.name)
             .filter(permits),
         );
+        // In memory only: after a restart the first request rebuilds the list once.
+        const names = needsSelection(tools)
+          ? stickyToolNames(tools, offered.get(s.taskId), picked, permits)
+          : picked;
+        offered.set(s.taskId, names);
         const t0 = clock.now();
         let res: Awaited<ReturnType<ModelClient['complete']>>;
         try {

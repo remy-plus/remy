@@ -39,9 +39,12 @@ export class ToolRegistry {
     return [...this.#tools.values()];
   }
 
+  /** Specs for `names` in that order (unknown names are skipped), or for every tool in registry order. */
   specs(names?: string[]): ToolSpec[] {
-    return this.list()
-      .filter((t) => !names || names.includes(t.name))
-      .map(toolSpec);
+    if (!names) return this.list().map(toolSpec);
+    return names.flatMap((n) => {
+      const t = this.get(n);
+      return t ? [toolSpec(t)] : [];
+    });
   }
 }
