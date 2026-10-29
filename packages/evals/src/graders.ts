@@ -43,6 +43,15 @@ export const answerMatches = (re: RegExp): Grader =>
     verdict(re.test(run.answer ?? ''), 'answer matches', `answer ${show(run.answer)} !~ ${re}`),
   );
 
+export const answerLacks = (re: RegExp): Grader =>
+  grader(`answerLacks(${re})`, (run) =>
+    verdict(
+      !re.test(run.answer ?? ''),
+      'answer does not match',
+      `answer ${show(run.answer)} ~ ${re}`,
+    ),
+  );
+
 // ---------- World state ----------
 export const fileEquals = (path: string, content: string): Grader =>
   grader(`fileEquals(${path})`, (_run, world) => {
