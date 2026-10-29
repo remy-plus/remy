@@ -421,6 +421,8 @@ Owner's goal: Remy should do "pretty much anything, only limited by the model's 
 
 **Decision:** build capability in the terminal before the web app. Remy runs on the user's machine, so it can use a real browser, local files and apps without the cloud infrastructure Phase 1 needs. Phase 1 (web app) moves after 0.10 and reuses everything below through the same `Runtime` interface. The safety rules do not change: longer unattended runs come from standing approvals and risk classes, never from weaker gates. Each release ships only when its eval suite passes and safety and recovery stay at 100%.
 
+**Update (2026-10-28, owner):** **1.0.0 is the web app**, and it has to look really polished and catch people's eye. Work toward it during 0.8.0 and 0.9.0: alongside their capability work, build the design system from `branding/`, design and prototype the core web screens early, and lay the Phase 1 server pieces. Open question for the owner: 0.10 (skills + sub-agents) folds into 0.9 or follows 1.0. Next up for 0.8 from live testing: web search with only the model's key, and one key check on every login path.
+
 | Release | Capability | Pulled forward from |
 |---|---|---|
 | **0.4.1** | Terminal feel: input-priority frame pacing, stdout backpressure, send now vs queue (`design/research/engineering/claude-code-terminal.md`) | — |
