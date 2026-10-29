@@ -1,6 +1,6 @@
 // The scrolling region: one Ink line per row, only the rows in view. No JSX; createElement.
 import { Box, Text } from 'ink';
-import { createElement as h, type ReactElement } from 'react';
+import { createElement as h, memo, type ReactElement } from 'react';
 import { spanProps } from '../span-style.ts';
 import type { Role, Theme } from '../theme.ts';
 import type { Row, RSpan } from './rows.ts';
@@ -17,8 +17,12 @@ function textProps(sp: RSpan, theme: Theme) {
 
 const BAR_ROLE = { accent: 'accent', error: 'error', faint: 'faint' } as const;
 
-/** One row, exactly one terminal line tall, `width` columns wide. */
-export function RowView(p: { row: Row; width: number; theme: Theme }): ReactElement {
+/** One row, exactly one terminal line tall, `width` columns wide. Memoised: rows are cached, so a keypress redraws none of them. */
+export const RowView = memo(function RowView(p: {
+  row: Row;
+  width: number;
+  theme: Theme;
+}): ReactElement {
   const { row, theme } = p;
   const body = h(
     Text,
@@ -43,10 +47,13 @@ export function RowView(p: { row: Row; width: number; theme: Theme }): ReactElem
       body,
     ),
   );
-}
+});
 
-/** The slice of `rows` that fits, from `top`. Short content leaves the rest of the area blank. */
-export function Viewport(p: {
+/**
+ * The slice of `rows` that fits, from `top`. Short content leaves the rest of the area blank.
+ * Memoised, so typing in the prompt (which changes none of its props) does not redraw the session.
+ */
+export const Viewport = memo(function Viewport(p: {
   rows: Row[];
   top: number;
   height: number;
@@ -65,4 +72,4 @@ export function Viewport(p: {
     },
     ...shown.map((row, i) => h(RowView, { key: p.top + i, row, width: p.width, theme: p.theme })),
   );
-}
+});

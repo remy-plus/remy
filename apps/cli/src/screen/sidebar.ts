@@ -1,7 +1,7 @@
 // The sidebar of the full-screen terminal: session title, context, plan and files, model at the
 // foot. Pure props in, one column out; sections that do not fit the height drop from the bottom.
 import { Box, Text } from 'ink';
-import { createElement as h, type ReactElement } from 'react';
+import { createElement as h, memo, type ReactElement } from 'react';
 import type { ChatState } from '../chat.ts';
 import type { Theme } from '../theme.ts';
 
@@ -110,7 +110,7 @@ interface Section {
   node: Node;
 }
 
-export function Sidebar(p: SidebarProps): ReactElement {
+function SidebarView(p: SidebarProps): ReactElement {
   const { state, theme, height } = p;
   const width = p.width ?? SIDEBAR_WIDTH;
   const inner = Math.max(1, width - PAD_X * 2);
@@ -238,3 +238,6 @@ export function Sidebar(p: SidebarProps): ReactElement {
     state.model ? h(Text, { wrap: 'truncate-end', ...muted }, state.model) : null,
   );
 }
+
+/** Memoised: a keypress in the prompt changes none of its props, so it is not redrawn. */
+export const Sidebar = memo(SidebarView);
