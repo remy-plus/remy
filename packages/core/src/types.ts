@@ -199,6 +199,11 @@ export type Event =
     }
   /** A quiet one-line status, recorded every few steps on long tasks. */
   | { type: 'progress'; step: number; text: string }
+  /**
+   * The model stopped in plain text with plan steps still open; `text` goes back to it as a
+   * message and it carries on. Once per task, like the plan gate on `finish`.
+   */
+  | { type: 'plan.gated'; text: string }
   | { type: 'task.finished'; status: FinalStatus; answer?: string; reason?: string };
 
 export type EventType = Event['type'];

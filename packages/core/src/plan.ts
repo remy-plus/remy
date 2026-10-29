@@ -36,6 +36,7 @@ export const openPlanSteps = (s: TaskState): PlanStep[] =>
 export const PLAN_GATE_PREFIX = 'Not finished yet: your plan still has open steps.';
 
 export const planGateUsed = (s: TaskState): boolean =>
+  s.planGated ||
   Object.values(s.calls).some(
     (c) =>
       c.tool === 'finish' &&
@@ -47,6 +48,12 @@ export const planGateUsed = (s: TaskState): boolean =>
 export function planGateMessage(open: PlanStep[]): string {
   const list = open.map((p) => `- ${p.text} (${p.status})`).join('\n');
   return `${PLAN_GATE_PREFIX}\n${list}\nFinish them, or call update_plan with those steps marked skipped and a reason in the step text (for example "Compare prices: skipped, site was down"), then finish.`;
+}
+
+/** Sent back when the model stops in plain text, for example to ask whether to go on, with steps open. */
+export function planGateTextMessage(open: PlanStep[]): string {
+  const list = open.map((p) => `- ${p.text} (${p.status})`).join('\n');
+  return `(From Remy, not the user.) ${PLAN_GATE_PREFIX}\n${list}\nThe user asked you to do this work, so do not stop to ask whether to continue: carry on with the next step now. If a step cannot be done, call update_plan with it marked skipped and a reason, then finish. Ask with ask_user only if you need something only the user knows.`;
 }
 
 /** One line for a progress note, from the plan. No model call. */

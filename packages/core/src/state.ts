@@ -67,6 +67,8 @@ export interface TaskState {
   initialBudget: Budget;
   /** The step of the last progress note (0: none yet). */
   progressAt: number;
+  /** The plan gate already sent a plain-text stop back to work (see `plan.gated`). */
+  planGated: boolean;
   cancelRequested: boolean;
   final?: { status: FinalStatus; answer?: string; reason?: string };
 }
@@ -92,6 +94,7 @@ const ALLOWED_FROM: Record<Exclude<EventType, 'task.created'>, TaskStatus[]> = {
   'budget.exhausted': ['running'],
   'budget.extended': ['paused'],
   progress: ['running'],
+  'plan.gated': ['running'],
   'task.cancel_requested': OPEN,
   'task.finished': OPEN,
 };
@@ -125,6 +128,7 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
       config: { ...e.config, budget: { ...e.config.budget } },
       initialBudget: { ...e.config.budget },
       progressAt: 0,
+      planGated: false,
       status: 'running',
       seq: 1,
       createdAt: Date.parse(stored.at),
@@ -316,6 +320,10 @@ function on(s: TaskState, e: Event) {
       return;
     case 'progress':
       s.progressAt = e.step;
+      return;
+    case 'plan.gated':
+      s.planGated = true;
+      s.log.push({ kind: 'user', text: e.text });
       return;
     case 'task.cancel_requested':
       s.cancelRequested = true;

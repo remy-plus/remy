@@ -15,6 +15,8 @@ export type Action =
   | { kind: 'progress' }
   /** `finish` while the plan has open steps: answer it with a tool error, once. */
   | { kind: 'gate_finish'; callId: string }
+  /** A plain-text stop with plan steps open: send the model back to work once. */
+  | { kind: 'gate_text' }
   | { kind: 'decide'; callId: string }
   | { kind: 'request_approval'; callId: string }
   | { kind: 'execute'; callId: string }
@@ -68,6 +70,7 @@ export function nextAction(s: TaskState, now: number): Action {
   if (s.step > 0 && calls.length === 0 && last?.kind === 'model') {
     const text = last.text?.trim() ?? '';
     if (isQuestion(text)) return { kind: 'ask', question: text };
+    if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
 

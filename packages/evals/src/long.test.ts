@@ -152,6 +152,53 @@ describe('plan gate', () => {
     });
   });
 
+  it('sends a plain-text stop with open steps back to work, once', async () => {
+    const store = new MemoryEventStore();
+    const text = (t: string): ModelResponse => ({
+      text: t,
+      calls: [],
+      usage: { inTokens: 1, outTokens: 1 },
+    });
+    const model = new ScriptedModelClient([
+      plan('done', 'pending'),
+      text('Here is my plan for the rest. Would you like me to proceed with the next steps?'),
+      plan('done', 'done'),
+      text('Done: here is the comparison.'),
+    ]);
+    const rt = make(store, model);
+    const id = await rt.start('go', config());
+    expect(await rt.advance(id)).toMatchObject({
+      status: 'succeeded',
+      answer: 'Done: here is the comparison.',
+    });
+    const gated = (await store.read(id)).filter((e) => e.event.type === 'plan.gated');
+    expect(gated).toHaveLength(1);
+    // The model saw the gate as a message right after its plain-text stop.
+    const seen = model.requests[2]?.messages.at(-1);
+    expect(seen).toMatchObject({
+      role: 'user',
+      content: expect.stringContaining('Step 2 (pending)'),
+    });
+  });
+
+  it('lets a second plain-text stop through, so it cannot loop', async () => {
+    const text = (t: string): ModelResponse => ({
+      text: t,
+      calls: [],
+      usage: { inTokens: 1, outTokens: 1 },
+    });
+    const model = new ScriptedModelClient([
+      plan('done', 'pending'),
+      text('I will stop here for now, the rest needs more time.'),
+      text('Stopping here; step 2 could not be done.'),
+    ]);
+    const rt = make(new MemoryEventStore(), model);
+    expect(await rt.advance(await rt.start('go', config()))).toMatchObject({
+      status: 'succeeded',
+      answer: 'Stopping here; step 2 could not be done.',
+    });
+  });
+
   it('does nothing without a plan', async () => {
     const model = new ScriptedModelClient([call('finish', { answer: 'ok' })]);
     const rt = make(new MemoryEventStore(), model);

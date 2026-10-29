@@ -105,6 +105,8 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
         return `continued by ${ev.by}: now up to ${ev.maxSteps} steps and $${ev.maxCostUsd.toFixed(2)}`;
       case 'progress':
         return st.dim(`progress: ${ev.text}`);
+      case 'plan.gated':
+        return st.dim('stopped with plan steps open: sent back to work');
       case 'task.cancel_requested':
         return `cancel requested by ${ev.by}`;
       case 'task.finished':

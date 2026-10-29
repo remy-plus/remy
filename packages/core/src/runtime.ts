@@ -11,7 +11,7 @@ import {
   MAX_TOOL_ATTEMPTS,
   nextAction,
 } from './next.ts';
-import { openPlanSteps, planGateMessage, progressLine } from './plan.ts';
+import { openPlanSteps, planGateMessage, planGateTextMessage, progressLine } from './plan.ts';
 import { authorize, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
 import {
@@ -424,6 +424,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             break;
           case 'progress':
             await commit([{ type: 'progress', step: s.step, text: progressLine(s) }]);
+            break;
+          case 'gate_text':
+            await commit([{ type: 'plan.gated', text: planGateTextMessage(openPlanSteps(s)) }]);
             break;
           case 'gate_finish':
             if (!c) break;
