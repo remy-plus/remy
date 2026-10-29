@@ -61,6 +61,14 @@ describe('conversation context', () => {
     expect(out[0]?.content).toBe('q5');
   });
 
+  it('drops turns in blocks, so the first message stays the same for several turns', () => {
+    const firstFor = (n: number) =>
+      renderContext(Array.from({ length: n }, (_, i) => turn(i)))[0]?.content;
+    const firsts = [11, 12, 13, 14, 15].map(firstFor);
+    expect(new Set(firsts)).toEqual(new Set(['q5']));
+    expect(firstFor(16)).toBe('q10');
+  });
+
   it('drops the oldest turns once the character cap is reached', () => {
     const size = Math.floor(MAX_CONTEXT_CHARS / 3) - 10;
     const out = renderContext([turn(1, size), turn(2, size), turn(3, size), turn(4, size)]);

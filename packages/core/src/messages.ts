@@ -46,15 +46,29 @@ export function fencePasted(text: string, pasted: string[] | undefined): string 
 export const MAX_CONTEXT_TURNS = 10;
 export const MAX_CONTEXT_CHARS = 8000;
 
-/** Earlier answers are the agent's own words, so they are trusted. Oldest turns drop first. */
+/** Turns are dropped in blocks of this many, counted from the first turn given. */
+const CONTEXT_STEP = MAX_CONTEXT_TURNS / 2;
+
+const turnChars = (ts: ConversationTurn[]) =>
+  ts.reduce((n, t) => n + t.prompt.length + t.answer.length, 0);
+
+/**
+ * Earlier answers are the agent's own words, so they are trusted. Oldest turns drop first, in
+ * blocks: the kept turns start at a multiple of `CONTEXT_STEP` from the first turn given, so the
+ * first message stays the same for several turns and the provider's prompt cache keeps working.
+ * When even the newest block is over the character cap, its oldest turns drop one by one.
+ */
 export function renderContext(turns: ConversationTurn[] | undefined): Message[] {
-  const kept: ConversationTurn[] = [];
-  let chars = 0;
-  for (const t of (turns ?? []).slice(-MAX_CONTEXT_TURNS).reverse()) {
-    chars += t.prompt.length + t.answer.length;
-    if (chars > MAX_CONTEXT_CHARS) break;
-    kept.unshift(t);
-  }
+  const all = turns ?? [];
+  let start = 0;
+  while (
+    start < all.length &&
+    (all.length - start > MAX_CONTEXT_TURNS || turnChars(all.slice(start)) > MAX_CONTEXT_CHARS)
+  )
+    start += CONTEXT_STEP;
+  if (start >= all.length) start = Math.max(0, start - CONTEXT_STEP);
+  const kept = all.slice(start);
+  while (kept.length && turnChars(kept) > MAX_CONTEXT_CHARS) kept.shift();
   return kept.flatMap((t): Message[] => [
     { role: 'user', content: fencePasted(t.prompt, t.pasted) },
     { role: 'assistant', content: t.answer },

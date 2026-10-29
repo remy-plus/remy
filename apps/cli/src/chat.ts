@@ -302,6 +302,14 @@ export interface Chat {
 /** Earlier turns sent as context are capped so a long chat does not outgrow the model. */
 export const MAX_CONTEXT_TURNS = 20;
 
+/**
+ * Past the cap the oldest half goes at once, not one turn per message: the first turn sent then
+ * stays the same for ten messages at a time, so the provider's prompt cache keeps working.
+ */
+export function keepTurns<T>(turns: T[]): T[] {
+  return turns.length > MAX_CONTEXT_TURNS ? turns.slice(MAX_CONTEXT_TURNS / 2) : turns;
+}
+
 export const HELP_TEXT = [
   'Type a message and press Enter. Remy answers, and asks before anything it should not do alone.',
   '',
@@ -715,10 +723,10 @@ export function createChat(deps: ChatDeps): Chat {
         const prompt = current?.prompt ?? '';
         if (o.status === 'succeeded') {
           const answer = o.answer?.trim() || 'Done.';
-          turns = [
+          turns = keepTurns([
             ...turns,
             { prompt, answer, ...(current?.pasted?.length && { pasted: current.pasted }) },
-          ].slice(-MAX_CONTEXT_TURNS);
+          ]);
           const ms = s.turnStartedAt === undefined ? undefined : Date.now() - s.turnStartedAt;
           return await end(true, {
             kind: 'reply',

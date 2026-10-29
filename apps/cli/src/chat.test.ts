@@ -17,6 +17,8 @@ import {
   type ChatDeps,
   createChat,
   friendlyError,
+  keepTurns,
+  MAX_CONTEXT_TURNS,
   parsePlan,
   releaseLease,
   resumeBanner,
@@ -726,5 +728,13 @@ describe('/bg', () => {
     const notes = noteTexts(chat);
     expect(notes[0]).toContain('Use /bg <task>');
     expect(notes[1]).toContain('no model');
+  });
+});
+
+describe('keepTurns', () => {
+  it('drops the oldest half at once past the cap', () => {
+    const n = (k: number) => Array.from({ length: k }, (_, i) => i);
+    expect(keepTurns(n(MAX_CONTEXT_TURNS))).toHaveLength(MAX_CONTEXT_TURNS);
+    expect(keepTurns(n(MAX_CONTEXT_TURNS + 1))[0]).toBe(MAX_CONTEXT_TURNS / 2);
   });
 });
