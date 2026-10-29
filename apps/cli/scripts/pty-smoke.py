@@ -223,7 +223,23 @@ def start_fake_model(delay: float = 0.02):
             pass
 
         def do_POST(self):
-            self.rfile.read(int(self.headers.get("content-length") or 0))
+            raw = self.rfile.read(int(self.headers.get("content-length") or 0))
+            try:
+                wants_stream = bool(json.loads(raw or b"{}").get("stream"))
+            except ValueError:
+                wants_stream = True
+            if not wants_stream:
+                # One JSON reply, as for the chat's summary call.
+                body = json.dumps({"id": "x", "object": "chat.completion", "model": "fake",
+                                   "choices": [{"index": 0, "finish_reason": "stop",
+                                                "message": {"role": "assistant", "content": "".join(FAKE_TOKENS).strip()}}],
+                                   "usage": {"prompt_tokens": 10, "completion_tokens": 10}}).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             self.send_response(200)
             self.send_header("content-type", "text/event-stream")
             self.end_headers()

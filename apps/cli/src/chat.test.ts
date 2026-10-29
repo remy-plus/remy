@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type ConversationTurn,
   createRuntime,
   DEFAULT_BUDGET,
   type ModelClient,
@@ -56,6 +57,7 @@ function harness(
 ) {
   const store = new MemoryEventStore();
   const contexts: number[] = [];
+  const seen: ConversationTurn[][] = [];
   const chat: Chat = createChat({
     runtime: (hooks) =>
       createRuntime({
@@ -73,6 +75,7 @@ function harness(
       }),
     config: (context) => {
       contexts.push(context.length);
+      seen.push(context);
       return {
         model: model.id,
         permissions: { autoApprove },
@@ -86,7 +89,7 @@ function harness(
     release: releaseLease(store, 'chat-test'),
     ...extra,
   });
-  return { chat, store, contexts };
+  return { chat, store, contexts, seen };
 }
 
 const replies = (chat: Chat) =>
@@ -744,8 +747,8 @@ describe('the ongoing conversation', () => {
     const recorded: string[] = [];
     let resets = 0;
     const saved = [
-      { prompt: 'what is 2+2', answer: 'Four.' },
-      { prompt: 'and 3+3', answer: 'Six.' },
+      { taskId: 'task_a', turn: { prompt: 'what is 2+2', answer: 'Four.' } },
+      { taskId: 'task_b', turn: { prompt: 'and 3+3', answer: 'Six.' } },
     ];
     const { chat, contexts } = harness(new ScriptedModelClient([done('Eight.')]), undefined, {
       conversation: { turns: saved, onTurn: (id) => recorded.push(id), onNew: () => resets++ },
@@ -759,5 +762,55 @@ describe('the ongoing conversation', () => {
     expect(recorded[0]).toMatch(/^task_/);
     await chat.submit('/new');
     expect(resets).toBe(1);
+  });
+});
+
+describe('compaction', () => {
+  const eleven = Array.from({ length: 10 }, (_, i) => ({
+    taskId: `task_${i}`,
+    turn: { prompt: `q${i}`, answer: `a${i}` },
+  }));
+
+  it('folds the oldest half into a summary that leads the next context', async () => {
+    const folded: string[][] = [];
+    const summaries: [string, string][] = [];
+    const { chat, seen } = harness(new ScriptedModelClient([done('A.'), done('B.')]), undefined, {
+      conversation: {
+        turns: eleven,
+        onTurn: () => {},
+        onNew: () => {},
+        onSummary: (text, upTo) => summaries.push([text, upTo]),
+      },
+      summarize: async (_prev, turns) => {
+        folded.push(turns.map((t) => t.prompt));
+        return { text: 'SUMMARY', costUsd: 0.001 };
+      },
+    });
+    await chat.submit('eleventh');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(folded).toEqual([['q0', 'q1', 'q2', 'q3', 'q4']]);
+    expect(summaries).toEqual([['SUMMARY', 'task_4']]);
+    await chat.submit('twelfth');
+    const next = seen.at(-1) ?? [];
+    expect(next[0]).toEqual({ prompt: '', answer: 'SUMMARY', summary: true });
+    expect(next.slice(1).map((t) => t.prompt)).toEqual(['q5', 'q6', 'q7', 'q8', 'q9', 'eleventh']);
+    expect(chat.getState().costUsd).toBeGreaterThanOrEqual(0.001);
+  });
+
+  it('drops the oldest turns when the summary fails', async () => {
+    const { chat, contexts } = harness(
+      new ScriptedModelClient([done('A.'), done('B.')]),
+      undefined,
+      {
+        conversation: { turns: eleven, onTurn: () => {}, onNew: () => {} },
+        summarize: async () => {
+          throw new Error('down');
+        },
+      },
+    );
+    await chat.submit('eleventh');
+    await new Promise((r) => setTimeout(r, 0));
+    await chat.submit('twelfth');
+    expect(contexts).toEqual([10, 6]);
   });
 });

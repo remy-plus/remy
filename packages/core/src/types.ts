@@ -77,6 +77,12 @@ export interface ConversationTurn {
   /** Pasted segments of `prompt`, fenced when the turn is replayed as context. */
   pasted?: string[];
   answer: string;
+  /**
+   * A summary of the turns before the ones kept (in `answer`; `prompt` is empty). Written by the
+   * model from the user's typed words and Remy's answers, never from pasted text, so it is as
+   * trusted as the turns themselves. Only ever the first turn; always kept.
+   */
+  summary?: boolean;
 }
 
 /** What `--long` sets: for big jobs the user expects to take a while. */

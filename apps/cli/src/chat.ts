@@ -253,10 +253,21 @@ export interface ChatDeps {
    * turn and each fresh start is recorded so the next `remy` opens where this one left off.
    */
   conversation?: {
-    turns: ConversationTurn[];
+    /** Oldest first; a summary turn, when there is one, comes first. */
+    turns: { taskId: string; turn: ConversationTurn }[];
     onTurn: (taskId: string) => void;
     onNew: () => void;
+    /** A summary now covers every turn up to and including `upTo`. */
+    onSummary?: (text: string, upTo: string) => void;
   };
+  /**
+   * Folds turns that no longer fit into a short summary (with the previous one, if any). Without
+   * it, or when it fails, the oldest turns are dropped instead.
+   */
+  summarize?: (
+    previous: string | undefined,
+    turns: ConversationTurn[],
+  ) => Promise<{ text: string; costUsd: number }>;
 }
 
 export interface Chat {
@@ -308,8 +319,11 @@ export interface Chat {
   startTask(prompt: string, workspaceDir: string): Promise<void>;
 }
 
-/** Earlier turns sent as context are capped so a long chat does not outgrow the model. */
-export const MAX_CONTEXT_TURNS = 20;
+/**
+ * Earlier turns sent word for word are capped so a long chat does not outgrow the model (the
+ * same cap core applies); older ones are folded into a summary.
+ */
+export const MAX_CONTEXT_TURNS = 10;
 
 /**
  * Past the cap the oldest half goes at once, not one turn per message: the first turn sent then
@@ -325,7 +339,8 @@ export function keepTurns<T>(turns: T[]): T[] {
 export const RESUME_SHOWN = 3;
 
 /** The transcript a saved conversation opens with: its last few exchanges and a line on /new. */
-export function resumedItems(turns: ConversationTurn[]): Item[] {
+export function resumedItems(all: ConversationTurn[]): Item[] {
+  const turns = all.filter((t) => !t.summary);
   if (!turns.length) return [];
   return [
     ...turns.slice(-RESUME_SHOWN).flatMap((t): Item[] => [
@@ -459,11 +474,46 @@ export function createChat(deps: ChatDeps): Chat {
     contextWindow: deps.contextWindow,
     ...(deps.model && { model: deps.model }),
     ...(deps.theme && { theme: deps.theme }),
-    items: resumedItems(deps.conversation?.turns ?? []),
+    items: resumedItems((deps.conversation?.turns ?? []).map((t) => t.turn)),
     // With no model yet, the chat opens on the login panel.
     ...(deps.connect && !deps.model && { overlay: 'login' as const }),
   };
-  let turns: ConversationTurn[] = keepTurns(deps.conversation?.turns ?? []);
+  // The conversation so far: a summary of what no longer fits, then the turns sent word for word.
+  const saved = deps.conversation?.turns ?? [];
+  let summary = saved[0]?.turn.summary ? saved[0].turn : undefined;
+  let turns = keepTurns(saved.filter((t) => !t.turn.summary));
+  let compacting = false;
+  const context = (): ConversationTurn[] => [
+    ...(summary ? [summary] : []),
+    ...turns.map((t) => t.turn),
+  ];
+
+  /** Folds the oldest half into the summary once the turns pass the cap; drops it without a summarizer. */
+  async function compact() {
+    if (turns.length <= MAX_CONTEXT_TURNS || compacting) return;
+    const fold = turns.slice(0, MAX_CONTEXT_TURNS / 2);
+    const last = fold.at(-1)?.taskId as string;
+    if (!deps.summarize) {
+      turns = keepTurns(turns);
+      return;
+    }
+    compacting = true;
+    try {
+      const r = await deps.summarize(
+        summary?.answer,
+        fold.map((t) => t.turn),
+      );
+      summary = { prompt: '', answer: r.text, summary: true };
+      turns = turns.filter((t) => !fold.includes(t));
+      set({ costUsd: s.costUsd + r.costUsd });
+      deps.conversation?.onSummary?.(r.text, last);
+    } catch {
+      // A failed summary must not lose the chat: drop the oldest turns as before.
+      turns = keepTurns(turns);
+    } finally {
+      compacting = false;
+    }
+  }
   let minimal = deps.minimal ?? false;
   const sent: string[] = [];
   const listeners = new Set<() => void>();
@@ -750,11 +800,15 @@ export function createChat(deps: ChatDeps): Chat {
         const prompt = current?.prompt ?? '';
         if (o.status === 'succeeded') {
           const answer = o.answer?.trim() || 'Done.';
-          turns = keepTurns([
+          turns = [
             ...turns,
-            { prompt, answer, ...(current?.pasted?.length && { pasted: current.pasted }) },
-          ]);
+            {
+              taskId: id,
+              turn: { prompt, answer, ...(current?.pasted?.length && { pasted: current.pasted }) },
+            },
+          ];
           deps.conversation?.onTurn(id);
+          void compact();
           const ms = s.turnStartedAt === undefined ? undefined : Date.now() - s.turnStartedAt;
           return await end(true, {
             kind: 'reply',
@@ -849,7 +903,9 @@ export function createChat(deps: ChatDeps): Chat {
       if (files) for (const n of files.notes) commit({ kind: 'note', text: n });
       const prompt = files?.prompt ?? text;
       const pasted = [...(typedPaste ?? []), ...(files?.pasted ?? [])];
-      const base = folder ? { ...deps.config(turns), workspaceDir: folder } : deps.config(turns);
+      const base = folder
+        ? { ...deps.config(context()), workspaceDir: folder }
+        : deps.config(context());
       workspaceDir = base.workspaceDir;
       const config = pasted.length ? { ...base, pasted } : base;
       set({ budgetUsd: config.budget.maxCostUsd });
@@ -950,6 +1006,7 @@ export function createChat(deps: ChatDeps): Chat {
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
       turns = [];
+      summary = undefined;
       deps.conversation?.onNew();
       if (deps.newClears) set({ items: [], title: undefined, filesTouched: undefined });
       else {
@@ -958,6 +1015,7 @@ export function createChat(deps: ChatDeps): Chat {
       }
     } else if (name === 'clear') {
       turns = [];
+      summary = undefined;
       deps.conversation?.onNew();
       // The screen wipes itself and prints the header again; the transcript starts empty.
       set({ items: [], clears: s.clears + 1, title: undefined, filesTouched: undefined });

@@ -73,7 +73,7 @@ import { connectCommand } from './connect.ts';
 import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from './connect-plan.ts';
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
-import { openConversation, savedTurns } from './conversation.ts';
+import { openConversation, savedTurns, summarizeTurns } from './conversation.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
@@ -1150,10 +1150,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       memory: { store: memory(), personalise: () => personaliseOn(home) },
       startTour: () => onboarding?.start(),
       conversation: {
-        turns: (resumed ?? []).map((r) => r.turn),
+        turns: resumed ?? [],
         onTurn: (id) => conversation.add(id),
         onNew: () => conversation.reset(workspace),
+        onSummary: (text, upTo) => conversation.summarise(text, upTo),
       },
+      summarize: (previous, turns) => summarizeTurns(model, previous, turns),
       theme: prefs.theme ?? 'auto',
       saveTheme: (choice) => savePrefs(home, { theme: choice }),
       newClears: !minimal,

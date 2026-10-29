@@ -6,6 +6,7 @@ import {
   MAX_CONTEXT_CHARS,
   MAX_CONTEXT_TURNS,
   renderContext,
+  SUMMARY_LEAD,
   SYSTEM_PROMPT,
   toolResultBudgetChars,
 } from './messages.ts';
@@ -67,6 +68,15 @@ describe('conversation context', () => {
     const firsts = [11, 12, 13, 14, 15].map(firstFor);
     expect(new Set(firsts)).toEqual(new Set(['q5']));
     expect(firstFor(16)).toBe('q10');
+  });
+
+  it('always keeps a leading summary, as a user and assistant pair', () => {
+    const many = Array.from({ length: MAX_CONTEXT_TURNS + 7 }, (_, i) => turn(i));
+    const out = renderContext([{ prompt: '', answer: 'They like tea.', summary: true }, ...many]);
+    expect(out[0]).toEqual({ role: 'user', content: `${SUMMARY_LEAD}\nThey like tea.` });
+    expect(out[1]).toEqual({ role: 'assistant', content: 'Noted.' });
+    expect(out[2]?.role).toBe('user');
+    expect(renderContext([{ prompt: '', answer: 'S', summary: true }])).toHaveLength(2);
   });
 
   it('drops the oldest turns once the character cap is reached', () => {

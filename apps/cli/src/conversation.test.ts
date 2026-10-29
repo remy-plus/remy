@@ -2,8 +2,16 @@ import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULT_BUDGET, type StoredEvent, type TaskConfig } from '@remy/core';
+import { ScriptedModelClient } from '@remy/models';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MAX_SAVED_TASKS, openConversation, savedTurns, turnOf } from './conversation.ts';
+import {
+  MAX_SAVED_TASKS,
+  openConversation,
+  SUMMARY_SYSTEM,
+  savedTurns,
+  summarizeTurns,
+  turnOf,
+} from './conversation.ts';
 
 let home: string;
 beforeEach(() => {
@@ -94,5 +102,47 @@ describe('turns from tasks', () => {
       ['task_a', 'first'],
       ['task_c', 'third'],
     ]);
+  });
+});
+
+describe('summaries', () => {
+  it('a summary replaces the ids it covers and comes back first', async () => {
+    const c = openConversation(home);
+    c.reset('/ws');
+    for (const id of ['task_a', 'task_b', 'task_c']) c.add(id);
+    c.summarise('They like tea.', 'task_b');
+    const saved = c.load();
+    expect(saved?.tasks).toEqual(['task_c']);
+    const turns = await savedTurns(saved as NonNullable<typeof saved>, async (id) =>
+      task(id, 'three', { answer: 'third' }),
+    );
+    expect(turns[0]?.turn).toEqual({ prompt: '', answer: 'They like tea.', summary: true });
+    expect(turns[1]?.taskId).toBe('task_c');
+    c.reset('/ws');
+    expect(c.load()?.summary).toBeUndefined();
+  });
+
+  it('sends typed words and answers, never pasted text, and prices the call', async () => {
+    const model = new ScriptedModelClient([
+      { text: ' New summary. ', calls: [], usage: { inTokens: 1000, outTokens: 100 } },
+    ]);
+    const r = await summarizeTurns(model, 'Old summary.', [
+      { prompt: 'summarise SECRET-PASTE please', pasted: ['SECRET-PASTE'], answer: 'Done.' },
+    ]);
+    expect(r.text).toBe('New summary.');
+    const req = model.requests[0];
+    expect(req?.system).toBe(SUMMARY_SYSTEM);
+    expect(req?.tools).toEqual([]);
+    const body = req?.messages[0]?.content ?? '';
+    expect(body).toContain('Old summary.');
+    expect(body).toContain('[pasted text]');
+    expect(body).not.toContain('SECRET-PASTE');
+  });
+
+  it('an empty summary is an error, so the chat falls back to dropping turns', async () => {
+    const model = new ScriptedModelClient([
+      { text: '  ', calls: [], usage: { inTokens: 1, outTokens: 1 } },
+    ]);
+    await expect(summarizeTurns(model, undefined, [])).rejects.toThrow('empty');
   });
 });

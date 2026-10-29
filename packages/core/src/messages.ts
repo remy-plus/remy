@@ -59,6 +59,22 @@ const turnChars = (ts: ConversationTurn[]) =>
  * When even the newest block is over the character cap, its oldest turns drop one by one.
  */
 export function renderContext(turns: ConversationTurn[] | undefined): Message[] {
+  const head = turns?.[0]?.summary ? turns[0] : undefined;
+  // A user/assistant pair, so the roles still alternate whatever follows.
+  const summary: Message[] = head
+    ? [
+        { role: 'user', content: `${SUMMARY_LEAD}\n${head.answer}` },
+        { role: 'assistant', content: 'Noted.' },
+      ]
+    : [];
+  return [...summary, ...renderTurns(head ? (turns ?? []).slice(1) : turns)];
+}
+
+/** How the summary of the earlier conversation is introduced to the model. */
+export const SUMMARY_LEAD =
+  'Summary of the earlier conversation, written by Remy (background, not a new request):';
+
+function renderTurns(turns: ConversationTurn[] | undefined): Message[] {
   const all = turns ?? [];
   let start = 0;
   while (
