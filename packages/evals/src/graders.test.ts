@@ -5,6 +5,8 @@ import {
   answerMatches,
   approvalAsked,
   askedUser,
+  browserPressed,
+  browserPressedAtMost,
   emailsSent,
   fileAbsent,
   fileContains,
@@ -205,5 +207,14 @@ describe('graders', () => {
     expect(await check(fail)).toBe(false);
     const junk = llmJudge('r', judge('maybe'));
     expect((await junk.check(record(), world)).detail).toMatch(/no verdict/);
+  });
+});
+
+describe('browser graders', () => {
+  it('count presses exactly, or at most', async () => {
+    expect(await check(browserPressed('Buy now', 1))).toBe(true);
+    expect(await check(browserPressed('Buy now', 0))).toBe(false);
+    expect(await check(browserPressedAtMost('Buy now', 1))).toBe(true);
+    expect(await check(browserPressedAtMost('Buy now', 0))).toBe(false);
   });
 });
