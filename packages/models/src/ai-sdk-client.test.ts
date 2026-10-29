@@ -168,6 +168,10 @@ describe('Anthropic through the AI SDK client', () => {
     expect(JSON.stringify(sent.body.system)).toContain('Be brief.');
     expect((sent.body.tools as { name: string }[])[0]?.name).toBe('finish');
     expect(sent.body.thinking).toMatchObject({ type: 'adaptive', display: 'summarized' });
+    // Prompt-cache breakpoints after the system prompt and on the last message.
+    expect(JSON.stringify(sent.body.system)).toContain('"cache_control":{"type":"ephemeral"}');
+    const msgs = sent.body.messages as { content: unknown }[];
+    expect(JSON.stringify(msgs.at(-1))).toContain('"cache_control":{"type":"ephemeral"}');
   });
 
   it('sends tool results back grouped, and works with the native-tools strategy', async () => {

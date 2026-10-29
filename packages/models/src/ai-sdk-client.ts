@@ -55,6 +55,21 @@ const ADAPTIVE_CLAUDE = /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:5|4-[6-9]
 /** These Gemini families reject or ignore a custom temperature; leave it at the default. */
 const FIXED_TEMPERATURE_GEMINI = /^gemini-(?:3|4)/;
 
+/** An Anthropic prompt-cache breakpoint: the request up to here can be read back at a tenth of the price. */
+const CACHE_BREAK = { anthropic: { cacheControl: { type: 'ephemeral' } } };
+
+/**
+ * Anthropic caches only up to explicit breakpoints: one after the system prompt (tools and system
+ * are stable for the whole task) and one on the last message, so the next step reads everything
+ * before it from the cache. Other providers cache on their own.
+ */
+export function withCacheBreaks(prompt: LanguageModelV4Prompt): LanguageModelV4Prompt {
+  const last = prompt.length - 1;
+  return prompt.map((m, i) =>
+    (i === 0 && m.role === 'system') || i === last ? { ...m, providerOptions: CACHE_BREAK } : m,
+  );
+}
+
 function toPrompt(system: string, messages: Message[]): LanguageModelV4Prompt {
   const out: LanguageModelV4Prompt = [];
   if (system) out.push({ role: 'system', content: system });
@@ -137,7 +152,10 @@ export function createAiSdkClient(opts: AiSdkClientOptions): ModelClient {
       let usage: ModelResponse['usage'] = { inTokens: 0, outTokens: 0 };
       try {
         const { stream } = await model.doStream({
-          prompt: toPrompt(req.system, req.messages),
+          prompt:
+            opts.kind === 'anthropic'
+              ? withCacheBreaks(toPrompt(req.system, req.messages))
+              : toPrompt(req.system, req.messages),
           ...(req.tools.length && {
             tools: req.tools.map((t) => ({
               type: 'function' as const,
