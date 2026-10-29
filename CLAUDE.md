@@ -23,7 +23,7 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 
 ## Dev
 - pnpm 12 via corepack (shim in `~/.local/bin`). TypeScript 7 (native `tsc`), vitest 5, Biome 2.
-- Run the CLI from source: `pnpm remy ...`; evals: `pnpm eval:replay` (CI gate), `pnpm eval -- --profile <p> --model <id>`.
+- Run the CLI from source: `pnpm remy ...`; evals: `pnpm eval:replay` (CI gate), `pnpm eval --profile <p> --model <id> [--suite s]` (the key comes from the env: `OPENAI_API_KEY=$(security find-generic-password -s remy -a openai -w)` reads the one `remy login` saved).
 - `pnpm check` = lint + typecheck (src and tests) + `tsc -b` build + tests. Every step must end green on it.
 - Packages export `src/` under the custom condition `@remy/source` (TS) and a vitest alias, `dist/` otherwise. Tests are colocated `*.test.ts` and excluded from the build.
 - `test/boundaries.test.ts` enforces the package dependency graph. Adding an edge means editing `ALLOWED` there on purpose.
