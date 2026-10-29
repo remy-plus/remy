@@ -1,10 +1,14 @@
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { type Browser, createBrowserTools, createLocalBrowser, profileInUse } from '@remy/browser';
 import {
   type ApprovalRequest,
+  BROWSER_HINT,
   type ConversationTurn,
   canStandingAllow,
   createRuntime,
@@ -195,6 +199,11 @@ Usage
   remy connect [add|auth|list|remove]
                                   Connect apps and services through MCP servers; --import
                                   brings in the ones Claude Desktop or Claude Code already use
+  remy browser [show|reset|install]
+                                  Remy's own browser, which it uses to search and browse:
+                                  show opens it so you can sign in to sites, reset signs
+                                  out of everything, install gets Chromium for machines
+                                  without Chrome or Edge
   remy --version | help
 
 Options for run
@@ -239,8 +248,10 @@ Setup
   never holds Remy up.
   Flags beat env, env beats a saved login, a saved login beats the config file.
   REMY_KEYCHAIN=off keeps keys in a private file instead of the Keychain.
-  Data lives in REMY_HOME (default ~/.remy). Web search turns on with BRAVE_API_KEY,
-  TAVILY_API_KEY or SEARXNG_URL.
+  Data lives in REMY_HOME (default ~/.remy). Remy searches and browses in a hidden browser on
+  this machine (Chrome, Edge or Chromium) with its own profile in REMY_HOME/browser; it shows the
+  window when you need to sign in. REMY_BROWSER=off turns it off; REMY_BROWSER_LOCAL=on lets it
+  open local addresses. BRAVE_API_KEY, TAVILY_API_KEY or SEARXNG_URL search through that service.
 `;
 
 const OPTIONS = {
@@ -356,6 +367,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'connect',
       'approvals',
       'memory',
+      'browser',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -443,9 +455,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   let active: string | undefined;
   /** Connected MCP servers; started by the first runtime that needs a model. */
   let mcp: McpHost | undefined;
+  /** The browser on this machine, one per process; it starts on the first page it opens. */
+  let browser: Browser | undefined;
   let attaching: string | undefined;
   const dispose = deps.onInterrupt?.(async () => {
     await mcp?.close();
+    await browser?.close();
     if (attaching) {
       out(`\nDetached. ${attaching} keeps running. Follow it again: remy attach ${attaching}`);
       return;
@@ -642,6 +657,18 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return out;
   }
 
+  const browserOn = () => env.REMY_BROWSER !== 'off';
+  const browserDir = () => join(home, 'browser');
+  function browserFor(file: FileConfig): Browser {
+    const allow = list(flags['net-allow']) ?? file.netAllow;
+    browser ??= createLocalBrowser({
+      profileDir: browserDir(),
+      allowLocal: env.REMY_BROWSER_LOCAL === 'on',
+      ...(allow && { allow }),
+    });
+    return browser;
+  }
+
   function makeRuntime(
     file: FileConfig,
     opts: { model: boolean | ModelClient; taskId?: string; hooks?: Partial<RuntimeHooks> },
@@ -693,6 +720,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
     else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
+    // The browser on this machine; it also searches when no search key is set.
+    if (browserOn())
+      for (const t of createBrowserTools(browserFor(file))) if (!tools.get(t.name)) tools.add(t);
     // Commands that never call a model (cancel) do not start the servers.
     if (opts.model) mcpHost(file, Boolean(opts.hooks))?.attach(tools);
     const timeline = createTimeline(st, { live: true });
@@ -700,7 +730,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const runtime = createRuntime({
       store,
       model,
-      ...(!tools.get('web_search') && { systemPrompt: `${SYSTEM_PROMPT}\n\n${NO_SEARCH_HINT}` }),
+      ...((browserOn() || !tools.get('web_search')) && {
+        systemPrompt: [
+          SYSTEM_PROMPT,
+          ...(browserOn() ? [BROWSER_HINT] : []),
+          ...(tools.get('web_search') ? [] : [NO_SEARCH_HINT]),
+        ].join('\n\n'),
+      }),
       tools,
       owner,
       redact,
@@ -1483,6 +1519,41 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         return 0;
       }
 
+      case 'browser': {
+        const sub = rest[0] ?? 'show';
+        if (sub === 'install') {
+          // For machines without Chrome or Edge (a server): Playwright's own Chromium.
+          const pkg = createRequire(import.meta.url).resolve('playwright-core/package.json');
+          const r = spawnSync(
+            process.execPath,
+            [join(dirname(pkg), 'cli.js'), 'install', 'chromium'],
+            {
+              stdio: 'inherit',
+            },
+          );
+          if (r.status !== 0) throw new Error('Chromium did not install. See the output above.');
+          out('Chromium is installed. Remy uses it when Chrome and Edge are not there.');
+          return 0;
+        }
+        if (sub === 'reset') {
+          if (profileInUse(browserDir()))
+            throw new Error("Remy's browser is open in another Remy. Close that one first.");
+          rmSync(browserDir(), { recursive: true, force: true });
+          out("Remy's browser is cleared: every site is signed out.");
+          return 0;
+        }
+        if (sub !== 'show')
+          throw new Error('Use remy browser show, remy browser reset or remy browser install.');
+        const b = browserFor(cfg());
+        await b.show();
+        out(
+          "Remy's browser is open, on its own profile. Sign in to the sites you want Remy to use, then close the window.",
+        );
+        while (b.visible) await new Promise((r) => setTimeout(r, 500));
+        out('Closed. Remy keeps those sign-ins.');
+        return 0;
+      }
+
       case 'show': {
         need(1, 'remy show <id> [--json]');
         const id = rest[0] as string;
@@ -1512,6 +1583,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   } finally {
     dispose?.();
     await mcp?.close();
+    await browser?.close();
     ownStore?.close();
   }
 }

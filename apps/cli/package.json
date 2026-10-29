@@ -28,13 +28,15 @@
     "release"
   ],
   "scripts": {
-    "bundle": "esbuild src/run.ts --bundle --platform=node --target=node22 --format=esm --conditions=@remy/source --external:ink --external:react --external:'react/*' --banner:js=\"import{createRequire as __remyRequire}from'node:module';const require=__remyRequire(import.meta.url);\" --outfile=release/main.js --log-level=warning && node scripts/write-bin.mjs"
+    "bundle": "esbuild src/run.ts --bundle --platform=node --target=node22 --format=esm --conditions=@remy/source --external:ink --external:playwright-core --external:react --external:'react/*' --banner:js=\"import{createRequire as __remyRequire}from'node:module';const require=__remyRequire(import.meta.url);\" --outfile=release/main.js --log-level=warning && node scripts/write-bin.mjs"
   },
   "dependencies": {
     "ink": "^8.0.0",
+    "playwright-core": "^1.64.1",
     "react": "^19.3.1"
   },
   "devDependencies": {
+    "@remy/browser": "workspace:*",
     "@remy/core": "workspace:*",
     "@remy/evals": "workspace:*",
     "@remy/mcp": "workspace:*",

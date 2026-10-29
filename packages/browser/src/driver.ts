@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isPrivateAddress } from '@remy/tools';
-import { type BrowserContext, chromium, type Page } from 'playwright-core';
+import type { BrowserContext, Page } from 'playwright-core';
 import type { Browser, PageSnapshot, SearchHit } from './port.ts';
 import { BING_RESULTS_SCRIPT, DDG_RESULTS_SCRIPT, SNAPSHOT_SCRIPT } from './walker.ts';
 
@@ -17,6 +17,8 @@ export interface LocalBrowserOptions {
   channels?: (string | undefined)[];
   /** Let pages open loopback and private-network addresses. Default false. */
   allowLocal?: boolean;
+  /** Only these domains (exact or subdomain) open, like `--net-allow`. Default: any. */
+  allow?: string[];
   navigationTimeoutMs?: number;
 }
 
@@ -36,7 +38,7 @@ function pidAlive(pid: number): boolean {
 }
 
 /** True when another live Remy process holds the profile. */
-function lockedByOther(dir: string): boolean {
+export function profileInUse(dir: string): boolean {
   const file = join(dir, LOCK);
   if (!existsSync(file)) return false;
   const pid = Number(readFileSync(file, 'utf8'));
@@ -62,17 +64,20 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
   let visible = opts.visible ?? false;
   let last: PageSnapshot | undefined;
   let profile: string | undefined;
+  let refusedHost: string | undefined; // set when the allowlist, not the local rule, blocked a page
   let ownTab = 0; // tabs Remy opens itself (search), which must not become the current page
 
   async function launch(): Promise<BrowserContext> {
     if (!profile) {
       mkdirSync(opts.profileDir, { recursive: true });
       // A background task can run while the chat has the profile open: it gets a fresh one.
-      profile = lockedByOther(opts.profileDir)
+      profile = profileInUse(opts.profileDir)
         ? mkdtempSync(join(tmpdir(), 'remy-browser-'))
         : opts.profileDir;
       writeFileSync(join(profile, LOCK), String(process.pid));
     }
+    // Loaded on first use: Playwright is large and most turns never open a page.
+    const { chromium } = await import('playwright-core');
     let failure: string | undefined;
     for (const channel of opts.channels ?? ['chrome', 'msedge', undefined]) {
       try {
@@ -94,12 +99,19 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
             visible = false;
           }
         });
-        if (!opts.allowLocal)
+        const allow = opts.allow;
+        if (!opts.allowLocal || allow)
           await c.route('**/*', async (route) => {
             const req = route.request();
             if (!req.isNavigationRequest()) return route.continue();
-            const host = new URL(req.url()).hostname;
-            if (/^https?:$/.test(new URL(req.url()).protocol) && (await isLocalHost(host)))
+            const url = new URL(req.url());
+            if (!/^https?:$/.test(url.protocol)) return route.continue();
+            const host = url.hostname;
+            if (allow && !allow.some((d) => host === d || host.endsWith(`.${d}`))) {
+              refusedHost = host;
+              return route.abort('blockedbyclient');
+            }
+            if (!opts.allowLocal && (await isLocalHost(host)))
               return route.abort('blockedbyclient');
             return route.continue();
           });
@@ -150,10 +162,15 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
       await p.goto(url, { waitUntil: 'domcontentloaded' });
     } catch (e) {
       const msg = e instanceof Error ? e.message.split('\n')[0] : String(e);
-      if (/ERR_BLOCKED_BY_CLIENT/.test(msg ?? ''))
+      if (/ERR_BLOCKED_BY_CLIENT/.test(msg ?? '')) {
+        const host = refusedHost;
+        refusedHost = undefined;
         throw new Error(
-          `${url} is on this computer or its local network, which Remy does not open.`,
+          host
+            ? `${host} is not on this task's list of allowed sites.`
+            : `${url} is on this computer or its local network, which Remy does not open.`,
         );
+      }
       throw new Error(`Could not open ${url}: ${msg}`);
     }
   }

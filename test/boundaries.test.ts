@@ -15,7 +15,7 @@ const ALLOWED: Record<string, string[]> = {
   'packages/mcp': ['core'],
   'packages/browser': ['core', 'tools'],
   'packages/evals': ['core', 'models', 'tools', 'store', 'mcp'],
-  'apps/cli': ['core', 'models', 'tools', 'store', 'evals', 'mcp'],
+  'apps/cli': ['core', 'models', 'tools', 'store', 'evals', 'mcp', 'browser'],
 };
 
 // Third-party runtime dependencies `core` may use. Everything else goes behind a port.

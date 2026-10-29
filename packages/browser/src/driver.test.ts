@@ -109,6 +109,20 @@ describe.runIf(process.env.REMY_SKIP_BROWSER !== '1')('local browser', () => {
     }
   });
 
+  it('opens only allowed sites when given a list', async ({ skip }) => {
+    if (!available) skip();
+    const listed = createLocalBrowser({
+      profileDir: join(profile, 'listed'),
+      allowLocal: true,
+      allow: ['example.test'],
+    });
+    try {
+      await expect(listed.open(`${base}/`)).rejects.toThrow(/127.0.0.1 is not on this task's list/);
+    } finally {
+      await listed.close();
+    }
+  });
+
   it('gives a second process on a locked profile its own profile', async ({ skip }) => {
     if (!available) skip();
     // The lock names this process, so a same-process second browser reuses the profile; fake another pid.

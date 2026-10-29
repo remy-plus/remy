@@ -1,7 +1,7 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type ModelResponse, NO_SEARCH_HINT } from '@remy/core';
+import { BROWSER_HINT, type ModelResponse, NO_SEARCH_HINT } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { MEMORY_MAX_ENTRIES } from '@remy/tools';
@@ -248,9 +248,20 @@ describe('remy memory', () => {
 });
 
 describe('web search', () => {
-  it('tells the model search is off, so it does not guess page addresses', async () => {
+  it('searches and browses through the browser on this machine by default', async () => {
     const model = new ScriptedModelClient([finish]);
     await harness(model).run('run', 'find the best budget laptops');
+    const req = model.requests[0];
+    expect(req?.system).toContain(BROWSER_HINT);
+    expect(req?.system).not.toContain(NO_SEARCH_HINT);
+    expect(req?.tools.map((t) => t.name)).toEqual(
+      expect.arrayContaining(['web_search', 'browser_open', 'browser_act', 'browser_pay']),
+    );
+  });
+
+  it('tells the model search is off, so it does not guess page addresses', async () => {
+    const model = new ScriptedModelClient([finish]);
+    await harness(model, { REMY_BROWSER: 'off' }).run('run', 'find the best budget laptops');
     expect(model.requests[0]?.system).toContain(NO_SEARCH_HINT);
     expect(model.requests[0]?.tools.map((t) => t.name)).not.toContain('web_search');
   });
