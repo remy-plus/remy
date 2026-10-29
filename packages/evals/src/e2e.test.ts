@@ -107,6 +107,21 @@ describe('evalMain', () => {
     ).toBe(0);
   });
 
+  it('takes the flags after a leading -- (pnpm eval -- ...)', async () => {
+    quiet();
+    expect(
+      await evalMain([
+        '--',
+        '--model',
+        'reference',
+        '--suite',
+        'browser',
+        '--strict',
+        '--no-write',
+      ]),
+    ).toBe(0);
+  });
+
   it('exits non-zero from compare when a regression is seeded', async () => {
     quiet();
     const dir = mkdtempSync(join(tmpdir(), 'remy-evals-cmp-'));

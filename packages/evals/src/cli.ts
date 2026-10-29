@@ -44,7 +44,9 @@ function compareMain(base: string | undefined, next: string | undefined): number
 export async function evalMain(argv: string[]): Promise<number> {
   let parsed: ReturnType<typeof parse>;
   try {
-    parsed = parse(argv);
+    // pnpm 12 passes the `--` of `pnpm eval -- --suite x` through; without this, every flag
+    // after it would be read as a command.
+    parsed = parse(argv[0] === '--' ? argv.slice(1) : argv);
   } catch (e) {
     console.error(`${(e as Error).message}\n\n${USAGE}`);
     return 2;
