@@ -310,7 +310,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
         return {
           ok: true,
           trust: 'trusted',
-          content: `The browser window is open${url ? ` on ${url}` : ''}. Ask the user to ${reason} there and to tell you when they are done, then look at the page with browser_look.`,
+          content: `The browser window is open${url ? ` on ${url}` : ''}. Now call ask_user: ask the user to ${reason} in that window and to reply when they are done. A reply without ask_user ends the task. After their answer, look at the page with browser_look.`,
         };
       } catch (e) {
         return failed(e);

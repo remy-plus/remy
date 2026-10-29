@@ -201,7 +201,7 @@ describe('browser tools', () => {
     const { run, browser } = setup();
     const r = await run('browser_show', { reason: 'log in' });
     expect(r).toMatchObject({ ok: true, trust: 'trusted' });
-    expect(r.ok && r.content).toContain('Ask the user to log in');
+    expect(r.ok && r.content).toContain('Now call ask_user: ask the user to log in');
     expect(browser.visible).toBe(true);
   });
 
