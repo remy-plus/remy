@@ -10,6 +10,8 @@ export interface FileConfig {
   autoApprove?: string[];
   budget?: Partial<Budget>;
   netAllow?: string[];
+  /** Which service searches: browser, context, brave, tavily, searxng or off (REMY_SEARCH wins). */
+  search?: string;
   /** Same shape as Claude Desktop's `mcpServers`. Wins over servers saved by `remy connect`. */
   mcpServers?: Record<string, McpServerConfig>;
 }
@@ -43,11 +45,13 @@ export function loadConfig(cwd: string, home: string): FileConfig {
   const profile = text('profile');
   const model = text('model');
   const baseUrl = text('baseUrl');
+  const search = text('search');
   const autoApprove = strings(raw.autoApprove, 'autoApprove');
   const netAllow = strings(raw.netAllow, 'netAllow');
   if (profile) out.profile = profile;
   if (model) out.model = model;
   if (baseUrl) out.baseUrl = baseUrl;
+  if (search) out.search = search;
   if (autoApprove) out.autoApprove = autoApprove;
   if (netAllow) out.netAllow = netAllow;
   if (budget) out.budget = budget as Partial<Budget>;

@@ -273,3 +273,25 @@ describe('web search', () => {
     expect(model.requests[0]?.tools.map((t) => t.name)).toContain('web_search');
   });
 });
+
+describe('picking the search', () => {
+  it('follows REMY_SEARCH over the browser, and turns search off', async () => {
+    const ctx = new ScriptedModelClient([finish]);
+    await harness(ctx, { REMY_SEARCH: 'context', CONTEXT_DEV_API_KEY: 'c' }).run('run', 'find rye');
+    const names = ctx.requests[0]?.tools.map((t) => t.name);
+    expect(names).toContain('web_search');
+    expect(names).toContain('browser_open');
+    const off = new ScriptedModelClient([finish]);
+    await harness(off, { REMY_SEARCH: 'off' }).run('run', 'find rye');
+    expect(off.requests[0]?.tools.map((t) => t.name)).not.toContain('web_search');
+    expect(off.requests[0]?.system).toContain(NO_SEARCH_HINT);
+  });
+
+  it('says which key a picked service needs', async () => {
+    const r = await harness(new ScriptedModelClient([finish]), { REMY_SEARCH: 'brave' }).run(
+      'run',
+      'find rye',
+    );
+    expect(r.err).toContain('needs BRAVE_API_KEY');
+  });
+});

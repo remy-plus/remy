@@ -32,7 +32,6 @@ import { BUILTIN_CATALOG, DEFAULT_CAPS, modelFromEnv, PROFILES, resolveCaps } fr
 import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
-  braveSearch,
   calculate,
   createMemoryTools,
   createRecallTool,
@@ -50,8 +49,6 @@ import {
   moveFile,
   readFile,
   runCommand,
-  searxngSearch,
-  tavilySearch,
   updatePlan,
   writeFile,
 } from '@remy/tools';
@@ -82,6 +79,7 @@ import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from '.
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
+import { pickSearch } from './search.ts';
 
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
@@ -251,7 +249,10 @@ Setup
   Data lives in REMY_HOME (default ~/.remy). Remy searches and browses in a hidden browser on
   this machine (Chrome, Edge or Chromium) with its own profile in REMY_HOME/browser; it shows the
   window when you need to sign in. REMY_BROWSER=off turns it off; REMY_BROWSER_LOCAL=on lets it
-  open local addresses. BRAVE_API_KEY, TAVILY_API_KEY or SEARXNG_URL search through that service.
+  open local addresses.
+  Search: REMY_SEARCH (or "search" in remy.config.json) picks browser, context, brave, tavily,
+  searxng or off. Unset, a service whose key is set searches (CONTEXT_DEV_API_KEY, BRAVE_API_KEY,
+  TAVILY_API_KEY, SEARXNG_URL), else the browser.
 `;
 
 const OPTIONS = {
@@ -303,8 +304,9 @@ const SECRET_ENV = [
   'GEMINI_API_KEY',
   'BRAVE_API_KEY',
   'TAVILY_API_KEY',
+  'CONTEXT_DEV_API_KEY',
 ];
-const TOOL_SECRETS = ['BRAVE_API_KEY', 'TAVILY_API_KEY', 'SEARXNG_URL'];
+const TOOL_SECRETS = ['BRAVE_API_KEY', 'TAVILY_API_KEY', 'CONTEXT_DEV_API_KEY', 'SEARXNG_URL'];
 
 const list = (v: string | undefined) =>
   v
@@ -717,12 +719,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           connections: mcp?.list() ?? [],
         }),
     });
-    if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
-    else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
-    else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
-    // The browser on this machine; it also searches when no search key is set.
+    const search = pickSearch(env, env.REMY_SEARCH ?? file.search);
+    if (search.provider) tools.add(createWebSearch(search.provider));
+    // The browser on this machine; it searches too when the pick is the browser.
     if (browserOn())
-      for (const t of createBrowserTools(browserFor(file))) if (!tools.get(t.name)) tools.add(t);
+      for (const t of createBrowserTools(browserFor(file)))
+        if ((t.name !== 'web_search' || search.choice === 'browser') && !tools.get(t.name))
+          tools.add(t);
     // Commands that never call a model (cancel) do not start the servers.
     if (opts.model) mcpHost(file, Boolean(opts.hooks))?.attach(tools);
     const timeline = createTimeline(st, { live: true });
