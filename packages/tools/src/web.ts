@@ -68,7 +68,8 @@ export const fetchUrl = defineTool({
   },
 });
 
-export function createWebSearch(provider: SearchProvider): Tool {
+/** `timeoutMs` defaults to 15 s; a search through a browser needs longer. */
+export function createWebSearch(provider: SearchProvider, opts: { timeoutMs?: number } = {}): Tool {
   return defineTool({
     name: 'web_search',
     description:
@@ -80,7 +81,7 @@ export function createWebSearch(provider: SearchProvider): Tool {
     risk: 'read',
     effect: 'none',
     outputTrust: 'untrusted',
-    timeoutMs: 15_000,
+    timeoutMs: opts.timeoutMs ?? 15_000,
     maxOutputChars: 20_000,
     preview: ({ query }) => `Search the web for "${query}"`,
     async execute({ query, count }): Promise<ToolResult> {
