@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (0.8)
+
+Remy uses the computer it runs on to find things.
+
+- **Its own browser.** Remy searches and reads the web in a hidden Chrome (or Edge, or Chromium) on your machine, with its own profile in `~/.remy/browser`, instead of guessing page addresses. Nothing to sign up for. It can open pages, follow links, use a site's search box and fill in fields.
+- **It asks before it acts.** Pressing a button that sends, posts, saves or deletes something asks you first, and paying asks every time. Remy never types passwords or card numbers: it shows the window and you do that part. A plain click cannot press "Buy now".
+- **Sign in once.** `remy browser show` (or `/browser` in the chat) opens the window so you can sign in to sites; Remy keeps those sign-ins. `remy browser reset` signs out of everything; `remy browser install` gets Chromium for machines without Chrome or Edge.
+- `REMY_BROWSER=off` turns the browser off. Local addresses stay blocked unless `REMY_BROWSER_LOCAL=on`, and `--net-allow` limits the browser too. A Brave, Tavily or SearXNG key still does the searching when set.
+- Remy no longer asks for keys or passwords in the chat, and never says it set something up unless a tool did it.
+
 ## 0.7.0 (2026-10-28)
 
 Remy costs less to run and keeps one conversation going.
