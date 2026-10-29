@@ -117,6 +117,35 @@ describe('remember and forget', () => {
   });
 });
 
+describe('remember several notes', () => {
+  it('saves them in one call, with one preview for the approval card', async () => {
+    const p = port();
+    const [r] = toolsFor(p);
+    const args = {
+      notes: [
+        { text: 'Prefers tea', kind: 'preference' },
+        { text: 'Lives in Toronto', kind: 'about_you' },
+      ],
+    };
+    expect((r as Tool).preview(args as never)).toBe(
+      'Remember 2 notes: Prefers tea; Lives in Toronto',
+    );
+    const res = await (r as Tool).execute(args, ctx);
+    expect(res).toMatchObject({
+      ok: true,
+      data: { ids: [expect.any(String), expect.any(String)] },
+    });
+    expect(p.entries.map((e) => e.kind)).toEqual(['preference', 'about_you']);
+  });
+
+  it('refuses a call with no note, and more than five', async () => {
+    const [r] = toolsFor(port());
+    expect(await (r as Tool).execute({}, ctx)).toMatchObject({ ok: false });
+    const six = Array.from({ length: 6 }, (_, i) => ({ text: `note ${i}`, kind: 'preference' }));
+    expect((r as Tool).args.safeParse({ notes: six }).success).toBe(false);
+  });
+});
+
 describe('policy', () => {
   const config = (autoApprove: TaskConfig['permissions']['autoApprove']): TaskConfig =>
     ({ permissions: { autoApprove } }) as TaskConfig;
