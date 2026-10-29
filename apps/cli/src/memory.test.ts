@@ -175,8 +175,11 @@ describe('the system prompt and tools', () => {
     const model = new ScriptedModelClient([finish]);
     await harness(model).run('run', 'convert 3 cups to metric');
     const req = model.requests[0];
-    expect(req?.system).toContain("The user's own saved notes");
-    expect(req?.system).toContain('"Wants answers in metric units"');
+    // The notes go before the user's message; the system prompt only gets the fixed remember hint.
+    expect(req?.system).toContain('Call remember only');
+    expect(req?.system).not.toContain('saved notes');
+    expect(req?.messages[0]?.content).toContain("The user's own saved notes");
+    expect(req?.messages[0]?.content).toContain('"Wants answers in metric units"');
     expect(req?.tools.map((t) => t.name)).toEqual(expect.arrayContaining(['remember', 'forget']));
   });
 
@@ -210,7 +213,7 @@ describe('the system prompt and tools', () => {
     expect(openMemory(home).list()[0]).toMatchObject({ text: 'Prefers tea', source: id });
     const model = new ScriptedModelClient([finish]);
     await harness(model).run('run', 'which drink');
-    expect(model.requests[0]?.system).toContain('Prefers tea');
+    expect(model.requests[0]?.messages[0]?.content).toContain('Prefers tea');
   });
 });
 

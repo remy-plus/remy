@@ -39,8 +39,6 @@ import {
   finish,
   listFiles,
   makeDir,
-  memoryBlock,
-  memoryQuery,
   moveFile,
   readFile,
   runCommand,
@@ -95,6 +93,7 @@ import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
+import { withRecall } from './recall.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 
@@ -624,23 +623,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     ]);
     // Notes about the user: tools and recall exist only while personalising is on.
     if (personaliseOn(home)) for (const t of createMemoryTools(memory())) tools.add(t);
-    const model: ModelClient = {
-      get id() {
-        return inner.id;
-      },
-      get caps() {
-        return inner.caps;
-      },
-      complete(req, ...a) {
-        if (!personaliseOn(home)) return inner.complete(req, ...a);
-        const block = memoryBlock(
-          memory().list(),
-          memoryQuery(req.messages),
-          Boolean(tools.get('remember')),
-        );
-        return inner.complete(block ? { ...req, system: `${req.system}\n\n${block}` } : req, ...a);
-      },
-    };
+    const model = withRecall(inner, {
+      enabled: () => personaliseOn(home),
+      notes: () => memory().list(),
+      hasTools: Boolean(tools.get('remember')),
+    });
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));
     else if (env.SEARXNG_URL) tools.add(createWebSearch(searxngSearch(env.SEARXNG_URL)));
