@@ -62,3 +62,20 @@ export function searxngSearch(baseUrl: string): SearchProvider {
     },
   };
 }
+
+/** Context.dev web search (https://docs.context.dev/search/overview). */
+export function contextDevSearch(apiKey: string): SearchProvider {
+  return {
+    async search(query, count) {
+      const data = await json(
+        await fetch('https://api.context.dev/v1/web/search', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ query, numResults: count, descriptionMaxCharacters: 300 }),
+        }),
+        'Context.dev',
+      );
+      return rows(data.results).map((r) => toResult(r, r.description));
+    },
+  };
+}
