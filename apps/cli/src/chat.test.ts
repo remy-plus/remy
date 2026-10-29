@@ -830,12 +830,16 @@ describe('/browser', () => {
         hide: async () => {
           visible = false;
         },
+        page: () => 'https://shop.test/rye',
       },
     });
+    expect(chat.getState().browser).toBeUndefined();
     await chat.submit('/browser');
     expect(visible).toBe(true);
+    expect(chat.getState().browser).toEqual({ visible: true, page: 'https://shop.test/rye' });
     await chat.submit('/browser');
     expect(visible).toBe(false);
+    expect(chat.getState().browser?.visible).toBe(false);
     const notes = noteTexts(chat);
     expect(notes[0]).toContain('The browser window is open');
     expect(notes[1]).toContain('hidden again');

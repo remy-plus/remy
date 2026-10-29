@@ -156,6 +156,8 @@ export interface ChatState {
   title?: string;
   /** Files written, edited, moved or deleted this session (workspace-relative), newest first. */
   filesTouched?: FileTouch[];
+  /** Remy's browser once it has been used this session: shown or hidden, and the page it is on. */
+  browser?: { visible: boolean; page?: string };
   /** Total spend of this conversation. */
   costUsd: number;
   /** Tokens (in and out) used by this conversation. */
@@ -249,7 +251,13 @@ export interface ChatDeps {
   /** /tour replays the onboarding; absent where there is none. */
   startTour?: () => void;
   /** /browser shows or hides Remy's browser window; absent when the browser is off. */
-  browser?: { visible(): boolean; show(): Promise<void>; hide(): Promise<void> };
+  browser?: {
+    visible(): boolean;
+    show(): Promise<void>;
+    hide(): Promise<void>;
+    /** The page the browser is on, if any. */
+    page?(): string | undefined;
+  };
   /**
    * The ongoing conversation: the turns it starts with (oldest first), and where each finished
    * turn and each fresh start is recorded so the next `remy` opens where this one left off.
@@ -540,6 +548,13 @@ export function createChat(deps: ChatDeps): Chat {
     s = { ...s, ...patch };
     for (const fn of listeners) fn();
   };
+  /** Copies the browser's state into the chat, for the sidebar. */
+  const syncBrowser = () => {
+    const b = deps.browser;
+    if (!b) return;
+    const page = b.page?.();
+    set({ browser: { visible: b.visible(), ...(page && { page }) } });
+  };
   /** Moves things into the transcript. Each goes in once and is never touched again. */
   const commit = (...items: Item[]) => {
     if (items.length) set({ items: [...s.items, ...items] });
@@ -654,6 +669,7 @@ export function createChat(deps: ChatDeps): Chat {
         else if (c) {
           const paths = changedPaths(c.tool, c.args).map((p) => workspacePath(p, workspaceDir));
           if (paths.length) set({ filesTouched: touchFiles(s.filesTouched ?? [], paths) });
+          if (c.tool.startsWith('browser_')) syncBrowser();
         }
         flush(false, true);
         break;
@@ -1128,13 +1144,15 @@ export function createChat(deps: ChatDeps): Chat {
         return void commit({ kind: 'note', text: "Remy's browser is off (REMY_BROWSER=off)." });
       const show = !b.visible();
       return (show ? b.show() : b.hide()).then(
-        () =>
+        () => {
+          syncBrowser();
           commit({
             kind: 'note',
             text: show
               ? 'The browser window is open. Sign in to sites there and Remy keeps the sign-ins. /browser hides it.'
               : 'The browser runs hidden again.',
-          }),
+          });
+        },
         (e) => commit({ kind: 'error', text: friendlyError(e) }),
       );
     } else if (name === 'tour') {

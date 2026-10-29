@@ -1232,9 +1232,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       startTour: () => onboarding?.start(),
       ...(browserOn() && {
         browser: {
-          visible: () => browserFor(file).visible,
+          visible: () => browser?.visible ?? false,
           show: () => browserFor(file).show(),
           hide: () => browserFor(file).hide(),
+          page: () => browser?.current()?.url,
         },
       }),
       conversation: {
