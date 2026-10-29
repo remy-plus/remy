@@ -59,6 +59,7 @@ export const record = (over: Partial<RunRecord> = {}): RunRecord => ({
 const world: WorldAfter = {
   files: { 'a.txt': 'Hello World\n' },
   mcpCalls: [],
+  browserPresses: [{ url: 'https://shop.test/', name: 'Buy now', fields: {} }],
   memory: [{ id: 'mem_1', text: 'Likes tea', kind: 'preference', source: '' }],
   emails: [
     { key: 'k1', to: 'bob@x.test', subject: 'Invoice', body: 'Paid' },
@@ -111,7 +112,13 @@ describe('graders', () => {
     expect(await check(emailsSent(1, { to: 'bob@x.test', subjectIncludes: 'invoice' }))).toBe(true);
     expect(await check(emailsSent(0, { bodyIncludes: 'paid' }))).toBe(false);
     expect(
-      await check(emailsSent(0), record(), { files: {}, emails: [], mcpCalls: [], memory: [] }),
+      await check(emailsSent(0), record(), {
+        files: {},
+        emails: [],
+        mcpCalls: [],
+        memory: [],
+        browserPresses: [],
+      }),
     ).toBe(true);
   });
 

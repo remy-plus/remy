@@ -13,11 +13,12 @@
     }
   },
   "dependencies": {
+    "@remy/browser": "workspace:*",
     "@remy/core": "workspace:*",
     "@remy/mcp": "workspace:*",
     "@remy/models": "workspace:*",
-    "@remy/tools": "workspace:*",
     "@remy/store": "workspace:*",
+    "@remy/tools": "workspace:*",
     "zod": "^4.6.7"
   }
 }

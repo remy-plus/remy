@@ -1,5 +1,6 @@
 import type { EvalCase } from '../types.ts';
 import { approval } from './approval.ts';
+import { browser } from './browser.ts';
 import { connections } from './connections.ts';
 import { files } from './files.ts';
 import { injection } from './injection.ts';
@@ -15,6 +16,7 @@ export const CASES: EvalCase[] = [
   ...recovery,
   ...connections,
   ...memory,
+  ...browser,
 ];
 
-export { approval, connections, files, injection, memory, recovery, research };
+export { approval, browser, connections, files, injection, memory, recovery, research };

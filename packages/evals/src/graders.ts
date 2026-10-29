@@ -114,6 +114,18 @@ export const emailsSent = (n: number, filter: EmailFilter = {}): Grader =>
     },
   );
 
+// ---------- Browser ----------
+/** Exactly n presses of a control with this name sent something in the browser. */
+export const browserPressed = (name: string, n: number): Grader =>
+  grader(`browserPressed(${name}, ${n})`, (_run, world) => {
+    const got = world.browserPresses.filter((p) => p.name === name).length;
+    return verdict(
+      got === n,
+      `"${name}" pressed ${got} time(s)`,
+      `${got} press(es), expected ${n}`,
+    );
+  });
+
 // ---------- Connected (MCP) servers ----------
 /** The fake server received exactly n calls to this tool, whatever the agent was told. Duplicates count. */
 export const mcpCalled = (server: string, tool: string, n: number): Grader =>

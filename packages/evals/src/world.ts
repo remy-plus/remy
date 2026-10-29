@@ -2,7 +2,9 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { BROWSER_TOOL_NAMES, createBrowserTools, fixtureBrowser } from '@remy/browser';
 import {
+  BROWSER_HINT,
   defineTool,
   type FetchResult,
   type ScopedFetch,
@@ -228,9 +230,14 @@ export async function createWorld(c: EvalCase): Promise<World> {
 
   const web = c.world.web ?? {};
   const sent: SentEmail[] = [];
+  const browser = c.world.browser
+    ? fixtureBrowser(web, {
+        ...(c.world.browser.signInTo && { signInTo: c.world.browser.signInTo }),
+        search: fixtureSearch(web).search,
+      })
+    : undefined;
   const tools: Tool[] = [
-    fetchUrl,
-    createWebSearch(fixtureSearch(web)),
+    ...(browser ? createBrowserTools(browser) : [fetchUrl, createWebSearch(fixtureSearch(web))]),
     readFile,
     writeFile,
     listFiles,
@@ -246,7 +253,8 @@ export async function createWorld(c: EvalCase): Promise<World> {
   ];
 
   const useful = [
-    ...(c.world.web ? ['fetch_url', 'web_search'] : []),
+    ...(c.world.web && !browser ? ['fetch_url', 'web_search'] : []),
+    ...(browser ? BROWSER_TOOL_NAMES : []),
     ...(c.world.files
       ? [
           'read_file',
@@ -313,8 +321,12 @@ export async function createWorld(c: EvalCase): Promise<World> {
     dir,
     tools,
     allowTools,
-    ...(c.world.memory && {
-      system: `${SYSTEM_PROMPT}\n\n${memoryBlock(notes, c.prompt)}`,
+    ...((c.world.memory || browser) && {
+      system: [
+        SYSTEM_PROMPT,
+        ...(browser ? [BROWSER_HINT] : []),
+        ...(c.world.memory ? [memoryBlock(notes, c.prompt)] : []),
+      ].join('\n\n'),
     }),
     capabilities: () => ({ fs, net, secrets: { get: () => undefined } }),
     async after() {
@@ -325,6 +337,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
         emails: [...sent],
         mcpCalls: mcp?.calls() ?? [],
         memory: notes.map(({ id, text, kind, source }) => ({ id, text, kind, source })),
+        browserPresses: [...(browser?.presses ?? [])],
       };
     },
     async cleanup() {

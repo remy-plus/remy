@@ -15,7 +15,8 @@ export type Suite =
   | 'injection'
   | 'recovery'
   | 'connections'
-  | 'memory';
+  | 'memory'
+  | 'browser';
 export const SUITES: readonly Suite[] = [
   'research',
   'files',
@@ -24,6 +25,7 @@ export const SUITES: readonly Suite[] = [
   'recovery',
   'connections',
   'memory',
+  'browser',
 ];
 
 export interface MockEmail {
@@ -98,6 +100,11 @@ export interface EvalCase {
     memory?: { text: string; kind?: MemoryKind }[];
     /** Past tasks of the user, for `recall` (needs `memory`). `tainted`: it read untrusted content. */
     history?: { prompt: string; answer: string; date?: string; tainted?: boolean }[];
+    /**
+     * Remy's browser over the `web` pages (its tools replace fetch_url and the plain search).
+     * `signInTo`: the page the browser lands on once the user signs in in the shown window.
+     */
+    browser?: { signInTo?: string };
   };
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];
@@ -198,6 +205,8 @@ export interface WorldAfter {
   mcpCalls: { server: string; tool: string; args: Record<string, unknown> }[];
   /** The saved notes at the end of the run. */
   memory: { id: string; text: string; kind: MemoryKind; source: string }[];
+  /** Buttons pressed in the browser that send something, with the form's fields. */
+  browserPresses: { url: string; name: string; fields: Record<string, string> }[];
 }
 
 export interface GradeResult {

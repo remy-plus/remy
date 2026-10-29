@@ -305,6 +305,9 @@ importers:
 
   packages/evals:
     dependencies:
+      '@remy/browser':
+        specifier: workspace:*
+        version: link:../browser
       '@remy/core':
         specifier: workspace:*
         version: link:../core

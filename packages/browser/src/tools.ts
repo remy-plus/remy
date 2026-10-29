@@ -90,6 +90,18 @@ export function browserSearch(browser: Browser): SearchProvider {
 const refArg = z.number().int().min(1).describe('The number in [ ] from the latest page');
 const nameArg = z.string().min(1).describe('The control\'s name as the page shows it, e.g. "Send"');
 
+/** Names of the tools `createBrowserTools` returns. */
+export const BROWSER_TOOL_NAMES = [
+  'web_search',
+  'browser_open',
+  'browser_look',
+  'browser_click',
+  'browser_type',
+  'browser_act',
+  'browser_pay',
+  'browser_show',
+];
+
 /** Browser tools on a real browser on the user's machine. All page content is untrusted. */
 export function createBrowserTools(browser: Browser): Tool[] {
   const common = { outputTrust: 'untrusted', maxOutputChars: 20_000 } as const;
