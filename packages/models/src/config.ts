@@ -1,7 +1,7 @@
 import type { ModelClient } from '@remy/core';
 import { createAiSdkClient } from './ai-sdk-client.ts';
 import { BUILTIN_CATALOG, type Catalog, resolveCaps } from './catalog.ts';
-import { createOpenAIClient } from './openai.ts';
+import { createOpenAIClient, REASONING_EFFORTS, type ReasoningEffort } from './openai.ts';
 import { selectStrategy } from './strategy.ts';
 
 export interface Profile {
@@ -46,12 +46,22 @@ export function modelFromEnv(env: Env, catalog?: Catalog): ModelClient {
   if (!model) throw new Error('set REMY_MODEL');
   const apiKey = env.REMY_API_KEY ?? (profile?.keyEnv ? env[profile.keyEnv] : undefined);
   const caps = resolveCaps(model, { ...BUILTIN_CATALOG, ...catalog });
+  const effort = env.REMY_REASONING?.toLowerCase();
+  if (effort && !(REASONING_EFFORTS as readonly string[]).includes(effort))
+    throw new Error(`REMY_REASONING must be one of ${REASONING_EFFORTS.join(', ')}`);
+  const reasoningEffort = effort as ReasoningEffort | undefined;
   const kind = profile?.kind ?? 'openai';
   if (kind !== 'openai' && !apiKey)
     throw new Error(`the ${name} profile needs an API key (${profile?.keyEnv})`);
   const raw =
     kind === 'openai'
-      ? createOpenAIClient({ id: model, baseUrl, ...(apiKey && { apiKey }), caps })
+      ? createOpenAIClient({
+          id: model,
+          baseUrl,
+          ...(apiKey && { apiKey }),
+          caps,
+          ...(reasoningEffort && { reasoningEffort }),
+        })
       : createAiSdkClient({ kind, id: model, baseUrl, apiKey: apiKey as string, caps });
   return selectStrategy(raw);
 }

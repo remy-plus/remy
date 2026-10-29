@@ -92,8 +92,36 @@ describe('createOpenAIClient', () => {
       expect(body.max_completion_tokens).toBe(REASONING_MIN_OUTPUT_TOKENS);
       expect(body).not.toHaveProperty('max_tokens');
       expect(body).not.toHaveProperty('temperature');
+      expect(body.reasoning_effort).toBe('low');
     },
   );
+
+  it('asks OpenRouter for the effort its own way, and takes a chosen effort', async () => {
+    const seen: string[] = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      seen.push(init.body as string);
+      return json({ choices: [{ message: { content: 'x' } }] });
+    }) as unknown as typeof fetch;
+    const router = createOpenAIClient({
+      id: 'openai/gpt-5-nano',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      caps,
+      fetchImpl,
+    });
+    await router.complete(req, sig());
+    const high = createOpenAIClient({
+      id: 'gpt-5-nano',
+      baseUrl: 'http://x/v1/',
+      caps,
+      fetchImpl,
+      reasoningEffort: 'high',
+    });
+    await high.complete(req, sig());
+    const [a, b] = seen.map((x) => JSON.parse(x));
+    expect(a.reasoning).toEqual({ effort: 'low' });
+    expect(a).not.toHaveProperty('reasoning_effort');
+    expect(b.reasoning_effort).toBe('high');
+  });
 
   it('reports an empty reply cut off by the output limit as retryable', async () => {
     const { client } = make(() =>
@@ -115,6 +143,7 @@ describe('createOpenAIClient', () => {
     expect(body.max_tokens).toBe(100);
     expect(body.temperature).toBe(0.2);
     expect(body).not.toHaveProperty('max_completion_tokens');
+    expect(body).not.toHaveProperty('reasoning_effort');
   });
 
   it('parses text, tool calls and usage', async () => {

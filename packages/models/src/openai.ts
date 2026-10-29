@@ -15,7 +15,13 @@ export interface OpenAIClientOptions {
   headers?: Record<string, string>;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /** How hard a reasoning model thinks per step. Default `low`: medium made GPT-5 nano take 10–30 s a step. */
+  reasoningEffort?: ReasoningEffort;
 }
+
+export const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'low';
 
 type Json = Record<string, unknown>;
 
@@ -181,8 +187,13 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       const maxTokens = reasoning
         ? Math.max(req.maxOutputTokens, REASONING_MIN_OUTPUT_TOKENS)
         : req.maxOutputTokens;
-      if (reasoning) body.max_completion_tokens = maxTokens;
-      else {
+      if (reasoning) {
+        body.max_completion_tokens = maxTokens;
+        const effort = opts.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
+        // OpenRouter takes a `reasoning` object; OpenAI and compatible servers take `reasoning_effort`.
+        if (/openrouter\.ai/i.test(opts.baseUrl)) body.reasoning = { effort };
+        else body.reasoning_effort = effort;
+      } else {
         body.max_tokens = maxTokens;
         body.temperature = req.temperature;
       }
