@@ -13,10 +13,14 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 - move files and create folders
 - delete files
 
-**Web:**
-- fetch a page
-- search the web, if you set `BRAVE_API_KEY`, `TAVILY_API_KEY` or `SEARXNG_URL`
-- restrict browsing to the domains you pass with `--net-allow`
+**Web (Remy's own browser on your computer):**
+- search the web and open pages, with no key: a hidden Chrome, Edge or Chromium with its own profile in `~/.remy/browser`
+- follow links, use a site's search box, fill in fields
+- press buttons that send, post, save or delete, **after you approve**; pay, **after you approve, every time**
+- never types passwords or card numbers: it shows the window and you do that part (`remy browser show` or `/browser` to sign in to sites ahead of time)
+- pick another search with `REMY_SEARCH`: `context` (Context.dev), `brave`, `tavily`, `searxng` or `off`; `REMY_BROWSER=off` keeps Remy off your machine's browser
+- fetch a page without the browser
+- restrict browsing to the domains you pass with `--net-allow`; local addresses only with `REMY_BROWSER_LOCAL=on`
 
 **Connections.** Remy uses apps through MCP servers: GitHub, Notion, Linear and Sentry, a folder of files, memory and web pages from the built-in list (`remy connect` or `/connect`), and any other server you add or import from Claude Desktop or Claude Code. Remote servers sign in through your browser or take a token; tokens stay in the Keychain. With many tools connected, each step offers the model the most relevant 12, and it can search for the rest.
 
