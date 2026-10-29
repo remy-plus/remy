@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0 (2026-10-28)
 
 Remy costs less to run and keeps one conversation going.
 
@@ -9,6 +9,9 @@ Remy costs less to run and keeps one conversation going.
 - **Remy knows the moment.** Each message carries the local date and time, your background tasks and your connected apps, so "what's running?" or "what day is it?" needs no lookup.
 - **Remy remembers what you did together.** A new `recall` tool searches all your notes and your past tasks, so "when was that invoice due?" finds last week's answer. Several notes can be saved with one approval.
 - **See the savings.** `remy show` and the sidebar show how much of the input came from the cache, and cached input is priced at its real rate.
+- **Faster.** Reasoning models such as GPT-5 nano think at low effort by default, so steps take seconds instead of half a minute (`REMY_REASONING=minimal|low|medium|high` changes it). Typing in the full screen reaches the screen in about 12 ms instead of 43.
+- **Finishes what it starts.** A task that stops to ask "shall I go on?" with its plan unfinished is sent back to work once. Remy no longer asks to confirm what you already said, and checks a source before saying a new product does not exist.
+- **Reads big pages.** Pages over 2 MB (most news and review sites) are read up to 2 MB instead of refused. Without web search, Remy no longer guesses page addresses.
 
 ## 0.6.0 (2026-10-28)
 
