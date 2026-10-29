@@ -115,17 +115,35 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry, opts: BuildOptions)
   };
   const resultIds = s.log.flatMap((e) => (e.kind === 'result' ? [e.callId] : []));
   for (const id of resultIds) render(id);
+  // Over budget, older results are cut in whole steps (a quarter, then the minimum), oldest
+  // first, and the newest only as a last resort. Steps rather than exactly the overflow: a result
+  // cut once renders the same way on later steps, so the start of the request stays the same and
+  // the provider's prompt cache keeps working.
   const budget = opts.toolBudgetChars;
   if (budget !== undefined) {
     const total = () => [...rendered.values()].reduce((n, t) => n + t.length, 0);
-    for (const id of resultIds) {
-      const over = total() - budget;
-      if (over <= 0) break;
+    const size = (id: string) => {
       const r = s.calls[id]?.result;
-      const len = r?.ok ? r.content.length : 0;
-      const cur = Math.min(caps.get(id) ?? 0, len);
-      caps.set(id, Math.max(MIN_RESULT_CHARS, cur - over - 80)); // 80: the truncation marker
-      render(id);
+      return Math.min(caps.get(id) ?? 0, r?.ok ? r.content.length : 0);
+    };
+    const quarter = (n: number) => Math.floor(n / 4);
+    const older = resultIds.slice(0, -1);
+    const newest = resultIds.slice(-1);
+    const passes: [string[], (n: number) => number][] = [
+      [older, quarter],
+      [older, () => 0],
+      [newest, quarter],
+      [newest, () => 0],
+    ];
+    for (const [ids, cut] of passes) {
+      for (const id of ids) {
+        if (total() <= budget) break;
+        const cur = size(id);
+        const next = Math.max(MIN_RESULT_CHARS, cut(cur));
+        if (next >= cur) continue;
+        caps.set(id, next);
+        render(id);
+      }
     }
   }
   return s.log.map((entry): Message => {

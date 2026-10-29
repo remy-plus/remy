@@ -251,6 +251,17 @@ describe('tool result budget', () => {
     expect(out[0]).toContain('<untrusted source="fetch_url">');
   });
 
+  it('renders an already shortened result the same way on the next step', () => {
+    const before = toolText(
+      buildMessages(withResults([6000, 6000, 6000]), tools, { toolBudgetChars: 9000 }),
+    );
+    const after = toolText(
+      buildMessages(withResults([6000, 6000, 6000, 6000]), tools, { toolBudgetChars: 9000 }),
+    );
+    expect(after[0]).toBe(before[0]);
+    expect(after[3]).not.toContain('[truncated');
+  });
+
   it('leaves the stored result untouched', () => {
     const state = withResults([6000, 6000]);
     buildMessages(state, tools, { toolBudgetChars: 2000 });
