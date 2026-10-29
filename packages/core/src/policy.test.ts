@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { argsHash } from './hash.ts';
 import {
   authorize,
+  callRisk,
   decide,
   isAuthorized,
   MAX_QUESTIONS,
@@ -220,6 +221,32 @@ const ctx: ToolContext = {
   secrets: { get: () => undefined },
   clock: { now: () => 0 },
 };
+
+describe('riskFor', () => {
+  // Pays when n is 2: like a browser button that turns out to be "Buy now".
+  const press = mk('send_as_user', {
+    riskFor: (a) => ((a as { n: number }).n === 2 ? 'spend_money' : 'read'),
+  });
+
+  it('raises a call to a higher risk, never lowers it', () => {
+    expect(callRisk(press, { n: 2 })).toBe('spend_money');
+    expect(callRisk(press, { n: 1 })).toBe('send_as_user');
+    expect(callRisk(press, { n: 'bad' })).toBe('send_as_user');
+    expect(callRisk(mk('write'), { n: 1 })).toBe('write');
+  });
+
+  it('a raised call asks every time, even with the tool always allowed', () => {
+    const s = state({ autoApprove: [...RISKS], standing: ['t_send_as_user'] });
+    expect(decide(planned('t_send_as_user', { n: 1 }), press, s)).toMatchObject({
+      kind: 'allow',
+      via: 'standing',
+    });
+    expect(decide(planned('t_send_as_user', { n: 2 }), press, s)).toMatchObject({
+      kind: 'require_approval',
+      reason: 'Spending money always needs your approval',
+    });
+  });
+});
 
 describe('authorize', () => {
   const tool = mk('write');

@@ -12,7 +12,7 @@ import {
   nextAction,
 } from './next.ts';
 import { openPlanSteps, planGateMessage, planGateTextMessage, progressLine } from './plan.ts';
-import { authorize, decide, reconcileTool, runTool } from './policy.ts';
+import { authorize, callRisk, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
 import {
   createFindTools,
@@ -519,7 +519,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     callId: c.callId,
     argsHash: c.argsHash,
     preview: tool.preview(tool.args.safeParse(c.args).data as never),
-    risk: tool.risk,
+    risk: callRisk(tool, c.args),
     reason,
   });
 

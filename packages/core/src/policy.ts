@@ -4,8 +4,10 @@ import type { CallState, TaskState } from './state.ts';
 import {
   canStandingAllow,
   HIGH_RISK,
+  maxRisk,
   type PlannedCall,
   type PolicyDecision,
+  type Risk,
   type Tool,
   type ToolContext,
   type ToolResult,
@@ -19,6 +21,13 @@ export type AuthorizedCall = PlannedCall & { readonly [brand]: true };
 export const MAX_QUESTIONS = 3;
 
 const minted = new WeakSet<object>();
+
+/** The risk policy uses for this call: the tool's risk, raised by `riskFor` when it says so. */
+export function callRisk(tool: Tool, args: unknown): Risk {
+  const parsed = tool.args.safeParse(args);
+  const raised = parsed.success ? tool.riskFor?.(parsed.data as never) : undefined;
+  return raised ? maxRisk(tool.risk, raised) : tool.risk;
+}
 
 export class PolicyError extends Error {
   override name = 'PolicyError';
@@ -59,6 +68,7 @@ export function decide(
         reason: `you have already asked the user ${asked} questions. Finish with what you have`,
       };
   }
+  const risk = callRisk(tool, call.args);
   // 2. Task-level tool lists.
   const { allowTools, denyTools, autoApprove, standing } = state.config.permissions;
   if (denyTools?.includes(tool.name)) return { kind: 'deny', reason: `${tool.name} is blocked` };
@@ -68,7 +78,7 @@ export function decide(
   // an entry for any other risk (a hand-edited file) is ignored.
   if (
     !state.tainted &&
-    canStandingAllow(tool.risk) &&
+    canStandingAllow(risk) &&
     (standing?.includes(tool.name) || state.alwaysAllowed?.includes(tool.name))
   )
     return {
@@ -77,17 +87,17 @@ export function decide(
       reason: `you always allow ${tool.name}`,
     };
   // 3. High-risk actions always need a human.
-  if (HIGH_RISK.includes(tool.risk))
-    return { kind: 'require_approval', reason: `${label(tool.risk)} always needs your approval` };
+  if (HIGH_RISK.includes(risk))
+    return { kind: 'require_approval', reason: `${label(risk)} always needs your approval` };
   // 4. After untrusted content, anything beyond reading needs a human.
-  if (state.tainted && tool.risk !== 'read')
+  if (state.tainted && risk !== 'read')
     return {
       kind: 'require_approval',
       reason: 'this task read untrusted content (a web page, search result, email or pasted text)',
     };
   // 5. Standing permissions.
-  if (autoApprove.includes(tool.risk)) return { kind: 'allow' };
-  return { kind: 'require_approval', reason: `${label(tool.risk)} isn't auto-approved` };
+  if (autoApprove.includes(risk)) return { kind: 'allow' };
+  return { kind: 'require_approval', reason: `${label(risk)} isn't auto-approved` };
 }
 
 const label = (risk: string) =>

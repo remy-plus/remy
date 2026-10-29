@@ -32,6 +32,9 @@ export type ToolResult =
 export const STANDING_RISKS: readonly Risk[] = ['write', 'send_as_user'];
 export const canStandingAllow = (risk: Risk): boolean => STANDING_RISKS.includes(risk);
 
+/** The higher of two risks, in the order of `RISKS`. */
+export const maxRisk = (a: Risk, b: Risk): Risk => (RISKS.indexOf(b) > RISKS.indexOf(a) ? b : a);
+
 export type PolicyDecision =
   /** `via: 'standing'` means the user's standing approval for this tool cleared the call. */
   | { kind: 'allow'; via?: 'standing'; reason?: string }
@@ -391,6 +394,11 @@ export interface Tool<A = unknown> {
   description: string;
   args: z.ZodType<A>;
   risk: Risk;
+  /**
+   * The risk of one call, when it depends on what the call touches (a browser button that pays).
+   * It can only raise `risk`, never lower it; see `callRisk`.
+   */
+  riskFor?(args: A): Risk;
   effect: Effect;
   outputTrust: Trust;
   timeoutMs: number;
