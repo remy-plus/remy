@@ -46,6 +46,25 @@ export function toOpenAIMessages(system: string, messages: Message[]): Json[] {
   return out;
 }
 
+/** Claude through OpenRouter: Anthropic caches only up to explicit breakpoints. */
+const ANTHROPIC_VIA_ROUTER = /^anthropic\//;
+
+/**
+ * Prompt-cache breakpoints for Claude on OpenRouter: after the system prompt and on the last
+ * message, as `cache_control` on a text part (the form OpenRouter passes on to Anthropic).
+ */
+export function withRouterCacheBreaks(messages: Json[]): Json[] {
+  const last = messages.length - 1;
+  return messages.map((m, i) => {
+    const mark = (i === 0 && m.role === 'system') || i === last;
+    if (!mark || typeof m.content !== 'string' || !m.content) return m;
+    return {
+      ...m,
+      content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }],
+    };
+  });
+}
+
 interface Reply {
   text: string;
   calls: { name: string; args: string }[];
@@ -153,9 +172,10 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       onText?: (delta: string) => void,
       onReasoning?: (delta: string) => void,
     ): Promise<ModelResponse> {
+      const messages = toOpenAIMessages(req.system, req.messages);
       const body: Json = {
         model: opts.id,
-        messages: toOpenAIMessages(req.system, req.messages),
+        messages: ANTHROPIC_VIA_ROUTER.test(opts.id) ? withRouterCacheBreaks(messages) : messages,
       };
       const reasoning = isReasoningModel(opts.id);
       const maxTokens = reasoning

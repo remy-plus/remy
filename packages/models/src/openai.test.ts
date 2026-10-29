@@ -5,6 +5,7 @@ import {
   createOpenAIClient,
   REASONING_MIN_OUTPUT_TOKENS,
   retryAfterMs,
+  withRouterCacheBreaks,
 } from './openai.ts';
 import type { RawRequest } from './types.ts';
 
@@ -254,5 +255,31 @@ describe('cachedTokens', () => {
   it('is empty when nothing was cached or nothing was said', () => {
     expect(cachedTokens({})).toEqual({});
     expect(cachedTokens({ prompt_tokens_details: { cached_tokens: 0 } })).toEqual({});
+  });
+});
+
+describe('withRouterCacheBreaks', () => {
+  it('marks the system prompt and the last message', () => {
+    const out = withRouterCacheBreaks([
+      { role: 'system', content: 'S' },
+      { role: 'user', content: 'U1' },
+      { role: 'assistant', content: 'A' },
+      { role: 'user', content: 'U2' },
+    ]);
+    const mark = { type: 'ephemeral' };
+    expect(out[0]).toEqual({
+      role: 'system',
+      content: [{ type: 'text', text: 'S', cache_control: mark }],
+    });
+    expect(out[1]).toEqual({ role: 'user', content: 'U1' });
+    expect(out[3]).toEqual({
+      role: 'user',
+      content: [{ type: 'text', text: 'U2', cache_control: mark }],
+    });
+  });
+
+  it('leaves a last message without text alone', () => {
+    const call = { role: 'assistant', content: null, tool_calls: [] };
+    expect(withRouterCacheBreaks([call])).toEqual([call]);
   });
 });
