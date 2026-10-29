@@ -94,6 +94,7 @@ import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
 import { withRecall } from './recall.ts';
+import { type BackgroundTask, situationBlock } from './situation.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 
@@ -589,6 +590,17 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return mcp;
   }
 
+  /** Tasks a background worker started, newest first, with what `remy list` would call them. */
+  async function backgroundTasks(): Promise<BackgroundTask[]> {
+    const out: BackgroundTask[] = [];
+    for (const t of await store.listTasks()) {
+      const m = readMarker(home, t.taskId);
+      if (m)
+        out.push({ id: t.taskId, state: bgState(t.status, pidAlive(m.pid)), prompt: t.prompt });
+    }
+    return out;
+  }
+
   function makeRuntime(
     file: FileConfig,
     opts: { model: boolean | ModelClient; taskId?: string; hooks?: Partial<RuntimeHooks> },
@@ -627,6 +639,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),
       hasTools: Boolean(tools.get('remember')),
+      situation: async () =>
+        situationBlock({
+          now: new Date(),
+          background: await backgroundTasks(),
+          connections: mcp?.list() ?? [],
+        }),
     });
     if (env.BRAVE_API_KEY) tools.add(createWebSearch(braveSearch(env.BRAVE_API_KEY)));
     else if (env.TAVILY_API_KEY) tools.add(createWebSearch(tavilySearch(env.TAVILY_API_KEY)));

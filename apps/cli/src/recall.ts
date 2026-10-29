@@ -1,6 +1,7 @@
-// Memory recall that keeps the prompt cache warm. The system prompt never changes; the notes picked
-// for a user message go in front of that message, computed once and then reused word for word, so
-// a later `remember` or a new turn only changes what comes after it.
+// Per-message context that keeps the prompt cache warm: the situation (time, background tasks,
+// connections) and the memory notes picked for a user message go in front of that message,
+// computed once and then reused word for word, so a later `remember` or a new turn only changes
+// what comes after it. The system prompt never changes.
 import type { ModelClient } from '@remy/core';
 import { type MemoryEntry, memoryQuery, notesBlock, REMEMBER_HINT } from '@remy/tools';
 
@@ -10,6 +11,8 @@ export interface RecallOptions {
   notes: () => MemoryEntry[];
   /** Whether the remember and forget tools are registered. */
   hasTools: boolean;
+  /** The situation block for a new user message; sent whether or not personalising is on. */
+  situation?: () => Promise<string>;
 }
 
 export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
@@ -22,20 +25,24 @@ export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
     get caps() {
       return inner.caps;
     },
-    complete(req, ...a) {
-      if (!o.enabled()) return inner.complete(req, ...a);
+    async complete(req, ...a) {
+      const on = o.enabled();
+      if (!on && !o.situation) return inner.complete(req, ...a);
       const last = req.messages.findLastIndex((m) => m.role === 'user');
-      const messages = req.messages.map((m, i) => {
+      const lastText = req.messages[last]?.content;
+      if (last >= 0 && typeof lastText === 'string' && !frozen.has(lastText)) {
+        const parts = [
+          o.situation ? await o.situation() : '',
+          on ? notesBlock(o.notes(), memoryQuery(req.messages.slice(0, last + 1))) : '',
+        ];
+        frozen.set(lastText, parts.filter(Boolean).join('\n\n'));
+      }
+      const messages = req.messages.map((m) => {
         if (m.role !== 'user') return m;
-        const text = m.content ?? '';
-        let block = frozen.get(text);
-        if (block === undefined && i === last) {
-          block = notesBlock(o.notes(), memoryQuery(req.messages.slice(0, i + 1)));
-          frozen.set(text, block);
-        }
-        return block ? { ...m, content: `${block}\n\n${text}` } : m;
+        const block = frozen.get(m.content);
+        return block ? { ...m, content: `${block}\n\n${m.content}` } : m;
       });
-      const system = o.hasTools ? `${req.system}\n\n${REMEMBER_HINT}` : req.system;
+      const system = on && o.hasTools ? `${req.system}\n\n${REMEMBER_HINT}` : req.system;
       return inner.complete({ ...req, system, messages }, ...a);
     },
   };

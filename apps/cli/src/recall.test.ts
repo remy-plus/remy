@@ -23,7 +23,7 @@ const req = (...users: string[]): ModelRequest => ({
   temperature: 0,
 });
 
-function setup(notes: MemoryEntry[], enabled = true) {
+function setup(notes: MemoryEntry[], enabled = true, situation?: () => Promise<string>) {
   const inner = new ScriptedModelClient(
     Array.from({ length: 5 }, () => ({
       text: 'ok',
@@ -31,7 +31,12 @@ function setup(notes: MemoryEntry[], enabled = true) {
       usage: { inTokens: 1, outTokens: 1 },
     })),
   );
-  const model = withRecall(inner, { enabled: () => enabled, notes: () => notes, hasTools: true });
+  const model = withRecall(inner, {
+    enabled: () => enabled,
+    notes: () => notes,
+    hasTools: true,
+    ...(situation && { situation }),
+  });
   return { inner, model, notes };
 }
 
@@ -63,5 +68,25 @@ describe('withRecall', () => {
     const r = req('metric units please');
     await model.complete(r, signal);
     expect(inner.requests[0]).toEqual(r);
+  });
+});
+
+describe('withRecall: situation', () => {
+  it('sends the situation even with personalising off, frozen per message', async () => {
+    let n = 0;
+    const { inner, model } = setup([], false, async () => `SITUATION ${++n}`);
+    await model.complete(req('first'), signal);
+    await model.complete(req('first', 'second'), signal);
+    const [a, b] = inner.requests;
+    expect(a?.system).toBe('SYSTEM');
+    expect(a?.messages[0]?.content).toBe('SITUATION 1\n\nfirst');
+    expect(b?.messages[0]).toEqual(a?.messages[0]);
+    expect(b?.messages[2]?.content).toBe('SITUATION 2\n\nsecond');
+  });
+
+  it('puts the situation before the notes', async () => {
+    const { inner, model } = setup([note('mem_a', 'Prefers metric units')], true, async () => 'S');
+    await model.complete(req('metric please'), signal);
+    expect(inner.requests[0]?.messages[0]?.content).toMatch(/^S\n\nThe user's own saved notes/);
   });
 });
