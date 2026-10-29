@@ -12,7 +12,7 @@ import { percentile } from './metrics.ts';
 import { buildRecord, policyViolations } from './record.ts';
 import { referenceModel } from './reference.ts';
 import { renderSummary } from './report.ts';
-import { runCase, runEval } from './runner.ts';
+import { runCase, runEval, sharedPrefix } from './runner.ts';
 import type { EvalCase } from './types.ts';
 
 const page = (t: string) => `<html><head><title>T</title></head><body><p>${t}</p></body></html>`;
@@ -205,5 +205,13 @@ describe('records and metrics', () => {
       suites: ['files'],
     });
     expect(res.runs.map((r) => r.caseId)).toEqual(['other']);
+  });
+});
+
+describe('sharedPrefix', () => {
+  it('counts the common start', () => {
+    expect(sharedPrefix('abcdef', 'abcxyz')).toBe(3);
+    expect(sharedPrefix('abc', 'abcdef')).toBe(3);
+    expect(sharedPrefix('', 'a')).toBe(0);
   });
 });

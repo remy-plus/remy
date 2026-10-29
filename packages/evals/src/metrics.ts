@@ -16,6 +16,8 @@ export interface SuiteMetrics {
   wallP50: number;
   wallP95: number;
   modelLatencyMs: number;
+  /** Share of each previous request that the next one repeats at its start (what a prompt cache can reuse). Absent with no multi-request runs. */
+  prefixStable?: number;
   failures: Partial<Record<FailureCategory, number>>;
 }
 
@@ -40,6 +42,7 @@ export function summarize(runs: RunRecord[]): SuiteMetrics {
   const failures: SuiteMetrics['failures'] = {};
   for (const r of runs) if (r.failure) failures[r.failure] = (failures[r.failure] ?? 0) + 1;
   const wall = runs.map((r) => r.wallMs);
+  const prefixTotal = sum(runs.map((r) => r.prefix?.total ?? 0));
   return {
     cases: byCase.size,
     runs: runs.length,
@@ -55,6 +58,9 @@ export function summarize(runs: RunRecord[]): SuiteMetrics {
     wallP50: percentile(wall, 0.5),
     wallP95: percentile(wall, 0.95),
     modelLatencyMs: mean(runs.map((r) => r.modelLatencyMs)),
+    ...(prefixTotal > 0 && {
+      prefixStable: sum(runs.map((r) => r.prefix?.shared ?? 0)) / prefixTotal,
+    }),
     failures,
   };
 }

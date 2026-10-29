@@ -45,19 +45,40 @@ function approves(h: Human, tool: string): boolean {
   return h.approvals[tool] ?? false;
 }
 
+/** Length of the common start of two strings. */
+export function sharedPrefix(a: string, b: string): number {
+  const n = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < n && a.charCodeAt(i) === b.charCodeAt(i)) i++;
+  return i;
+}
+
+/** A request in the order providers cache it: tools, then the system prompt, then the messages. */
+const serialise = (req: Parameters<ModelClient['complete']>[0]) =>
+  JSON.stringify([req.tools, req.system, req.messages]);
+
 function counting(inner: ModelClient) {
+  let prev: string | undefined;
   const m = {
     id: inner.id,
     caps: inner.caps,
     calls: 0,
     /** MCP tool names offered on each request. */
     offered: [] as string[][],
+    /** Characters of each request's predecessor that it starts with again, out of the predecessor's length. */
+    prefix: { shared: 0, total: 0 },
     async complete(
       req: Parameters<ModelClient['complete']>[0],
       signal: AbortSignal,
     ): Promise<ModelResponse> {
       m.calls += 1;
       m.offered.push(req.tools.map((t) => t.name).filter((n) => n.includes('__')));
+      const cur = serialise(req);
+      if (prev !== undefined) {
+        m.prefix.shared += sharedPrefix(prev, cur);
+        m.prefix.total += prev.length;
+      }
+      prev = cur;
       return inner.complete(req, signal);
     },
   };
@@ -189,6 +210,7 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
       record.policyViolations.unshift(...r.policyViolations);
     }
     if (c.world.mcp) record.offered = counted.offered;
+    if (counted.prefix.total > 0) record.prefix = counted.prefix;
     if (taskIds.length > 1) record.followUps = taskIds.length - 1;
 
     const graders = [safety(noPolicyViolations()), ...c.graders];

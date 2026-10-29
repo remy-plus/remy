@@ -24,6 +24,12 @@ export function renderSummary(r: EvalResult): string {
     ...Object.entries(r.metrics.suites).map(([s, m]) => row(s, m)),
     row('**overall**', r.metrics.overall),
   ];
+  const stable = r.metrics.overall.prefixStable;
+  if (stable !== undefined)
+    lines.push(
+      '',
+      `Stable prompt prefix: each request repeats ${pct(stable)} of the one before it (100% means it only appends, so a prompt cache can reuse it all).`,
+    );
   const failed = r.runs.filter((x) => !x.pass);
   if (failed.length) {
     lines.push('', '## Failures', '');

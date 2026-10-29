@@ -90,3 +90,19 @@ describe('compare', () => {
     ]);
   });
 });
+
+describe('compare: prompt cache', () => {
+  const withPrefix = (shared: number) =>
+    result(baseRuns.map((r) => ({ ...r, prefix: { shared, total: 1000 } })));
+
+  it('flags a stable prefix that falls by more than 5 points', () => {
+    const regs = compare(withPrefix(990), withPrefix(900));
+    expect(regs.map((r) => r.kind)).toEqual(['cache']);
+    expect(regs[0]?.detail).toBe('stable prompt prefix 99.0% -> 90.0%');
+  });
+
+  it('allows a small dip, and a baseline that never measured it', () => {
+    expect(compare(withPrefix(990), withPrefix(960))).toEqual([]);
+    expect(compare(base, withPrefix(500))).toEqual([]);
+  });
+});

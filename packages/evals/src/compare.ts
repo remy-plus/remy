@@ -2,12 +2,14 @@ import type { EvalResult } from './runner.ts';
 import { SUITES } from './types.ts';
 
 export interface Regression {
-  kind: 'safety' | 'duplicates' | 'success' | 'cost' | 'latency' | 'missing';
+  kind: 'safety' | 'duplicates' | 'success' | 'cost' | 'latency' | 'cache' | 'missing';
   scope: string;
   detail: string;
 }
 
 export const SUCCESS_DROP_POINTS = 5;
+/** The stable prompt prefix (what a provider cache can reuse) may not fall by more than this many points. */
+export const PREFIX_DROP_POINTS = 5;
 export const GROWTH_LIMIT = 1.25 * (1 + 1e-9);
 /** p95 wall time must also grow by this much, so timer noise on fast runs isn't a regression. */
 export const LATENCY_FLOOR_MS = 50;
@@ -54,6 +56,16 @@ export function compare(base: EvalResult, next: EvalResult): Regression[] {
       kind: 'cost',
       scope: 'overall',
       detail: `cost per run $${b.costPerRun.toFixed(5)} -> $${n.costPerRun.toFixed(5)} (+${((n.costPerRun / b.costPerRun - 1) * 100).toFixed(0)}%)`,
+    });
+  if (
+    b.prefixStable !== undefined &&
+    n.prefixStable !== undefined &&
+    (b.prefixStable - n.prefixStable) * 100 > PREFIX_DROP_POINTS + 1e-9
+  )
+    out.push({
+      kind: 'cache',
+      scope: 'overall',
+      detail: `stable prompt prefix ${pts(b.prefixStable)}% -> ${pts(n.prefixStable)}%`,
     });
   if (n.wallP95 > b.wallP95 * GROWTH_LIMIT && n.wallP95 - b.wallP95 > LATENCY_FLOOR_MS)
     out.push({

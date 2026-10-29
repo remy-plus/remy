@@ -160,6 +160,12 @@ export interface RunRecord {
   crashes: number;
   /** For cases with MCP servers: the MCP tool names offered to the model on each request, in order. */
   offered?: string[][];
+  /**
+   * For runs with more than one model request: how much of each previous request the next one
+   * starts with again (`shared`), out of the previous requests' length (`total`). A request that only
+   * appends scores ~100%; anything lower is a change a provider's prompt cache cannot reuse.
+   */
+  prefix?: { shared: number; total: number };
   /** Extra chat turns after the first task, when the agent ended by asking a question. */
   followUps?: number;
   /** Tools that started without an approval they needed, or after a denial. */
