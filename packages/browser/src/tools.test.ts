@@ -120,6 +120,11 @@ describe('browser tools', () => {
     expect(text).toContain('[2] search box "Search"');
     expect(text).toContain('[3] textbox "Email" = "a@b.test"');
     expect(text).toContain('[4] password "Password" (the user types this: browser_show)');
+    expect(text).toContain('[5] submit "Sign up" (sends: browser_act)');
+    expect(text).toContain('[6] button "Buy now" (pays: browser_pay)');
+    expect(text).toContain('[7] button "Show details"\n');
+    expect(text).toContain('[10] submit "Continue" (pays: browser_pay)');
+    expect(text).toContain('[11] button "Delete account" (sends: browser_act)');
   });
 
   it('opens only http and https', async () => {

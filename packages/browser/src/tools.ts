@@ -20,17 +20,25 @@ const isMoney = (e: PageElement, page: PageSnapshot | undefined) =>
   (e.form !== undefined &&
     Boolean(page?.elements.some((o) => o.form === e.form && o.kind === 'card')));
 
-const describe = (e: PageElement): string => {
+/** The tool a control needs, so the model picks the right one before it asks the user. */
+const needs = (e: PageElement, page: PageSnapshot): string => {
+  if (e.kind === 'password' || e.kind === 'card') return ' (the user types this: browser_show)';
+  if (!['submit', 'button', 'link'].includes(e.kind)) return '';
+  if (isMoney(e, page)) return ' (pays: browser_pay)';
+  if (e.kind === 'submit' || ACTION_WORDS.test(e.name)) return ' (sends: browser_act)';
+  return '';
+};
+
+const describe = (e: PageElement, page: PageSnapshot): string => {
   const what = e.kind === 'textbox' && e.role === 'searchbox' ? 'search box' : e.kind;
   let line = `[${e.ref}] ${what} "${e.name}"`;
   if (e.href) line += ` -> ${e.href}`;
   if (e.value !== undefined) line += ` = "${e.value}"`;
-  if (e.kind === 'password' || e.kind === 'card') line += ' (the user types this: browser_show)';
-  return line;
+  return line + needs(e, page);
 };
 
 export function renderSnapshot(s: PageSnapshot, maxChars = PAGE_MAX_CHARS): string {
-  const shown = s.elements.slice(0, MAX_CONTROLS).map(describe);
+  const shown = s.elements.slice(0, MAX_CONTROLS).map((e) => describe(e, s));
   const more = s.elements.length - shown.length;
   return [
     `Page: ${s.title || '(no title)'}`,
