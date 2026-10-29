@@ -248,6 +248,15 @@ export interface ChatDeps {
   memory?: { store: MemoryStore; personalise: () => boolean };
   /** /tour replays the onboarding; absent where there is none. */
   startTour?: () => void;
+  /**
+   * The ongoing conversation: the turns it starts with (oldest first), and where each finished
+   * turn and each fresh start is recorded so the next `remy` opens where this one left off.
+   */
+  conversation?: {
+    turns: ConversationTurn[];
+    onTurn: (taskId: string) => void;
+    onNew: () => void;
+  };
 }
 
 export interface Chat {
@@ -307,7 +316,24 @@ export const MAX_CONTEXT_TURNS = 20;
  * stays the same for ten messages at a time, so the provider's prompt cache keeps working.
  */
 export function keepTurns<T>(turns: T[]): T[] {
-  return turns.length > MAX_CONTEXT_TURNS ? turns.slice(MAX_CONTEXT_TURNS / 2) : turns;
+  let kept = turns;
+  while (kept.length > MAX_CONTEXT_TURNS) kept = kept.slice(MAX_CONTEXT_TURNS / 2);
+  return kept;
+}
+
+/** Earlier exchanges shown when the chat opens on a saved conversation. */
+export const RESUME_SHOWN = 3;
+
+/** The transcript a saved conversation opens with: its last few exchanges and a line on /new. */
+export function resumedItems(turns: ConversationTurn[]): Item[] {
+  if (!turns.length) return [];
+  return [
+    ...turns.slice(-RESUME_SHOWN).flatMap((t): Item[] => [
+      { kind: 'user', text: t.prompt },
+      { kind: 'reply', text: t.answer },
+    ]),
+    { kind: 'note', text: 'Picking up where you left off. /new starts a fresh conversation.' },
+  ];
 }
 
 export const HELP_TEXT = [
@@ -433,10 +459,11 @@ export function createChat(deps: ChatDeps): Chat {
     contextWindow: deps.contextWindow,
     ...(deps.model && { model: deps.model }),
     ...(deps.theme && { theme: deps.theme }),
+    items: resumedItems(deps.conversation?.turns ?? []),
     // With no model yet, the chat opens on the login panel.
     ...(deps.connect && !deps.model && { overlay: 'login' as const }),
   };
-  let turns: ConversationTurn[] = [];
+  let turns: ConversationTurn[] = keepTurns(deps.conversation?.turns ?? []);
   let minimal = deps.minimal ?? false;
   const sent: string[] = [];
   const listeners = new Set<() => void>();
@@ -727,6 +754,7 @@ export function createChat(deps: ChatDeps): Chat {
             ...turns,
             { prompt, answer, ...(current?.pasted?.length && { pasted: current.pasted }) },
           ]);
+          deps.conversation?.onTurn(id);
           const ms = s.turnStartedAt === undefined ? undefined : Date.now() - s.turnStartedAt;
           return await end(true, {
             kind: 'reply',
@@ -922,6 +950,7 @@ export function createChat(deps: ChatDeps): Chat {
     if (name === 'help') commit({ kind: 'note', text: HELP_TEXT });
     else if (name === 'new') {
       turns = [];
+      deps.conversation?.onNew();
       if (deps.newClears) set({ items: [], title: undefined, filesTouched: undefined });
       else {
         set({ title: undefined, filesTouched: undefined });
@@ -929,6 +958,7 @@ export function createChat(deps: ChatDeps): Chat {
       }
     } else if (name === 'clear') {
       turns = [];
+      deps.conversation?.onNew();
       // The screen wipes itself and prints the header again; the transcript starts empty.
       set({ items: [], clears: s.clears + 1, title: undefined, filesTouched: undefined });
     } else if (name === 'sessions') {

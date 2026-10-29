@@ -738,3 +738,26 @@ describe('keepTurns', () => {
     expect(keepTurns(n(MAX_CONTEXT_TURNS + 1))[0]).toBe(MAX_CONTEXT_TURNS / 2);
   });
 });
+
+describe('the ongoing conversation', () => {
+  it('opens on the saved turns, sends them as context and records new ones', async () => {
+    const recorded: string[] = [];
+    let resets = 0;
+    const saved = [
+      { prompt: 'what is 2+2', answer: 'Four.' },
+      { prompt: 'and 3+3', answer: 'Six.' },
+    ];
+    const { chat, contexts } = harness(new ScriptedModelClient([done('Eight.')]), undefined, {
+      conversation: { turns: saved, onTurn: (id) => recorded.push(id), onNew: () => resets++ },
+    });
+    const opening = chat.getState().items;
+    expect(opening.map((i) => i.kind)).toEqual(['user', 'reply', 'user', 'reply', 'note']);
+    expect(opening.at(-1)).toMatchObject({ text: expect.stringContaining('/new') });
+    await chat.submit('double the last one');
+    expect(contexts).toEqual([2]);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatch(/^task_/);
+    await chat.submit('/new');
+    expect(resets).toBe(1);
+  });
+});

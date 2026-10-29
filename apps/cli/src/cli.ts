@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -73,6 +73,7 @@ import { connectCommand } from './connect.ts';
 import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from './connect-plan.ts';
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
+import { openConversation, savedTurns } from './conversation.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
@@ -207,6 +208,7 @@ Options for every command
   --reduced-motion      No animation in the chat (also REMY_REDUCED_MOTION=1)
   --minimal             A quiet scrolling chat instead of the full screen (also REMY_SCREEN=minimal;
                         /minimal in the chat saves the choice)
+  --new                 Start a fresh conversation instead of picking up the last one
 
 Options for connect
   --url <url>  --header K=V  --env K=V  --secret KEY  --secret-stdin  --yes  --import
@@ -263,6 +265,7 @@ const OPTIONS = {
   debug: { type: 'boolean' },
   'reduced-motion': { type: 'boolean' },
   minimal: { type: 'boolean' },
+  new: { type: 'boolean' },
   // Hidden alias of --minimal, kept for one release.
   classic: { type: 'boolean' },
   deny: { type: 'boolean' },
@@ -1021,9 +1024,19 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       },
     };
     // One workspace for the whole conversation, so files made in one turn are there in the next.
+    // The saved conversation keeps its workspace across launches; --new starts a fresh one.
+    const conversation = openConversation(home);
+    const saved = flags.new ? undefined : conversation.load();
     const workspace = flags.workspace
       ? resolve(cwd, flags.workspace)
-      : join(home, 'workspaces', `chat_${randomUUID().replaceAll('-', '').slice(0, 12)}`);
+      : saved && existsSync(saved.workspace)
+        ? saved.workspace
+        : join(home, 'workspaces', `chat_${randomUUID().replaceAll('-', '').slice(0, 12)}`);
+    const resumed =
+      saved && saved.workspace === workspace
+        ? await savedTurns(saved, (id) => store.read(id))
+        : undefined;
+    if (!resumed) conversation.reset(workspace);
     taskConfig(file, model.id, workspace); // fail on bad flags before the screen opens
     mkdirSync(workspace, { recursive: true });
     const wsFs = createScopedFs(workspace);
@@ -1136,6 +1149,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       profileEnabled: true,
       memory: { store: memory(), personalise: () => personaliseOn(home) },
       startTour: () => onboarding?.start(),
+      conversation: {
+        turns: (resumed ?? []).map((r) => r.turn),
+        onTurn: (id) => conversation.add(id),
+        onNew: () => conversation.reset(workspace),
+      },
       theme: prefs.theme ?? 'auto',
       saveTheme: (choice) => savePrefs(home, { theme: choice }),
       newClears: !minimal,

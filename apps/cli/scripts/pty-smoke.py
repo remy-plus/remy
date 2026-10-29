@@ -301,6 +301,8 @@ def main() -> int:
     ap.add_argument("--ease", action="store_true", help="first run in an empty REMY_HOME, then /, Ctrl+P, /model and @ completion")
     ap.add_argument("--cli-arg", action="append", default=[], help="an extra argument for the chat (repeatable)")
     ap.add_argument("--raw", help="write the raw bytes to this file")
+    ap.add_argument("--home", help="use this REMY_HOME (kept) instead of a fresh temporary one, e.g. to test a second launch")
+    ap.add_argument("--expect-start", action="append", default=[], help="text the first screen must show (repeatable)")
     ap.add_argument("--shot", help="write PREFIX.png (final screen) and PREFIX-all.png (scrollback plus screen), coloured, via headless Chrome")
     ap.add_argument("--shot-dir", help="like --shot, with the prefix DIR/<mode>-<cols>x<rows>-<bg>")
     ap.add_argument("--seq", help="comma-separated steps after the turns: a key (pgup, ctrl+p, esc ...), type:text, wait:secs, shot:name")
@@ -327,7 +329,7 @@ def main() -> int:
 
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", args.rows, args.cols, 0, 0))
-    home = tempfile.mkdtemp(prefix="remy-smoke-")
+    home = args.home or tempfile.mkdtemp(prefix="remy-smoke-")
     env = dict(os.environ, TERM=args.term, COLORTERM="truecolor", REMY_HOME=home)
     env["REMY_KEYCHAIN"] = "off"  # never touch the real Keychain from a smoke run
     key = env.get("OPENAI_API_KEY", "")
@@ -510,6 +512,12 @@ def main() -> int:
         return 1
     mode_shots: dict[str, list[str]] = {}
     mode_shots["startup"] = [l.rstrip() for l in screen.display]
+    start_text = "\n".join(mode_shots["startup"])
+    missing = [t for t in args.expect_start if t not in start_text]
+    if missing:
+        print(f"START FAIL: not on the first screen: {missing}\n{start_text}")
+        proc.kill()
+        return 1
     startup_alt = screen.in_alt
     if args.unfocus:
         os.write(master, b"\x1b[O")
