@@ -15,6 +15,7 @@ export const COMMANDS: CommandInfo[] = [
   { name: 'connect', summary: 'Add an app or service Remy can use' },
   { name: 'connections', summary: 'See connected apps; switch them off or remove them' },
   { name: 'approvals', summary: 'See the tools you always allow; stop allowing one' },
+  { name: 'browser', summary: "Show or hide Remy's browser window, e.g. to sign in to a site" },
   { name: 'bg', summary: 'Run a task in the background: /bg <task>', aliases: ['background'] },
   { name: 'sessions', summary: 'Pick up an unfinished task', aliases: ['resume'] },
   { name: 'new', summary: 'Start a fresh conversation' },

@@ -1227,6 +1227,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       profileEnabled: true,
       memory: { store: memory(), personalise: () => personaliseOn(home) },
       startTour: () => onboarding?.start(),
+      ...(browserOn() && {
+        browser: {
+          visible: () => browserFor(file).visible,
+          show: () => browserFor(file).show(),
+          hide: () => browserFor(file).hide(),
+        },
+      }),
       conversation: {
         turns: resumed ?? [],
         onTurn: (id) => conversation.add(id),

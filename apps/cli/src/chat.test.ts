@@ -814,3 +814,47 @@ describe('compaction', () => {
     expect(contexts).toEqual([10, 6]);
   });
 });
+
+describe('/browser', () => {
+  const noteTexts = (chat: Chat) =>
+    chat.getState().items.flatMap((i) => (i.kind === 'note' || i.kind === 'error' ? [i.text] : []));
+
+  it('shows the window, then hides it again', async () => {
+    let visible = false;
+    const { chat } = harness(new ScriptedModelClient([]), ['read'], {
+      browser: {
+        visible: () => visible,
+        show: async () => {
+          visible = true;
+        },
+        hide: async () => {
+          visible = false;
+        },
+      },
+    });
+    await chat.submit('/browser');
+    expect(visible).toBe(true);
+    await chat.submit('/browser');
+    expect(visible).toBe(false);
+    const notes = noteTexts(chat);
+    expect(notes[0]).toContain('The browser window is open');
+    expect(notes[1]).toContain('hidden again');
+  });
+
+  it('says so when the browser is off or does not start', async () => {
+    const off = harness(new ScriptedModelClient([]));
+    await off.chat.submit('/browser');
+    expect(noteTexts(off.chat)[0]).toContain('REMY_BROWSER=off');
+    const broken = harness(new ScriptedModelClient([]), ['read'], {
+      browser: {
+        visible: () => false,
+        show: async () => {
+          throw new Error('Remy found no browser to use.');
+        },
+        hide: async () => {},
+      },
+    });
+    await broken.chat.submit('/browser');
+    expect(noteTexts(broken.chat)[0]).toContain('no browser');
+  });
+});

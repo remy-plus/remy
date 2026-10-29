@@ -248,6 +248,8 @@ export interface ChatDeps {
   memory?: { store: MemoryStore; personalise: () => boolean };
   /** /tour replays the onboarding; absent where there is none. */
   startTour?: () => void;
+  /** /browser shows or hides Remy's browser window; absent when the browser is off. */
+  browser?: { visible(): boolean; show(): Promise<void>; hide(): Promise<void> };
   /**
    * The ongoing conversation: the turns it starts with (oldest first), and where each finished
    * turn and each fresh start is recorded so the next `remy` opens where this one left off.
@@ -1117,6 +1119,21 @@ export function createChat(deps: ChatDeps): Chat {
           commit({
             kind: 'note',
             text: `Started ${id} in the background. Follow it: remy attach ${id}. It shows in /sessions.`,
+          }),
+        (e) => commit({ kind: 'error', text: friendlyError(e) }),
+      );
+    } else if (name === 'browser') {
+      const b = deps.browser;
+      if (!b)
+        return void commit({ kind: 'note', text: "Remy's browser is off (REMY_BROWSER=off)." });
+      const show = !b.visible();
+      return (show ? b.show() : b.hide()).then(
+        () =>
+          commit({
+            kind: 'note',
+            text: show
+              ? 'The browser window is open. Sign in to sites there and Remy keeps the sign-ins. /browser hides it.'
+              : 'The browser runs hidden again.',
           }),
         (e) => commit({ kind: 'error', text: friendlyError(e) }),
       );
