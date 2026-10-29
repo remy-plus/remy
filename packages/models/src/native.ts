@@ -9,7 +9,12 @@ import {
 export const MAX_REPAIRS = 2;
 
 export function addUsage(a: ModelResponse['usage'], b: ModelResponse['usage']) {
-  return { inTokens: a.inTokens + b.inTokens, outTokens: a.outTokens + b.outTokens };
+  const cached = (a.cachedInTokens ?? 0) + (b.cachedInTokens ?? 0);
+  return {
+    inTokens: a.inTokens + b.inTokens,
+    outTokens: a.outTokens + b.outTokens,
+    ...(cached > 0 && { cachedInTokens: cached }),
+  };
 }
 
 function findProblem(res: ModelResponse, known: Set<string>): string | undefined {

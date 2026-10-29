@@ -160,6 +160,9 @@ export interface ChatState {
   costUsd: number;
   /** Tokens (in and out) used by this conversation. */
   tokens: number;
+  /** Input tokens this conversation sent, and how many of them the provider read from its prompt cache. */
+  inTokens: number;
+  cachedTokens: number;
   /** Prompt size of the latest model call: how full the context is. */
   contextTokens: number;
   /** The model's context window, when known. */
@@ -399,6 +402,8 @@ const initial = (): ChatState => ({
   queue: [],
   costUsd: 0,
   tokens: 0,
+  inTokens: 0,
+  cachedTokens: 0,
   contextTokens: 0,
   taskCostUsd: 0,
   reasoning: '',
@@ -504,6 +509,8 @@ export function createChat(deps: ChatDeps): Chat {
           streaming: '',
           costUsd: s.costUsd + ev.costUsd,
           tokens: s.tokens + ev.usage.inTokens + ev.usage.outTokens,
+          inTokens: s.inTokens + ev.usage.inTokens,
+          cachedTokens: s.cachedTokens + (ev.usage.cachedInTokens ?? 0),
           taskCostUsd: s.taskCostUsd + ev.costUsd,
           contextTokens: ev.usage.inTokens,
           items: [...s.items, ...toCommit],

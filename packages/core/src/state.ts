@@ -183,6 +183,8 @@ function on(s: TaskState, e: Event) {
       s.modelAttempts = 0;
       s.usage.inTokens += e.usage.inTokens;
       s.usage.outTokens += e.usage.outTokens;
+      if (e.usage.cachedInTokens)
+        s.usage.cachedInTokens = (s.usage.cachedInTokens ?? 0) + e.usage.cachedInTokens;
       s.costUsd += e.costUsd;
       for (const c of e.calls) {
         if (s.calls[c.callId]) fail(`duplicate callId ${c.callId}`);

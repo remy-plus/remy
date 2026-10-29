@@ -367,7 +367,7 @@ describe('profiles and catalog', () => {
       REMY_MODEL: 'claude-sonnet-5-5',
       ANTHROPIC_API_KEY: 'sk-ant-test-0001',
     });
-    expect(client.caps.pricing).toEqual({ inPerMTok: 2, outPerMTok: 10 });
+    expect(client.caps.pricing).toEqual({ inPerMTok: 2, outPerMTok: 10, cachedInPerMTok: 0.2 });
     expect(client.caps.contextWindow).toBe(1_000_000);
     const res = await client.complete(request, never);
     expect(res.calls[0]?.tool).toBe('finish');

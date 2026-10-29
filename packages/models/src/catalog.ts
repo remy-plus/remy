@@ -11,31 +11,33 @@ export const DEFAULT_CAPS: ModelCaps = {
   pricing: { inPerMTok: 0, outPerMTok: 0 },
 };
 
-/** Only ids and prices we are sure of; anything uncertain stays at the default (0) until a user models.json says otherwise. */
+/**
+ * Only ids and prices we are sure of. Cached input: OpenAI's GPT-4o family bills it at half price, GPT-5 and
+ * Anthropic models at a tenth; elsewhere it is unknown and billed as normal input. Anything uncertain stays at the default (0) until a user models.json says otherwise. */
 export const BUILTIN_CATALOG: Catalog = {
   'openai/gpt-4o-mini': {
     jsonSchema: true,
     contextTokens: 128000,
     contextWindow: 128000,
-    pricing: { inPerMTok: 0.15, outPerMTok: 0.6 },
+    pricing: { inPerMTok: 0.15, outPerMTok: 0.6, cachedInPerMTok: 0.075 },
   },
   'openai/gpt-4o': {
     jsonSchema: true,
     contextTokens: 128000,
     contextWindow: 128000,
-    pricing: { inPerMTok: 2.5, outPerMTok: 10 },
+    pricing: { inPerMTok: 2.5, outPerMTok: 10, cachedInPerMTok: 1.25 },
   },
   'gpt-4o-mini': {
     jsonSchema: true,
     contextTokens: 128000,
     contextWindow: 128000,
-    pricing: { inPerMTok: 0.15, outPerMTok: 0.6 },
+    pricing: { inPerMTok: 0.15, outPerMTok: 0.6, cachedInPerMTok: 0.075 },
   },
   'gpt-4o': {
     jsonSchema: true,
     contextTokens: 128000,
     contextWindow: 128000,
-    pricing: { inPerMTok: 2.5, outPerMTok: 10 },
+    pricing: { inPerMTok: 2.5, outPerMTok: 10, cachedInPerMTok: 1.25 },
   },
   // Free OpenRouter tier: price is 0.
   'google/gemma-4-26b-a4b-it:free': {
@@ -96,38 +98,38 @@ export const BUILTIN_CATALOG: Catalog = {
     jsonSchema: true,
     contextTokens: 400000,
     contextWindow: 400000,
-    pricing: { inPerMTok: 0.05, outPerMTok: 0.4 },
+    pricing: { inPerMTok: 0.05, outPerMTok: 0.4, cachedInPerMTok: 0.005 },
   },
   'gpt-5-nano': {
     jsonSchema: true,
     contextTokens: 400000,
     contextWindow: 400000,
-    pricing: { inPerMTok: 0.05, outPerMTok: 0.4 },
+    pricing: { inPerMTok: 0.05, outPerMTok: 0.4, cachedInPerMTok: 0.005 },
   },
   // Anthropic (first-party list prices; Haiku 5.5 is $0.10 / $0.50 up to 100K-token prompts).
   'claude-opus-5-5': {
     jsonSchema: false,
     contextTokens: 1000000,
     contextWindow: 1000000,
-    pricing: { inPerMTok: 4, outPerMTok: 20 },
+    pricing: { inPerMTok: 4, outPerMTok: 20, cachedInPerMTok: 0.4 },
   },
   'claude-sonnet-5-5': {
     jsonSchema: false,
     contextTokens: 1000000,
     contextWindow: 1000000,
-    pricing: { inPerMTok: 2, outPerMTok: 10 },
+    pricing: { inPerMTok: 2, outPerMTok: 10, cachedInPerMTok: 0.2 },
   },
   'claude-haiku-5-5': {
     jsonSchema: false,
     contextTokens: 1000000,
     contextWindow: 1000000,
-    pricing: { inPerMTok: 0.1, outPerMTok: 0.5 },
+    pricing: { inPerMTok: 0.1, outPerMTok: 0.5, cachedInPerMTok: 0.01 },
   },
   'claude-haiku-4-5': {
     jsonSchema: false,
     contextTokens: 200000,
     contextWindow: 200000,
-    pricing: { inPerMTok: 1, outPerMTok: 5 },
+    pricing: { inPerMTok: 1, outPerMTok: 5, cachedInPerMTok: 0.1 },
   },
   // Google Gemini (paid tier, standard prompts; Pro costs more above 200K tokens).
   'gemini-2.5-pro': {

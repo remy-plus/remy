@@ -33,6 +33,7 @@ import {
   type Tool,
   type ToolContext,
   type ToolResult,
+  usageCostUsd,
 } from './types.ts';
 
 export interface RuntimeDeps {
@@ -282,9 +283,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
               argsHash: argsHash(c.args),
             })),
             usage: res.usage,
-            costUsd:
-              (res.usage.inTokens * pricing.inPerMTok + res.usage.outTokens * pricing.outPerMTok) /
-              1e6,
+            costUsd: usageCostUsd(res.usage, pricing),
             latencyMs: clock.now() - t0,
           },
         ]);

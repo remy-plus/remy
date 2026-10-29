@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash, canonicalJson } from './hash.ts';
 import { fold, InvalidTransitionError, reduce } from './state.ts';
-import { DEFAULT_BUDGET, type Event, type StoredEvent, type TaskConfig } from './types.ts';
+import {
+  DEFAULT_BUDGET,
+  type Event,
+  type StoredEvent,
+  type TaskConfig,
+  usageCostUsd,
+} from './types.ts';
 
 const config: TaskConfig = {
   model: 'test',
@@ -318,5 +324,20 @@ describe('discovered tools', () => {
     expect(fold(log(created, ...found('find_tools', { names: 'nope' }))).discovered).toEqual([]);
     expect(fold(log(created, ...found('find_tools', undefined))).discovered).toEqual([]);
     expect(fold(log(created, ...found('read_file', { names: ['a__x'] }))).discovered).toEqual([]);
+  });
+});
+
+describe('usageCostUsd', () => {
+  const pricing = { inPerMTok: 1, outPerMTok: 4, cachedInPerMTok: 0.1 };
+
+  it('bills cached input at the cached rate', () => {
+    expect(usageCostUsd({ inTokens: 1e6, outTokens: 0, cachedInTokens: 5e5 }, pricing)).toBeCloseTo(
+      0.55,
+    );
+  });
+
+  it('bills cached input as normal input when the cached price is unknown', () => {
+    const p = { inPerMTok: 1, outPerMTok: 4 };
+    expect(usageCostUsd({ inTokens: 1e6, outTokens: 1e6, cachedInTokens: 5e5 }, p)).toBeCloseTo(5);
   });
 });

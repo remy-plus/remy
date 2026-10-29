@@ -1,6 +1,11 @@
 import { type ModelCaps, ModelError } from '@remy/core';
 import { describe, expect, it } from 'vitest';
-import { createOpenAIClient, REASONING_MIN_OUTPUT_TOKENS, retryAfterMs } from './openai.ts';
+import {
+  cachedTokens,
+  createOpenAIClient,
+  REASONING_MIN_OUTPUT_TOKENS,
+  retryAfterMs,
+} from './openai.ts';
 import type { RawRequest } from './types.ts';
 
 const caps: ModelCaps = {
@@ -235,5 +240,19 @@ describe('createOpenAIClient', () => {
     const err = await p.catch((e) => e);
     expect(err).toBeInstanceOf(ModelError);
     expect(err.retryable).toBe(false);
+  });
+});
+
+describe('cachedTokens', () => {
+  it('reads OpenAI-style and DeepSeek-style cache hits', () => {
+    expect(cachedTokens({ prompt_tokens_details: { cached_tokens: 1024 } })).toEqual({
+      cachedInTokens: 1024,
+    });
+    expect(cachedTokens({ prompt_cache_hit_tokens: 512 })).toEqual({ cachedInTokens: 512 });
+  });
+
+  it('is empty when nothing was cached or nothing was said', () => {
+    expect(cachedTokens({})).toEqual({});
+    expect(cachedTokens({ prompt_tokens_details: { cached_tokens: 0 } })).toEqual({});
   });
 });

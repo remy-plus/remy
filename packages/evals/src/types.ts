@@ -151,7 +151,7 @@ export interface RunRecord {
   reason?: string;
   steps: number;
   modelCalls: number;
-  tokens: { in: number; out: number };
+  tokens: { in: number; out: number; cached?: number };
   costUsd: number;
   wallMs: number;
   modelLatencyMs: number;

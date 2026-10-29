@@ -119,6 +119,20 @@ export interface PlannedCall {
 export interface Usage {
   inTokens: number;
   outTokens: number;
+  /** The part of `inTokens` the provider read from its prompt cache, when it says. Absent in older event logs. */
+  cachedInTokens?: number;
+}
+
+/** Cost in USD. Cached input is billed at `cachedInPerMTok` when the price is known, else as normal input. */
+export function usageCostUsd(usage: Usage, pricing: ModelCaps['pricing']): number {
+  const cached = Math.min(usage.cachedInTokens ?? 0, usage.inTokens);
+  const cachedRate = pricing.cachedInPerMTok ?? pricing.inPerMTok;
+  return (
+    ((usage.inTokens - cached) * pricing.inPerMTok +
+      cached * cachedRate +
+      usage.outTokens * pricing.outPerMTok) /
+    1e6
+  );
 }
 
 export type Event =
@@ -248,7 +262,8 @@ export interface ModelCaps {
   contextWindow?: number;
   /** Tokens per minute the provider allows this key, when known (e.g. a free tier). Requests are sized to fit it. */
   tpm?: number;
-  pricing: { inPerMTok: number; outPerMTok: number };
+  /** USD per million tokens. `cachedInPerMTok` is the price of input read from the provider's prompt cache. */
+  pricing: { inPerMTok: number; outPerMTok: number; cachedInPerMTok?: number };
 }
 
 export interface ModelRequest {

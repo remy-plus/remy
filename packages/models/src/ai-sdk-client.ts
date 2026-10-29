@@ -134,7 +134,7 @@ export function createAiSdkClient(opts: AiSdkClientOptions): ModelClient {
       let text = '';
       const calls: { tool: string; args: unknown }[] = [];
       let finish: string | undefined;
-      let usage = { inTokens: 0, outTokens: 0 };
+      let usage: ModelResponse['usage'] = { inTokens: 0, outTokens: 0 };
       try {
         const { stream } = await model.doStream({
           prompt: toPrompt(req.system, req.messages),
@@ -169,9 +169,11 @@ export function createAiSdkClient(opts: AiSdkClientOptions): ModelClient {
             calls.push({ tool: part.toolName, args });
           } else if (part.type === 'finish') {
             finish = part.finishReason.unified;
+            const cached = part.usage.inputTokens.cacheRead ?? 0;
             usage = {
               inTokens: part.usage.inputTokens.total ?? 0,
               outTokens: part.usage.outputTokens.total ?? 0,
+              ...(cached > 0 && { cachedInTokens: cached }),
             };
           } else if (part.type === 'error') throw part.error;
         }

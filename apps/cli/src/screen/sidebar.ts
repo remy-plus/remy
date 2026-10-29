@@ -10,6 +10,8 @@ export type SidebarState = Pick<
   | 'title'
   | 'contextTokens'
   | 'contextWindow'
+  | 'inTokens'
+  | 'cachedTokens'
   | 'costUsd'
   | 'taskCostUsd'
   | 'budgetUsd'
@@ -81,7 +83,11 @@ export function contextLines(s: SidebarState): { tokens: string; cost: string } 
     s.budgetUsd !== undefined
       ? `${money(s.taskCostUsd)} of $${s.budgetUsd.toFixed(2)}`
       : `${money(s.costUsd)} spent`;
-  return { tokens: `${s.contextTokens.toLocaleString('en-US')} tokens${pct}`, cost };
+  const cached =
+    s.cachedTokens > 0 && s.inTokens > 0
+      ? ` · ${Math.round((s.cachedTokens / s.inTokens) * 100)}% cached`
+      : '';
+  return { tokens: `${s.contextTokens.toLocaleString('en-US')} tokens${pct}${cached}`, cost };
 }
 
 export interface SidebarProps {

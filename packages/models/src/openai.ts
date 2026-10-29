@@ -258,10 +258,21 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
         usage: {
           inTokens: Number(usage.prompt_tokens ?? 0),
           outTokens: Number(usage.completion_tokens ?? 0),
+          ...cachedTokens(usage),
         },
       };
     },
   };
+}
+
+/**
+ * Input tokens served from the provider's prompt cache: `prompt_tokens_details.cached_tokens`
+ * (OpenAI, OpenRouter, Groq, vLLM) or `prompt_cache_hit_tokens` (DeepSeek). Empty when not reported.
+ */
+export function cachedTokens(usage: Json): { cachedInTokens?: number } {
+  const details = usage.prompt_tokens_details as Json | undefined;
+  const n = Number(details?.cached_tokens ?? usage.prompt_cache_hit_tokens ?? 0);
+  return Number.isFinite(n) && n > 0 ? { cachedInTokens: n } : {};
 }
 
 /**

@@ -87,7 +87,11 @@ export function buildRecord(
     ...(final?.reason !== undefined && { reason: final.reason }),
     steps: state.step,
     modelCalls: m.modelCalls,
-    tokens: { in: state.usage.inTokens, out: state.usage.outTokens },
+    tokens: {
+      in: state.usage.inTokens,
+      out: state.usage.outTokens,
+      ...(state.usage.cachedInTokens ? { cached: state.usage.cachedInTokens } : {}),
+    },
     costUsd: state.costUsd,
     wallMs: m.wallMs,
     modelLatencyMs: events.reduce(

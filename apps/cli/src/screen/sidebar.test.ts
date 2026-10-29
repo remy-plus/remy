@@ -12,7 +12,13 @@ import {
   wrapTitle,
 } from './sidebar.ts';
 
-const base: SidebarState = { contextTokens: 0, costUsd: 0, taskCostUsd: 0 };
+const base: SidebarState = {
+  contextTokens: 0,
+  inTokens: 0,
+  cachedTokens: 0,
+  costUsd: 0,
+  taskCostUsd: 0,
+};
 
 const frame = (state: SidebarState, height: number) => {
   const app = render(h(Sidebar, { state, theme: createTheme('none'), height }));
@@ -56,6 +62,11 @@ describe('helpers', () => {
     const s = { ...base, contextTokens: 12345, contextWindow: 88000, costUsd: 0.04 };
     expect(contextLines(s)).toEqual({ tokens: '12,345 tokens · 14% used', cost: '$0.04 spent' });
     expect(contextLines({ ...s, budgetUsd: 0.5, taskCostUsd: 0.04 }).cost).toBe('$0.04 of $0.50');
+  });
+
+  it('contextLines adds the cached share once the provider reports one', () => {
+    const s = { ...base, contextTokens: 1000, inTokens: 4000, cachedTokens: 3000 };
+    expect(contextLines(s).tokens).toBe('1,000 tokens · 75% cached');
   });
 });
 

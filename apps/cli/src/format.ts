@@ -1,5 +1,5 @@
 // Plain-text rendering: colors, one-line event summaries, the readable timeline.
-import type { StoredEvent, TaskState } from '@remy/core';
+import type { StoredEvent, TaskState, Usage } from '@remy/core';
 import { ansi, type ColorLevel } from './theme.ts';
 
 export interface Styler {
@@ -25,6 +25,14 @@ export const fmtMs = (ms: number) =>
   ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
 export const fmtCost = (usd: number) => (usd === 0 ? '$0' : `$${usd.toFixed(4)}`);
 export const fmtTokens = (n: number) => (n < 1000 ? String(n) : `${(n / 1000).toFixed(1)}k`);
+
+/** "12k in" plus the cached share when the provider reported one. */
+function fmtIn(u: Usage): string {
+  const cached = u.cachedInTokens ?? 0;
+  const pct =
+    cached > 0 && u.inTokens > 0 ? ` (${Math.round((cached / u.inTokens) * 100)}% cached)` : '';
+  return `${fmtTokens(u.inTokens)} in${pct}`;
+}
 
 function summarizeArgs(args: unknown): string {
   if (args === null || typeof args !== 'object')
@@ -54,7 +62,7 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
         const what = ev.calls.length
           ? ev.calls.map((c) => c.tool).join(', ')
           : truncate(ev.text ?? '', 100) || 'no action';
-        const stats = `${fmtTokens(ev.usage.inTokens)} in, ${fmtTokens(ev.usage.outTokens)} out, ${fmtCost(ev.costUsd)}, ${fmtMs(ev.latencyMs)}`;
+        const stats = `${fmtIn(ev.usage)}, ${fmtTokens(ev.usage.outTokens)} out, ${fmtCost(ev.costUsd)}, ${fmtMs(ev.latencyMs)}`;
         return `step ${ev.step}  ${what}  ${st.dim(stats)}`;
       }
       case 'model.failed':
@@ -130,6 +138,6 @@ export function totalsLine(events: StoredEvent[], s: TaskState, st: Styler): str
     if (event.type === 'tool.completed') tools += event.latencyMs;
   }
   return st.dim(
-    `${s.step} steps, ${fmtTokens(s.usage.inTokens)} in, ${fmtTokens(s.usage.outTokens)} out, ${fmtCost(s.costUsd)}, model ${fmtMs(model)}, tools ${fmtMs(tools)}`,
+    `${s.step} steps, ${fmtIn(s.usage)}, ${fmtTokens(s.usage.outTokens)} out, ${fmtCost(s.costUsd)}, model ${fmtMs(model)}, tools ${fmtMs(tools)}`,
   );
 }
