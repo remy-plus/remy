@@ -430,8 +430,8 @@ Owner's goal: Remy should do "pretty much anything, only limited by the model's 
 | **0.6 Long tasks + memory** | Plan, act, verify loop with checkpoints; larger budgets with progress reports; background tasks you can leave and resume; memory beyond the profile (facts and preferences learned with consent, viewable and editable) | Phases 1, 5 |
 | **0.7 Context + continuity** | Prompt caching that actually hits (stable prefix, sticky tool selection, cache breakpoints, cached tokens and savings measured), one continuous chat with compaction instead of separate sessions, a situation block (who, when, what is running), deeper memory (task summaries, a `recall` tool, batched saves, meaning-based search) | Owner's Ideas, 2026-10-28 |
 | **0.8 Local browser** | Playwright on the user's machine (accessibility tree first, vision fallback), take-over for logins and CAPTCHAs, browser actions classified by risk (submit = `write`+, checkout = `spend_money`) | Phase 3 |
-| **0.9 Proactive** | Schedules and triggers run as ordinary tasks, a small local daemon, notifications when Remy finishes or needs you | Phase 3 |
-| **0.10 Skills + sub-agents** | Procedures distilled from successful runs, retrieved as tools; child tasks on the same runtime for parallel work | Phase 5 |
+| **0.9 Skills + helpers** | Procedures distilled from successful runs, retrieved as tools; child tasks on the same runtime for parallel work (swapped with proactive, 2026-11-01) | Phase 5 |
+| **0.10 Proactive** | Schedules and triggers run as ordinary tasks, a small local daemon, notifications when Remy finishes or needs you | Phase 3 |
 
 ### 0.5 Connections: build plan (2026-10-28)
 
@@ -501,9 +501,9 @@ Owner (2026-10-29): Remy must not lean on links the model remembers, and not on 
 - **Search is the user's pick (2026-10-29, owner).** `REMY_SEARCH` / config `search`: browser, context (Context.dev, `POST api.context.dev/v1/web/search`), brave, tavily, searxng, off; unset = first service with a key, else the browser. Paid services are the better-search option; `REMY_BROWSER=off` + a service for people who do not want Remy on their machine.
 - **Open: search quality while hidden.** Bing serves a hidden (headless) browser weaker results for some queries (only the first word seems to count), and DuckDuckGo shows it a CAPTCHA. Changing the user agent to hide that it is headless is bot-check circumvention and is not done. Owner to choose: accept it (the model opens sites and follows links), search in the shown window, or an optional search key. Not done yet: sidebar browser state, a live eval run of the browser suite, the shared key check, release.
 
-### 0.9 Skills + helpers: build plan (proposed 2026-11-01, waiting for the owner's go)
+### 0.9 Skills + helpers: build plan (2026-11-01)
 
-Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make this genuinely smart" (comment, 2026-10-29). Proposed order change: **0.9 = skills + helpers, 0.10 = proactive** (schedules are more useful once Remy has skills to run on a schedule). Needs the owner's yes.
+Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make this genuinely smart" (comment, 2026-10-29). **Decided (owner, 2026-11-01): 0.9 = skills + helpers, 0.10 = proactive** (schedules are more useful once Remy has skills to run on a schedule). Helpers are read-only by default and the user can give them control (decided the same day).
 
 **What the research says (summary; sources in the Research database):**
 - Anthropic's multi-agent research system (2025): a lead agent with parallel subagents beat a single agent by about 90% on breadth-first research, but used about 15x the tokens. It helps when the work splits into independent parts; it hurts when parts depend on each other.
@@ -516,7 +516,7 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 - **A. Skills.** Skills live in `REMY_HOME/skills/<name>/SKILL.md` (yours) and `.remy/skills/` in a project, in a format compatible with Agent Skills so existing skills work. Descriptions go into the same BM25 selection as tools; the situation block lists the 3 best matches; the `use_skill(name)` tool (read) returns the full text. Skills hold instructions only, no scripts, so a skill never runs code by itself. A skill grants no permissions: policy, approvals and taint are unchanged. CLI: `remy skills list|show|add <folder>|rm`, `/skills` in the chat. `add` shows the whole file and asks before installing. Local folders only, no URLs, in 0.9. Built-in skills: research, compare-and-buy, write-and-send.
 - **B. Learned skills.** `save_skill` (write, one approval card showing the full text). Remy offers it after a task that succeeded with 8 or more steps, or after you corrected it ("Save how I did this as a skill?"). Same rule as memory: built from the user's words and Remy's own steps, never from page or email text. When a skill is used and the user corrects the result, Remy offers an edit. Skills used often rank higher.
 - **C. Helpers (core).** A `delegate` tool, `{ role?, task, context }`. It starts a **child task on the same runtime**: `task.created` gets `parent: { taskId, callId }`, its own event log, recovery and leases. The rules that keep it safe:
-  - Tools: the role's `tools` list, read-only by default. A helper gets a write tool only if the parent's task allows it and the role names it.
+  - Tools: the role's `tools` list, read-only by default. The user can give helpers control (`/helpers` in the chat, `helpers: "act"` in config, or "let helpers act" on one task); then a helper may also use the role's write tools. Each action still goes through policy and asks like any other.
   - Approvals: a helper's approval card goes to you, labelled with the helper ("Research helper wants to…"). It is never decided by the parent model.
   - Taint: a helper of a tainted task starts tainted. A helper's answer is untrusted if the helper read untrusted content, so the parent becomes tainted too.
   - Budget: carved from the parent's budget (default 15 steps and $0.25 each), and its spend counts against the parent.
@@ -529,7 +529,7 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 **Order and size:** A → B → C → D → F, with E last and optional. About 2–3 sessions. Packages: skills in `packages/tools` (store + tools) and selection in `core`; `delegate` needs a `Delegator` port in `ToolContext`, implemented by the runtime, so `core` stays vendor-free.
 
-**Open for the owner:** (1) 0.9 = skills + helpers, proactive moves to 0.10? (2) Helpers read-only by default: OK? (3) Installing skills from a URL or git repo later (convenient, but it is a supply-chain risk): leave it out of 0.9?
+**Open for the owner:** installing skills from a URL or git repo (convenient, but a supply-chain risk): leave it out of 0.9?
 
 **Research alongside (the AGI track, in `research/`):** the harness is the experiment. Start with what the event log and evals already give us: measure where tasks fail on cheap models, test harness changes (verification steps, planning, tool selection) against pass^k, and publish what works. Model training waits until there is enough consented trajectory data.
 
