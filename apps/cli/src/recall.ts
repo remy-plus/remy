@@ -1,5 +1,5 @@
 // Per-message context that keeps the prompt cache warm: the situation (time, background tasks,
-// connections) and the memory notes picked for a user message go in front of that message,
+// connections), the skills that fit and the memory notes picked for a user message go in front of that message,
 // computed once and then reused word for word, so a later `remember` or a new turn only changes
 // what comes after it. The system prompt never changes.
 import type { ModelClient } from '@remy/core';
@@ -13,6 +13,8 @@ export interface RecallOptions {
   hasTools: boolean;
   /** The situation block for a new user message; sent whether or not personalising is on. */
   situation?: () => Promise<string>;
+  /** The skills that fit the user's recent messages; sent whether or not personalising is on. */
+  skills?: (query: string) => string;
 }
 
 export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
@@ -27,13 +29,15 @@ export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
     },
     async complete(req, ...a) {
       const on = o.enabled();
-      if (!on && !o.situation) return inner.complete(req, ...a);
+      if (!on && !o.situation && !o.skills) return inner.complete(req, ...a);
       const last = req.messages.findLastIndex((m) => m.role === 'user');
       const lastText = req.messages[last]?.content;
       if (last >= 0 && typeof lastText === 'string' && !frozen.has(lastText)) {
+        const query = memoryQuery(req.messages.slice(0, last + 1));
         const parts = [
           o.situation ? await o.situation() : '',
-          on ? notesBlock(o.notes(), memoryQuery(req.messages.slice(0, last + 1))) : '',
+          o.skills ? o.skills(query) : '',
+          on ? notesBlock(o.notes(), query) : '',
         ];
         frozen.set(lastText, parts.filter(Boolean).join('\n\n'));
       }

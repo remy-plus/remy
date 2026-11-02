@@ -38,6 +38,7 @@ import {
   createRedactor,
   createScopedFetch,
   createScopedFs,
+  createSkillTools,
   createWebSearch,
   deleteFile,
   type Episode,
@@ -49,6 +50,8 @@ import {
   moveFile,
   readFile,
   runCommand,
+  SKILLS_HINT,
+  skillsBlock,
   updatePlan,
   writeFile,
 } from '@remy/tools';
@@ -106,6 +109,7 @@ import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
 import { withRecall } from './recall.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
+import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 
@@ -186,6 +190,9 @@ Usage
                                   See what Remy remembers about you, forget one note
                                   or all of them (notes are used only while
                                   "Personalise replies" is on in /profile)
+  remy skills [list|show <name>|add <folder>|rm <name>]
+                                  How-tos Remy follows for kinds of tasks; add shows the
+                                  SKILL.md and asks first (--yes skips the question)
   remy answer <id> "<text>"       Answer a pending question, then continue
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
@@ -369,6 +376,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'connect',
       'approvals',
       'memory',
+      'skills',
       'browser',
     ].includes(command)
   )
@@ -397,6 +405,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const memory = () => {
     memoryStore ??= openMemory(home, { enabled: () => personaliseOn(home) });
     return memoryStore;
+  };
+  let skillStore: SkillStore | undefined;
+  const skills = () => {
+    skillStore ??= openSkills(home, deps.cwd);
+    return skillStore;
   };
   /** Tool names the user always allows. A damaged file turns them off, with one note. */
   const standingNames = (): string[] => {
@@ -708,10 +721,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       for (const t of createMemoryTools(memory())) tools.add(t);
       tools.add(createRecallTool(memory(), pastTasks));
     }
+    for (const t of createSkillTools(skills())) tools.add(t);
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),
       hasTools: Boolean(tools.get('remember')),
+      skills: (query) => skillsBlock(skills().list(), query),
       situation: async () =>
         situationBlock({
           now: new Date(),
@@ -733,13 +748,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const runtime = createRuntime({
       store,
       model,
-      ...((browserOn() || !tools.get('web_search')) && {
-        systemPrompt: [
-          SYSTEM_PROMPT,
-          ...(browserOn() ? [BROWSER_HINT] : []),
-          ...(tools.get('web_search') ? [] : [NO_SEARCH_HINT]),
-        ].join('\n\n'),
-      }),
+      systemPrompt: [
+        SYSTEM_PROMPT,
+        ...(browserOn() ? [BROWSER_HINT] : []),
+        ...(tools.get('web_search') ? [] : [NO_SEARCH_HINT]),
+        SKILLS_HINT,
+      ].join('\n\n'),
       tools,
       owner,
       redact,
@@ -1258,6 +1272,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       effectOf: (tool) => registry?.get(tool)?.effect,
       riskOf: (tool) => registry?.get(tool)?.risk,
       approvals: standing(),
+      skills: () => plainSkills(skills().list(), skills().problems()),
       config: (context) => taskConfig(file, model.id, workspace, context),
       listTasks: () => store.listTasks(),
       background: {
@@ -1482,6 +1497,56 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         if (sub !== 'list') throw new Error('Use remy memory list, forget <id> or clear.');
         out(plainMemory(memory().load(), personaliseOn(home)));
         return 0;
+      }
+
+      case 'skills': {
+        const sub = rest[0] ?? 'list';
+        if (sub === 'list') {
+          out(plainSkills(skills().list(), skills().problems()));
+          return 0;
+        }
+        if (sub === 'show') {
+          need(2, 'remy skills show <name>');
+          const hit = skills()
+            .list()
+            .find((s) => s.name === rest[1]);
+          if (!hit) throw new Error(`There is no skill named ${rest[1]}. See remy skills list.`);
+          out(plainSkill(hit));
+          return 0;
+        }
+        if (sub === 'add') {
+          need(2, 'remy skills add <folder>');
+          const c = skills().prepare(rest[1] as string);
+          out(plainSkill(c.skill));
+          out();
+          if (c.skipped.length)
+            out(
+              `Only SKILL.md is copied; skills are instructions only. Not copied: ${c.skipped.join(', ')}.`,
+            );
+          if (c.replaces) out(`This replaces your skill ${c.skill.name}.`);
+          if (!flags.yes && !(deps.isTTY && deps.ask))
+            throw new Error('Review the skill above, then run again with --yes.');
+          const yes =
+            flags.yes ||
+            /^y(es)?$/i.test(((await deps.ask?.('Add this skill? [y/N] ')) ?? '').trim());
+          if (!yes) {
+            out('Nothing was added.');
+            return 1;
+          }
+          out(`Added ${c.skill.name}: ${skills().install(c)}`);
+          return 0;
+        }
+        if (sub === 'rm' || sub === 'remove') {
+          need(2, 'remy skills rm <name>');
+          const name = rest[1] as string;
+          if (!skills().remove(name))
+            throw new Error(
+              `You have no skill named ${name}. Built-in and project skills cannot be removed here.`,
+            );
+          out(`Removed ${name}.`);
+          return 0;
+        }
+        throw new Error('Use remy skills list, show <name>, add <folder> or rm <name>.');
       }
 
       case 'answer': {

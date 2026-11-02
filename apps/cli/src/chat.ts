@@ -221,6 +221,8 @@ export interface ChatDeps {
   connections?: ConnectionsApi;
   /** Standing approvals ("always allow"), for the `a` key and /approvals. */
   approvals?: ApprovalsStore;
+  /** The skills list for /skills, as plain text. */
+  skills?: () => string;
   /** A tool's risk, for listing standing approvals. */
   riskOf?: (tool: string) => Risk | undefined;
   /** Adds an app or service, for /connect. */
@@ -1064,6 +1066,12 @@ export function createChat(deps: ChatDeps): Chat {
       commit({
         kind: 'note',
         text: `${plainApprovals(deps.approvals.load(), (t) => deps.riskOf?.(t))}\nRemove one with /approvals remove <tool>.`,
+      });
+    } else if (name === 'skills') {
+      commit({
+        kind: 'note',
+        text:
+          deps.skills?.() ?? 'Skills are not available here. Run remy skills list in a terminal.',
       });
     } else if (name === 'connections') {
       if (!deps.connections)
