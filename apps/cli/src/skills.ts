@@ -18,8 +18,10 @@ import {
   parseSkill,
   SKILL_BODY_MAX,
   type Skill,
+  type SkillDraft,
   type SkillSource,
   type SkillsPort,
+  skillText,
 } from '@remy/tools';
 
 export interface SkillProblem {
@@ -38,6 +40,8 @@ export interface SkillCandidate {
 }
 
 export interface SkillStore extends SkillsPort {
+  save(draft: SkillDraft): { path: string };
+  used(name: string): void;
   /** Skills that could not be read, with why. */
   problems(): SkillProblem[];
   /** Reads a folder (or a SKILL.md) to show the user before `install`. Throws with a plain reason. */
@@ -82,14 +86,26 @@ export function openSkills(home: string, cwd: string): SkillStore {
   const mine = join(home, 'skills');
   const projectDir = resolve(cwd, '.remy', 'skills');
   const project = resolve(projectDir) === resolve(mine) ? undefined : projectDir;
+  const usesPath = join(mine, '.uses.json');
+  const loadUses = (): Record<string, number> => {
+    try {
+      const raw = JSON.parse(readFileSync(usesPath, 'utf8')) as unknown;
+      return raw && typeof raw === 'object' ? (raw as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  };
   const read = () => {
     const problems: SkillProblem[] = [];
-    const skills = mergeSkills(
+    const uses = loadUses();
+    const withUses = (list: Skill[]) =>
+      list.map((k) => (typeof uses[k.name] === 'number' ? { ...k, uses: uses[k.name] } : k));
+    const merged = mergeSkills(
       readDir(mine, 'yours', problems),
       project ? readDir(project, 'project', problems) : [],
       BUILTIN_SKILLS,
     );
-    return { skills, problems };
+    return { skills: withUses(merged), problems };
   };
   return {
     list: () => read().skills,
@@ -123,6 +139,22 @@ export function openSkills(home: string, cwd: string): SkillStore {
       const path = join(dir, SKILL_FILE);
       writeFileSync(path, c.text);
       return path;
+    },
+    save(d) {
+      const dir = join(mine, d.name);
+      mkdirSync(dir, { recursive: true });
+      const path = join(dir, SKILL_FILE);
+      writeFileSync(path, skillText(d));
+      return { path };
+    },
+    used(name) {
+      // Best effort: a lost count only changes ranking a little.
+      try {
+        const uses = loadUses();
+        uses[name] = (uses[name] ?? 0) + 1;
+        mkdirSync(mine, { recursive: true });
+        writeFileSync(usesPath, JSON.stringify(uses));
+      } catch {}
     },
     remove(name) {
       const dir = join(mine, name);

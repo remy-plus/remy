@@ -177,3 +177,47 @@ describe('skills in a task', () => {
     expect(JSON.stringify(model.requests[1]?.messages)).toContain('primary sources');
   });
 });
+
+describe('saved skills', () => {
+  it('save_skill writes a skill after approval that the next task is offered', async () => {
+    const save: ModelResponse = {
+      calls: [
+        {
+          tool: 'save_skill',
+          args: {
+            name: 'tax-return',
+            description: 'Prepare and file the yearly tax return',
+            steps: '1. Gather the forms.\n2. Fill them in.',
+          },
+        },
+      ],
+      usage,
+    };
+    const run = harness(new ScriptedModelClient([save, finish]));
+    const r = await run('run', 'save how we did the taxes as a skill');
+    expect(r.out).toContain('Save the skill tax-return');
+    const id = /task_[0-9a-f]{12}/.exec(r.out)?.[0] as string;
+    await run('approve', id);
+    expect(
+      openSkills(home, cwd)
+        .list()
+        .find((k) => k.name === 'tax-return')?.source,
+    ).toBe('yours');
+    const model = new ScriptedModelClient([finish]);
+    await harness(model)('run', 'file my tax return');
+    expect(model.requests[0]?.messages[0]?.content).toContain('- tax-return:');
+  });
+
+  it('counts each read', async () => {
+    const use: ModelResponse = {
+      calls: [{ tool: 'use_skill', args: { name: 'research' } }],
+      usage,
+    };
+    await harness(new ScriptedModelClient([use, finish]))('run', 'research it');
+    expect(
+      openSkills(home, cwd)
+        .list()
+        .find((k) => k.name === 'research')?.uses,
+    ).toBe(1);
+  });
+});

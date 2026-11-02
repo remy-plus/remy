@@ -9,6 +9,7 @@ import {
   parseSkill,
   type Skill,
   skillsBlock,
+  skillText,
 } from './skills.ts';
 
 const skill = (name: string, description: string, source: Skill['source'] = 'yours'): Skill => ({
@@ -176,5 +177,79 @@ describe('use_skill', () => {
     const r = await use.execute({ name: 'taxes' }, ctx);
     expect(r.ok).toBe(false);
     expect(!r.ok && r.error).toContain('tax-return');
+  });
+});
+
+describe('save_skill', () => {
+  const ctx = { taskId: 'task_1' } as ToolContext;
+  function store(initial: Skill[] = BUILTIN_SKILLS) {
+    const saved: Skill[] = [];
+    const uses: Record<string, number> = {};
+    const port = {
+      list: () => mergeSkills(saved, initial).map((s) => ({ ...s, uses: uses[s.name] ?? 0 })),
+      save(d: { name: string; description: string; body: string }) {
+        const i = saved.findIndex((s) => s.name === d.name);
+        if (i >= 0) saved.splice(i, 1);
+        saved.push({ ...d, tools: [], source: 'yours' });
+        return { path: `/skills/${d.name}/SKILL.md` };
+      },
+      used: (n: string) => {
+        uses[n] = (uses[n] ?? 0) + 1;
+      },
+    };
+    const [use, save] = createSkillTools(port) as [Tool, Tool];
+    return { port, use, save, saved, uses };
+  }
+  const args = {
+    name: 'weekly-report',
+    description: 'Write the weekly report from my notes: "short" and plain \\ simple',
+    steps: '1. Read notes.md.\n2. Write report.md with three headings.',
+  };
+
+  it('is a write tool, so it always shows a card unless writes are pre-approved', () => {
+    const { save } = store();
+    expect(save.risk).toBe('write');
+    expect(save.effect).toBe('idempotent');
+  });
+
+  it('shows the whole skill on the card', () => {
+    const { save } = store();
+    const p = save.preview(args);
+    expect(p).toContain('Save the skill weekly-report');
+    expect(p).toContain('2. Write report.md');
+    expect(save.preview({ ...args, name: 'research' })).toContain('instead of the built-in');
+  });
+
+  it('saves a skill that round-trips through SKILL.md', async () => {
+    const { save, saved } = store();
+    const r = await save.execute(args, ctx);
+    expect(r.ok).toBe(true);
+    expect(saved[0]?.name).toBe('weekly-report');
+    const back = parseSkill(skillText(saved[0] as Skill));
+    expect(back.ok && back.skill.description).toBe(args.description);
+    expect(back.ok && back.skill.body).toBe(args.steps);
+  });
+
+  it('cannot break out of the front matter', () => {
+    const text = skillText({ name: 'x', description: 'a\n---\nname: evil', body: 'b' });
+    const back = parseSkill(text);
+    expect(back.ok && back.skill.name).toBe('x');
+  });
+
+  it('refuses a bad name in its arguments', () => {
+    const { save } = store();
+    expect(save.args.safeParse({ ...args, name: 'Bad Name' }).success).toBe(false);
+  });
+
+  it('is absent when the store cannot save', () => {
+    expect(createSkillTools({ list: () => [] }).map((t) => t.name)).toEqual(['use_skill']);
+  });
+
+  it('counts reads, and skills read often rank higher on a tie', async () => {
+    const two = [skill('report-a', 'write a report'), skill('report-b', 'write a report')];
+    const { use, port } = store(two);
+    expect(matchSkills(port.list(), 'write a report')[0]?.name).toBe('report-a');
+    for (let i = 0; i < 3; i++) await use.execute({ name: 'report-b' }, ctx);
+    expect(matchSkills(port.list(), 'write a report')[0]?.name).toBe('report-b');
   });
 });
