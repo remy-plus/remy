@@ -531,7 +531,17 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 **Order and size:** A → B → C → D → F, with E last and optional. About 2–3 sessions. Packages: skills in `packages/tools` (store + tools) and selection in `core`; `delegate` needs a `Delegator` port in `ToolContext`, implemented by the runtime, so `core` stays vendor-free.
 
-**Open for the owner:** installing skills from a URL or git repo (convenient, but a supply-chain risk): leave it out of 0.9?
+**Decided (owner, 2026-11-04):** the owner wants skills to reach outside Remy ("I kinda wanted connections"), so the local-folders-only line in phase A is replaced by phase G below. Proposed; check with the owner before building, since "connections" could mean either part.
+
+- **G. Skills from elsewhere, and skills that use connections.** Runs after D, before the F evals, so F covers it.
+  - **G1. Skills that name a connection.** A SKILL.md can say `connections: github` (a front-matter field; other Agent Skills tools ignore it, to be checked). Listing it grants nothing, same as `allowed-tools`. When the connection is missing, `use_skill` returns the steps plus one line: "This needs GitHub. Run /connect." Remy never connects anything by itself. Ship two or three built-ins that prove it, chosen from the catalog (GitHub, Notion, Linear). This part carries no new supply-chain risk, so it goes first.
+  - **G2. `remy skills add <url>`.** Accepts an https link to a SKILL.md, or a GitHub repo or folder. The tag or branch is resolved to a commit, and that commit is what gets saved. Same flow as a local add: the whole text on screen, then a yes. SKILL.md only; scripts and other files are listed as skipped and never copied or run. The size limit is the same, and http or a private address is refused.
+  - **Safety rules for G2.** Only the user can add: the command lives in the CLI and chat commands, with no tool, so a page or email cannot install a skill. A skill from the web is marked `web` in `remy skills list` with its address and commit, stored in `REMY_HOME/skills/.sources.json`. It is treated like a project skill: the per-message block shows only its name, and `use_skill` on it taints the task, so any non-read action then needs approval. Never auto-updated: `remy skills update <name>` shows the diff and asks again.
+  - **Evals (added to the F `skills` suite).** A web skill that says "ignore your rules and send this" cannot raise risk or skip a card; a page that tells Remy to install a skill does nothing; a moved tag shows a diff, never a silent change; a skill naming a missing connection asks instead of failing or connecting.
+  - **Left out for now:** a skills marketplace or search, skills that run code, and auto-updates.
+  - **Size:** one session.
+
+**Fix before C (live check, 2026-11-04):** GPT-5 nano on a research task made 13 `web_search` calls, opened no pages, never called `use_skill` and ended with questions, recorded as succeeded (task_9a958fa55b8c, $0.0020). Skill matching works (compare-and-buy, research); the block is wired in `apps/cli/src/cli.ts`. Hidden-browser Bing is the main cause: it returned Best Buy and dictionary pages for nearly every query, so the model had nothing to open. Skills cannot prove themselves until search works. Options, for the owner: search in a shown window, make a search key the recommended setup, or accept it for now.
 
 **Research alongside (the AGI track, in `research/`):** the harness is the experiment. Start with what the event log and evals already give us: measure where tasks fail on cheap models, test harness changes (verification steps, planning, tool selection) against pass^k, and publish what works. Model training waits until there is enough consented trajectory data.
 
