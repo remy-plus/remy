@@ -169,6 +169,7 @@ const SOURCE_LABEL: Record<SkillSource, string> = {
   yours: 'yours',
   project: 'this project',
   builtin: 'built in',
+  web: 'from the web',
 };
 
 const firstSentence = (t: string) => t.split(/(?<=[.!?])\s/)[0] ?? t;
@@ -176,7 +177,7 @@ const firstSentence = (t: string) => t.split(/(?<=[.!?])\s/)[0] ?? t;
 /** The plain list for `remy skills list` and `/skills`. */
 export function plainSkills(skills: Skill[], problems: SkillProblem[] = []): string {
   const lines = skills.length ? [] : ['No skills yet.'];
-  for (const source of ['yours', 'project', 'builtin'] as const) {
+  for (const source of ['yours', 'web', 'project', 'builtin'] as const) {
     const group = skills.filter((s) => s.source === source);
     if (!group.length) continue;
     if (lines.length) lines.push('');

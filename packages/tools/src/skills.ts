@@ -8,7 +8,7 @@ import { bm25, defineTool, type Tool } from '@remy/core';
 import { z } from 'zod';
 
 /** Where a skill came from. `yours` and `builtin` are trusted; `project` is not. */
-export type SkillSource = 'builtin' | 'yours' | 'project';
+export type SkillSource = 'builtin' | 'yours' | 'project' | 'web';
 
 export interface Skill {
   name: string;
@@ -39,6 +39,20 @@ export interface SkillsPort {
   /** Counts a read by use_skill. */
   used?(name: string): void;
 }
+
+/**
+ * Project skills and skills from the web are text nobody here wrote. The model sees only their
+ * name until it reads one, and reading one taints the task.
+ */
+export const isReviewed = (s: Pick<Skill, 'source'>) =>
+  s.source === 'builtin' || s.source === 'yours';
+
+const FROM: Record<SkillSource, string> = {
+  builtin: 'built in',
+  yours: 'yours',
+  project: 'from this project folder',
+  web: 'from the web',
+};
 
 export const SKILL_NAME_MAX = 64;
 export const SKILL_DESCRIPTION_MAX = 1024;
@@ -148,7 +162,7 @@ const docOf = (s: Skill) => ({ name: s.name, text: s.description });
 /** Skills that match `query`, best first. Project skills match on their name only (their description was never reviewed). */
 export function matchSkills(skills: Skill[], query: string, limit = SKILLS_SHOWN): Skill[] {
   const scores = bm25(
-    skills.map((s) => (s.source === 'project' ? { name: s.name, text: '' } : docOf(s))),
+    skills.map((s) => (!isReviewed(s) ? { name: s.name, text: '' } : docOf(s))),
     query,
   );
   // Use lifts a skill a little (at most about 50% for one read 30 times), never past a better match by much.
@@ -181,8 +195,8 @@ export function skillsBlock(
       ? ['Skills that may fit (how-tos; read one with use_skill before you start):']
       : []),
     ...others.map((s) =>
-      s.source === 'project'
-        ? `- ${s.name} (from this project folder)`
+      !isReviewed(s)
+        ? `- ${s.name} (${FROM[s.source]})`
         : `- ${s.name}: ${JSON.stringify(s.description.length > 200 ? `${s.description.slice(0, 199)}…` : s.description)}`,
     ),
   ]
@@ -190,8 +204,8 @@ export function skillsBlock(
     .trim();
 }
 
-/** Short and reviewed: a project skill was never checked, so only its name goes to the model. */
-const canSendSteps = (s: Skill) => s.source !== 'project' && s.body.length <= SKILL_STEPS_MAX;
+/** Short and reviewed: an unreviewed skill's name is all that goes to the model unasked. */
+const canSendSteps = (s: Skill) => isReviewed(s) && s.body.length <= SKILL_STEPS_MAX;
 
 /** When to use skills. Fixed text, so it sits in the system prompt without breaking a prompt cache. */
 export const SKILLS_HINT =
@@ -236,12 +250,12 @@ export function createSkillTools(port: SkillsPort): Tool[] {
             );
       }
       port.used?.(hit.name);
-      const head = `Skill ${hit.name}${hit.source === 'project' ? ' (from this project folder, not reviewed by the user)' : ''}: ${hit.description}`;
+      const head = `Skill ${hit.name}${isReviewed(hit) ? '' : ` (${FROM[hit.source]}, not reviewed by the user)`}`;
       const tools = hit.tools.length ? `\nTools it expects: ${hit.tools.join(', ')}.` : '';
       return {
         ok: true,
         content: `${head}${tools}\n\n${hit.body.slice(0, SKILL_BODY_MAX)}`,
-        trust: hit.source === 'project' ? 'untrusted' : 'trusted',
+        trust: isReviewed(hit) ? 'trusted' : 'untrusted',
         data: { name: hit.name, source: hit.source },
       };
     },
