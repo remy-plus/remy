@@ -69,7 +69,7 @@ export function nextAction(s: TaskState, now: number): Action {
   const last = s.log.at(-1);
   if (s.step > 0 && calls.length === 0 && last?.kind === 'model') {
     const text = last.text?.trim() ?? '';
-    if (isQuestion(text)) return { kind: 'ask', question: text };
+    if (isQuestion(text) || isStalledAsk(text)) return { kind: 'ask', question: text };
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
@@ -100,6 +100,19 @@ export const isQuestion = (text: string) =>
   text.length <= 300 &&
   (text.endsWith('?') || (text.endsWith('.') && REQUEST.test(text))) &&
   !/[.!?]\s|\n/.test(text.slice(0, -1));
+
+/**
+ * A long reply that has not done the work: it puts several questions to the user and closes by
+ * asking for the answers. An answer that ends with an offer has neither.
+ */
+export const isStalledAsk = (text: string) =>
+  (text.match(/\?(\s|$)/g)?.length ?? 0) >= 2 &&
+  REQUEST.test(
+    text
+      .split(/\n\s*\n/)
+      .at(-1)
+      ?.trim() ?? '',
+  );
 
 const REQUEST =
   /^(please |kindly )?(provide|share|tell me|send me|give me|specify|confirm|let me know (what|which|who|where|when|your|the))\b/i;
