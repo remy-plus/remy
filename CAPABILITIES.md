@@ -70,3 +70,11 @@ On GPT-5 nano, the 30 cases that existed then passed at 100% across 150 runs (ru
 - `REMY_SKILL_STEPS=on` sends the best match's steps with each message; off by default, it tested worse on GPT-5 nano
 - helpers: `REMY_HELPERS=on`, read-only, up to 3 at once, no browser tools; `remy show <id>` lists them
 - search in a container: `remy browser vm start|stop|status`, `REMY_SEARCH=vm`; needs Docker or Colima
+
+## Schedules
+
+- `remy schedule add|list|run|rm|pause|resume`, `/schedules`, or ask in the chat
+- "every day at 9", "weekdays at 8:30", "every monday at 9am", "every 2 hours", "hourly", "when ~/Downloads changes"
+- `remy daemon` runs them; `remy daemon install` starts it at login on macOS
+- each run is a background task that asks before acting; it cannot approve itself while you are away
+- `remy doctor` checks your setup
