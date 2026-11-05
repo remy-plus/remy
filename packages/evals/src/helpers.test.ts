@@ -90,6 +90,23 @@ const children = async (store: MemoryEventStore) => {
   return out;
 };
 
+/** Runs until the helper finished, then stops the parent as a crash would: no result recorded. */
+async function crashAfterHelper(
+  rt: ReturnType<typeof setup>['rt'],
+  store: MemoryEventStore,
+  id: string,
+): Promise<string> {
+  const realAppend = store.append.bind(store);
+  store.append = async (taskId, seq, events, lease) => {
+    if (taskId === id && events.some((e) => e.type === 'tool.completed')) throw new Error('crash');
+    return realAppend(taskId, seq, events, lease);
+  };
+  await rt.advance(id).catch(() => {});
+  store.append = realAppend;
+  const [child] = await children(store);
+  return child?.taskId as string;
+}
+
 describe('delegate', () => {
   it('runs a helper as a child task and returns its answer', async () => {
     const { rt, store } = setup([
@@ -190,5 +207,26 @@ describe('delegate', () => {
     ]);
     const id = await rt.start('p', config);
     expect(await rt.advance(id)).toMatchObject({ status: 'succeeded' });
+  });
+
+  it('picks up the same helper after a crash instead of starting another', async () => {
+    const script = [
+      calls(['delegate', { helpers: [{ task: 'Go' }] }]),
+      say('Found.'),
+      say('Done.'),
+    ];
+    const { rt, store, registry } = setup(script);
+    const id = await rt.start('p', config);
+    const child = await crashAfterHelper(rt, store, id);
+    const again = createRuntime({
+      store,
+      model: new ScriptedModelClient([say('Done after the crash.')]),
+      tools: registry,
+      capabilities: () => ({}) as never,
+      sleep: async () => {},
+    });
+    expect(await again.advance(id)).toMatchObject({ status: 'succeeded' });
+    const helpers = await children(store);
+    expect(helpers.map((h) => h.taskId)).toEqual([child]);
   });
 });
