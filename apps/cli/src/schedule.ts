@@ -2,6 +2,7 @@
 // Each run is an ordinary background task with ordinary approvals; a schedule grants nothing.
 export type When =
   | { kind: 'every'; minutes: number }
+  | { kind: 'changes'; path: string }
   | { kind: 'at'; hour: number; minute: number; days?: number[] };
 
 export interface Schedule {
@@ -12,16 +13,20 @@ export interface Schedule {
   createdAt: string;
   /** ISO time of the next run. */
   nextRun: string;
+  /** For a schedule that watches a file or folder: when it last changed. */
+  seenChange?: number;
   lastRun?: string;
   lastTask?: string;
   paused?: boolean;
 }
 
 const MIN_MINUTES = 5;
+/** How often a watch looks, and the shortest gap between its runs. */
+const WATCH_MINUTES = 5;
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const HELP =
-  'Say when like "every day at 9", "weekdays at 8:30", "every monday at 9am", "every 2 hours" or "hourly".';
+  'Say when like "every day at 9", "weekdays at 8:30", "every monday at 9am", "every 2 hours", "hourly" or "when ~/Downloads changes".';
 
 function clockTime(text: string): { hour: number; minute: number } | undefined {
   const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(text.trim());
@@ -36,6 +41,8 @@ function clockTime(text: string): { hour: number; minute: number } | undefined {
 }
 
 export function parseWhen(input: string): When {
+  const watch = /^when (.+) changes$/i.exec(input.trim());
+  if (watch) return { kind: 'changes', path: watch[1] as string };
   const text = input.trim().toLowerCase();
   if (text === 'hourly') return { kind: 'every', minutes: 60 };
   const every = /^every (\d+) (minute|hour)s?$/.exec(text);
@@ -59,6 +66,8 @@ export function parseWhen(input: string): When {
 /** The next time after `from`, in local time. */
 export function nextRun(when: When, from: Date): Date {
   if (when.kind === 'every') return new Date(from.getTime() + when.minutes * 60_000);
+  // A watch has no next time: the daemon checks it every tick.
+  if (when.kind === 'changes') return new Date(from.getTime() + WATCH_MINUTES * 60_000);
   const next = new Date(from);
   next.setHours(when.hour, when.minute, 0, 0);
   while (next <= from || (when.days && !when.days.includes(next.getDay())))

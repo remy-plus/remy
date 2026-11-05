@@ -33,6 +33,17 @@ describe('parseWhen', () => {
   });
 });
 
+describe('watching', () => {
+  it('reads a path and keeps its case', () => {
+    expect(parseWhen('when ~/Downloads changes')).toEqual({ kind: 'changes', path: '~/Downloads' });
+  });
+
+  it('looks again in five minutes', () => {
+    const n = nextRun({ kind: 'changes', path: 'x' }, at('2026-11-04T10:00:00'));
+    expect(n).toEqual(at('2026-11-04T10:05:00'));
+  });
+});
+
 describe('nextRun', () => {
   it('counts on from now for an interval', () => {
     const n = nextRun({ kind: 'every', minutes: 30 }, at('2026-11-04T10:00:00'));
