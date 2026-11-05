@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0 (2026-11-04)
+
+Remy learns how you work, and search no longer has to fight the search engines.
+
+- **Skills.** Short how-tos Remy follows for kinds of tasks, in the Agent Skills format. Built in: research, compare-and-buy, write-and-send, triage-issues and save-to-notion. `remy skills`, `/skills`.
+- **Skills from a link.** `remy skills add <link>` takes a GitHub repository, folder or file, or any public `https` link. It shows the whole text first and saves only that text, pinned to its commit on GitHub. `remy skills update <name>` shows new text before using it. Only you can add a skill; nothing on a page can.
+- **Skills from outside stay limited.** The model sees only the name until it reads one, and reading one means any action needs your approval.
+- **Remy offers to save what worked.** After a long task it can save the steps as a skill of yours, with a card showing the full text.
+- **Skills can name a connection.** When one is missing, Remy tells you to run `/connect`. It never connects anything by itself.
+- **Search in a container (optional).** `remy browser vm start`, then `REMY_SEARCH=vm`. A real Chromium with a virtual display runs in Docker or Colima, so search engines accept it and nothing appears on your screen. It holds none of your files or sign-ins. Needs about 2 GB of download and a few GB of memory.
+- **Helpers (optional).** `REMY_HELPERS=on` lets Remy hand separate parts of a task to up to 3 read-only helpers working at once. They share the task's budget, cannot change anything, and a crash picks up the same helpers instead of starting more.
+- Fixed: a broken web address no longer crashes Remy.
+- Includes every fix from 0.8.1.
+
 ## 0.8.1 (2026-11-04)
 
 Search gives you real pages or says it found nothing.
