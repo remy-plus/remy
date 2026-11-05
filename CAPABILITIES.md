@@ -62,3 +62,11 @@ On GPT-5 nano, the 30 cases that existed then passed at 100% across 150 runs (ru
 - `run_command` is not a full sandbox. `node`, `python3` and `git` can do anything you could do in the workspace, so read the command before you approve it.
 - No scheduled tasks and no voice yet. Memory notes are matched by words, not meaning.
 - Weaker or free models are less reliable than the numbers above. Open-weight baselines are still to be measured.
+
+## Skills and helpers
+
+- skills: `remy skills list|show|add|update|rm`, `/skills`; add takes a folder or a link
+- skills from a project folder or a link are limited: name only until read, and reading one taints the task
+- `REMY_SKILL_STEPS=on` sends the best match's steps with each message; off by default, it tested worse on GPT-5 nano
+- helpers: `REMY_HELPERS=on`, read-only, up to 3 at once, no browser tools; `remy show <id>` lists them
+- search in a container: `remy browser vm start|stop|status`, `REMY_SEARCH=vm`; needs Docker or Colima
