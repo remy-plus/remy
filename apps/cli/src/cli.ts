@@ -695,6 +695,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const browserOn = () => env.REMY_BROWSER !== 'off';
   const browserDir = () => join(home, 'browser');
   const vmFile = () => join(home, 'search-vm.json');
+  const vmRun: Run = (cmd, args) => {
+    const r = spawnSync(cmd, args, { encoding: 'utf8' });
+    return { ok: r.status === 0, out: r.stdout ?? '' };
+  };
+  /** Starts the container and saves how to reach it; the saved file also means "search there". */
+  const startVmSearch = async (): Promise<void> => {
+    const conn = { url: `http://127.0.0.1:${VM_PORT}`, token: randomBytes(24).toString('hex') };
+    const started = startVm(vmRun, { port: VM_PORT, token: conn.token, script: vmServerScript() });
+    if (started === 'no-docker')
+      throw new Error('Search in a container needs Docker or Colima. Install one, then try again.');
+    if (started === 'failed') throw new Error('The container did not start.');
+    if (started === 'already-running') return;
+    writeFileSync(vmFile(), JSON.stringify(conn), { mode: 0o600 });
+    if (!(await waitForVm(conn)))
+      throw new Error('The container started but did not answer. Try remy browser vm stop.');
+  };
   const vmConnection = (): VmConnection => {
     try {
       return JSON.parse(readFileSync(vmFile(), 'utf8')) as VmConnection;
@@ -771,7 +787,17 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           connections: mcp?.list() ?? [],
         }),
     });
-    const search = pickSearch(env, env.REMY_SEARCH ?? file.search, () => vmSearch(vmConnection()));
+    const search = pickSearch(
+      env,
+      env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : undefined),
+      () =>
+        vmSearch(vmConnection, fetch, () =>
+          startVmSearch().then(
+            () => true,
+            () => false,
+          ),
+        ),
+    );
     if (search.provider)
       tools.add(
         createWebSearch(
@@ -1704,47 +1730,24 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           return 0;
         }
         if (sub === 'vm') {
-          const run: Run = (cmd, args) => {
-            const r = spawnSync(cmd, args, { encoding: 'utf8' });
-            return { ok: r.status === 0, out: r.stdout ?? '' };
-          };
           const action = rest[1] ?? 'status';
           if (action === 'stop') {
-            stopVm(run);
-            out('Search in the container is stopped.');
+            stopVm(vmRun);
+            rmSync(vmFile(), { force: true });
+            out('Search in the container is off.');
             return 0;
           }
           if (action === 'status') {
-            out(`Search in the container: ${vmStatus(run)}.`);
+            out(`Search in the container: ${vmStatus(vmRun)}.`);
             return 0;
           }
           if (action !== 'start')
             throw new Error(
               'Use remy browser vm start, remy browser vm stop or remy browser vm status.',
             );
-          const conn = {
-            url: `http://127.0.0.1:${VM_PORT}`,
-            token: randomBytes(24).toString('hex'),
-          };
-          const started = startVm(run, {
-            port: VM_PORT,
-            token: conn.token,
-            script: vmServerScript(),
-          });
-          if (started === 'no-docker')
-            throw new Error(
-              'Search in a container needs Docker or Colima. Install one, then try again.',
-            );
-          if (started === 'failed') throw new Error('The container did not start.');
-          if (started === 'started') {
-            writeFileSync(vmFile(), JSON.stringify(conn), { mode: 0o600 });
-            out('Starting. The first start downloads a browser, about 2 GB.');
-            if (!(await waitForVm(conn)))
-              throw new Error(
-                'The container started but did not answer. Try remy browser vm stop.',
-              );
-          }
-          out('Search in the container is on. Set REMY_SEARCH=vm to use it.');
+          out('Starting. The first start downloads a browser, about 2 GB.');
+          await startVmSearch();
+          out('Search now runs in the container, with nothing on your screen.');
           return 0;
         }
         if (sub !== 'show')
