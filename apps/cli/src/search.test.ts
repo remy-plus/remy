@@ -24,4 +24,10 @@ describe('pickSearch', () => {
     expect(() => pickSearch({}, 'context')).toThrow('needs CONTEXT_DEV_API_KEY');
     expect(() => pickSearch({}, 'google')).toThrow('REMY_SEARCH must be one of');
   });
+
+  it('uses the container only when picked', () => {
+    const vm = { search: async () => [] };
+    expect(pickSearch({}, 'vm', () => vm)).toEqual({ choice: 'vm', provider: vm });
+    expect(pickSearch({}, undefined, () => vm).choice).toBe('browser');
+  });
 });

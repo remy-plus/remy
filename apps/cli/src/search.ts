@@ -8,11 +8,19 @@ import {
   tavilySearch,
 } from '@remy/tools';
 
-export const SEARCH_CHOICES = ['browser', 'context', 'brave', 'tavily', 'searxng', 'off'] as const;
+export const SEARCH_CHOICES = [
+  'browser',
+  'vm',
+  'context',
+  'brave',
+  'tavily',
+  'searxng',
+  'off',
+] as const;
 export type SearchChoice = (typeof SEARCH_CHOICES)[number];
 
 const SERVICES: Record<
-  Exclude<SearchChoice, 'browser' | 'off'>,
+  Exclude<SearchChoice, 'browser' | 'vm' | 'off'>,
   { env: string; make: (value: string) => SearchProvider }
 > = {
   context: { env: 'CONTEXT_DEV_API_KEY', make: contextDevSearch },
@@ -31,12 +39,14 @@ export const isSearchChoice = (v: string): v is SearchChoice =>
 export function pickSearch(
   env: Record<string, string | undefined>,
   picked: string | undefined,
+  vm?: () => SearchProvider,
 ): { choice: SearchChoice; provider?: SearchProvider } {
   const want = picked?.trim().toLowerCase();
   if (want) {
     if (!isSearchChoice(want))
       throw new Error(`REMY_SEARCH must be one of ${SEARCH_CHOICES.join(', ')}, not "${picked}".`);
     if (want === 'browser' || want === 'off') return { choice: want };
+    if (want === 'vm') return vm ? { choice: want, provider: vm() } : { choice: 'browser' };
     const s = SERVICES[want];
     const value = env[s.env];
     if (!value)
