@@ -2,6 +2,7 @@
 // or finishes. PLAN.md "The runner" and "Persistence, recovery, retries, duplicate protection".
 import { randomUUID } from 'node:crypto';
 import { argsHash, idempotencyKey } from './hash.ts';
+import { helperBudget, helperId, helperPermissions, helperPrompt } from './helpers.ts';
 import { buildMessages, fencePasted, SYSTEM_PROMPT, toolResultBudgetChars } from './messages.ts';
 import {
   type Action,
@@ -28,6 +29,8 @@ import {
   type Event,
   type EventStore,
   FIND_TOOLS,
+  type HelperRequest,
+  type HelperResult,
   type IdGen,
   type Lease,
   type ModelClient,
@@ -68,6 +71,8 @@ export interface RuntimeDeps {
   onReasoning?: (delta: string) => void;
   /** Called before each model call, including retries. */
   onModelStart?: () => void;
+  /** Narrows the read tools helpers get, e.g. tools that cannot run side by side. */
+  helperTools?: (tool: Tool) => boolean;
 }
 
 export class TaskBusyError extends Error {
@@ -167,6 +172,54 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     return (n: string) => (!allowTools || allowTools.includes(n)) && !denyTools?.includes(n);
   };
 
+  // Helpers run on their own runtime: same store, model and tools, none of the parent's streams.
+  let helperRuntime: RemyRuntime | undefined;
+  const helpers = () =>
+    (helperRuntime ??= createRuntime({
+      ...deps,
+      onEvent: undefined,
+      onText: undefined,
+      onReasoning: undefined,
+      onModelStart: undefined,
+    }));
+
+  async function runHelper(
+    s: TaskState,
+    c: CallState,
+    request: HelperRequest,
+    index: number,
+    count: number,
+  ): Promise<HelperResult> {
+    const taskId = helperId(idempotencyKey(s.taskId, c.callId), index);
+    // A helper from before a crash has events already: carry on with it.
+    if (!(await store.read(taskId)).length)
+      await store.createTask(taskId, redact(helperPrompt(request)), {
+        ...s.config,
+        context: undefined,
+        pasted: undefined,
+        parent: { taskId: s.taskId, callId: c.callId },
+        startTainted: s.tainted,
+        permissions: helperPermissions(tools, s.config.permissions, deps.helperTools),
+        budget: helperBudget(s.config.budget, s, count),
+      });
+    const done = await helpers().advance(taskId);
+    const h = await load(taskId);
+    const answer =
+      done.status === 'succeeded'
+        ? (done.answer ?? '')
+        : done.status === 'waiting_user'
+          ? `Stopped with a question: ${done.question}`
+          : `Stopped without an answer (${done.status}).`;
+    return {
+      taskId,
+      ok: done.status === 'succeeded',
+      answer,
+      tainted: h.tainted,
+      costUsd: h.costUsd,
+      steps: h.step,
+    };
+  }
+
   const ctxFor = (s: TaskState, c: CallState, signal: AbortSignal): ToolContext => ({
     ...deps.capabilities(s.config),
     permits: permitsFor(s),
@@ -175,6 +228,10 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     idempotencyKey: idempotencyKey(s.taskId, c.callId),
     signal,
     clock,
+    ...(!s.config.parent && {
+      delegate: (requests: HelperRequest[]) =>
+        Promise.all(requests.map((r, i) => runHelper(s, c, r, i, requests.length))),
+    }),
   });
 
   const clean = (r: ToolResult): ToolResult =>
