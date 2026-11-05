@@ -15,6 +15,7 @@ import {
   DEFAULT_BUDGET,
   type EventStore,
   fold,
+  isHelperTask,
   LONG_BUDGET,
   type ModelClient,
   NO_SEARCH_HINT,
@@ -40,6 +41,7 @@ import {
   createScopedFs,
   createSkillTools,
   createWebSearch,
+  delegate,
   deleteFile,
   type Episode,
   editFile,
@@ -651,6 +653,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   /** The user's succeeded tasks, newest first (at most `MAX_EPISODES`), for `recall`. */
   async function pastTasks(exclude: string): Promise<Episode[]> {
     const done = (await store.listTasks({ status: 'succeeded' }))
+      .filter((t) => !isHelperTask(t.taskId))
       .filter((t) => t.taskId !== exclude)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, MAX_EPISODES);
@@ -745,6 +748,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       tools.add(createRecallTool(memory(), pastTasks));
     }
     for (const t of createSkillTools(skills())) tools.add(t);
+    if (env.REMY_HELPERS === 'on') tools.add(delegate);
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),
@@ -781,6 +785,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const runtime = createRuntime({
       store,
       model,
+      // Browser tools share one page, so helpers working side by side cannot use them.
+      helperTools: (t) => !t.name.startsWith('browser_'),
       systemPrompt: [
         SYSTEM_PROMPT,
         ...(browserOn() ? [BROWSER_HINT] : []),
@@ -1308,7 +1314,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       approvals: standing(),
       skills: () => plainSkills(skills().list(), skills().problems()),
       config: (context) => taskConfig(file, model.id, workspace, context),
-      listTasks: () => store.listTasks(),
+      listTasks: async () => (await store.listTasks()).filter((t) => !isHelperTask(t.taskId)),
       background: {
         async start(prompt) {
           // Its own runtime and workspace: the chat's conversation is not part of this task.
@@ -1612,7 +1618,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const status = flags.status as TaskStatus | undefined;
         if (status && !STATUSES.includes(status))
           throw new Error(`Unknown status "${status}". Choose from ${STATUSES.join(', ')}.`);
-        const tasks = await store.listTasks(status ? { status } : undefined);
+        const tasks = (await store.listTasks(status ? { status } : undefined)).filter(
+          (t) => !isHelperTask(t.taskId),
+        );
         if (!tasks.length) {
           out(status ? `No ${status} tasks.` : 'No tasks yet. Start one with remy run "<prompt>".');
           return 0;
