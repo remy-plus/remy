@@ -115,6 +115,7 @@ import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
 import { withRecall } from './recall.ts';
+import { plainSchedules } from './schedule.ts';
 import { openSchedules } from './schedule-store.ts';
 import {
   type Run,
@@ -1363,6 +1364,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       riskOf: (tool) => registry?.get(tool)?.risk,
       approvals: standing(),
       skills: () => plainSkills(skills().list(), skills().problems()),
+      schedules: () => plainSchedules(openSchedules(home).list()),
       config: (context) => taskConfig(file, model.id, workspace, context),
       listTasks: async () => (await store.listTasks()).filter((t) => !isHelperTask(t.taskId)),
       background: {
@@ -1680,15 +1682,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const store = openSchedules(home);
         const sub = rest[0] ?? 'list';
         if (sub === 'list') {
-          const all = store.list();
-          if (!all.length) {
-            out('No schedules yet. Add one with remy schedule add "every day at 9" "<prompt>".');
-            return 0;
-          }
-          for (const s of all)
-            out(
-              `${s.id}  ${s.when}  ${s.paused ? 'paused' : `next ${new Date(s.nextRun).toLocaleString()}`}  ${truncate(s.prompt, 60)}`,
-            );
+          out(plainSchedules(store.list()));
           return 0;
         }
         if (sub === 'add') {

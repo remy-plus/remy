@@ -223,6 +223,8 @@ export interface ChatDeps {
   approvals?: ApprovalsStore;
   /** The skills list for /skills, as plain text. */
   skills?: () => string;
+  /** The schedule list for /schedules, as plain text. */
+  schedules?: () => string;
   /** A tool's risk, for listing standing approvals. */
   riskOf?: (tool: string) => Risk | undefined;
   /** Adds an app or service, for /connect. */
@@ -1066,6 +1068,11 @@ export function createChat(deps: ChatDeps): Chat {
       commit({
         kind: 'note',
         text: `${plainApprovals(deps.approvals.load(), (t) => deps.riskOf?.(t))}\nRemove one with /approvals remove <tool>.`,
+      });
+    } else if (name === 'schedules') {
+      commit({
+        kind: 'note',
+        text: deps.schedules?.() ?? 'Schedules are not available here. Run remy schedule list.',
       });
     } else if (name === 'skills') {
       commit({
