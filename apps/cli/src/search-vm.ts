@@ -14,8 +14,8 @@ const NAME = 'remy-search';
 const IMAGE = 'mcr.microsoft.com/playwright:v1.50.0-noble';
 const INNER_PORT = 8080;
 export const VM_PORT = 38917;
-/** A search takes a few seconds, and two engines may be tried. */
-export const VM_TIMEOUT_MS = 45_000;
+/** A search takes a few seconds; the first one after a restart also starts the container. */
+export const VM_TIMEOUT_MS = 120_000;
 
 const NOT_RUNNING = 'Search in the container is not running. Start it with remy browser vm start.';
 
