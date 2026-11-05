@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -92,6 +92,7 @@ import { pickSearch } from './search.ts';
 const MAX_EPISODES = 300;
 
 import { type Credentials, openCredentials } from './credentials.ts';
+import { LAUNCH_LABEL, launchAgentPlist, TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
@@ -113,6 +114,7 @@ import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
 import { withRecall } from './recall.ts';
+import { openSchedules } from './schedule-store.ts';
 import {
   type Run,
   startVm,
@@ -222,6 +224,11 @@ Usage
   remy connect [add|auth|list|remove]
                                   Connect apps and services through MCP servers; --import
                                   brings in the ones Claude Desktop or Claude Code already use
+  remy schedule [list|add "<when>" "<prompt>"|rm <id>|pause <id>|resume <id>]
+                                  Run a task on a schedule, such as "every day at 9" or
+                                  "weekdays at 8:30". Each run asks before it acts
+  remy daemon [install|uninstall|status]
+                                  Runs schedules; install starts it when you log in (macOS)
   remy browser [show|reset|install|vm start|vm stop|vm status]
                                   Remy's own browser, which it uses to search and browse:
                                   show opens it so you can sign in to sites, reset signs
@@ -398,6 +405,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'memory',
       'skills',
       'browser',
+      'schedule',
+      'daemon',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -1658,6 +1667,96 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         throw new Error(
           'Use remy skills list, show <name>, add <folder or link>, update <name> or rm <name>.',
         );
+      }
+
+      case 'schedule': {
+        const store = openSchedules(home);
+        const sub = rest[0] ?? 'list';
+        if (sub === 'list') {
+          const all = store.list();
+          if (!all.length) {
+            out('No schedules yet. Add one with remy schedule add "every day at 9" "<prompt>".');
+            return 0;
+          }
+          for (const s of all)
+            out(
+              `${s.id}  ${s.when}  ${s.paused ? 'paused' : `next ${new Date(s.nextRun).toLocaleString()}`}  ${truncate(s.prompt, 60)}`,
+            );
+          return 0;
+        }
+        if (sub === 'add') {
+          need(3, 'remy schedule add "<when>" "<prompt>"');
+          const s = store.add(rest[1] as string, rest.slice(2).join(' '), new Date());
+          out(`Scheduled ${s.id}. Next run: ${new Date(s.nextRun).toLocaleString()}.`);
+          out(st.dim('It runs while remy daemon is on. Turn that on with remy daemon install.'));
+          return 0;
+        }
+        if (sub === 'rm' || sub === 'remove') {
+          need(2, 'remy schedule rm <id>');
+          if (!store.remove(rest[1] as string)) throw new Error(`There is no schedule ${rest[1]}.`);
+          out(`Removed ${rest[1]}.`);
+          return 0;
+        }
+        if (sub === 'pause' || sub === 'resume') {
+          need(2, `remy schedule ${sub} <id>`);
+          if (!store.setPaused(rest[1] as string, sub === 'pause'))
+            throw new Error(`There is no schedule ${rest[1]}.`);
+          out(`${sub === 'pause' ? 'Paused' : 'Resumed'} ${rest[1]}.`);
+          return 0;
+        }
+        throw new Error('Use remy schedule list, add, rm, pause or resume.');
+      }
+
+      case 'daemon': {
+        const sub = rest[0];
+        const plist = join(homedir(), 'Library', 'LaunchAgents', `${LAUNCH_LABEL}.plist`);
+        const entry = deps.entry ?? currentEntry();
+        if (sub === 'install') {
+          if (process.platform !== 'darwin')
+            throw new Error(
+              'remy daemon install is for macOS. Run remy daemon in your own service.',
+            );
+          mkdirSync(dirname(plist), { recursive: true });
+          writeFileSync(plist, launchAgentPlist(entry, join(home, 'logs', 'daemon.log'), env.PATH));
+          spawnSync('launchctl', ['unload', plist]);
+          if (spawnSync('launchctl', ['load', '-w', plist]).status !== 0)
+            throw new Error('macOS did not start the daemon.');
+          out('The daemon is on and starts when you log in.');
+          return 0;
+        }
+        if (sub === 'uninstall') {
+          spawnSync('launchctl', ['unload', '-w', plist]);
+          rmSync(plist, { force: true });
+          out('The daemon is off.');
+          return 0;
+        }
+        if (sub === 'status') {
+          out(
+            spawnSync('launchctl', ['list', LAUNCH_LABEL]).status === 0
+              ? 'The daemon is on.'
+              : 'The daemon is off. Turn it on with remy daemon install.',
+          );
+          return 0;
+        }
+        if (sub) throw new Error('Use remy daemon, or remy daemon install, uninstall or status.');
+        const store = openSchedules(home);
+        const start = (prompt: string) =>
+          new Promise<string>((done, fail) => {
+            execFile(
+              entry.execPath,
+              [...entry.execArgv, entry.script, 'run', '--background', prompt],
+              { env, cwd: home },
+              (e, stdout) => {
+                if (e) return fail(e);
+                done(/task_[a-f0-9]+/.exec(stdout)?.[0] ?? '');
+              },
+            );
+          });
+        out('The daemon is running. Press Ctrl+C to stop it.');
+        for (;;) {
+          await tick(store, new Date(), start, (line) => out(line));
+          await new Promise((r) => setTimeout(r, TICK_MS));
+        }
       }
 
       case 'answer': {
