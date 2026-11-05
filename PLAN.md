@@ -554,37 +554,66 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 **Research alongside (the AGI track, in `research/`):** the harness is the experiment. Start with what the event log and evals already give us: measure where tasks fail on cheap models, test harness changes (verification steps, planning, tool selection) against pass^k, and publish what works. Model training waits until there is enough consented trajectory data.
 
-## Road to 1.0: ideas and order (2026-11-04)
+## Road to 1.0: stages (2026-11-04)
 
-0.9.0 is on npm. This turns the owner's Notion Ideas into work. Proposed; the owner has not approved it yet. **Open decision, blocks the 1.0 build:** where does the web app run (see "Where 1.0 runs").
+**Owner, 2026-11-04: 1.0 must be the best release possible and genuinely include every idea on the board.** There is no 0.11 and nothing is cut to "after 1.0". Replaces the earlier order. Proposed, for the owner to approve. No dates: each stage ends when its gate passes, not when time runs out. Terminal releases can keep shipping between stages as 1.0 betas.
 
-### The ideas, sorted
+"Best" has to be measured or it means nothing, so Stage 1 builds the bar and every later gate uses it.
 
-| Idea | Where it stands | What to do |
+### Every idea, and where it lands
+
+| Idea | Stage | What 1.0 needs from it |
 |---|---|---|
-| Minimal mode, themes, onboarding | Shipped | Mark Shipped in Notion if not already |
-| One endless chat, prompt caching, web search with no keys | Shipped (0.7, 0.8) | Search quality continues below |
-| Team of specialists | Built, unproven | Test helpers on a stronger model; add role skills only if they win |
-| Much deeper memory | Half done: episodic recall and batched saves shipped | After 1.0: meaning-based search, clean-up, SQLite with no cap |
-| More autonomous, self-aware | Half done | Schedules shipped; verify before finish goes in 1.0 |
-| Self-improvement | Level 2 shipped (skills) | After 1.0: corrections become how-tos; level 3 stays research |
-| Ultra intelligence | Reviewing | Hard eval suite and verify in 1.0; MausBot study and best-of-n after |
-| Get people to notice | Reviewing | Cheap parts now, launch with 1.0 |
-| Brand, bolder | Reviewing, conflicts with "quiet" | 2 or 3 directions before any web screen |
-| Launch video | Parked | Demo mode now, record with 1.0 |
-| /voice | Parked | After 1.0; the web app gets real push-to-talk |
-| Lightpanda | Reviewing | Park: cannot show a window, unlikely to help search |
-| Agent harness tutorial | Reviewing | Needs the post text from the owner, or close |
+| Ultra intelligence, beat MausBot 10-100x | 1, 2 | Study its source, hard eval suite, checks its own work |
+| Agent harness tutorial | 1 | Read the post, keep what raises the evals |
+| Web search with no extra keys | 2 | Works on a fresh machine with nothing on screen |
+| Team of specialists | 2 | Helpers proven live, role helpers, can act with approval |
+| More autonomous, self-aware | 2 | Knows what it can and cannot do, works for hours, levels of trust |
+| Much deeper memory | 3 | Meaning-based search, clean-up, no cap |
+| Self-improvement | 3 | Learns from corrections; proposes changes that must pass the evals |
+| One endless chat | 3, 6 | Shipped in the terminal; carried into the web app |
+| Cut AI bills with prompt caching | 3 | Shipped; keep the cached share high as memory grows |
+| Lighter browser (Lightpanda) | 4 | Measured, optional engine for reading if it wins |
+| Remy's own computer (terminal-mac, container) | 4 | Remy can use real apps, with nothing on the user's screen |
+| /voice, local speech to text | 4, 6 | Terminal first, real push-to-talk in the web app |
+| Brand, bolder and sponsor-worthy | 5 | Two or three directions, owner picks |
+| Onboarding system | 5, 6 | Shipped in the terminal; redesigned for the web |
+| /day /night themes | 5, 6 | Shipped in the terminal; both looks designed for the web |
+| Minimal Remy | 5, 6 | Shipped in the terminal; a quiet mode in the web app |
+| Launch video (Glide) | 8 | Demo mode exists; recorded on the finished app |
+| Get people to notice and contribute | 1, 8 | Groundwork done; public numbers and launch |
 
-### Order
+Also in: everything built so far (skills, connections, schedules, background tasks) must work in the web app. If Notion holds ideas the search did not return, add them here.
 
-**Changed 2026-11-04 (owner): there is no 0.11. The next release is 1.0.** Everything below serves shipping it.
+### The stages
 
-1. **1.0 web app.** `remy web` serves the app from the user's machine (local first, assumed until the owner says otherwise). Design first: design system from `branding/`, core screens reviewed in a browser before wiring. Then a small server on the existing `Runtime` API, streaming, chat, timeline, approval cards, connections, skills, schedules. Then polish until it holds up in a 60 second video.
-2. **Inside 1.0, because research has to work:** a harder eval suite of real multi-step tasks, and Remy checking its answer before finishing.
-3. **Launch.** Video, site, Show HN, r/LocalLLaMA, X, all on the same day.
+**Stage 0: Decide and clear the desk.** Publish 0.10.0. Owner answers the questions below. Fix what is known to be weak: the stalled reply that ends in an offer, and `remy daemon install` through a real login. *Gate: decisions written here, nothing known broken.*
 
-**After 1.0:** deeper memory, corrections becoming how-tos, the MausBot study, role bots, voice, hosted Remy.
+**Stage 1: Build the bar.** Study MausBot's source and the two X posts, feature by feature against Remy. Build a hard eval suite of real multi-step tasks (research, buying, email, files, connections) with baselines on a cheap model and a strong one, and publish the numbers. *Gate: a score we can beat, on two models.*
+
+**Stage 2: Make it smart.** Search that works with no key and nothing on screen. Remy checks its answer before finishing, cites what it read, and plans better. Helpers proven live, with role helpers and the choice to let them act. Remy knows its own tools and limits and says what it needs. Skills that models actually use. Each change stays only if the evals rise. *Gate: sourced answers on the hard research suite, safety and recovery at 100%, a clear win over the Stage 1 baseline.*
+
+**Stage 3: Make it learn.** Deeper memory: meaning-based search, merged and flagged notes, SQLite with no cap. Corrections become how-tos. Remy proposes changes to its own prompts from failed runs, kept only if evals improve and the owner approves; it never changes its own safety rules. Cost stays in check as context grows. *Gate: recall suite at about 25 cases passing, cached share holds, a repeated task visibly improves.*
+
+**Stage 4: Give it reach.** Local voice in the terminal. Measure Remy's browser, then test Lightpanda as an optional engine. Remy's own computer for real apps through a container or terminal-mac. Schedule and daemon support on Linux and Windows, webhooks, and a review of what ran overnight. *Gate: each one works from a clean install, or is dropped by the owner on purpose.*
+
+**Stage 5: Design it.** Nothing is built yet. Refresh the brand with two or three directions. Design system from `branding/`, Cline as the reference. Prototype every core screen in the browser: first run, chat, a task at work, approval card, connections, skills, schedules, memory, settings, light and dark, phone size. *Gate: the owner signs off on real screens.*
+
+**Stage 6: Build the web app.** The server on the existing `Runtime` API, streaming, then every screen from Stage 5. Everything the terminal does, plus push-to-talk. *Gate: every terminal capability works in the web app, and killing it mid-task loses nothing.*
+
+**Stage 7: Prove it.** Non-technical testers finish real tasks unaided. A security review and a red-team pass. Speed, accessibility, and failure paths: no key, no network, bad model. A clean install on machines we do not own. *Gate: testers succeed unaided, no open blockers, the final scores beat Stage 1 by a wide margin.*
+
+**Stage 8: Launch 1.0.0.** Final site, docs and the Glide video recorded on the real app. Show HN, r/LocalLLaMA and X on the same day, with the public numbers. *Gate: the owner says go.*
+
+### Why this order
+
+Intelligence comes before design because a beautiful app doing weak work is not the best thing ever released, and the video needs real results. Design comes before the build because the owner wants it to catch the eye, and that is cheap to change on a prototype and expensive afterwards. Stage 1 comes first because without a score "better" is opinion.
+
+### Honest risks
+
+- Search is outside our control. Stage 2 may need a key as a fallback if no keyless route holds up.
+- "10-100x" may not be measurable; the gate is a clear win on real tasks.
+- All of this is large: roughly 25 to 40 sessions, a guess until Stage 1 is done.
 
 ### Progress (2026-11-04, night)
 
@@ -592,26 +621,21 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 0.10 built: `remy schedule`, `/schedules`, `schedule_task` with an approval card, `list_schedules`, file watches, `remy daemon` with a macOS LaunchAgent, `remy doctor`, `proactive` eval suite (83 replay cases). The next run is saved before a task starts, so a crash can miss a run but never repeats one. Scheduled runs use read-only auto-approval, so a run that needs to act waits for the user. Not built: Linux and Windows service install, webhooks, a screen to review what ran overnight. `remy daemon install` itself is not tested on a real login cycle.
 
-### Where 1.0 runs
+### Where 1.0 runs (owner decides in Stage 0)
 
-**Recommended: local first.** `remy web` serves the app from the user's machine on the existing runtime, SQLite store, Keychain keys and local browser. It drops Postgres, auth, a worker pool and paid infrastructure from 1.0, and everything built so far carries over. It cannot be used from a phone without a tunnel, and it needs an install.
+**Local first (recommended):** `remy web` runs on the user's machine on the existing runtime, store, Keychain and browser. Everything built carries over and there are no servers to pay for. It needs an install, and phones need a tunnel.
 
-**The alternative: hosted.** Sign up and go, which is what "anyone" means long term, but it needs all of Phase 1 plus billing, a place to hold user keys, and cloud browsers. Search engines are likely to treat data-centre addresses worse than the home network that already gets challenged; untested. Hosted can follow as 1.x on the same interfaces.
+**Hosted:** sign up and go, which is what "anyone" means long term. It adds accounts, billing, holding user keys, Postgres and cloud browsers, and search engines may treat data-centre addresses worse; untested.
 
-### 1.0 is ready when
-
-- A non-technical tester finishes real tasks unaided.
-- Safety and recovery suites are at 100%, and research tasks give sourced answers on the recommended model.
-- Search works without a key on a fresh machine, or says plainly what it needs.
-- Killing the app mid-task loses nothing.
-- The core flow looks good enough for the launch video.
+**Both:** local at 1.0, hosted as a later stage on the same interfaces.
 
 ### Needed from the owner
 
 - Where 1.0 runs: local first or hosted.
 - Brand: stay quiet, or go bolder. "boot.dev" still needs confirming.
 - The text of the two X posts (MausBot, harness tutorial); X blocks fetching.
-- A key for a stronger model, to test helpers.
+- A key for a stronger model, for helpers and the Stage 1 baselines.
+- Whether Stage 4's own-computer work should be Linux containers, terminal-mac, or both.
 
 ## Product roadmap after Phase 0
 
