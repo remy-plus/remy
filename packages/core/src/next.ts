@@ -97,6 +97,7 @@ export function nextAction(s: TaskState, now: number): Action {
  * email."). Longer replies that end with an offer are answers.
  */
 export const isQuestion = (text: string) =>
+  !GREETING.test(text) &&
   text.length <= 300 &&
   (text.endsWith('?') || (text.endsWith('.') && REQUEST.test(text))) &&
   !/[.!?]\s|\n/.test(text.slice(0, -1));
@@ -113,6 +114,9 @@ export const isStalledAsk = (text: string) =>
       .at(-1)
       ?.trim() ?? '',
   );
+
+/** "Hello there, ready to help?" is a reply, not a question that needs an answer to go on. */
+const GREETING = /^(hi|hello|hey|good (morning|afternoon|evening))\b/i;
 
 const REQUEST =
   /^(please |kindly )?(provide|share|tell me|send me|give me|specify|confirm|let me know (what|which|who|where|when|your|the))\b/i;

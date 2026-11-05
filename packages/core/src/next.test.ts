@@ -187,6 +187,8 @@ describe('nextAction', () => {
     expect(isQuestion('The page has no phone number. Want me to search for it?')).toBe(false);
     expect(isQuestion('Done.\nAnything else?')).toBe(false);
     expect(isQuestion('All set.')).toBe(false);
+    expect(isQuestion('Hello there, ready to help?')).toBe(false);
+    expect(isQuestion('Good morning! How are you today?')).toBe(false);
     expect(
       isQuestion("Please provide your manager's email address and the subject line you'd like."),
     ).toBe(true);
