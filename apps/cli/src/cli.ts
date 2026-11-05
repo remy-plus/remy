@@ -748,7 +748,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       for (const t of createMemoryTools(memory())) tools.add(t);
       tools.add(createRecallTool(memory(), pastTasks));
     }
-    for (const t of createSkillTools(skills())) tools.add(t);
+    for (const t of createSkillTools({
+      ...skills(),
+      connected: (name) => Boolean(mcp?.list().some((c) => c.name === name)),
+    }))
+      tools.add(t);
     if (env.REMY_HELPERS === 'on') tools.add(delegate);
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
