@@ -42,6 +42,36 @@ describe('vmSearch', () => {
     await expect(provider.search('rye bread', 3)).rejects.toThrow('remy browser vm start');
   });
 
+  it('starts the container once when it is not running', async () => {
+    let up = false;
+    let starts = 0;
+    const provider = vmSearch(
+      () => conn,
+      async () => {
+        if (!up) throw new TypeError('fetch failed');
+        return reply({ hits: [hit('rye bread')] });
+      },
+      async () => {
+        starts++;
+        up = true;
+        return true;
+      },
+    );
+    expect(await provider.search('rye bread', 3)).toHaveLength(1);
+    expect(starts).toBe(1);
+  });
+
+  it('says how to start it when starting by itself fails', async () => {
+    const provider = vmSearch(
+      conn,
+      async () => {
+        throw new TypeError('fetch failed');
+      },
+      async () => false,
+    );
+    await expect(provider.search('rye bread', 3)).rejects.toThrow('remy browser vm start');
+  });
+
   it('caps the results', async () => {
     const provider = vmSearch(conn, async () =>
       reply({ hits: [hit('rye bread 1'), hit('rye bread 2')] }),

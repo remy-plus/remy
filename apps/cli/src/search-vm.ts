@@ -27,14 +27,28 @@ export interface VmConnection {
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** `REMY_SEARCH=vm`: asks the container, DuckDuckGo first, and keeps only useful hits. */
-export function vmSearch(conn: VmConnection, fetchImpl: Fetch = fetch): SearchProvider {
+export function vmSearch(
+  conn: VmConnection | (() => VmConnection),
+  fetchImpl: Fetch = fetch,
+  /** Starts the container when it is not running. False when it could not. */
+  ensure?: () => Promise<boolean>,
+): SearchProvider {
+  const current = () => (typeof conn === 'function' ? conn() : conn);
+  const ask = (name: string, query: string) => {
+    const { url, token } = current();
+    return fetchImpl(`${url}/search?engine=${name}&q=${encodeURIComponent(query)}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+  };
   const engine = (name: string, query: string) => async (): Promise<SearchHit[] | null> => {
-    const url = `${conn.url}/search?engine=${name}&q=${encodeURIComponent(query)}`;
     let r: Response;
     try {
-      r = await fetchImpl(url, { headers: { authorization: `Bearer ${conn.token}` } });
+      r = await ask(name, query);
     } catch {
-      throw new Error(NOT_RUNNING);
+      if (!(await ensure?.())) throw new Error(NOT_RUNNING);
+      r = await ask(name, query).catch(() => {
+        throw new Error(NOT_RUNNING);
+      });
     }
     if (!r.ok) throw new Error(`Search in the container failed (${r.status}).`);
     return ((await r.json()) as { hits: SearchHit[] | null }).hits;
