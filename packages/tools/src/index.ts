@@ -8,6 +8,7 @@ export * from './memory-tools.ts';
 export * from './plan-tool.ts';
 export * from './redact.ts';
 export * from './run-command.ts';
+export * from './schedule-tools.ts';
 export * from './scoped-fetch.ts';
 export * from './scoped-fs.ts';
 export * from './search-providers.ts';
