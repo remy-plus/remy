@@ -245,15 +245,20 @@ describe('remy connect', () => {
   });
 
   it('imports after showing what it found, skipping names already connected', async () => {
-    files.set(
+    // Claude Desktop keeps its config in a different place on each system.
+    for (const path of [
       '/Users/me/Library/Application Support/Claude/claude_desktop_config.json',
-      JSON.stringify({
-        mcpServers: {
-          github: { command: 'npx', args: ['gh'], env: { GITHUB_TOKEN: 'ghp_import_1' } },
-          have: { command: 'z' },
-        },
-      }),
-    );
+      '/Users/me/.config/Claude/claude_desktop_config.json',
+    ])
+      files.set(
+        path,
+        JSON.stringify({
+          mcpServers: {
+            github: { command: 'npx', args: ['gh'], env: { GITHUB_TOKEN: 'ghp_import_1' } },
+            have: { command: 'z' },
+          },
+        }),
+      );
     files.set(
       '/work/proj/.mcp.json',
       JSON.stringify({ mcpServers: { web: { url: 'https://w.example/mcp' } } }),
