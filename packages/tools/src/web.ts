@@ -68,6 +68,9 @@ export const fetchUrl = defineTool({
   },
 });
 
+const noResults = (query: string) =>
+  `No useful results for "${query}". Try once more with clearly different words. If that fails too, stop searching and tell the user the search found nothing; do not answer from memory.`;
+
 /** `timeoutMs` defaults to 15 s; a search through a browser needs longer. */
 export function createWebSearch(provider: SearchProvider, opts: { timeoutMs?: number } = {}): Tool {
   return defineTool({
@@ -87,7 +90,7 @@ export function createWebSearch(provider: SearchProvider, opts: { timeoutMs?: nu
     async execute({ query, count }): Promise<ToolResult> {
       try {
         const results = (await provider.search(query, count ?? 5)).slice(0, count ?? 5);
-        if (results.length === 0) return untrusted(`No results for "${query}".`);
+        if (results.length === 0) return untrusted(noResults(query));
         return untrusted(
           results
             .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`.trimEnd())
