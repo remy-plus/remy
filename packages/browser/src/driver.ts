@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { isPrivateAddress } from '@remy/tools';
 import type { BrowserContext, Page } from 'playwright-core';
 import type { Browser, PageSnapshot, SearchHit } from './port.ts';
-import { rereadAfterNavigation, usefulHits } from './results.ts';
+import { firstUseful, rephrased, rereadAfterNavigation } from './results.ts';
 import { BING_RESULTS_SCRIPT, DDG_RESULTS_SCRIPT, SNAPSHOT_SCRIPT } from './walker.ts';
 
 export interface LocalBrowserOptions {
@@ -237,14 +237,19 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
             () => tab.evaluate(script) as Promise<SearchHit[] | null>,
             () => settle(tab),
           );
-        await navigate(tab, `https://www.bing.com/search?q=${q}`);
-        await settle(tab);
-        let hits = usefulHits(query, (await read(BING_RESULTS_SCRIPT)) ?? []);
-        if (!hits.length) {
-          await navigate(tab, `https://html.duckduckgo.com/html/?q=${q}`);
+        const engine = (url: string, script: string) => async () => {
+          await navigate(tab, url);
           await settle(tab);
-          hits = usefulHits(query, (await read(DDG_RESULTS_SCRIPT)) ?? []);
-        }
+          return read(script);
+        };
+        const bing = (text: string) =>
+          engine(`https://www.bing.com/search?q=${encodeURIComponent(text)}`, BING_RESULTS_SCRIPT);
+        const other = rephrased(query);
+        const hits = await firstUseful(query, [
+          bing(query),
+          ...(other ? [bing(other)] : []),
+          engine(`https://html.duckduckgo.com/html/?q=${q}`, DDG_RESULTS_SCRIPT),
+        ]);
         return hits.slice(0, count);
       } finally {
         await tab.close().catch(() => {});

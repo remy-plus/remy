@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rereadAfterNavigation, usefulHits } from './results.ts';
+import { firstUseful, rephrased, rereadAfterNavigation, usefulHits } from './results.ts';
 
 const hit = (title: string, url = 'https://example.com/a', snippet = '') => ({
   title,
@@ -49,6 +49,65 @@ describe('usefulHits', () => {
   it('checks queries in other alphabets', () => {
     const good = hit('Лучшие наушники');
     expect(usefulHits('лучшие наушники', [good, hit('Best Buy')])).toEqual([good]);
+  });
+});
+
+describe('usefulHits on one-word matches', () => {
+  it('drops a dictionary page that shares one word of three', () => {
+    const q = 'what causes northern lights';
+    const bad = hit(
+      'CAUSES Definition & Meaning',
+      'https://www.merriam-webster.com/dictionary/cause',
+    );
+    const good = hit('What causes the northern lights?');
+    expect(usefulHits(q, [bad, good])).toEqual([good]);
+  });
+});
+
+describe('rephrased', () => {
+  it('moves the last meaningful word to the front', () => {
+    expect(rephrased('best budget noise cancelling headphones 2026')).toBe(
+      'headphones best budget noise cancelling 2026',
+    );
+    expect(rephrased('budget headphones')).toBe('headphones budget');
+  });
+
+  it('leaves alone what has nothing to move, and search filters', () => {
+    expect(rephrased('headphones')).toBeNull();
+    expect(rephrased('headphones of the')).toBeNull();
+    expect(rephrased('site:nodejs.org latest node')).toBeNull();
+    expect(rephrased('rye bread -sourdough')).toBeNull();
+  });
+});
+
+describe('firstUseful', () => {
+  const good = hit('Rye bread recipe');
+  const none = async () => [hit('Best Buy')];
+
+  it('moves to the next engine when the first has nothing useful', async () => {
+    expect(await firstUseful('rye bread', [none, async () => [good]])).toEqual([good]);
+  });
+
+  it('moves on when an engine fails or is blocked', async () => {
+    const broken = async () => {
+      throw new Error('Could not open');
+    };
+    expect(await firstUseful('rye bread', [broken, async () => [good]])).toEqual([good]);
+    expect(await firstUseful('rye bread', [async () => null, async () => [good]])).toEqual([good]);
+  });
+
+  it('gives no results when one engine answered and the fallback failed', async () => {
+    const broken = async () => {
+      throw new Error('Could not open');
+    };
+    expect(await firstUseful('rye bread', [none, broken])).toEqual([]);
+  });
+
+  it('reports the failure when every engine failed', async () => {
+    const broken = async () => {
+      throw new Error('Could not open');
+    };
+    await expect(firstUseful('rye bread', [broken, broken])).rejects.toThrow('Could not open');
   });
 });
 
