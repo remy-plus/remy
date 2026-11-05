@@ -68,3 +68,16 @@ export function nextRun(when: When, from: Date): Date {
 
 export const dueNow = (schedules: Schedule[], now: Date): Schedule[] =>
   schedules.filter((s) => !s.paused && new Date(s.nextRun) <= now);
+
+/** The plain list for `remy schedule list` and /schedules. */
+export function plainSchedules(all: Schedule[]): string {
+  if (!all.length)
+    return 'No schedules yet. Add one with remy schedule add "every day at 9" "<prompt>".';
+  return all
+    .map((s) => {
+      const state = s.paused ? 'paused' : `next ${new Date(s.nextRun).toLocaleString()}`;
+      const prompt = s.prompt.length > 60 ? `${s.prompt.slice(0, 59)}…` : s.prompt;
+      return `${s.id}  ${s.when}  ${state}  ${prompt}`;
+    })
+    .join('\n');
+}

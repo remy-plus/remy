@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dueNow, nextRun, parseWhen } from './schedule.ts';
+import { dueNow, nextRun, parseWhen, plainSchedules } from './schedule.ts';
 
 const at = (s: string) => new Date(s);
 
@@ -71,5 +71,30 @@ describe('dueNow', () => {
   it('leaves a paused schedule alone', () => {
     const paused = { ...base, nextRun: '2026-11-04T09:00:00.000Z', paused: true };
     expect(dueNow([paused], new Date('2026-11-04T10:00:00.000Z'))).toEqual([]);
+  });
+});
+
+describe('plainSchedules', () => {
+  const base = {
+    id: 's1',
+    prompt: 'Check mail',
+    when: 'hourly',
+    createdAt: '',
+    nextRun: '2026-11-04T09:00:00.000Z',
+  };
+
+  it('says how to add one when there are none', () => {
+    expect(plainSchedules([])).toContain('remy schedule add');
+  });
+
+  it('shows what runs and when', () => {
+    const text = plainSchedules([base]);
+    expect(text).toContain('hourly');
+    expect(text).toContain('Check mail');
+    expect(text).toContain('next');
+  });
+
+  it('says when one is paused', () => {
+    expect(plainSchedules([{ ...base, paused: true }])).toContain('paused');
   });
 });
