@@ -38,6 +38,7 @@ import {
   createMemoryTools,
   createRecallTool,
   createRedactor,
+  createScheduleTools,
   createScopedFetch,
   createScopedFs,
   createSkillTools,
@@ -782,6 +783,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     }))
       tools.add(t);
     if (env.REMY_HELPERS === 'on') tools.add(delegate);
+    const schedules = openSchedules(home);
+    for (const t of createScheduleTools({
+      add: (when, prompt) => schedules.add(when, prompt, new Date()),
+      list: () => schedules.list(),
+    }))
+      tools.add(t);
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),
