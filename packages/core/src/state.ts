@@ -137,7 +137,7 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
       log: [{ kind: 'user', text: e.prompt }],
       discovered: [],
       alwaysAllowed: [],
-      tainted: (e.config.pasted?.length ?? 0) > 0,
+      tainted: (e.config.pasted?.length ?? 0) > 0 || e.config.startTainted === true,
       usage: { inTokens: 0, outTokens: 0 },
       costUsd: 0,
       modelAttempts: 0,
@@ -166,6 +166,7 @@ function setResult(s: TaskState, call: CallState, result: ToolResult) {
   call.result = result;
   call.inFlight = false;
   if (result.ok && result.trust === 'untrusted') s.tainted = true;
+  if (result.ok && result.spentUsd) s.costUsd += result.spentUsd;
   if (result.ok && call.tool === FIND_TOOLS) {
     const names = (result.data as { names?: unknown } | undefined)?.names;
     if (Array.isArray(names))

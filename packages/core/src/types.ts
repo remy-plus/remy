@@ -17,7 +17,14 @@ export type Effect = 'none' | 'idempotent' | 'reconcilable' | 'unsafe_to_retry';
 export type Trust = 'trusted' | 'untrusted';
 
 export type ToolResult =
-  | { ok: true; content: string; trust: Trust; data?: unknown }
+  | {
+      ok: true;
+      content: string;
+      trust: Trust;
+      data?: unknown;
+      /** Spent by the tool on the task's behalf (helpers); added to the task's cost. */
+      spentUsd?: number;
+    }
   | {
       ok: false;
       error: string;
@@ -73,6 +80,10 @@ export interface TaskConfig {
    * starts tainted and `buildMessages` fences them. Absent in older event logs.
    */
   pasted?: string[];
+  /** Set on a helper: the task and tool call that started it. A helper cannot start helpers. */
+  parent?: { taskId: string; callId: string };
+  /** A helper of a tainted task starts tainted. */
+  startTainted?: boolean;
 }
 
 export interface ConversationTurn {
@@ -379,6 +390,27 @@ export interface ToolContext {
    * list other tools (find_tools) use it so they do not reveal what the task cannot call.
    */
   permits?: (tool: string) => boolean;
+  /** Runs helpers, one child task each, together. Absent inside a helper. */
+  delegate?: (requests: HelperRequest[]) => Promise<HelperResult[]>;
+}
+
+export interface HelperRequest {
+  /** What kind of helper, in a word or two ("researcher"). */
+  role?: string;
+  task: string;
+  /** What the helper needs to know: it does not see the conversation. */
+  context?: string;
+}
+
+export interface HelperResult {
+  taskId: string;
+  /** False when it stopped without an answer; `answer` then says why. */
+  ok: boolean;
+  answer: string;
+  /** It read untrusted content, so its answer is untrusted too. */
+  tainted: boolean;
+  costUsd: number;
+  steps: number;
 }
 
 /** Name of the built-in tool that searches selectable tools. Its results feed `TaskState.discovered`. */

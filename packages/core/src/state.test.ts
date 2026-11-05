@@ -341,3 +341,27 @@ describe('usageCostUsd', () => {
     expect(usageCostUsd({ inTokens: 1e6, outTokens: 1e6, cachedInTokens: 5e5 }, p)).toBeCloseTo(5);
   });
 });
+
+describe('helpers in state', () => {
+  const config = {
+    model: 'm',
+    permissions: { autoApprove: ['read' as const] },
+    budget: DEFAULT_BUDGET,
+    workspaceDir: '/w',
+  };
+  const stored = (seq: number, event: Event) => ({
+    taskId: 't',
+    seq,
+    at: new Date(0).toISOString(),
+    event,
+  });
+
+  it('starts tainted when asked to', () => {
+    const event: Event = {
+      type: 'task.created',
+      prompt: 'p',
+      config: { ...config, startTainted: true },
+    };
+    expect(fold([stored(1, event)]).tainted).toBe(true);
+  });
+});
