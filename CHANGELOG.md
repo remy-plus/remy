@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1 (2026-11-04)
+
+Search gives you real pages or says it found nothing.
+
+- **Search skips pages that miss the question.** Bing sometimes reads only one word of a query, so Remy now drops off-topic results, tries the query another way, then tries DuckDuckGo.
+- **Fewer wasted steps.** When a search finds nothing, Remy stops and says so instead of repeating it or answering from memory.
+- **Remy waits for you when it needs an answer.** A long reply that hands the work back with questions now pauses the task instead of counting as finished.
+- **Stopping works.** `kill` ends a running task instead of restarting its browser.
+- Fixed: a redirect during a search, or a failed DuckDuckGo fallback, no longer fails the search.
+- Known limit: some topics still return nothing, because the search engine reads only part of the query.
+
 ## 0.8.0 (2026-10-29)
 
 Remy uses the computer it runs on to find things.
