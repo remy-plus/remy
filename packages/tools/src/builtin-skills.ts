@@ -27,6 +27,28 @@ allowed-tools: web_search browser_open browser_look browser_click browser_type b
 5. After buying, report the order number, total and delivery date from the confirmation page.
 `;
 
+const TRIAGE_ISSUES = `---
+name: triage-issues
+description: Go through open GitHub issues, group them and say what to do first. Use for triaging a backlog or reviewing bug reports.
+connections: github
+---
+1. List the open issues for the repository the user named. If they named none, ask which one.
+2. Group them: bugs, requests, questions, duplicates. Note which ones many people care about.
+3. Pick the three to do first and say why in one line each.
+4. Change nothing unless the user asks. Labels, comments and closing all go through the approval card.
+`;
+
+const SAVE_TO_NOTION = `---
+name: save-to-notion
+description: Save notes, research or a summary to a Notion page. Use when the user asks to put something in Notion.
+connections: notion
+---
+1. Find the page or database the user means. If there are several, ask which one.
+2. Write the content in short sections with the main point first, and keep any source links.
+3. Create or update the page; the approval card shows what will be written.
+4. Give the user the link to the page.
+`;
+
 const WRITE_AND_SEND = `---
 name: write-and-send
 description: Draft a message, email or post in the user's voice and send it once they approve. Use for writing an email, replying, posting an update or messaging someone.
@@ -40,7 +62,13 @@ allowed-tools: browser_open browser_look browser_type browser_act ask_user
 `;
 
 /** The built-in skills, parsed once. */
-export const BUILTIN_SKILLS: Skill[] = [RESEARCH, COMPARE_AND_BUY, WRITE_AND_SEND].map((text) => {
+export const BUILTIN_SKILLS: Skill[] = [
+  RESEARCH,
+  COMPARE_AND_BUY,
+  WRITE_AND_SEND,
+  TRIAGE_ISSUES,
+  SAVE_TO_NOTION,
+].map((text) => {
   const r = parseSkill(text);
   if (!r.ok) throw new Error(`A built-in skill does not parse: ${r.error}`);
   return { ...r.skill, source: 'builtin' as const };

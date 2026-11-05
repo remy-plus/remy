@@ -50,6 +50,11 @@ describe('parseFrontMatter', () => {
 });
 
 describe('parseSkill', () => {
+  it('reads the connections a skill names', () => {
+    const r = parseSkill('---\nname: a\ndescription: b\nconnections: github notion\n---\nSteps');
+    expect(r.ok && r.skill.connections).toEqual(['github', 'notion']);
+  });
+
   it('parses an Agent Skills SKILL.md', () => {
     const r = parseSkill(
       '---\nname: weekly-report\ndescription: Write the weekly report.\nallowed-tools: read_file write_file\n---\n\n1. Read notes.\n2. Write it.\n',
@@ -89,6 +94,8 @@ describe('built-in skills', () => {
       'research',
       'compare-and-buy',
       'write-and-send',
+      'triage-issues',
+      'save-to-notion',
     ]);
     for (const s of BUILTIN_SKILLS) {
       expect(s.source).toBe('builtin');
@@ -109,6 +116,8 @@ describe('mergeSkills', () => {
       'compare-and-buy',
       'deploy',
       'research',
+      'save-to-notion',
+      'triage-issues',
       'write-and-send',
     ]);
   });
@@ -212,6 +221,34 @@ describe('matching and the block', () => {
 });
 
 describe('use_skill', () => {
+  const linked = {
+    name: 'triage',
+    description: 'Triage issues',
+    tools: [],
+    connections: ['github'],
+    body: 'Steps.',
+    source: 'builtin' as const,
+  };
+  const useSkill = (connected?: (n: string) => boolean) =>
+    createSkillTools({ list: () => [linked], connected }).find((t) => t.name === 'use_skill');
+
+  it('says which connection a skill needs and that Remy cannot add it', async () => {
+    const r = await useSkill(() => false)?.execute({ name: 'triage' }, {} as ToolContext);
+    expect(r).toMatchObject({ ok: true });
+    expect(r?.ok && r.content).toContain('needs github, which is not connected');
+    expect(r?.ok && r.content).toContain('/connect');
+  });
+
+  it('includes the description', async () => {
+    const r = await useSkill()?.execute({ name: 'triage' }, {} as ToolContext);
+    expect(r?.ok && r.content).toContain('Skill triage: Triage issues');
+  });
+
+  it('says nothing when the connection is there', async () => {
+    const r = await useSkill(() => true)?.execute({ name: 'triage' }, {} as ToolContext);
+    expect(r?.ok && r.content).not.toContain('not connected');
+  });
+
   const ctx = { taskId: 'task_1' } as ToolContext;
   const all = mergeSkills(
     [skill('tax-return', 'File taxes')],
