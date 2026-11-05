@@ -16,6 +16,12 @@ describe('parseWhen', () => {
     ['weekdays at 8:30', { kind: 'at', hour: 8, minute: 30, days: [1, 2, 3, 4, 5] }],
     ['every monday at 9', { kind: 'at', hour: 9, minute: 0, days: [1] }],
     ['every sunday at 6pm', { kind: 'at', hour: 18, minute: 0, days: [0] }],
+    ['every day at 8:00 AM', { kind: 'at', hour: 8, minute: 0 }],
+    ['every day at 8:00 AM America/New_York', { kind: 'at', hour: 8, minute: 0 }],
+    ['every day at 8am local time', { kind: 'at', hour: 8, minute: 0 }],
+    ['every day at 9 EST', { kind: 'at', hour: 9, minute: 0 }],
+    ['every weekday at 9', { kind: 'at', hour: 9, minute: 0, days: [1, 2, 3, 4, 5] }],
+    ['every morning at 8', { kind: 'at', hour: 8, minute: 0 }],
   ])('reads %s', (text, when) => {
     expect(parseWhen(text)).toEqual(when);
   });

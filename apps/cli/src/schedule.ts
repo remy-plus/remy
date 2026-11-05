@@ -28,8 +28,11 @@ const WEEKDAYS = [1, 2, 3, 4, 5];
 const HELP =
   'Say when like "every day at 9", "weekdays at 8:30", "every monday at 9am", "every 2 hours", "hourly" or "when ~/Downloads changes".';
 
+/** Times are local, so a time zone or "local time" after the time adds nothing. */
+const AFTER_TIME = /\s+(local(\s+time)?|[a-z_]+\/[a-z_]+|[a-z]{2,4}t|utc)$/;
+
 function clockTime(text: string): { hour: number; minute: number } | undefined {
-  const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(text.trim());
+  const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(text.trim().replace(AFTER_TIME, ''));
   if (!m) return undefined;
   let hour = Number(m[1]);
   const minute = Number(m[2] ?? 0);
@@ -52,12 +55,13 @@ export function parseWhen(input: string): When {
       throw new Error(`A schedule can run at most every ${MIN_MINUTES} minutes.`);
     return { kind: 'every', minutes };
   }
-  const at = /^(daily|weekdays|every day|every [a-z]+) at (.+)$/.exec(text);
+  const at = /^(daily|weekdays|every [a-z]+) at (.+)$/.exec(text);
   const time = at ? clockTime(at[2] as string) : undefined;
   if (!at || !time) throw new Error(HELP);
   const on = at[1] as string;
-  if (on === 'daily' || on === 'every day') return { kind: 'at', ...time };
-  if (on === 'weekdays') return { kind: 'at', ...time, days: WEEKDAYS };
+  if (['daily', 'every day', 'every morning', 'every evening'].includes(on))
+    return { kind: 'at', ...time };
+  if (on === 'weekdays' || on === 'every weekday') return { kind: 'at', ...time, days: WEEKDAYS };
   const day = DAYS.indexOf(on.replace('every ', ''));
   if (day < 0) throw new Error(HELP);
   return { kind: 'at', ...time, days: [day] };
