@@ -93,6 +93,7 @@ const MAX_EPISODES = 300;
 
 import { type Credentials, openCredentials } from './credentials.ts';
 import { debugModel, openDebug } from './debug.ts';
+import { demoModel } from './demo.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
 import {
   defaultModelFor,
@@ -591,6 +592,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   function modelFor(file: FileConfig): ModelClient {
     if (deps.model) return deps.model;
+    if (env.REMY_DEMO === 'on') return demoModel();
     // Per field: flags, then env, then a saved login, then remy.config.json.
     const explicitUrl = flags['base-url'] ?? env.REMY_BASE_URL;
     const named = flags.profile ?? env.REMY_PROFILE;
