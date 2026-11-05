@@ -585,6 +585,12 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 5. **1.0 Web app (5 or more sessions).** Design first: brand decision, design system from `branding/`, core screens prototyped and reviewed before building. Then the server on the existing `Runtime` API, streaming, chat, timeline, approval cards, connections, skills. Then polish until it holds up in a 60 second video.
 6. **Launch.** Video, site, Show HN, r/LocalLLaMA, X, all on the same day.
 
+### Progress (2026-11-04, night)
+
+0.9.x items done on main: greeting bug, source links in the system prompt (not measured live), container search stays on and restarts itself, skills and helpers in replay. Launch groundwork done: CONTRIBUTING, SECURITY, issue and pull request templates, README from npm, `docs/evals.md`, demo mode (`REMY_DEMO=on`).
+
+0.10 built: `remy schedule`, `/schedules`, `schedule_task` with an approval card, `list_schedules`, file watches, `remy daemon` with a macOS LaunchAgent, `remy doctor`, `proactive` eval suite (83 replay cases). The next run is saved before a task starts, so a crash can miss a run but never repeats one. Scheduled runs use read-only auto-approval, so a run that needs to act waits for the user. Not built: Linux and Windows service install, webhooks, a screen to review what ran overnight. `remy daemon install` itself is not tested on a real login cycle.
+
 ### Where 1.0 runs
 
 **Recommended: local first.** `remy web` serves the app from the user's machine on the existing runtime, SQLite store, Keychain keys and local browser. It drops Postgres, auth, a worker pool and paid infrastructure from 1.0, and everything built so far carries over. It cannot be used from a phone without a tunnel, and it needs an install.
