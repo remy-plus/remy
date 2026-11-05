@@ -20,6 +20,8 @@ export interface Skill {
   source: SkillSource;
   /** The SKILL.md it was read from; absent for built-ins. */
   path?: string;
+  /** Connections it works best with (`connections` in the front matter); grants nothing. */
+  connections?: string[];
   /** How many times use_skill read it; skills used often rank a little higher. */
   uses?: number;
 }
@@ -38,6 +40,8 @@ export interface SkillsPort {
   save?(draft: SkillDraft): { path: string };
   /** Counts a read by use_skill. */
   used?(name: string): void;
+  /** Whether a connection is set up. Absent where connections are not known. */
+  connected?(name: string): boolean;
 }
 
 /**
@@ -145,9 +149,16 @@ export function parseSkill(text: string, folderName?: string): SkillParse {
   const tools = (Array.isArray(rawTools) ? rawTools : rawTools.split(/[\s,]+/))
     .map((t) => t.trim())
     .filter(Boolean);
+  const rawLinks = fm.connections ?? [];
+  const connections = (Array.isArray(rawLinks) ? rawLinks : rawLinks.split(/[\s,]+/))
+    .map((c) => c.trim())
+    .filter(Boolean);
   const body = (m[2] ?? '').trim();
   if (!body) return { ok: false, error: `${name} has no steps after the front matter.` };
-  return { ok: true, skill: { name, description, tools, body } };
+  return {
+    ok: true,
+    skill: { name, description, tools, body, ...(connections.length && { connections }) },
+  };
 }
 
 /** Yours win over a project's, which win over the built-ins, by name. Sorted by name. */
@@ -250,11 +261,15 @@ export function createSkillTools(port: SkillsPort): Tool[] {
             );
       }
       port.used?.(hit.name);
-      const head = `Skill ${hit.name}${isReviewed(hit) ? '' : ` (${FROM[hit.source]}, not reviewed by the user)`}`;
+      const head = `Skill ${hit.name}${isReviewed(hit) ? '' : ` (${FROM[hit.source]}, not reviewed by the user)`}: ${hit.description}`;
       const tools = hit.tools.length ? `\nTools it expects: ${hit.tools.join(', ')}.` : '';
+      const missing = (hit.connections ?? []).filter((c) => port.connected && !port.connected(c));
+      const needs = missing.length
+        ? `\nThis skill needs ${missing.join(' and ')}, which is not connected. Tell the user to run /connect; do not try to connect it yourself.`
+        : '';
       return {
         ok: true,
-        content: `${head}${tools}\n\n${hit.body.slice(0, SKILL_BODY_MAX)}`,
+        content: `${head}${tools}${needs}\n\n${hit.body.slice(0, SKILL_BODY_MAX)}`,
         trust: isReviewed(hit) ? 'trusted' : 'untrusted',
         data: { name: hit.name, source: hit.source },
       };
