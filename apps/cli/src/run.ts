@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { cli } from './cli.ts';
+import { onStopSignals } from './signals.ts';
 
 const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
@@ -55,9 +56,5 @@ process.exitCode = await cli(process.argv.slice(2), {
     for await (const c of process.stdin) chunks.push(c as Buffer);
     return Buffer.concat(chunks).toString('utf8');
   },
-  onInterrupt: (handler) => {
-    const onSigint = () => void handler().finally(() => process.exit(130));
-    process.once('SIGINT', onSigint);
-    return () => void process.off('SIGINT', onSigint);
-  },
+  onInterrupt: (handler) => onStopSignals(process, handler),
 });
