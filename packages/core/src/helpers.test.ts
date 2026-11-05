@@ -6,6 +6,7 @@ import {
   HELPER_MAX_STEPS,
   helperBudget,
   helperId,
+  helperIds,
   helperPermissions,
   helperPrompt,
   isHelperTask,
@@ -99,6 +100,27 @@ describe('helperId', () => {
     expect(helperId('t:c', 0)).toBe(helperId('t:c', 0));
     expect(helperId('t:c', 0)).not.toBe(helperId('t:c', 1));
     expect(helperId('t:c', 0)).not.toBe(helperId('t:d', 0));
+  });
+});
+
+describe('helperIds', () => {
+  it('reads the helpers a task started', () => {
+    const calls = {
+      a: {
+        tool: 'read_file',
+        result: { ok: true as const, content: '', trust: 'trusted' as const },
+      },
+      b: {
+        tool: DELEGATE,
+        result: {
+          ok: true as const,
+          content: '',
+          trust: 'trusted' as const,
+          data: { helpers: ['helper_1', 'helper_2'] },
+        },
+      },
+    };
+    expect(helperIds({ calls })).toEqual(['helper_1', 'helper_2']);
   });
 });
 

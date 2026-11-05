@@ -15,6 +15,7 @@ import {
   DEFAULT_BUDGET,
   type EventStore,
   fold,
+  helperIds,
   isHelperTask,
   LONG_BUDGET,
   type ModelClient,
@@ -1738,6 +1739,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         }
         out();
         out(totalsLine(events, s, st));
+        for (const helper of helperIds(s)) {
+          const h = fold(await store.read(helper));
+          out(
+            st.dim(
+              `Helper ${helper}: ${h.status}, ${h.step} steps. ${truncate(h.final?.answer ?? '', 80)}`,
+            ),
+          );
+        }
         if (s.final?.answer) out(`\n${s.final.answer.trim()}`);
         else if (s.final?.reason) out(`\n${s.final.reason}`);
         return 0;

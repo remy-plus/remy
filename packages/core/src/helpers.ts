@@ -2,7 +2,7 @@
 // they can be tested on their own: what a helper may use, what it may spend, and its id.
 import { createHash } from 'node:crypto';
 import type { ToolRegistry } from './registry.ts';
-import type { Budget, HelperRequest, Permissions, Tool } from './types.ts';
+import type { Budget, HelperRequest, Permissions, Tool, ToolResult } from './types.ts';
 
 export const DELEGATE = 'delegate';
 const HELPER_PREFIX = 'helper_';
@@ -51,6 +51,14 @@ export function helperBudget(
 /** The same call gives the same ids, so a crash reattaches to helpers instead of starting more. */
 export const helperId = (idempotencyKey: string, index: number) =>
   `${HELPER_PREFIX}${createHash('sha256').update(`${idempotencyKey}#${index}`).digest('hex').slice(0, 12)}`;
+
+/** The helpers a task started, in order, from what its `delegate` calls returned. */
+export function helperIds(s: { calls: Record<string, { tool: string; result?: ToolResult }> }) {
+  return Object.values(s.calls).flatMap((c) => {
+    const data = c.tool === DELEGATE && c.result?.ok ? c.result.data : undefined;
+    return (data as { helpers?: string[] } | undefined)?.helpers ?? [];
+  });
+}
 
 /** Helpers are details of a task, so lists of the user's tasks leave them out. */
 export const isHelperTask = (taskId: string) => taskId.startsWith(HELPER_PREFIX);
