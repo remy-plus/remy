@@ -1,4 +1,5 @@
 export * from './hash.ts';
+export * from './helpers.ts';
 export * from './messages.ts';
 export * from './next.ts';
 export * from './plan.ts';
