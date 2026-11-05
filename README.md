@@ -54,6 +54,18 @@ Remy reaches your apps through [MCP](https://modelcontextprotocol.io) servers. `
 
 Tools from a connection ask before they act unless the server marks them read-only and is on the list above. What a connection returns is treated as untrusted, like a web page. On an approval card, `a` always allows that tool from then on (writes and sends only, never deletes or payments); `/approvals` or `remy approvals` lists and removes those.
 
+### Skills
+
+Skills are short how-tos Remy follows for kinds of tasks. Five are built in, and `remy skills add <link>` takes your own or one from GitHub. It shows you the whole text first. Skills from a link stay limited: reading one means any action needs your approval.
+
+### Search
+
+Remy searches in a hidden browser on your machine with no extra key. Search engines often turn that away, so results vary. `remy browser vm start` moves search into a container (Docker or Colima, about 2 GB) with nothing on your screen, and `REMY_SEARCH` picks a search service instead.
+
+### Helpers
+
+`REMY_HELPERS=on` lets Remy hand separate parts of a task to up to 3 read-only helpers working at once.
+
 Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Remy searches and browses in its own hidden browser on your computer, no key needed; `remy browser show` opens it so you can sign in to sites. `REMY_SEARCH` picks another search (`context`, `brave`, `tavily`, `searxng` or `off`).
 
 ## From source
