@@ -556,7 +556,7 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 ## Road to 1.0: stages (2026-11-04)
 
-**Owner, 2026-11-04: 1.0 must be the best release possible and genuinely include every idea on the board.** There is no 0.11 and nothing is cut to "after 1.0". Replaces the earlier order. Proposed, for the owner to approve. No dates: each stage ends when its gate passes, not when time runs out. Terminal releases can keep shipping between stages as 1.0 betas.
+**Owner, 2026-11-04: 1.0 must be the best release possible and genuinely include every idea on the board.** There is no 0.11 and nothing is cut to "after 1.0". Replaces the earlier order. Approved by the owner 2026-11-04. No dates: each stage ends when its gate passes, not when time runs out. Terminal releases can keep shipping between stages as 1.0 betas.
 
 "Best" has to be measured or it means nothing, so Stage 1 builds the bar and every later gate uses it.
 
@@ -599,7 +599,7 @@ Also in: everything built so far (skills, connections, schedules, background tas
 
 **Stage 5: Design it.** Nothing is built yet. Refresh the brand with two or three directions. Design system from `branding/`, Cline as the reference. Prototype every core screen in the browser: first run, chat, a task at work, approval card, connections, skills, schedules, memory, settings, light and dark, phone size. *Gate: the owner signs off on real screens.*
 
-**Stage 6: Build the web app.** The server on the existing `Runtime` API, streaming, then every screen from Stage 5. Everything the terminal does, plus push-to-talk. *Gate: every terminal capability works in the web app, and killing it mid-task loses nothing.*
+**Stage 6: Build the web app.** The server on the existing `Runtime` API, streaming, then every screen from Stage 5. Everything the terminal does, plus push-to-talk. A Docker image and sign-in for running it on a home server or VM. *Gate: every terminal capability works in the web app, from a laptop and from a home server reached by phone, and killing it mid-task loses nothing.*
 
 **Stage 7: Prove it.** Non-technical testers finish real tasks unaided. A security review and a red-team pass. Speed, accessibility, and failure paths: no key, no network, bad model. A clean install on machines we do not own. *Gate: testers succeed unaided, no open blockers, the final scores beat Stage 1 by a wide margin.*
 
@@ -621,21 +621,35 @@ Intelligence comes before design because a beautiful app doing weak work is not 
 
 0.10 built: `remy schedule`, `/schedules`, `schedule_task` with an approval card, `list_schedules`, file watches, `remy daemon` with a macOS LaunchAgent, `remy doctor`, `proactive` eval suite (83 replay cases). The next run is saved before a task starts, so a crash can miss a run but never repeats one. Scheduled runs use read-only auto-approval, so a run that needs to act waits for the user. Not built: Linux and Windows service install, webhooks, a screen to review what ran overnight. `remy daemon install` itself is not tested on a real login cycle.
 
-### Where 1.0 runs (owner decides in Stage 0)
+### Where 1.0 runs (decided by the owner, 2026-11-04)
 
-**Local first (recommended):** `remy web` runs on the user's machine on the existing runtime, store, Keychain and browser. Everything built carries over and there are no servers to pay for. It needs an install, and phones need a tunnel.
+**One Remy, run wherever the user likes.** It runs on a laptop, or on a machine they control: a home server, a spare VM, a rented server on a free trial. This is self-hosting, not a service we operate: each install belongs to one person, who holds their own keys and data. There are no accounts to sell, no billing and no user keys for us to hold. A multi-user hosted service stays out of 1.0.
 
-**Hosted:** sign up and go, which is what "anyone" means long term. It adds accounts, billing, holding user keys, Postgres and cloud browsers, and search engines may treat data-centre addresses worse; untested.
+Shapes, on the same code:
 
-**Both:** local at 1.0, hosted as a later stage on the same interfaces.
+| Where | How it starts | Reached from |
+|---|---|---|
+| Laptop | `npm i -g`, then `remy web` | That machine |
+| Home server or VM | One Docker image | Your phone and laptop, over a private network |
+
+**Architecture.** `Runtime` already hides the store, model and tools, so the web app is one more client of it. A server exposes tasks over HTTP. The browser asks for "events after number N" from the task's log, so a phone that loses signal reconnects with no gaps. Off-machine use needs a sign-in token and is off by default: Remy listens on localhost unless told otherwise, and the docs recommend a private network such as Tailscale over opening a port. SQLite stays; one person does not need Postgres. Remy's browser and schedules already run without a screen, which suits a server.
+
+### Reach depends on the machine (decided by the owner, 2026-11-04)
+
+Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what is installed, and recommends. Nobody pays for capacity they will not use.
+
+| Machine | Default for real apps and search |
+|---|---|
+| Light laptop | Hidden browser, or a small container if Docker is there |
+| Strong laptop or home server | Container |
+| Mac Studio or similar, power user | terminal-mac, opt-in |
 
 ### Needed from the owner
 
-- Where 1.0 runs: local first or hosted.
-- Brand: stay quiet, or go bolder. "boot.dev" still needs confirming.
-- The text of the two X posts (MausBot, harness tutorial); X blocks fetching.
+- The go for Stage 0, and later the go for the Stage 1 research.
+- The text of the two X posts: X blocks fetching.
 - A key for a stronger model, for helpers and the Stage 1 baselines.
-- Whether Stage 4's own-computer work should be Linux containers, terminal-mac, or both.
+- A link for the Boat.dev brand and hosting reference, in an Ideas card. Earlier notes said boot.dev; confirm which.
 
 ## Product roadmap after Phase 0
 
