@@ -379,6 +379,7 @@ describe('helpers in state', () => {
         type: 'tool.completed',
         callId: 'c',
         result: { ok: true, content: '', trust: 'trusted', spentUsd: 0.2 },
+        latencyMs: 1,
       },
     ];
     expect(fold(events.map((e, i) => stored(i + 1, e))).costUsd).toBeCloseTo(0.21);
