@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { isPrivateAddress } from '@remy/tools';
 import type { BrowserContext, Page } from 'playwright-core';
 import type { Browser, PageSnapshot, SearchHit } from './port.ts';
+import { rereadAfterNavigation, usefulHits } from './results.ts';
 import { BING_RESULTS_SCRIPT, DDG_RESULTS_SCRIPT, SNAPSHOT_SCRIPT } from './walker.ts';
 
 export interface LocalBrowserOptions {
@@ -231,12 +232,18 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
       try {
         // Bing first: DuckDuckGo shows a hidden browser a CAPTCHA, a shown one usually not.
         const q = encodeURIComponent(query);
+        const read = (script: string) =>
+          rereadAfterNavigation(
+            () => tab.evaluate(script) as Promise<SearchHit[] | null>,
+            () => settle(tab),
+          );
         await navigate(tab, `https://www.bing.com/search?q=${q}`);
         await settle(tab);
-        let hits = (await tab.evaluate(BING_RESULTS_SCRIPT)) as SearchHit[];
+        let hits = usefulHits(query, (await read(BING_RESULTS_SCRIPT)) ?? []);
         if (!hits.length) {
           await navigate(tab, `https://html.duckduckgo.com/html/?q=${q}`);
-          hits = ((await tab.evaluate(DDG_RESULTS_SCRIPT)) as SearchHit[] | null) ?? [];
+          await settle(tab);
+          hits = usefulHits(query, (await read(DDG_RESULTS_SCRIPT)) ?? []);
         }
         return hits.slice(0, count);
       } finally {
