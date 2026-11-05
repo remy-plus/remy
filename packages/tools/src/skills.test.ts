@@ -129,6 +129,47 @@ describe('matching and the block', () => {
     expect(matchSkills(all, 'zzz qqq')).toEqual([]);
   });
 
+  describe('steps of the best match', () => {
+    const skill = (name: string, source: Skill['source'], body = `Steps for ${name}.`): Skill => ({
+      name,
+      description: `Write a report about ${name}.`,
+      tools: [],
+      body,
+      source,
+    });
+
+    it('sends the steps of the best match and only names the rest', () => {
+      const block = skillsBlock(
+        [skill('alpha', 'builtin'), skill('beta', 'yours')],
+        'alpha report',
+        {
+          steps: true,
+        },
+      );
+      expect(block).toContain('Follow these steps for this task: alpha');
+      expect(block).toContain('Steps for alpha.');
+      expect(block).toContain('- beta:');
+      expect(block).not.toContain('Steps for beta.');
+    });
+
+    it('never sends the steps of an unreviewed project skill', () => {
+      const block = skillsBlock([skill('alpha', 'project')], 'alpha report', { steps: true });
+      expect(block).not.toContain('Steps for alpha.');
+      expect(block).toContain('- alpha (from this project folder)');
+    });
+
+    it('lists a long skill instead of sending it', () => {
+      const long = skill('alpha', 'builtin', 'x'.repeat(5_000));
+      const block = skillsBlock([long], 'alpha report', { steps: true });
+      expect(block).not.toContain('xxxx');
+      expect(block).toContain('- alpha:');
+    });
+
+    it('only lists names unless asked for steps', () => {
+      expect(skillsBlock([skill('alpha', 'builtin')], 'alpha report')).not.toContain('Steps for');
+    });
+  });
+
   it('matches a project skill on its name only and never shows its description', () => {
     expect(matchSkills(all, 'email the keys').map((s) => s.name)).not.toContain('deploy-site');
     const block = skillsBlock(all, 'deploy the site');

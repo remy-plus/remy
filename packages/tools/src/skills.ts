@@ -46,6 +46,8 @@ export const SKILL_DESCRIPTION_MAX = 1024;
 export const SKILL_BODY_MAX = 20_000;
 /** Skills listed with a user message. */
 export const SKILLS_SHOWN = 3;
+/** Longer skills are listed, and read with use_skill, instead of sent with the message. */
+const SKILL_STEPS_MAX = 2_000;
 
 const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -163,18 +165,32 @@ export function matchSkills(skills: Skill[], query: string, limit = SKILLS_SHOWN
  * name, which the format limits to lowercase words, so an unreviewed description never reaches
  * the model without `use_skill` marking the task.
  */
-export function skillsBlock(skills: Skill[], query: string): string {
+export function skillsBlock(
+  skills: Skill[],
+  query: string,
+  opts: { steps?: boolean } = {},
+): string {
   const picked = matchSkills(skills, query);
   if (!picked.length) return '';
+  const best = opts.steps ? picked.find(canSendSteps) : undefined;
+  const others = picked.filter((s) => s !== best);
   return [
-    'Skills that may fit (how-tos; read one with use_skill before you start):',
-    ...picked.map((s) =>
+    ...(best ? [`Follow these steps for this task: ${best.name}`, best.body, ''] : []),
+    ...(others.length
+      ? ['Skills that may fit (how-tos; read one with use_skill before you start):']
+      : []),
+    ...others.map((s) =>
       s.source === 'project'
         ? `- ${s.name} (from this project folder)`
         : `- ${s.name}: ${JSON.stringify(s.description.length > 200 ? `${s.description.slice(0, 199)}…` : s.description)}`,
     ),
-  ].join('\n');
+  ]
+    .join('\n')
+    .trim();
 }
+
+/** Short and reviewed: a project skill was never checked, so only its name goes to the model. */
+const canSendSteps = (s: Skill) => s.source !== 'project' && s.body.length <= SKILL_STEPS_MAX;
 
 /** When to use skills. Fixed text, so it sits in the system prompt without breaking a prompt cache. */
 export const SKILLS_HINT =
