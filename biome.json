@@ -1,8 +1,20 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
-    "includes": ["**", "!branding", "!PLAN.md", "!CLAUDE.md", "!pnpm-lock.yaml", "!evals/results"]
+    "includes": [
+      "**",
+      "!branding",
+      "!PLAN.md",
+      "!CLAUDE.md",
+      "!pnpm-lock.yaml",
+      "!evals/results",
+      "!.github/ISSUE_TEMPLATE"
+    ]
   },
   "formatter": {
     "indentStyle": "space",
@@ -10,18 +22,34 @@
     "lineWidth": 100
   },
   "javascript": {
-    "formatter": { "quoteStyle": "single" }
+    "formatter": {
+      "quoteStyle": "single"
+    }
   },
   "linter": {
-    "rules": { "preset": "recommended" }
+    "rules": {
+      "preset": "recommended"
+    }
   },
   "overrides": [
     {
-      "includes": ["**/*.test.ts"],
-      "linter": { "rules": { "suspicious": { "noTemplateCurlyInString": "off" } } }
+      "includes": [
+        "**/*.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noTemplateCurlyInString": "off"
+          }
+        }
+      }
     }
   ],
   "assist": {
-    "actions": { "source": { "organizeImports": "on" } }
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   }
 }
