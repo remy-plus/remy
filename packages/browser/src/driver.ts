@@ -105,7 +105,9 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
           await c.route('**/*', async (route) => {
             const req = route.request();
             if (!req.isNavigationRequest()) return route.continue();
-            const url = new URL(req.url());
+            // Chrome lets through addresses Node cannot read, such as one with a space in its host.
+            const url = URL.canParse(req.url()) ? new URL(req.url()) : undefined;
+            if (!url) return route.abort('blockedbyclient');
             if (!/^https?:$/.test(url.protocol)) return route.continue();
             const host = url.hostname;
             if (allow && !allow.some((d) => host === d || host.endsWith(`.${d}`))) {
@@ -200,6 +202,8 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
     },
     current: () => last,
     async open(url) {
+      if (!URL.canParse(url) || /\s/.test(url.trim()))
+        throw new Error(`"${url}" is not a valid address. Copy it from the search results.`);
       const p = await currentPage();
       await navigate(p, url);
       await settle(p);

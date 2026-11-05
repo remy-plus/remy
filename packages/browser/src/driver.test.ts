@@ -99,6 +99,12 @@ describe.runIf(process.env.REMY_SKIP_BROWSER !== '1')('local browser', () => {
     await expect(browser.click(99)).rejects.toThrow(/no element \[99\]/);
   });
 
+  it('refuses a broken address instead of crashing', async ({ skip }) => {
+    if (!available) skip();
+    await expect(browser.open('https://www hvac.com/guide')).rejects.toThrow('not a valid address');
+    await expect(browser.open('not a url')).rejects.toThrow('not a valid address');
+  });
+
   it('refuses local addresses unless allowed', async ({ skip }) => {
     if (!available) skip();
     const strict = createLocalBrowser({ profileDir: join(profile, 'strict') });
