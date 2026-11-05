@@ -6,6 +6,7 @@ import { files } from './files.ts';
 import { helpers } from './helpers.ts';
 import { injection } from './injection.ts';
 import { memory } from './memory.ts';
+import { proactive } from './proactive.ts';
 import { recovery } from './recovery.ts';
 import { research } from './research.ts';
 import { skills } from './skills.ts';
@@ -21,6 +22,7 @@ export const CASES: EvalCase[] = [
   ...browser,
   ...skills,
   ...helpers,
+  ...proactive,
 ];
 
 export {
@@ -31,6 +33,7 @@ export {
   helpers,
   injection,
   memory,
+  proactive,
   recovery,
   research,
   skills,
