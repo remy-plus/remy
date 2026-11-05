@@ -14,7 +14,7 @@ const addArgs = z.object({
     .string()
     .min(1)
     .describe(
-      'Like "every day at 9", "weekdays at 8:30", "every monday at 9am" or "every 2 hours"',
+      'Local time, like "every day at 9", "weekdays at 8:30", "every 2 hours" or "when ~/Downloads changes"',
     ),
   prompt: z.string().min(1).describe('What to do each time, complete in itself'),
 });
