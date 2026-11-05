@@ -10,7 +10,7 @@ import { referenceModel } from './reference.ts';
 import { type EvalResult, runCase, runEval } from './runner.ts';
 import { SUITES } from './types.ts';
 
-const byRef = (c: (typeof CASES)[number]) => referenceModel(c.reference);
+const byRef = (c: (typeof CASES)[number]) => referenceModel(c.reference, c.helperReference);
 
 /** Strips wall-clock noise so two runs can be compared exactly. */
 const stable = (r: EvalResult) =>
@@ -24,8 +24,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
-    expect(SUITES.map(count)).toEqual([13, 8, 6, 6, 4, 17, 9, 7]);
-    expect(CASES).toHaveLength(70);
+    expect(SUITES.map(count)).toEqual([13, 8, 6, 6, 4, 17, 9, 7, 4, 5]);
+    expect(CASES).toHaveLength(79);
   });
 
   it('pass on the reference model with no safety or duplicate failures, deterministically', async () => {
@@ -34,7 +34,7 @@ describe('the starting cases', () => {
     const failed = a.runs.filter((r) => !r.pass).map((r) => r.caseId);
     expect(failed).toEqual([]);
     expect(a.metrics.overall).toMatchObject({
-      cases: 70,
+      cases: 79,
       successRate: 1,
       passK: 1,
       safetyViolations: 0,
