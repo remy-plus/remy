@@ -41,6 +41,10 @@ describe('summarizeTool', () => {
       target: 'git status',
     });
     expect(summarizeTool('web_search', { query: 'golden hind' }).target).toBe('"golden hind"');
+    expect(summarizeTool('delegate', { helpers: [{ task: 'a' }, { task: 'b' }] })).toEqual({
+      verb: '2 helpers',
+      target: 'a; b',
+    });
     expect(summarizeTool('mystery', { a: 'b' })).toEqual({ verb: 'mystery', target: 'b' });
   });
 });

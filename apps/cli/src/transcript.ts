@@ -77,6 +77,13 @@ export function summarizeTool(tool: string, args: unknown): { verb: string; targ
       return { verb: 'fetch', target: shortUrl(str(a.url)) };
     case 'web_search':
       return { verb: 'search', target: truncate(`"${str(a.query)}"`, 64) };
+    case 'delegate': {
+      const helpers = Array.isArray(a.helpers) ? (a.helpers as { task?: unknown }[]) : [];
+      return {
+        verb: helpers.length === 1 ? 'helper' : `${helpers.length} helpers`,
+        target: truncate(helpers.map((h) => str(h.task)).join('; '), 64),
+      };
+    }
     case 'read_file':
       return { verb: 'read', target: str(a.path) };
     case 'write_file':
