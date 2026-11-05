@@ -254,7 +254,7 @@ Setup
   never holds Remy up.
   Flags beat env, env beats a saved login, a saved login beats the config file.
   REMY_KEYCHAIN=off keeps keys in a private file instead of the Keychain.
-  Skills: the best match's steps go with your message. REMY_SKILL_STEPS=off sends only names.
+  Skills: REMY_SKILL_STEPS=on sends the best match's steps with your message.
 
   Data lives in REMY_HOME (default ~/.remy). Remy searches and browses in a hidden browser on
   this machine (Chrome, Edge or Chromium) with its own profile in REMY_HOME/browser; it shows the
@@ -731,7 +731,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       hasTools: Boolean(tools.get('remember')),
       skills: (query) =>
         skillsBlock(skills().list(), query, {
-          steps: env.REMY_SKILL_STEPS !== 'off',
+          steps: env.REMY_SKILL_STEPS === 'on',
           onSteps: (s) => skills().used(s.name),
         }),
       situation: async () =>
