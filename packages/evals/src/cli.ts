@@ -103,7 +103,9 @@ export async function evalMain(argv: string[]): Promise<number> {
     return 2;
   }
   const client = live;
-  const modelFor: ModelFor = client ? () => client : (c) => referenceModel(c.reference);
+  const modelFor: ModelFor = client
+    ? () => client
+    : (c) => referenceModel(c.reference, c.helperReference);
 
   const result = await runEval(CASES, modelFor, {
     k,
