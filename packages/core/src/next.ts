@@ -106,7 +106,7 @@ export const isQuestion = (text: string) =>
  * asking for the answers. An answer that ends with an offer has neither.
  */
 export const isStalledAsk = (text: string) =>
-  (text.match(/\?(\s|$)/g)?.length ?? 0) >= 2 &&
+  (text.match(/\?(\s|$)|would you like/gi)?.length ?? 0) >= 2 &&
   REQUEST.test(
     text
       .split(/\n\s*\n/)

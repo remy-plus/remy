@@ -232,6 +232,12 @@ describe('isStalledAsk', () => {
     expect(isStalledAsk(stalled)).toBe(true);
   });
 
+  it('counts a list of offers as asking', () => {
+    const text =
+      "I could not find reliable sources.\n\nWould you like me to:\n- widen the price range, or\n- use a shortlist?\n\nTell me which approach you prefer, and I'll proceed.";
+    expect(isStalledAsk(text)).toBe(true);
+  });
+
   it('leaves answers alone', () => {
     expect(isStalledAsk('Here are the three picks.\n\nWant me to compare prices too?')).toBe(false);
     expect(isStalledAsk('Is it cheap? Is it good? Yes to both.\n\nEnjoy the headphones.')).toBe(
