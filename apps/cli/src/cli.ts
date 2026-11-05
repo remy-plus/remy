@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -109,6 +109,18 @@ import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
 import { withRecall } from './recall.ts';
+import {
+  type Run,
+  startVm,
+  stopVm,
+  VM_PORT,
+  VM_TIMEOUT_MS,
+  type VmConnection,
+  vmSearch,
+  vmServerScript,
+  vmStatus,
+  waitForVm,
+} from './search-vm.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
 import { stdoutGate } from './stream.ts';
@@ -205,7 +217,7 @@ Usage
   remy connect [add|auth|list|remove]
                                   Connect apps and services through MCP servers; --import
                                   brings in the ones Claude Desktop or Claude Code already use
-  remy browser [show|reset|install]
+  remy browser [show|reset|install|vm start|vm stop|vm status]
                                   Remy's own browser, which it uses to search and browse:
                                   show opens it so you can sign in to sites, reset signs
                                   out of everything, install gets Chromium for machines
@@ -677,6 +689,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   const browserOn = () => env.REMY_BROWSER !== 'off';
   const browserDir = () => join(home, 'browser');
+  const vmFile = () => join(home, 'search-vm.json');
+  const vmConnection = (): VmConnection => {
+    try {
+      return JSON.parse(readFileSync(vmFile(), 'utf8')) as VmConnection;
+    } catch {
+      return { url: `http://127.0.0.1:${VM_PORT}`, token: '' };
+    }
+  };
   function browserFor(file: FileConfig): Browser {
     const allow = list(flags['net-allow']) ?? file.netAllow;
     browser ??= createLocalBrowser({
@@ -741,8 +761,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           connections: mcp?.list() ?? [],
         }),
     });
-    const search = pickSearch(env, env.REMY_SEARCH ?? file.search);
-    if (search.provider) tools.add(createWebSearch(search.provider));
+    const search = pickSearch(env, env.REMY_SEARCH ?? file.search, () => vmSearch(vmConnection()));
+    if (search.provider)
+      tools.add(
+        createWebSearch(
+          search.provider,
+          search.choice === 'vm' ? { timeoutMs: VM_TIMEOUT_MS } : {},
+        ),
+      );
     // The browser on this machine; it searches too when the pick is the browser.
     if (browserOn())
       for (const t of createBrowserTools(browserFor(file)))
@@ -1626,8 +1652,54 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out("Remy's browser is cleared: every site is signed out.");
           return 0;
         }
+        if (sub === 'vm') {
+          const run: Run = (cmd, args) => {
+            const r = spawnSync(cmd, args, { encoding: 'utf8' });
+            return { ok: r.status === 0, out: r.stdout ?? '' };
+          };
+          const action = rest[1] ?? 'status';
+          if (action === 'stop') {
+            stopVm(run);
+            out('Search in the container is stopped.');
+            return 0;
+          }
+          if (action === 'status') {
+            out(`Search in the container: ${vmStatus(run)}.`);
+            return 0;
+          }
+          if (action !== 'start')
+            throw new Error(
+              'Use remy browser vm start, remy browser vm stop or remy browser vm status.',
+            );
+          const conn = {
+            url: `http://127.0.0.1:${VM_PORT}`,
+            token: randomBytes(24).toString('hex'),
+          };
+          const started = startVm(run, {
+            port: VM_PORT,
+            token: conn.token,
+            script: vmServerScript(),
+          });
+          if (started === 'no-docker')
+            throw new Error(
+              'Search in a container needs Docker or Colima. Install one, then try again.',
+            );
+          if (started === 'failed') throw new Error('The container did not start.');
+          if (started === 'started') {
+            writeFileSync(vmFile(), JSON.stringify(conn), { mode: 0o600 });
+            out('Starting. The first start downloads a browser, about 2 GB.');
+            if (!(await waitForVm(conn)))
+              throw new Error(
+                'The container started but did not answer. Try remy browser vm stop.',
+              );
+          }
+          out('Search in the container is on. Set REMY_SEARCH=vm to use it.');
+          return 0;
+        }
         if (sub !== 'show')
-          throw new Error('Use remy browser show, remy browser reset or remy browser install.');
+          throw new Error(
+            'Use remy browser show, remy browser reset, remy browser install or remy browser vm.',
+          );
         const b = browserFor(cfg());
         await b.show();
         out(
