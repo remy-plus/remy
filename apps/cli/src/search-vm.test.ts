@@ -19,7 +19,7 @@ describe('vmSearch', () => {
   it('sends the token and takes the first engine with useful hits', async () => {
     const asked: string[] = [];
     const provider = vmSearch(conn, async (url, init) => {
-      asked.push(`${url} ${(init?.headers as Record<string, string>).authorization}`);
+      asked.push(`${url} ${(init?.headers as Record<string, string> | undefined)?.authorization}`);
       return reply({ hits: String(url).includes('ddg') ? [hit('Best Buy')] : [hit('rye bread')] });
     });
     expect(await provider.search('rye bread', 3)).toEqual([hit('rye bread')]);
