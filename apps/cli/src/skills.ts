@@ -24,6 +24,8 @@ import {
   skillText,
 } from '@remy/tools';
 
+import type { SkillOrigin } from './skills-web.ts';
+
 export interface SkillProblem {
   path: string;
   error: string;
@@ -37,6 +39,8 @@ export interface SkillCandidate {
   skipped: string[];
   /** A skill of yours with this name is replaced. */
   replaces: boolean;
+  /** Where it came from, for a skill added from a link. */
+  origin?: SkillOrigin;
 }
 
 export interface SkillStore extends SkillsPort {
@@ -46,6 +50,10 @@ export interface SkillStore extends SkillsPort {
   problems(): SkillProblem[];
   /** Reads a folder (or a SKILL.md) to show the user before `install`. Throws with a plain reason. */
   prepare(path: string): SkillCandidate;
+  /** The same for text fetched from a link. */
+  prepareWeb(text: string, origin: SkillOrigin): SkillCandidate;
+  /** Where a skill from the web came from, and its text as saved. */
+  web(name: string): { origin: SkillOrigin; text: string } | undefined;
   install(c: SkillCandidate): string;
   /** Removes one of yours. False when you have no skill of that name. */
   remove(name: string): boolean;
@@ -87,6 +95,19 @@ export function openSkills(home: string, cwd: string): SkillStore {
   const projectDir = resolve(cwd, '.remy', 'skills');
   const project = resolve(projectDir) === resolve(mine) ? undefined : projectDir;
   const usesPath = join(mine, '.uses.json');
+  const sourcesPath = join(mine, '.sources.json');
+  const loadSources = (): Record<string, SkillOrigin> => {
+    try {
+      const raw = JSON.parse(readFileSync(sourcesPath, 'utf8')) as unknown;
+      return raw && typeof raw === 'object' ? (raw as Record<string, SkillOrigin>) : {};
+    } catch {
+      return {};
+    }
+  };
+  const saveSources = (sources: Record<string, SkillOrigin>) => {
+    mkdirSync(mine, { recursive: true });
+    writeFileSync(sourcesPath, JSON.stringify(sources, null, 2));
+  };
   const loadUses = (): Record<string, number> => {
     try {
       const raw = JSON.parse(readFileSync(usesPath, 'utf8')) as unknown;
@@ -100,8 +121,11 @@ export function openSkills(home: string, cwd: string): SkillStore {
     const uses = loadUses();
     const withUses = (list: Skill[]) =>
       list.map((k) => (typeof uses[k.name] === 'number' ? { ...k, uses: uses[k.name] } : k));
+    const sources = loadSources();
     const merged = mergeSkills(
-      readDir(mine, 'yours', problems),
+      readDir(mine, 'yours', problems).map((k) =>
+        sources[k.name] ? { ...k, source: 'web' as const } : k,
+      ),
       project ? readDir(project, 'project', problems) : [],
       BUILTIN_SKILLS,
     );
@@ -133,11 +157,35 @@ export function openSkills(home: string, cwd: string): SkillStore {
         replaces: existsSync(join(mine, r.skill.name, SKILL_FILE)),
       };
     },
+    prepareWeb(text, origin) {
+      const r = parseSkill(text);
+      if (!r.ok) throw new Error(`${origin.url}: ${r.error}`);
+      if (r.skill.body.length > SKILL_BODY_MAX)
+        throw new Error(
+          `${origin.url} is over ${SKILL_BODY_MAX.toLocaleString('en-US')} characters.`,
+        );
+      return {
+        skill: { ...r.skill, source: 'web' },
+        text,
+        skipped: [],
+        replaces: existsSync(join(mine, r.skill.name, SKILL_FILE)),
+        origin,
+      };
+    },
+    web(name) {
+      const origin = loadSources()[name];
+      const path = join(mine, name, SKILL_FILE);
+      if (!origin || !existsSync(path)) return undefined;
+      return { origin, text: readFileSync(path, 'utf8') };
+    },
     install(c) {
       const dir = join(mine, c.skill.name);
       mkdirSync(dir, { recursive: true });
       const path = join(dir, SKILL_FILE);
       writeFileSync(path, c.text);
+      // A skill added from a folder replaces one from the web and is no longer marked as such.
+      const { [c.skill.name]: _, ...others } = loadSources();
+      saveSources(c.origin ? { ...others, [c.skill.name]: c.origin } : others);
       return path;
     },
     save(d) {
@@ -160,6 +208,8 @@ export function openSkills(home: string, cwd: string): SkillStore {
       const dir = join(mine, name);
       if (!/^[a-z0-9-]+$/.test(name) || !existsSync(join(dir, SKILL_FILE))) return false;
       rmSync(dir, { recursive: true, force: true });
+      const { [name]: _, ...others } = loadSources();
+      saveSources(others);
       return true;
     },
   };
