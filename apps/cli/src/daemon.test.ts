@@ -78,6 +78,58 @@ describe('tick', () => {
   });
 });
 
+describe('a watch', () => {
+  const setup = () => {
+    const store = open();
+    const s = store.add('when ~/Downloads changes', 'Sort the new files', start);
+    store.update({ ...s, nextRun: start.toISOString() });
+    return store;
+  };
+  const due = (store: ReturnType<typeof open>) => {
+    const [s] = store.list();
+    if (s) store.update({ ...s, nextRun: start.toISOString() });
+  };
+
+  it('notes the time on the first look and runs nothing', async () => {
+    const store = setup();
+    const ran: string[] = [];
+    await tick(
+      store,
+      nine,
+      async (p) => (ran.push(p), 'task_1'),
+      undefined,
+      () => 100,
+    );
+    expect(ran).toEqual([]);
+    expect(store.list()[0]?.seenChange).toBe(100);
+  });
+
+  it('runs once when the file changes', async () => {
+    const store = setup();
+    const ran: string[] = [];
+    const run = async (p: string) => (ran.push(p), 'task_1');
+    await tick(store, nine, run, undefined, () => 100);
+    due(store);
+    await tick(store, nine, run, undefined, () => 200);
+    due(store);
+    await tick(store, nine, run, undefined, () => 200);
+    expect(ran).toHaveLength(1);
+  });
+
+  it('waits quietly while the path is missing', async () => {
+    const store = setup();
+    const ran: string[] = [];
+    await tick(
+      store,
+      nine,
+      async (p) => (ran.push(p), 'task_1'),
+      undefined,
+      () => undefined,
+    );
+    expect(ran).toEqual([]);
+  });
+});
+
 describe('launchAgentPlist', () => {
   const plist = launchAgentPlist(
     { execPath: '/usr/bin/node', execArgv: [], script: '/x/remy.js' },
