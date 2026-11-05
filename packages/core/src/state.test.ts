@@ -364,4 +364,23 @@ describe('helpers in state', () => {
     };
     expect(fold([stored(1, event)]).tainted).toBe(true);
   });
+
+  it('adds what a tool spent to the cost of the task', () => {
+    const events: Event[] = [
+      { type: 'task.created', prompt: 'p', config },
+      {
+        type: 'model.responded',
+        step: 1,
+        calls: [{ callId: 'c', tool: 'delegate', args: {}, argsHash: 'h' }],
+        usage: { inTokens: 0, outTokens: 0 },
+        costUsd: 0.01,
+      } as unknown as Event,
+      {
+        type: 'tool.completed',
+        callId: 'c',
+        result: { ok: true, content: '', trust: 'trusted', spentUsd: 0.2 },
+      },
+    ];
+    expect(fold(events.map((e, i) => stored(i + 1, e))).costUsd).toBeCloseTo(0.21);
+  });
 });
