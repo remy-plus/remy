@@ -565,10 +565,10 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 | Minimal mode, themes, onboarding | Shipped | Mark Shipped in Notion if not already |
 | One endless chat, prompt caching, web search with no keys | Shipped (0.7, 0.8) | Search quality continues below |
 | Team of specialists | Built, unproven | Test helpers on a stronger model; add role skills only if they win |
-| Much deeper memory | Half done: episodic recall and batched saves shipped | 0.11: meaning-based search, clean-up, SQLite with no cap |
-| More autonomous, self-aware | Half done | 0.10 schedules; 0.11 verify before finish, missing-capability messages |
-| Self-improvement | Level 2 shipped (skills) | 0.11 level 1 (corrections become how-tos); level 3 stays research |
-| Ultra intelligence | Reviewing | 0.11 hard eval suite, study of MausBot's source, verify and best-of-n only if evals rise |
+| Much deeper memory | Half done: episodic recall and batched saves shipped | After 1.0: meaning-based search, clean-up, SQLite with no cap |
+| More autonomous, self-aware | Half done | Schedules shipped; verify before finish goes in 1.0 |
+| Self-improvement | Level 2 shipped (skills) | After 1.0: corrections become how-tos; level 3 stays research |
+| Ultra intelligence | Reviewing | Hard eval suite and verify in 1.0; MausBot study and best-of-n after |
 | Get people to notice | Reviewing | Cheap parts now, launch with 1.0 |
 | Brand, bolder | Reviewing, conflicts with "quiet" | 2 or 3 directions before any web screen |
 | Launch video | Parked | Demo mode now, record with 1.0 |
@@ -578,12 +578,13 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 ### Order
 
-1. **0.9.x, make it trustworthy (1 session).** Find out if container search holds up over days. Remy sets up the container itself when Docker is there. Answers must link their sources. Fix the short greeting read as a question ("Hello there, ready to help?" paused a task). Add skills and helpers to replay. Finish the 0.9.0 release checklist.
-2. **Cheap launch groundwork, alongside (under 1 session).** CONTRIBUTING.md, issue labels, README with a one-line install, a demo mode on scripted models, public eval numbers.
-3. **0.10 Proactive (1 to 2 sessions).** Schedules and triggers as ordinary tasks, a small local daemon, notifications. No window on the user's screen.
-4. **0.11 Smarter (2 to 3 sessions).** A harder eval suite of real multi-step tasks first, so every change below is measured. Verify before finish. Corrections become how-tos. Deeper memory. MausBot study; take role bots and the skill recorder if they earn it.
-5. **1.0 Web app (5 or more sessions).** Design first: brand decision, design system from `branding/`, core screens prototyped and reviewed before building. Then the server on the existing `Runtime` API, streaming, chat, timeline, approval cards, connections, skills. Then polish until it holds up in a 60 second video.
-6. **Launch.** Video, site, Show HN, r/LocalLLaMA, X, all on the same day.
+**Changed 2026-11-04 (owner): there is no 0.11. The next release is 1.0.** Everything below serves shipping it.
+
+1. **1.0 web app.** `remy web` serves the app from the user's machine (local first, assumed until the owner says otherwise). Design first: design system from `branding/`, core screens reviewed in a browser before wiring. Then a small server on the existing `Runtime` API, streaming, chat, timeline, approval cards, connections, skills, schedules. Then polish until it holds up in a 60 second video.
+2. **Inside 1.0, because research has to work:** a harder eval suite of real multi-step tasks, and Remy checking its answer before finishing.
+3. **Launch.** Video, site, Show HN, r/LocalLLaMA, X, all on the same day.
+
+**After 1.0:** deeper memory, corrections becoming how-tos, the MausBot study, role bots, voice, hosted Remy.
 
 ### Progress (2026-11-04, night)
 
