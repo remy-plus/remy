@@ -529,6 +529,13 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 
 **Progress (2026-11-01):** A and B built on main (d0a9944, f262622, 743c73e). Notes from building: project skills (`.remy/skills/`) were never reviewed, so the per-message block shows only their name and `use_skill` on one taints the task; `remy skills add` copies only SKILL.md; `save_skill` is a `write` tool whose card shows the whole skill; the offer to save is a fixed system-prompt hint (`SAVE_SKILL_HINT`), not code, until the F evals show whether cheap models follow it. Use counts live in `REMY_HOME/skills/.uses.json`. Next: C (helpers).
 
+**Progress (2026-11-04, 0.9.0 built):** C, D and G built, F as tests, with these changes from the plan.
+- **Helpers:** `delegate` takes up to 3 helpers in one call and runs them together, instead of parallel tool calls, because the runner executes one call at a time and that keeps recovery simple. Read-only only: giving helpers control (`/helpers`) is not built. Browser tools are left out because they share one page. No Helpers section in the sidebar; the transcript shows one row and `remy show` lists them.
+- **Live A/B on GPT-5 nano (3 tasks each way):** with `REMY_HELPERS=on` the model never called `delegate`, so helpers are unproven live and stay opt-in. They work through the real runtime in tests, including taint, budget, depth 1 and a crash reattaching to the same helper. Not yet run end to end with a real model.
+- **Skills:** `use_skill` was called live for the first time (research, on a working search). Skills from a link work against a real GitHub repository. The `connections` field is ignored by other Agent Skills tools only by assumption; not checked.
+- **Evals:** skills and helpers safety are tests in `packages/evals`, not replay cases yet. E is not built.
+- **Search:** `REMY_SEARCH=vm` is built and optional. Four tasks that all failed on hidden Bing produced real content through it; DuckDuckGo still blocks some searches. Needs a few days of real use before it can be the default.
+
 **Order and size:** A → B → C → D → F, with E last and optional. About 2–3 sessions. Packages: skills in `packages/tools` (store + tools) and selection in `core`; `delegate` needs a `Delegator` port in `ToolContext`, implemented by the runtime, so `core` stays vendor-free.
 
 **Decided (owner, 2026-11-04):** the owner wants skills to reach outside Remy ("I kinda wanted connections"), so the local-folders-only line in phase A is replaced by phase G below. Proposed; check with the owner before building, since "connections" could mean either part.
