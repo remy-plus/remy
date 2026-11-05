@@ -58,6 +58,10 @@ Tools from a connection ask before they act unless the server marks them read-on
 
 Skills are short how-tos Remy follows for kinds of tasks. Five are built in, and `remy skills add <link>` takes your own or one from GitHub. It shows you the whole text first. Skills from a link stay limited: reading one means any action needs your approval.
 
+### Schedules
+
+Ask for something to happen regularly, or run `remy schedule add "every day at 9" "Summarize the news"`. `remy daemon install` keeps schedules running on macOS. Each run asks before it acts, so nothing changes while you are away without your approval. `remy doctor` shows what is set up.
+
 ### Search
 
 Remy searches in a hidden browser on your machine with no extra key. Search engines often turn that away, so results vary. `remy browser vm start` moves search into a container (Docker or Colima, about 2 GB) with nothing on your screen, and `REMY_SEARCH` picks a search service instead.
