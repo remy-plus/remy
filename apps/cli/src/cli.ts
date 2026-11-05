@@ -730,7 +730,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       notes: () => memory().list(),
       hasTools: Boolean(tools.get('remember')),
       skills: (query) =>
-        skillsBlock(skills().list(), query, { steps: env.REMY_SKILL_STEPS !== 'off' }),
+        skillsBlock(skills().list(), query, {
+          steps: env.REMY_SKILL_STEPS !== 'off',
+          onSteps: (s) => skills().used(s.name),
+        }),
       situation: async () =>
         situationBlock({
           now: new Date(),

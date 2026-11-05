@@ -165,6 +165,15 @@ describe('matching and the block', () => {
       expect(block).toContain('- alpha:');
     });
 
+    it('reports which skill it sent', () => {
+      const sent: string[] = [];
+      skillsBlock([skill('alpha', 'builtin')], 'alpha report', {
+        steps: true,
+        onSteps: (s) => sent.push(s.name),
+      });
+      expect(sent).toEqual(['alpha']);
+    });
+
     it('only lists names unless asked for steps', () => {
       expect(skillsBlock([skill('alpha', 'builtin')], 'alpha report')).not.toContain('Steps for');
     });

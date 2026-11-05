@@ -168,11 +168,12 @@ export function matchSkills(skills: Skill[], query: string, limit = SKILLS_SHOWN
 export function skillsBlock(
   skills: Skill[],
   query: string,
-  opts: { steps?: boolean } = {},
+  opts: { steps?: boolean; onSteps?: (skill: Skill) => void } = {},
 ): string {
   const picked = matchSkills(skills, query);
   if (!picked.length) return '';
   const best = opts.steps ? picked.find(canSendSteps) : undefined;
+  if (best) opts.onSteps?.(best);
   const others = picked.filter((s) => s !== best);
   return [
     ...(best ? [`Follow these steps for this task: ${best.name}`, best.body, ''] : []),
