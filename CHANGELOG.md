@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.0 (2026-11-04)
+
+Remy can start work by itself, on your schedule.
+
+- **Schedules.** `remy schedule add "every day at 9" "<prompt>"`, or just ask in the chat. Weekdays, intervals and "when ~/Downloads changes" work too. `/schedules` shows them.
+- **It still asks.** Setting up a schedule goes through an approval card, and each run asks before it acts. A page cannot set one up.
+- **A small daemon.** `remy daemon install` starts it when you log in on macOS. A missed run happens once when your Mac wakes, and a crash never repeats a run.
+- **Notifications** when a scheduled task finishes or needs you.
+- **`remy doctor`** shows what is set up and the next step for each.
+- **Container search stays on.** `remy browser vm start` now turns it on for good, and it restarts by itself after a reboot. `remy browser vm stop` turns it off.
+- Web answers end with the links of the pages Remy read.
+- Fixed: a greeting that ends in a question mark no longer pauses the task.
+
 ## 0.9.0 (2026-11-04)
 
 Remy learns how you work, and search no longer has to fight the search engines.
