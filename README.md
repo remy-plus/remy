@@ -18,16 +18,12 @@ Remy is an open-source AI agent that completes digital tasks through plain conve
 
 ## Quick start
 
-Requires Node 22.18+ and pnpm (via `corepack enable`).
+You need Node 22.18 or newer.
 
 ```sh
-git clone https://github.com/remy-plus/remy.git && cd remy
-pnpm install
-
-# Connect a model once: pick a provider, paste the key, done
-pnpm remy login
-
-pnpm remy
+npm install -g @koryei/remy
+remy login
+remy
 ```
 
 ### Models
@@ -49,7 +45,7 @@ Settings are resolved per field: flags, then environment variables, then a saved
 Plain `remy` in a terminal opens the chat full screen, on a calm home screen with the input box centered: type a message, and each one carries the earlier ones as context. Replies stream in, tool calls show as they run, and Remy asks for a `y` or `n` before anything that needs approval. PgUp and PgDn scroll the conversation, Ctrl+B shows the sidebar on wide terminals, and Ctrl+R searches what you sent before. Ctrl+C stops a running task (resume it with `remy resume <id>`), Ctrl+D quits. Type `/` for commands as you type (`/model` switches the model, `/login` connects a provider, `/sessions` picks up an unfinished task), press Ctrl+P for the command palette, and type `@` to attach a file from the workspace. With nothing connected yet, `remy` opens on the login panel. `/help` lists the rest. `/theme auto|light|dark` (or `/day`, `/night`) switches the colors at once and remembers the choice. `remy --minimal` opens a quieter scrolling chat with no header art, and `/minimal` makes it the default. Use `--reduced-motion` to turn off animation and `NO_COLOR=1` to turn off color. For scripts, run one task directly:
 
 ```sh
-pnpm remy run "Summarize https://example.com in three bullet points"
+remy run "Summarize https://example.com in three bullet points"
 ```
 
 ### Connections
@@ -60,15 +56,14 @@ Tools from a connection ask before they act unless the server marks them read-on
 
 Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Remy searches and browses in its own hidden browser on your computer, no key needed; `remy browser show` opens it so you can sign in to sites. `REMY_SEARCH` picks another search (`context`, `brave`, `tavily`, `searxng` or `off`).
 
-## Install
-
-Node 22.18 or newer:
+## From source
 
 ```sh
-npm install -g @koryei/remy
+git clone https://github.com/remy-plus/remy.git && cd remy
+corepack enable && pnpm install
+pnpm remy login
+pnpm remy
 ```
-
-From a clone instead: `pnpm install && pnpm bundle && npm install -g ./apps/cli`.
 
 See [CAPABILITIES.md](CAPABILITIES.md) for what Remy can and cannot do yet.
 
