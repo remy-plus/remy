@@ -87,7 +87,7 @@ pnpm eval:replay   # deterministic eval run (the CI gate)
 pnpm eval --profile openrouter --model <id> --k 3   # live eval
 ```
 
-The architecture, the reasoning behind it and the roadmap are in [PLAN.md](PLAN.md). Packages:
+The architecture, the reasoning behind it and the roadmap are in [PLAN.md](PLAN.md). [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send a change, and [docs/evals.md](docs/evals.md) has the numbers. Packages:
 
 | Package           | What it does                                                                     |
 | ----------------- | -------------------------------------------------------------------------------- |
@@ -95,6 +95,8 @@ The architecture, the reasoning behind it and the roadmap are in [PLAN.md](PLAN.
 | `packages/store`  | Event store: in-memory and SQLite                                                |
 | `packages/models` | OpenAI-compatible client, native and JSON tool-calling strategies, record/replay |
 | `packages/tools`  | Built-in tools behind a jailed filesystem and an SSRF-guarded network            |
+| `packages/browser` | Remy's own browser, its tools and search                                        |
+| `packages/mcp`    | Connections to apps through MCP servers                                          |
 | `packages/evals`  | Eval cases, mock world, graders, metrics, regression compare                     |
 | `apps/cli`        | The `remy` command                                                               |
 
