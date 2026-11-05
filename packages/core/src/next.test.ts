@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash } from './hash.ts';
-import { isQuestion, nextAction } from './next.ts';
+import { isQuestion, isStalledAsk, nextAction } from './next.ts';
 import { PLAN_GATE_PREFIX } from './plan.ts';
 import { fold } from './state.ts';
 import { DEFAULT_BUDGET, type Event } from './types.ts';
@@ -220,6 +220,26 @@ const stepsTo = (n: number): Event[] =>
     started(`c${i}`),
     done(`c${i}`),
   ]).flat();
+
+describe('isStalledAsk', () => {
+  const stalled = [
+    'Plan:\n- Step 1: find three options.\n- Step 2: compare them.',
+    'I started a search but the results are weak. To proceed:\n- What budget should I target?\n- Are you okay with review sites?\n- Any region preference?',
+    "Please confirm your budget range and whether I should pull from specific sites, and I'll fetch the three best options.",
+  ].join('\n\n');
+
+  it('catches a long reply that hands the work back with questions', () => {
+    expect(isStalledAsk(stalled)).toBe(true);
+  });
+
+  it('leaves answers alone', () => {
+    expect(isStalledAsk('Here are the three picks.\n\nWant me to compare prices too?')).toBe(false);
+    expect(isStalledAsk('Is it cheap? Is it good? Yes to both.\n\nEnjoy the headphones.')).toBe(
+      false,
+    );
+    expect(isStalledAsk('Sent it.\n\nPlease confirm it arrived.')).toBe(false);
+  });
+});
 
 describe('pause and extend', () => {
   const small = (...events: Event[]) =>
