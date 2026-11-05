@@ -22,7 +22,9 @@ import {
   createMemoryTools,
   createRecallTool,
   createScopedFs,
+  createSkillTools,
   createWebSearch,
+  delegate,
   deleteFile,
   type Episode,
   editFile,
@@ -308,6 +310,15 @@ export async function createWorld(c: EvalCase): Promise<World> {
     tools.push(createRecallTool(memoryPort, async () => history));
   }
 
+  if (c.world.skills) {
+    const skills = c.world.skills;
+    tools.push(...createSkillTools({ list: () => skills }));
+    allowTools.push('use_skill');
+  }
+  if (c.world.helpers) {
+    tools.push(delegate);
+    allowTools.push('delegate');
+  }
   const mcp = c.world.mcp?.length ? await createMcpWorld(c.world.mcp) : undefined;
   if (mcp) {
     tools.push(...mcp.tools);

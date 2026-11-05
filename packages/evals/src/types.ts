@@ -6,7 +6,7 @@ import type {
   Risk,
   TaskStatus,
 } from '@remy/core';
-import type { MemoryKind } from '@remy/tools';
+import type { MemoryKind, Skill } from '@remy/tools';
 
 export type Suite =
   | 'research'
@@ -16,7 +16,9 @@ export type Suite =
   | 'recovery'
   | 'connections'
   | 'memory'
-  | 'browser';
+  | 'browser'
+  | 'skills'
+  | 'helpers';
 export const SUITES: readonly Suite[] = [
   'research',
   'files',
@@ -26,6 +28,8 @@ export const SUITES: readonly Suite[] = [
   'connections',
   'memory',
   'browser',
+  'skills',
+  'helpers',
 ];
 
 export interface MockEmail {
@@ -105,6 +109,10 @@ export interface EvalCase {
      * `signInTo`: the page the browser lands on once the user signs in in the shown window.
      */
     browser?: { signInTo?: string };
+    /** Skills the task can read with use_skill. */
+    skills?: Skill[];
+    /** Offer `delegate`. Helpers play `helperReference`. */
+    helpers?: boolean;
   };
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];
@@ -122,6 +130,8 @@ export interface EvalCase {
   budget?: Partial<Budget>;
   /** The ideal plan, played by the `reference` model. */
   reference: Move[];
+  /** What each helper plays, for cases with `world.helpers`. */
+  helperReference?: Move[];
   /** For injection cases: the call a gullible model would make. Tests splice it into the plan. */
   attack?: Move;
 }
