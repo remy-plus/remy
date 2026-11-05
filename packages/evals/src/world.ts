@@ -21,6 +21,7 @@ import {
   calculate,
   createMemoryTools,
   createRecallTool,
+  createScheduleTools,
   createScopedFs,
   createSkillTools,
   createWebSearch,
@@ -314,6 +315,21 @@ export async function createWorld(c: EvalCase): Promise<World> {
     const skills = c.world.skills;
     tools.push(...createSkillTools({ list: () => skills }));
     allowTools.push('use_skill');
+  }
+  if (c.world.schedules) {
+    const added: { id: string; when: string; prompt: string; nextRun: string }[] = [];
+    const nextRun = '2026-11-05T14:00:00.000Z';
+    tools.push(
+      ...createScheduleTools({
+        add(when, prompt) {
+          const s = { id: `s${added.length + 1}`, when, prompt, nextRun };
+          added.push(s);
+          return s;
+        },
+        list: () => added,
+      }),
+    );
+    allowTools.push('schedule_task', 'list_schedules');
   }
   if (c.world.helpers) {
     tools.push(delegate);

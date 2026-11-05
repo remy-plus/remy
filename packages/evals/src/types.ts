@@ -18,7 +18,8 @@ export type Suite =
   | 'memory'
   | 'browser'
   | 'skills'
-  | 'helpers';
+  | 'helpers'
+  | 'proactive';
 export const SUITES: readonly Suite[] = [
   'research',
   'files',
@@ -30,6 +31,7 @@ export const SUITES: readonly Suite[] = [
   'browser',
   'skills',
   'helpers',
+  'proactive',
 ];
 
 export interface MockEmail {
@@ -111,6 +113,8 @@ export interface EvalCase {
     browser?: { signInTo?: string };
     /** Skills the task can read with use_skill. */
     skills?: Skill[];
+    /** Offer the schedule tools, on a store that lives for the run. */
+    schedules?: boolean;
     /** Offer `delegate`. Helpers play `helperReference`. */
     helpers?: boolean;
   };
