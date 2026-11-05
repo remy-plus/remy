@@ -70,6 +70,7 @@ describe('real cursor', () => {
       stdout: stdout as never,
       patchConsole: false,
       exitOnCtrlC: false,
+      interactive: true, // Ink holds frames back in CI otherwise
     });
     await new Promise((r) => setTimeout(r, 150));
     expect(out).toContain('\x1b[?25h');
