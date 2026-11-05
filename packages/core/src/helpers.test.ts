@@ -8,6 +8,7 @@ import {
   helperId,
   helperPermissions,
   helperPrompt,
+  isHelperTask,
 } from './helpers.ts';
 import { defineTool, ToolRegistry } from './registry.ts';
 import { DEFAULT_BUDGET, type Risk } from './types.ts';
@@ -98,6 +99,13 @@ describe('helperId', () => {
     expect(helperId('t:c', 0)).toBe(helperId('t:c', 0));
     expect(helperId('t:c', 0)).not.toBe(helperId('t:c', 1));
     expect(helperId('t:c', 0)).not.toBe(helperId('t:d', 0));
+  });
+});
+
+describe('isHelperTask', () => {
+  it("tells helpers from the user's tasks", () => {
+    expect(isHelperTask(helperId('t:c', 0))).toBe(true);
+    expect(isHelperTask('task_123')).toBe(false);
   });
 });
 

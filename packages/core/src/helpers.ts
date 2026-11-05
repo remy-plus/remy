@@ -5,6 +5,7 @@ import type { ToolRegistry } from './registry.ts';
 import type { Budget, HelperRequest, Permissions, Tool } from './types.ts';
 
 export const DELEGATE = 'delegate';
+const HELPER_PREFIX = 'helper_';
 /** Helpers that run together for one `delegate` call. */
 export const HELPERS_AT_ONCE = 3;
 export const HELPER_MAX_STEPS = 15;
@@ -49,7 +50,10 @@ export function helperBudget(
 
 /** The same call gives the same ids, so a crash reattaches to helpers instead of starting more. */
 export const helperId = (idempotencyKey: string, index: number) =>
-  `task_${createHash('sha256').update(`${idempotencyKey}#${index}`).digest('hex').slice(0, 12)}`;
+  `${HELPER_PREFIX}${createHash('sha256').update(`${idempotencyKey}#${index}`).digest('hex').slice(0, 12)}`;
+
+/** Helpers are details of a task, so lists of the user's tasks leave them out. */
+export const isHelperTask = (taskId: string) => taskId.startsWith(HELPER_PREFIX);
 
 export function helperPrompt(r: HelperRequest): string {
   return [
