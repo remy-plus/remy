@@ -99,7 +99,7 @@ describe('built-in skills', () => {
     ]);
     for (const s of BUILTIN_SKILLS) {
       expect(s.source).toBe('builtin');
-      expect(s.tools.length).toBeGreaterThan(0);
+      expect(s.tools.length + (s.connections?.length ?? 0)).toBeGreaterThan(0);
     }
   });
 });
