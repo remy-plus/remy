@@ -126,6 +126,7 @@ import {
 } from './search-vm.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
+import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 
@@ -206,7 +207,7 @@ Usage
                                   See what Remy remembers about you, forget one note
                                   or all of them (notes are used only while
                                   "Personalise replies" is on in /profile)
-  remy skills [list|show <name>|add <folder>|rm <name>]
+  remy skills [list|show <name>|add <folder or link>|update <name>|rm <name>]
                                   How-tos Remy follows for kinds of tasks; add shows the
                                   SKILL.md and asks first (--yes skips the question)
   remy answer <id> "<text>"       Answer a pending question, then continue
@@ -1560,9 +1561,17 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           return 0;
         }
         if (sub === 'add') {
-          need(2, 'remy skills add <folder>');
-          const c = skills().prepare(rest[1] as string);
+          need(2, 'remy skills add <folder or link>');
+          const where = rest[1] as string;
+          const fromWeb = /^[a-z]+:\/\//i.test(where);
+          const c = fromWeb
+            ? await fetchSkill(where).then((f) => skills().prepareWeb(f.text, f.origin))
+            : skills().prepare(where);
           out(plainSkill(c.skill));
+          if (c.origin)
+            out(
+              `\nFrom ${c.origin.url}${c.origin.commit ? ` at commit ${c.origin.commit.slice(0, 12)}` : ''}. Only the text is saved. Reading this skill counts as untrusted, so actions need your approval.`,
+            );
           out();
           if (c.skipped.length)
             out(
@@ -1581,6 +1590,33 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(`Added ${c.skill.name}: ${skills().install(c)}`);
           return 0;
         }
+        if (sub === 'update') {
+          need(2, 'remy skills update <name>');
+          const name = rest[1] as string;
+          const saved = skills().web(name);
+          if (!saved)
+            throw new Error(`${name} did not come from a link, so there is nothing to update.`);
+          const fresh = await fetchSkill(saved.origin.url);
+          if (fresh.text === saved.text) {
+            out(`${name} is up to date.`);
+            return 0;
+          }
+          const c = skills().prepareWeb(fresh.text, fresh.origin);
+          out(`${name} has changed. New text:\n`);
+          out(c.text);
+          if (!flags.yes && !(deps.isTTY && deps.ask))
+            throw new Error('Review the text above, then run again with --yes.');
+          const yes =
+            flags.yes ||
+            /^y(es)?$/i.test(((await deps.ask?.('Use the new text? [y/N] ')) ?? '').trim());
+          if (!yes) {
+            out('Nothing changed.');
+            return 1;
+          }
+          skills().install(c);
+          out(`Updated ${name}.`);
+          return 0;
+        }
         if (sub === 'rm' || sub === 'remove') {
           need(2, 'remy skills rm <name>');
           const name = rest[1] as string;
@@ -1591,7 +1627,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(`Removed ${name}.`);
           return 0;
         }
-        throw new Error('Use remy skills list, show <name>, add <folder> or rm <name>.');
+        throw new Error(
+          'Use remy skills list, show <name>, add <folder or link>, update <name> or rm <name>.',
+        );
       }
 
       case 'answer': {
