@@ -19,7 +19,7 @@ describe('demoModel', () => {
   it('plans, writes, then answers, the same on every take', async () => {
     const tools = [];
     for (const turn of [0, 1]) {
-      const r = await model.complete(req(turn));
+      const r = await model.complete(req(turn), new AbortController().signal);
       tools.push(r.calls[0]?.tool);
     }
     expect(tools).toEqual(['update_plan', 'write_file']);
@@ -27,7 +27,7 @@ describe('demoModel', () => {
 
   it('streams its answer word by word', async () => {
     const parts: string[] = [];
-    const r = await model.complete(req(2), undefined, (d) => parts.push(d));
+    const r = await model.complete(req(2), new AbortController().signal, (d) => parts.push(d));
     expect(parts.length).toBeGreaterThan(3);
     expect(parts.join('')).toBe(r.text);
     expect(r.calls).toEqual([]);
