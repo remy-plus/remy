@@ -96,6 +96,7 @@ import { type Credentials, openCredentials } from './credentials.ts';
 import { LAUNCH_LABEL, launchAgentPlist, TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
+import { plainChecks, runChecks } from './doctor.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
 import {
   defaultModelFor,
@@ -226,9 +227,9 @@ Usage
   remy connect [add|auth|list|remove]
                                   Connect apps and services through MCP servers; --import
                                   brings in the ones Claude Desktop or Claude Code already use
-  remy schedule [list|add "<when>" "<prompt>"|rm <id>|pause <id>|resume <id>]
-                                  Run a task on a schedule, such as "every day at 9" or
-                                  "weekdays at 8:30". Each run asks before it acts
+  remy schedule [list|add "<when>" "<prompt>"|run <id>|rm <id>|pause <id>|resume <id>]
+                                  Run a task on a schedule, such as "every day at 9", or
+                                  "when ~/Downloads changes". Each run asks before it acts
   remy daemon [install|uninstall|status]
                                   Runs schedules; install starts it when you log in (macOS)
   remy browser [show|reset|install|vm start|vm stop|vm status]
@@ -236,6 +237,7 @@ Usage
                                   show opens it so you can sign in to sites, reset signs
                                   out of everything, install gets Chromium for machines
                                   without Chrome or Edge
+  remy doctor                     See what is set up and the next step for each
   remy --version | help
 
 Options for run
@@ -409,6 +411,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'browser',
       'schedule',
       'daemon',
+      'doctor',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -1678,6 +1681,32 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         );
       }
 
+      case 'doctor': {
+        const file = cfg();
+        const has = (cmd: string, args: string[]) => spawnSync(cmd, args).status === 0;
+        const chrome = ['chrome', 'msedge'].some(
+          (c) =>
+            process.platform === 'darwin' &&
+            existsSync(
+              c === 'chrome'
+                ? '/Applications/Google Chrome.app'
+                : '/Applications/Microsoft Edge.app',
+            ),
+        );
+        const facts = {
+          node: process.version,
+          model: credentials().defaultProvider() ?? env.REMY_PROFILE ?? file.profile,
+          browser: chrome || process.platform !== 'darwin',
+          docker: has('docker', ['info']),
+          daemon: process.platform === 'darwin' && has('launchctl', ['list', LAUNCH_LABEL]),
+          schedules: openSchedules(home).list().length,
+          search: env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : 'browser'),
+        };
+        const checks = runChecks(facts);
+        out(plainChecks(checks));
+        return checks.some((c) => c.status === 'problem') ? 1 : 0;
+      }
+
       case 'schedule': {
         const store = openSchedules(home);
         const sub = rest[0] ?? 'list';
@@ -1698,6 +1727,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(`Removed ${rest[1]}.`);
           return 0;
         }
+        if (sub === 'run') {
+          need(2, 'remy schedule run <id>');
+          const s = store.list().find((x) => x.id === rest[1]);
+          if (!s) throw new Error(`There is no schedule ${rest[1]}.`);
+          return await cli(['run', '--background', s.prompt], deps);
+        }
         if (sub === 'pause' || sub === 'resume') {
           need(2, `remy schedule ${sub} <id>`);
           if (!store.setPaused(rest[1] as string, sub === 'pause'))
@@ -1705,7 +1740,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(`${sub === 'pause' ? 'Paused' : 'Resumed'} ${rest[1]}.`);
           return 0;
         }
-        throw new Error('Use remy schedule list, add, rm, pause or resume.');
+        throw new Error('Use remy schedule list, add, run, rm, pause or resume.');
       }
 
       case 'daemon': {
