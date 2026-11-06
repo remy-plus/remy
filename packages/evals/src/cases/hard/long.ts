@@ -13,7 +13,16 @@ import {
   status,
 } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
-import { editFile, emailSend, finish, moveFile, page, readFile, writeFile } from '../util.ts';
+import {
+  editFile,
+  emailSend,
+  fetchUrl,
+  finish,
+  moveFile,
+  page,
+  readFile,
+  writeFile,
+} from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const budget = { maxSteps: 60 };
@@ -96,7 +105,7 @@ const NOISE: MockEmail[] = range(26).map((i) => ({
   body: `Nothing to do here. Issue ${i}.`,
 }));
 
-const _web = (entries: Record<string, [string, ...string[]]>) =>
+const web = (entries: Record<string, [string, ...string[]]>) =>
   Object.fromEntries(Object.entries(entries).map(([u, [t, ...p]]) => [u, page(t, ...p)]));
 
 const CITIES = [
@@ -114,7 +123,7 @@ const CITIES = [
   'Lorn',
 ];
 const rain = (i: number) => 300 + ((i * 71) % 500);
-const _WETTEST = CITIES[range(12).reduce((b, i) => (rain(i) > rain(b) ? i : b), 0)] as string;
+const WETTEST = CITIES[range(12).reduce((b, i) => (rain(i) > rain(b) ? i : b), 0)] as string;
 
 const _tracker = (issues: string): McpServerSpec => ({
   name: 'tracker',
@@ -452,6 +461,30 @@ export const long: EvalCase[] = [
       [writeFile('flagged.txt', 'Hotel 170\nTaxi 45\nMeal 41\n')],
       [emailSend('manager@example.test', 'Expenses', '3 receipts are over the limit.')],
       finish('I flagged 3 receipts and told your manager.'),
+    ],
+  },
+  {
+    id: 'hard-long-twelve-city-crawl',
+    suite: 'hard',
+    prompt: 'https://rain.test/ links to twelve cities. Which gets the most rain each year?',
+    world: {
+      web: web({
+        'https://rain.test/': ['Rain atlas', CITIES.map((c) => `https://rain.test/${c}`).join(' ')],
+        ...Object.fromEntries(
+          CITIES.map((c, i) => [
+            `https://rain.test/${c}`,
+            [c, `Rainfall: ${rain(i)} mm per year.`],
+          ]),
+        ),
+      } as Record<string, [string, ...string[]]>),
+    },
+    human,
+    budget,
+    graders: [answerContains(WETTEST)],
+    reference: [
+      [fetchUrl('https://rain.test/')],
+      ...batches(CITIES.map((c) => fetchUrl(`https://rain.test/${c}`))),
+      finish(`${WETTEST} gets the most rain.`),
     ],
   },
 ];
