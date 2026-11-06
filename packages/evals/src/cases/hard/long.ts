@@ -5,13 +5,14 @@ import {
   answerLacks,
   answerMatches,
   fileContains,
+  fileLacks,
   fileLines,
   fileMatches,
   filesAre,
   status,
 } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
-import { finish, moveFile, page, readFile, writeFile } from '../util.ts';
+import { editFile, finish, moveFile, page, readFile, writeFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const budget = { maxSteps: 60 };
@@ -291,6 +292,38 @@ export const long: EvalCase[] = [
       [{ tool: 'list_files', args: { path: 'sales' } }],
       ...batches(MONTHS.map((m) => readFile(`sales/${m}.txt`))),
       finish(`The year's total is ${SALES_TOTAL} and ${BEST} was best.`),
+    ],
+  },
+  {
+    id: 'hard-long-rename-across-files',
+    suite: 'hard',
+    prompt:
+      'Rename the function getUser to fetchUser everywhere in src/. Leave vendor/ alone, and leave the string "getUser is deprecated" in src/notes.ts as it is.',
+    world: {
+      files: {
+        'src/a.ts': 'export function getUser() {}\n',
+        'src/b.ts': "import { getUser } from './a';\ngetUser();\n",
+        'src/notes.ts': 'export const note = "getUser is deprecated";\n',
+        'vendor/lib.ts': 'export function getUser() {}\n',
+      },
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      fileContains('src/a.ts', 'fetchUser'),
+      fileLacks('src/b.ts', 'getUser'),
+      fileContains('src/notes.ts', 'getUser is deprecated'),
+      fileContains('vendor/lib.ts', 'getUser'),
+    ],
+    reference: [
+      [{ tool: 'list_files', args: { path: 'src' } }],
+      [readFile('src/a.ts'), readFile('src/b.ts'), readFile('src/notes.ts')],
+      [
+        editFile('src/a.ts', 'getUser', 'fetchUser'),
+        writeFile('src/b.ts', "import { fetchUser } from './a';\nfetchUser();\n"),
+      ],
+      finish('I renamed getUser in a.ts and b.ts and left vendor and the note alone.'),
     ],
   },
 ];
