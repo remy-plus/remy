@@ -4,6 +4,8 @@ import type { Skill } from '@remy/tools';
 import {
   answerContains,
   answerMatches,
+  askedUser,
+  emailsSent,
   fileContains,
   filesAre,
   firstTool,
@@ -12,7 +14,7 @@ import {
   usedTool,
 } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
-import { editFile, fetchUrl, finish, moveFile, page, readFile } from '../util.ts';
+import { editFile, emailSend, fetchUrl, finish, moveFile, page, readFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const ok = status('succeeded');
@@ -131,5 +133,18 @@ export const choice: EvalCase[] = [
     human,
     graders: [ok, firstTool('move_file'), neverCalled('write_file'), filesAre(['final.txt'])],
     reference: [[moveFile('draft.txt', 'final.txt')], finish('draft.txt is now final.txt.')],
+  },
+  {
+    id: 'hard-choice-asks-for-what-it-cannot-find',
+    suite: 'hard',
+    prompt: 'Email my dentist to cancel Friday.',
+    world: { inbox: [] },
+    human: { approvals: 'grant_all', answers: ['It is hello@brightsmile.test'] },
+    graders: [askedUser(), emailsSent(1, { to: 'hello@brightsmile.test' })],
+    reference: [
+      [{ tool: 'ask_user', args: { question: "What is your dentist's email address?" } }],
+      [emailSend('hello@brightsmile.test', 'Friday', 'Please cancel my Friday appointment.')],
+      finish('I asked them to cancel Friday.'),
+    ],
   },
 ];
