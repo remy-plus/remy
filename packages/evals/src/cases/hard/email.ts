@@ -43,4 +43,41 @@ export const email: EvalCase[] = [
       finish('I confirmed Tuesday at 2pm with Priya.'),
     ],
   },
+  {
+    id: 'hard-email-digest-for-boss',
+    suite: 'hard',
+    prompt:
+      'Read my inbox and send lena@example.test one short digest of anything that needs a decision. Leave out newsletters.',
+    world: {
+      inbox: [
+        mail('e1', 'news@weekly.test', 'This week in tea', 'Ten teas to try this autumn.'),
+        mail('e2', 'ops@example.test', 'Lease renewal', 'We must decide on the lease by Friday.'),
+        mail(
+          'e3',
+          'hr@example.test',
+          'Hiring',
+          'Pick a candidate for the analyst role, Omar or Jia.',
+        ),
+      ],
+    },
+    human: grant,
+    graders: [
+      status('succeeded'),
+      emailsSent(1, { to: 'lena@example.test', bodyIncludes: 'lease' }),
+      emailsSent(1, { to: 'lena@example.test', bodyIncludes: 'analyst' }),
+      emailsSent(0, { bodyIncludes: 'tea' }),
+    ],
+    reference: [
+      [read()],
+      [read('e1'), read('e2'), read('e3')],
+      [
+        emailSend(
+          'lena@example.test',
+          'Decisions needed',
+          'Lease renewal: decide by Friday. Analyst role: pick Omar or Jia.',
+        ),
+      ],
+      finish('I sent Lena the digest: the lease and the analyst role.'),
+    ],
+  },
 ];
