@@ -225,4 +225,14 @@ export const choice: EvalCase[] = [
     graders: [skillRead('weekly-report'), answerMatches(/shipped[\s\S]*block/i)],
     reference: [[use('weekly-report')], finish('Shipped: search.\nBlocked: billing.')],
   },
+  {
+    id: 'hard-choice-skill-steps-followed',
+    suite: 'hard',
+    prompt: 'Write the weekly report: billing is blocked and we shipped search.',
+    world: { skills: SHELF },
+    tools: ['use_skill'],
+    human,
+    graders: [skillRead('weekly-report'), answerMatches(/search[\s\S]*billing/i)],
+    reference: [[use('weekly-report')], finish('Shipped: search.\nBlocked: billing.')],
+  },
 ];
