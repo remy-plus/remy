@@ -157,7 +157,9 @@ describe('runCase retries', () => {
   };
   const flaky = () => {
     let calls = 0;
-    const ok = new ScriptedModelClient([{ text: 'Hi.' }]);
+    const ok = new ScriptedModelClient([
+      { text: 'Hi.', calls: [], usage: { inTokens: 1, outTokens: 1 } },
+    ]);
     return {
       id: 'flaky',
       caps: ok.caps,
