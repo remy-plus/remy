@@ -3,7 +3,6 @@ import { argsHash } from './hash.ts';
 import {
   isClaimedWork,
   isEmptyOffer,
-  isPromisedWork,
   isQuestion,
   isStalledAsk,
   nextAction,
@@ -378,5 +377,82 @@ describe('progress and the plan gate', () => {
       kind: 'execute',
       callId: 'g',
     });
+  });
+});
+
+describe('work claimed with no tool run', () => {
+  const said = (text: string, step = 1): Event => ({
+    type: 'model.responded',
+    step,
+    text,
+    calls: [],
+    usage: { inTokens: 1, outTokens: 1 },
+    costUsd: 0,
+    latencyMs: 1,
+  });
+  const claim = 'I have completed the task as follows:\n- Wrote "flagged.txt"\n- Emailed the count';
+
+  it('sends the first claim back to work', () => {
+    expect(next(said(claim))).toEqual({ kind: 'gate_claim' });
+  });
+
+  it('never calls a second claim a success', () => {
+    const action = next(said(claim), { type: 'plan.gated', text: 'x' }, said(claim, 2));
+    expect(action).toMatchObject({ kind: 'finish', status: 'failed' });
+  });
+
+  it('accepts an honest reply after the gate', () => {
+    const honest = 'I cannot send email from here, so nothing went out.';
+    expect(next(said(claim), { type: 'plan.gated', text: 'x' }, said(honest, 2))).toEqual({
+      kind: 'finish',
+      status: 'succeeded',
+      answer: honest,
+    });
+  });
+
+  it('leaves the claim alone once a tool has run', () => {
+    expect(next(resp(1, call('a')), allow('a'), started('a'), done('a'), said(claim, 2))).toEqual({
+      kind: 'finish',
+      status: 'succeeded',
+      answer: claim,
+    });
+  });
+
+  it.each([
+    'I have completed the task.',
+    'The task is now complete.',
+    'The email has been sent to Sam.',
+    "I've saved the notes to notes.md.",
+    'I sent the invoice to billing.',
+    'Done. I just booked the table for two.',
+    '- Emailed the count to the manager',
+    'I wrote flagged.txt with three rows.',
+    'I successfully deleted the old files.',
+  ])('claims work: %s', (text) => {
+    expect(isClaimedWork(text)).toBe(true);
+  });
+
+  it.each([
+    'Here is a poem about the sea.',
+    "I've written a short poem for you:\n\nThe sea is wide.",
+    "I've summarised it below.",
+    'Paris is the capital of France.',
+    'I will send the email once you confirm.',
+    'I can save this to a file if you like.',
+    'I have not sent anything yet.',
+    'Earlier I sent the invoice to billing.',
+    'Yes, I emailed Sam last week.',
+    'To send an email, press the button.',
+    "The email hasn't been sent.",
+  ])('does not claim work: %s', (text) => {
+    expect(isClaimedWork(text)).toBe(false);
+  });
+});
+
+describe('temperatureFor', () => {
+  it('is steady on the first try and varies on a retry, so a bad reply is not repeated', () => {
+    expect(temperatureFor(0)).toBe(0);
+    expect(temperatureFor(1)).toBeGreaterThan(0);
+    expect(temperatureFor(2)).toBeGreaterThan(temperatureFor(1));
   });
 });

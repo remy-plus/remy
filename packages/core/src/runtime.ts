@@ -13,7 +13,13 @@ import {
   nextAction,
   temperatureFor,
 } from './next.ts';
-import { openPlanSteps, planGateMessage, planGateTextMessage, progressLine } from './plan.ts';
+import {
+  CLAIM_GATE_MESSAGE,
+  openPlanSteps,
+  planGateMessage,
+  planGateTextMessage,
+  progressLine,
+} from './plan.ts';
 import { authorize, callRisk, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
 import {
@@ -491,6 +497,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             break;
           case 'gate_text':
             await commit([{ type: 'plan.gated', text: planGateTextMessage(openPlanSteps(s)) }]);
+            break;
+          case 'gate_claim':
+            await commit([{ type: 'plan.gated', text: CLAIM_GATE_MESSAGE }]);
             break;
           case 'gate_finish':
             if (!c) break;

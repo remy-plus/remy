@@ -56,6 +56,10 @@ export function planGateTextMessage(open: PlanStep[]): string {
   return `(From Remy, not the user.) ${PLAN_GATE_PREFIX}\n${list}\nThe user asked you to do this work, so do not stop to ask whether to continue: carry on with the next step now. If a step cannot be done, call update_plan with it marked skipped and a reason, then finish. Ask with ask_user only if you need something only the user knows.`;
 }
 
+/** Sent back when the model says it did the work but no tool ran. */
+export const CLAIM_GATE_MESSAGE =
+  '(From Remy, not the user.) No tool has run in this task, so nothing you described has happened: no file was written and no message was sent. Do the work now by calling your tools. If you cannot do it, say so plainly and do not say that it is done.';
+
 /** One line for a progress note, from the plan. No model call. */
 export function progressLine(s: TaskState): string {
   const plan = latestPlan(s);

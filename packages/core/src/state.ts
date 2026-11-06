@@ -67,7 +67,7 @@ export interface TaskState {
   initialBudget: Budget;
   /** The step of the last progress note (0: none yet). */
   progressAt: number;
-  /** The plan gate already sent a plain-text stop back to work (see `plan.gated`). */
+  /** A gate already sent a plain-text stop back to work (see `plan.gated`). */
   planGated: boolean;
   cancelRequested: boolean;
   final?: { status: FinalStatus; answer?: string; reason?: string };

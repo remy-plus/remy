@@ -17,6 +17,8 @@ export type Action =
   | { kind: 'gate_finish'; callId: string }
   /** A plain-text stop with plan steps open: send the model back to work once. */
   | { kind: 'gate_text' }
+  /** A plain-text stop that claims work when no tool ran: send it back once. */
+  | { kind: 'gate_claim' }
   | { kind: 'decide'; callId: string }
   | { kind: 'request_approval'; callId: string }
   | { kind: 'execute'; callId: string }
@@ -35,11 +37,11 @@ export const MAX_RATE_LIMITED_ATTEMPTS = 6;
 export const MAX_RATE_LIMIT_WAIT_MS = 60_000;
 export const MAX_TOOL_ATTEMPTS = 3;
 
-export function currentCalls(s: TaskState): CallState[] {
-  return Object.values(s.calls).filter((c) => c.step === s.step);
 /** The same request at temperature 0 gets the same malformed reply back, so a retry has to vary. */
 export const temperatureFor = (failedAttempts: number) => Math.min(failedAttempts * 0.3, 0.9);
 
+export function currentCalls(s: TaskState): CallState[] {
+  return Object.values(s.calls).filter((c) => c.step === s.step);
 }
 
 export function nextAction(s: TaskState, now: number): Action {
@@ -75,6 +77,9 @@ export function nextAction(s: TaskState, now: number): Action {
     if (isQuestion(text) || isStalledAsk(text) || isEmptyOffer(text))
       return { kind: 'ask', question: text };
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
+    if (Object.keys(s.calls).length === 0) {
+      if (isClaimedWork(text)) return planGateUsed(s) ? fail(NOTHING_DONE) : { kind: 'gate_claim' };
+    }
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
 
@@ -132,6 +137,34 @@ export const isEmptyOffer = (text: string) => {
     NOTHING_FOUND.test(parts.length > 1 ? parts.slice(0, -1).join(' ') : text)
   );
 };
+
+/**
+ * A reply that says it acted in the world or finished the job. With no tool run, that is false:
+ * nothing happened, and reporting it as a success would tell the user that it did. Work done
+ * earlier is a fair thing to mention, and so is text written in the reply itself.
+ */
+export const isClaimedWork = (text: string) => {
+  const t = text.replace(/\u2019/g, "'");
+  return !DONE_BEFORE.test(t) && CLAIMS.some((re) => re.test(t));
+};
+
+const DONE_BEFORE =
+  /\b(earlier|previously|yesterday|last (week|month|night|time)|the other day|in (a|an|our) (previous|earlier|past))\b/i;
+const ACTED =
+  'sent|emailed|saved|deleted|moved|renamed|booked|ordered|purchased|bought|paid|posted|published|uploaded|scheduled|submitted|cancelled';
+const I_DID = "\\b(?:i|i've|we|we've)\\s+(?:(?:have|just|now|also|already|successfully)\\s+)*";
+const FILE_NAME = '(?:\\S+\\.[a-z]{2,4}\\b|(?:the |a |your )?file\\b)';
+const CLAIMS = [
+  new RegExp(`${I_DID}(?:${ACTED})\\b`, 'i'),
+  new RegExp(`${I_DID}(?:wrote|written|created|updated)\\s+(?:to\\s+)?${FILE_NAME}`, 'i'),
+  new RegExp(`\\b(?:has|have) been (?:successfully )?(?:${ACTED})\\b`, 'i'),
+  new RegExp(`^\\s*(?:[-*\u2022]|\\d+[.)])\\s+(?:${ACTED}|wrote|created|updated)\\b`, 'im'),
+  /\b(?:completed|finished) (?:the|your|this|all(?: the)?) (?:task|tasks|work|steps)\b/i,
+  /\btask is (?:now )?(?:complete|completed|done|finished)\b/i,
+];
+
+export const NOTHING_DONE =
+  'Nothing was done. The model said it finished the work but never used a tool. Try again, or pick a stronger model.';
 
 const OFFER =
   /(would you like|do you want|want me to|shall i|should i|if you('d| would) like|if you want|i can (try|also|instead)|i could (try|also|instead)|let me know if)\b/i;
