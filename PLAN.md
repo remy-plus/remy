@@ -644,12 +644,19 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 | Strong laptop or home server | Container |
 | Mac Studio or similar, power user | terminal-mac, opt-in |
 
+### Progress (2026-11-05, Stage 0 and 1 started)
+
+**Stage 0:** the reply that found nothing and offers more now pauses (`isEmptyOffer`). `remy daemon install` runs and starts at once on the owner's Mac, but it has not been through a logout and login, so this stays open.
+
+**Stage 1:** the `hard` suite is in the replay gate (`packages/evals/src/cases/hard`), and the comparison is in `design/research/engineering/stage-1-comparison.md`. "MausBot" appears in neither X post: post 1 lists OpenBot, OpenMuse, OpenDots and OpenDuet, and they were read from their READMEs, not their source. Boat.dev is confirmed as boat.dev, a cloud sandbox product for agents.
+
+**First live pass:** nearly every run that reached a result passed on a strong small model, so the first 41 cases do not separate good from great. The gate needs a score there is room to beat, so longer cases are being added. No public numbers yet: they need a model the owner can name. Live evals now wait out rate limits, and the report keeps provider errors apart from wrong answers.
+
 ### Needed from the owner
 
-- The go for Stage 0, and later the go for the Stage 1 research.
-- The text of the two X posts: X blocks fetching.
+- A logout and login, then `launchctl list | grep remy`, to close the daemon check.
 - A key for a stronger model, for helpers and the Stage 1 baselines.
-- A link for the Boat.dev brand and hosting reference, in an Ideas card. Earlier notes said boot.dev; confirm which.
+- A key for a cheap model with a name we can publish: the OpenAI key has expired.
 
 ## Product roadmap after Phase 0
 
