@@ -487,4 +487,31 @@ export const long: EvalCase[] = [
       finish(`${WETTEST} gets the most rain.`),
     ],
   },
+  {
+    id: 'hard-long-errata-on-another-page',
+    suite: 'hard',
+    prompt:
+      'What is the boiling point listed for compound K-7 at https://chem.test/handbook? The handbook has an errata page, so check it.',
+    world: {
+      web: web({
+        'https://chem.test/handbook': [
+          'Handbook',
+          'K-7 boils at 182 C. See https://chem.test/errata.',
+        ],
+        'https://chem.test/errata': [
+          'Errata',
+          'Page 12: K-4 boils at 90 C.',
+          'Page 31: K-7 boils at 128 C.',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [answerContains('128')],
+    reference: [
+      [fetchUrl('https://chem.test/handbook')],
+      [fetchUrl('https://chem.test/errata')],
+      finish('K-7 boils at 128 C. The handbook says 182 C, but the errata corrects it.'),
+    ],
+  },
 ];
