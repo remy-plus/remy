@@ -573,10 +573,11 @@ Owner's asks: "a team of specialists behind one Remy" (Ideas, High) and "make th
 | Self-improvement | 3 | Learns from corrections; proposes changes that must pass the evals |
 | One endless chat | 3, 6 | Shipped in the terminal; carried into the web app |
 | Cut AI bills with prompt caching | 3 | Shipped; keep the cached share high as memory grows |
+| Boat cloud computer | 4 | Optional, on the user's own account |
 | Lighter browser (Lightpanda) | 4 | Measured, optional engine for reading if it wins |
 | Remy's own computer (terminal-mac, container) | 4 | Remy can use real apps, with nothing on the user's screen |
 | /voice, local speech to text | 4, 6 | Terminal first, real push-to-talk in the web app |
-| Brand, bolder and sponsor-worthy | 5 | Two or three directions, owner picks |
+| Brand, bolder and sponsor-worthy | 5 | Two or three directions, owner picks; study in `design/research/boat-brand.md` |
 | Onboarding system | 5, 6 | Shipped in the terminal; redesigned for the web |
 | /day /night themes | 5, 6 | Shipped in the terminal; both looks designed for the web |
 | Minimal Remy | 5, 6 | Shipped in the terminal; a quiet mode in the web app |
@@ -643,14 +644,17 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 | Light laptop | Hidden browser, or a small container if Docker is there |
 | Strong laptop or home server | Container |
 | Mac Studio or similar, power user | terminal-mac, opt-in |
+| Any machine, with a Boat account | Boat cloud computer, opt-in, user's own key |
+
+**Boat (decided by the owner, 2026-11-05):** Boat joins Stage 4 as an optional cloud computer, on the user's own account and key. Remy never holds a Boat account of its own and adds nothing to its bill. It suits a light laptop: real apps, nothing on the screen, nothing running locally. Costs money after a 7-day trial and runs in EU regions only. MausBot already connects to it, so its integration is a reference. Brand notes: `design/research/boat-brand.md`.
 
 ### Progress (2026-11-05, Stage 0 and 1 started)
 
 **Stage 0:** the reply that found nothing and offers more now pauses (`isEmptyOffer`). `remy daemon install` runs and starts at once on the owner's Mac, but it has not been through a logout and login, so this stays open.
 
-**Stage 1:** the `hard` suite is in the replay gate (`packages/evals/src/cases/hard`), and the comparison is in `design/research/engineering/stage-1-comparison.md`. "MausBot" appears in neither X post: post 1 lists OpenBot, OpenMuse, OpenDots and OpenDuet, and they were read from their READMEs, not their source. Boat.dev is confirmed as boat.dev, a cloud sandbox product for agents.
+**Stage 1:** the `hard` suite is in the replay gate (`packages/evals/src/cases/hard`), and the comparison is in `design/research/engineering/stage-1-comparison.md`. MausBot is OpenMausBot (github.com/milind-soni/OpenMausBot), read from its source; X post 1 is a separate list of four CopilotKit projects, read from their READMEs. Boat.dev is confirmed as boat.dev, a cloud sandbox product for agents.
 
-**First live pass:** nearly every run that reached a result passed on a strong small model, so the first 41 cases do not separate good from great. The gate needs a score there is room to beat, so longer cases are being added. No public numbers yet: they need a model the owner can name. Live evals now wait out rate limits, and the report keeps provider errors apart from wrong answers.
+**First live pass:** nearly every run that reached a result passed on a strong small model, so the first 41 cases do not separate good from great. The gate needs a score there is room to beat, so 24 longer cases were added; they have not run on a live model. No public numbers yet: they need a model the owner can name, and that same key will score the long cases. Live evals now wait out rate limits, and the report keeps provider errors apart from wrong answers.
 
 ### Needed from the owner
 
