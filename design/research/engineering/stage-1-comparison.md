@@ -29,3 +29,10 @@ Always-on coworkers with a name, a role and permitted tools, moving between web,
 - **Remy already has:** read-only helpers, which are unproven live.
 - **Take:** a helper defined by a name, instructions and an explicit list of tools. That is the shape Stage 2 role helpers need.
 - **New for the board:** reaching Remy from Slack or text messages. No idea on the board covers this. Owner to decide if it belongs in 1.0.
+
+## OpenDuet
+
+Proactive agent built on OpenBot: a morning brief, sorting mail into what needs you and what can wait, and working while you are away.
+
+- **Remy already has:** schedules, the daemon, once and always approvals. Remy keeps secrets out of chat and redacts them from output.
+- **Take:** a morning brief built on schedules, listing what it could not check. A check on everything leaving the machine for card numbers or health details: Remy's redaction covers secrets, not personal data in an outgoing message. Labelled evals for judgement calls: its `evals/triage` measures mail sorting against a labelled set.
