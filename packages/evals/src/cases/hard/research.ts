@@ -116,7 +116,7 @@ export const research: EvalCase[] = [
     human,
     graders: [
       answerMatches(
-        /not (say|state|give|list|include|report)|does(n['’]t| not)|no 2024|could(n['’]t| not)/i,
+        /not (say|state|give|list|include|report|in the)|does(n['’]t| not)|no 2024|could(n['’]t| not)|can(no|['’])t/i,
       ),
       answerLacks(/employed \d+ staff in 2024/i),
     ],
