@@ -335,13 +335,16 @@ export function httpError(status: number, detail: string, headers: Headers): Mod
   const tooLarge = requestTooLarge(status, detail);
   if (status === 429)
     return new ModelError(`HTTP 429: ${detail}`, true, {
+/** Some providers check the model's tool call and answer 400 when it is malformed. The request was fine. */
+const BAD_MODEL_OUTPUT = /output_parse_failed|tool_use_failed/;
+
       rateLimited: true,
       retryAfterMs: retryAfterMs(headers, Date.now()),
       ...(tooLarge ? { tooLarge: true } : {}),
     });
   return new ModelError(
     `HTTP ${status}: ${detail}`,
-    status >= 500,
+    status >= 500 || (status === 400 && BAD_MODEL_OUTPUT.test(detail)),
     tooLarge ? { tooLarge: true } : undefined,
   );
 }

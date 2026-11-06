@@ -199,6 +199,18 @@ describe('createOpenAIClient', () => {
       new Response(JSON.stringify({ error: { message } }), { status });
     const run = async (r: Response) =>
       make(() => r)
+  it.each([
+    ['output_parse_failed', 'Parsing failed. The model generated output that could not be parsed.'],
+    ['tool_use_failed', 'Failed to call a function. Please adjust your prompt.'],
+  ])('a 400 for bad model output (%s) is worth another try', async (code, message) => {
+    const { client } = make(
+      () => new Response(JSON.stringify({ error: { message, code } }), { status: 400 }),
+    );
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err.retryable).toBe(true);
+  });
+
         .client.complete(req, sig())
         .catch((e) => e);
     expect(
