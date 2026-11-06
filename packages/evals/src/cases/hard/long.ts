@@ -147,7 +147,7 @@ const tracker = (issues: string): McpServerSpec => ({
   ],
 });
 
-const _calendar: McpServerSpec = {
+const calendar: McpServerSpec = {
   name: 'calendar',
   trustHints: true,
   tools: [
@@ -710,6 +710,21 @@ export const long: EvalCase[] = [
       ],
       [emailSend('dee@example.test', 'Re: Payment failed', 'We filed this as issue #88.')],
       finish('I filed issue #88 and replied to Dee.'),
+    ],
+  },
+  {
+    id: 'hard-long-find-a-slot',
+    suite: 'hard',
+    prompt:
+      'Find a one hour slot between 9 and 17 tomorrow when Ana, Ben and Cy are all free, using the calendar, then email team@example.test the time.',
+    world: { inbox: [], mcp: [calendar] },
+    human,
+    budget,
+    graders: [ok, emailsSent(1, { to: 'team@example.test', bodyIncludes: '12' })],
+    reference: [
+      [mcp('calendar__busy_times', { person: 'everyone', day: 'tomorrow' })],
+      [emailSend('team@example.test', 'Meeting', 'Everyone is free 12 to 13.')],
+      finish('I told the team 12 to 13 works.'),
     ],
   },
 ];
