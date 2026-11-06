@@ -544,4 +544,37 @@ export const long: EvalCase[] = [
       finish('Lima, at $770: Oslo is $960 and Rome is $960, and Doha needs a visa.'),
     ],
   },
+  {
+    id: 'hard-long-timeline-across-pages',
+    suite: 'hard',
+    prompt:
+      'Put the Vale Railway’s three milestones in order with years, using https://vale.test/a, https://vale.test/b and https://vale.test/c. Write the answer as "first > second > third".',
+    world: {
+      web: web({
+        'https://vale.test/a': [
+          'Electrification',
+          'The line was electrified eleven years after it opened.',
+        ],
+        'https://vale.test/b': ['Opening', 'The railway opened in 1903.'],
+        'https://vale.test/c': [
+          'Closure',
+          'Passenger service ended 40 years after electrification.',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [
+      answerContains(['1903', '1914', '1954']),
+      answerMatches(/1903[\s\S]*1914[\s\S]*1954/),
+    ],
+    reference: [
+      [
+        fetchUrl('https://vale.test/a'),
+        fetchUrl('https://vale.test/b'),
+        fetchUrl('https://vale.test/c'),
+      ],
+      finish('Opening 1903 > electrification 1914 > passenger closure 1954'),
+    ],
+  },
 ];
