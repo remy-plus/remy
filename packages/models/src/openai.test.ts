@@ -96,6 +96,19 @@ describe('createOpenAIClient', () => {
     },
   );
 
+  it.each(['openai/gpt-oss-20b', 'openai/gpt-oss-120b'])(
+    'gives %s room to reason, with the usual parameters',
+    async (id) => {
+      const { client, seen } = make(() => json({ choices: [{ message: { content: 'x' } }] }), id);
+      await client.complete(req, sig());
+      const body = JSON.parse(seen[0]?.init.body as string);
+      expect(body.max_tokens).toBe(REASONING_MIN_OUTPUT_TOKENS);
+      expect(body.temperature).toBe(req.temperature);
+      expect(body.reasoning_effort).toBe('low');
+      expect(body).not.toHaveProperty('max_completion_tokens');
+    },
+  );
+
   it('asks OpenRouter for the effort its own way, and takes a chosen effort', async () => {
     const seen: string[] = [];
     const fetchImpl = (async (_url: string, init: RequestInit) => {
@@ -186,6 +199,18 @@ describe('createOpenAIClient', () => {
     expect(err.retryable).toBe(retryable);
   });
 
+  it.each([
+    ['output_parse_failed', 'Parsing failed. The model generated output that could not be parsed.'],
+    ['tool_use_failed', 'Failed to call a function. Please adjust your prompt.'],
+  ])('a 400 for bad model output (%s) is worth another try', async (code, message) => {
+    const { client } = make(
+      () => new Response(JSON.stringify({ error: { message, code } }), { status: 400 }),
+    );
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect(err.retryable).toBe(true);
+  });
+
   it('a 429 is a rate limit and carries the wait the provider asked for', async () => {
     const { client } = make(
       () => new Response('slow down', { status: 429, headers: { 'retry-after': '7' } }),
@@ -199,18 +224,6 @@ describe('createOpenAIClient', () => {
       new Response(JSON.stringify({ error: { message } }), { status });
     const run = async (r: Response) =>
       make(() => r)
-  it.each([
-    ['output_parse_failed', 'Parsing failed. The model generated output that could not be parsed.'],
-    ['tool_use_failed', 'Failed to call a function. Please adjust your prompt.'],
-  ])('a 400 for bad model output (%s) is worth another try', async (code, message) => {
-    const { client } = make(
-      () => new Response(JSON.stringify({ error: { message, code } }), { status: 400 }),
-    );
-    const err = await client.complete(req, sig()).catch((e) => e);
-    expect(err).toBeInstanceOf(ModelError);
-    expect(err.retryable).toBe(true);
-  });
-
         .client.complete(req, sig())
         .catch((e) => e);
     expect(

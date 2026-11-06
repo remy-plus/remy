@@ -28,6 +28,8 @@ type Json = Record<string, unknown>;
 /** OpenAI reasoning models (gpt-5*, o1/o3/o4*, optionally `openai/`-prefixed) reject `max_tokens` and custom temperatures. */
 const REASONING_MODEL = /^(?:openai\/)?(?:gpt-5|o[134])(?![a-z0-9])/i;
 export const isReasoningModel = (id: string): boolean => REASONING_MODEL.test(id);
+/** Open-weight models that reason too, but take the usual `max_tokens` and `temperature`. */
+const OPEN_REASONING_MODEL = /^(?:openai\/)?gpt-oss(?![a-z0-9])/i;
 /** Reasoning tokens count against the output limit, so reasoning models get at least this many. */
 export const REASONING_MIN_OUTPUT_TOKENS = 8192;
 
@@ -183,16 +185,19 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
         model: opts.id,
         messages: ANTHROPIC_VIA_ROUTER.test(opts.id) ? withRouterCacheBreaks(messages) : messages,
       };
-      const reasoning = isReasoningModel(opts.id);
+      const strict = isReasoningModel(opts.id);
+      const reasoning = strict || OPEN_REASONING_MODEL.test(opts.id);
       const maxTokens = reasoning
         ? Math.max(req.maxOutputTokens, REASONING_MIN_OUTPUT_TOKENS)
         : req.maxOutputTokens;
       if (reasoning) {
-        body.max_completion_tokens = maxTokens;
         const effort = opts.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
         // OpenRouter takes a `reasoning` object; OpenAI and compatible servers take `reasoning_effort`.
         if (/openrouter\.ai/i.test(opts.baseUrl)) body.reasoning = { effort };
         else body.reasoning_effort = effort;
+      }
+      if (strict) {
+        body.max_completion_tokens = maxTokens;
       } else {
         body.max_tokens = maxTokens;
         body.temperature = req.temperature;
@@ -330,14 +335,14 @@ export function requestTooLarge(status: number, detail: string): boolean {
   return !!m && Number(m[2]) > Number(m[1]);
 }
 
+/** Some providers check the model's tool call and answer 400 when it is malformed. The request was fine. */
+const BAD_MODEL_OUTPUT = /output_parse_failed|tool_use_failed/;
+
 /** The ModelError for a non-2xx reply from an OpenAI-compatible endpoint. */
 export function httpError(status: number, detail: string, headers: Headers): ModelError {
   const tooLarge = requestTooLarge(status, detail);
   if (status === 429)
     return new ModelError(`HTTP 429: ${detail}`, true, {
-/** Some providers check the model's tool call and answer 400 when it is malformed. The request was fine. */
-const BAD_MODEL_OUTPUT = /output_parse_failed|tool_use_failed/;
-
       rateLimited: true,
       retryAfterMs: retryAfterMs(headers, Date.now()),
       ...(tooLarge ? { tooLarge: true } : {}),
