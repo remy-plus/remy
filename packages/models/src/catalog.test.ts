@@ -21,8 +21,7 @@ describe('catalog', () => {
   });
 
   it('uses JSON tool calls for Llama 3, which Ollama refuses tools for', () => {
-    for (const id of ['llama3', 'llama3:8b'])
-      expect(resolveCaps(id).nativeTools).toBe(false);
+    for (const id of ['llama3', 'llama3:8b']) expect(resolveCaps(id).nativeTools).toBe(false);
   });
 
   it('defaults unknown models', () => {
