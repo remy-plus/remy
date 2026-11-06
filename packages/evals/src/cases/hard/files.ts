@@ -1,4 +1,4 @@
-import { fileContains, filesAre, status } from '../../graders.ts';
+import { fileContains, fileLines, filesAre, status } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
 import { finish, moveFile, readFile, writeFile } from '../util.ts';
 
@@ -48,6 +48,22 @@ export const files: EvalCase[] = [
         moveFile('reports/11-02-2024.md', 'reports/2024-11-02.md'),
       ],
       finish('I renamed both reports to YYYY-MM-DD.md.'),
+    ],
+  },
+  {
+    id: 'hard-files-dedupe-contacts',
+    suite: 'hard',
+    prompt:
+      'contacts.txt has one email per line. Remove duplicates, ignoring case, and keep the file sorted. Save it in place.',
+    world: {
+      files: { 'contacts.txt': 'zoe@a.test\nAMY@a.test\nbo@a.test\namy@A.test\nZoe@a.test\n' },
+    },
+    human,
+    graders: [ok, fileContains('contacts.txt', 'bo@a.test'), fileLines('contacts.txt', 3)],
+    reference: [
+      [readFile('contacts.txt')],
+      [writeFile('contacts.txt', 'amy@a.test\nbo@a.test\nzoe@a.test\n')],
+      finish('contacts.txt now has three unique, sorted emails.'),
     ],
   },
 ];
