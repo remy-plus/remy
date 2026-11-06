@@ -10,6 +10,7 @@ import {
   filesAre,
   firstTool,
   neverCalled,
+  skillRead,
   status,
   usedTool,
 } from '../../graders.ts';
@@ -19,7 +20,7 @@ import { editFile, emailSend, fetchUrl, finish, moveFile, page, readFile } from 
 const human = { approvals: 'grant_all' } as const;
 const ok = status('succeeded');
 const search = (query: string) => ({ tool: 'web_search', args: { query } });
-const _use = (name: string) => ({ tool: 'use_skill', args: { name } });
+const use = (name: string) => ({ tool: 'use_skill', args: { name } });
 
 const skill = (name: string, description: string, body: string): Skill => ({
   name,
@@ -29,7 +30,7 @@ const skill = (name: string, description: string, body: string): Skill => ({
   source: 'yours',
 });
 
-const _SHELF: Skill[] = [
+const SHELF: Skill[] = [
   skill(
     'trip-planner',
     'Plan a trip: flights, hotels and a day-by-day route',
@@ -166,6 +167,19 @@ export const choice: EvalCase[] = [
     reference: [
       [{ tool: 'recall', args: { query: 'Lisbon hotel' } }],
       finish('It was Casa do Rio, at 110 EUR a night.'),
+    ],
+  },
+  {
+    id: 'hard-choice-skill-plain-match',
+    suite: 'hard',
+    prompt: 'Plan me a three day trip to Porto.',
+    world: { skills: SHELF },
+    tools: ['use_skill'],
+    human,
+    graders: [skillRead('trip-planner')],
+    reference: [
+      [use('trip-planner')],
+      finish('Day 1: the old town. Day 2: the river. Day 3: the coast. Pack light layers.'),
     ],
   },
 ];
