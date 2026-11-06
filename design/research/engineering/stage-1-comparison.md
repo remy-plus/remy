@@ -56,3 +56,13 @@ The post's claim: many agent failures come from the system around the model, not
 | Build to delete                   | `remy eval compare`                                  | No test of what each layer adds when removed                  |
 
 Taking this as a warning too: the post says complexity should be earned by observed failure. Each item below stays only if the hard suite rises.
+
+## What this adds to Stage 2
+
+1. **Evidence before finishing.** Before `finish`, compare the answer with what the tools returned: numbers and names need a source in the task's own log. Deterministic first.
+2. **A verifier that tries to reject.** Fresh context, the request and the answer, permission to reject but not to repair. Only for tasks with several steps, and only if the hard suite rises.
+3. **Receipts.** A short record at the end of a task: what was read, what changed, what was asked.
+4. **New metrics.** Count unsupported claims and human interventions per task in the eval report.
+5. **Outgoing check.** Stop card numbers and similar details in outgoing messages unless approved.
+
+For the owner: page watches, a morning brief and Slack or text access are not on the board yet.
