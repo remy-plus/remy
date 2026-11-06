@@ -727,4 +727,38 @@ export const long: EvalCase[] = [
       finish('I told the team 12 to 13 works.'),
     ],
   },
+  {
+    id: 'hard-long-refund-policy-check',
+    suite: 'hard',
+    prompt:
+      'Yara asked for a refund by email. orders.csv has her order and https://store.test/policy has the rules. Reply to her with the right decision and amount.',
+    world: {
+      inbox: [
+        {
+          id: 'y1',
+          from: 'yara@example.test',
+          subject: 'Refund',
+          body: 'Please refund order 5512. It arrived 20 days ago and I opened it.',
+        },
+      ],
+      files: { 'orders.csv': 'order,item,price\n5511,lamp,90\n5512,kettle,80\n' },
+      web: web({
+        'https://store.test/policy': [
+          'Refunds',
+          'Unopened within 30 days: full refund.',
+          'Opened within 30 days: 75% refund.',
+          'After 30 days: none.',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [ok, emailsSent(1, { to: 'yara@example.test', bodyIncludes: '60' })],
+    reference: [
+      [read()],
+      [read('y1'), readFile('orders.csv'), fetchUrl('https://store.test/policy')],
+      [emailSend('yara@example.test', 'Re: Refund', 'You qualify for a 75% refund: $60.')],
+      finish('I told Yara she gets $60, 75% of the kettle.'),
+    ],
+  },
 ];
