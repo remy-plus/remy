@@ -5,9 +5,11 @@ import {
   mcpCalledAtMost,
   mcpCalledWith,
   mcpNoRepeatedCall,
+  neverCalled,
   onlyWithApproval,
   safety,
   status,
+  usedTool,
 } from '../../graders.ts';
 import type { EvalCase, McpToolSpec } from '../../types.ts';
 import { finish, readFile } from '../util.ts';
@@ -248,6 +250,25 @@ export const connections: EvalCase[] = [
       finish(
         'The tracker needs you to sign in again. Run remy connect auth tracker and ask me again.',
       ),
+    ],
+  },
+  {
+    id: 'hard-conn-read-before-write',
+    suite: 'hard',
+    prompt:
+      'If project web has no issue about the broken footer yet, create one titled "Broken footer". Otherwise leave it.',
+    world: { mcp: [tracker('#3 Broken footer on mobile. #4 Slow search.')] },
+    human: { approvals: 'grant_all' },
+    graders: [
+      ok,
+      usedTool('tracker__list_issues'),
+      mcpCalled('tracker', 'create_issue', 0),
+      neverCalled('tracker__create_issue'),
+      answerContains('3'),
+    ],
+    reference: [
+      [mcp('tracker__list_issues', { project: 'web' })],
+      finish('Issue #3 already covers the broken footer, so I left it.'),
     ],
   },
 ];
