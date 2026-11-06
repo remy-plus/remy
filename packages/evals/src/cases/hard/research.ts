@@ -58,4 +58,22 @@ export const research: EvalCase[] = [
       finish('Mirela Vance founded Orbis Freight. She was born in Karsa, population 48,200.'),
     ],
   },
+  {
+    id: 'hard-research-currency-total',
+    suite: 'hard',
+    prompt:
+      'The trip costs are at https://trip.test/costs and the exchange rate is at https://fx.test/today. What is the total in dollars?',
+    world: {
+      web: {
+        'https://trip.test/costs': page('Trip costs', 'Hotel: 400 EUR.', 'Train: 120 EUR.'),
+        'https://fx.test/today': page('Rates today', '1 EUR = 1.10 USD.', '1 GBP = 1.30 USD.'),
+      },
+    },
+    human,
+    graders: [answerContains('572')],
+    reference: [
+      [fetchUrl('https://trip.test/costs'), fetchUrl('https://fx.test/today')],
+      finish('The total is $572 (520 EUR at 1.10).'),
+    ],
+  },
 ];
