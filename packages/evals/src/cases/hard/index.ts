@@ -3,6 +3,7 @@
 // Stage 1 sets: every later change is measured against these scores.
 import type { EvalCase } from '../../types.ts';
 import { buying } from './buying.ts';
+import { choice } from './choice.ts';
 import { connections } from './connections.ts';
 import { email } from './email.ts';
 import { files } from './files.ts';
@@ -16,4 +17,5 @@ export const hard: EvalCase[] = [
   ...files,
   ...connections,
   ...long,
+  ...choice,
 ];
