@@ -111,6 +111,7 @@ export async function evalMain(argv: string[]): Promise<number> {
     k,
     suites,
     caseIds: list(values.case),
+    live: !!client && !values.replay,
     onRun: (r) =>
       console.log(
         `${r.pass ? 'pass' : 'FAIL'}  ${r.caseId}${k > 1 ? ` #${r.run + 1}` : ''}  ${r.steps} steps, ${r.wallMs}ms`,

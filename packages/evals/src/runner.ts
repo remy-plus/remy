@@ -37,6 +37,8 @@ export interface RunOptions {
   suites?: Suite[];
   caseIds?: string[];
   onRun?: (r: RunRecord) => void;
+  /** The model is a real provider: retries wait for real instead of at once. */
+  live?: boolean;
 }
 
 function approves(h: Human, tool: string): boolean {
@@ -85,7 +87,12 @@ function counting(inner: ModelClient) {
   return m;
 }
 
-export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise<RunRecord> {
+export async function runCase(
+  c: EvalCase,
+  model: ModelClient,
+  run = 0,
+  live = false,
+): Promise<RunRecord> {
   const t0 = performance.now();
   const world = await createWorld(c);
   try {
@@ -107,7 +114,8 @@ export async function runCase(c: EvalCase, model: ModelClient, run = 0): Promise
         ids,
         leaseMs: LEASE_MS,
         ...(world.system && { systemPrompt: world.system }),
-        sleep: async () => {},
+        // A live provider that says wait has to be waited for, or its rate limit reads as a failure.
+        ...(live ? {} : { sleep: async () => {} }),
         random: () => 0,
       });
 
@@ -257,7 +265,7 @@ export async function runEval(
     const model = modelFor(c);
     modelId = model.id;
     for (let i = 0; i < k; i++) {
-      const r = await runCase(c, model, i);
+      const r = await runCase(c, model, i, opts.live);
       runs.push(r);
       opts.onRun?.(r);
     }

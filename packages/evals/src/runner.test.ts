@@ -1,4 +1,5 @@
-import { DEFAULT_BUDGET, type Event, type StoredEvent } from '@remy/core';
+import { DEFAULT_BUDGET, type Event, ModelError, type StoredEvent } from '@remy/core';
+import { ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
 import {
   answerContains,
@@ -141,6 +142,38 @@ describe('runCase', () => {
       outcome: 'declined',
       started: false,
     });
+  });
+});
+
+describe('runCase retries', () => {
+  const c: EvalCase = {
+    id: 'wait',
+    suite: 'files',
+    prompt: 'Say hi.',
+    world: {},
+    human: { approvals: 'deny_all' },
+    graders: [],
+    reference: [],
+  };
+  const flaky = () => {
+    let calls = 0;
+    const ok = new ScriptedModelClient([{ text: 'Hi.' }]);
+    return {
+      id: 'flaky',
+      caps: ok.caps,
+      complete(req: Parameters<typeof ok.complete>[0], signal: AbortSignal) {
+        calls += 1;
+        if (calls === 1) throw new ModelError('HTTP 429', true, { rateLimited: true });
+        return ok.complete(req, signal);
+      },
+    };
+  };
+
+  it('waits for real on a live model', async () => {
+    const t0 = performance.now();
+    const r = await runCase(c, flaky(), 0, true);
+    expect(r.status).toBe('succeeded');
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(240);
   });
 });
 
