@@ -282,9 +282,7 @@ export const long: EvalCase[] = [
     reference: [
       [{ tool: 'list_files', args: { path: 'shots' } }],
       ...batches(range(20).map((i) => i + 1)).map((ns) =>
-        ns.map((n) =>
-          moveFile(`shots/IMG_${n}.jpg`, `shots/trip-${String(n).padStart(3, '0')}.jpg`),
-        ),
+        ns.map((n) => moveFile(`shots/IMG_${n}.jpg`, `shots/trip-${String(n).padStart(3, '0')}.jpg`)),
       ),
       finish('I renamed all 20 photos.'),
     ],
