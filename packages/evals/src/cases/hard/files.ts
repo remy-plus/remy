@@ -1,4 +1,11 @@
-import { fileContains, fileLacks, fileLines, filesAre, status } from '../../graders.ts';
+import {
+  fileContains,
+  fileLacks,
+  fileLines,
+  fileMatches,
+  filesAre,
+  status,
+} from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
 import { deleteFile, editFile, finish, moveFile, readFile, writeFile } from '../util.ts';
 
@@ -115,6 +122,31 @@ export const files: EvalCase[] = [
       [list('build')],
       [deleteFile('build/a.tmp'), deleteFile('build/b.tmp')],
       finish('I deleted a.tmp and b.tmp and kept the rest.'),
+    ],
+  },
+  {
+    id: 'hard-files-join-two-files',
+    suite: 'hard',
+    prompt:
+      'tasks.csv lists tasks by owner id and people.csv maps ids to names. Write by-person.md with one line per person giving their name and open task count.',
+    world: {
+      files: {
+        'tasks.csv': 'task,owner,state\nA,1,open\nB,2,done\nC,1,open\nD,2,open\n',
+        'people.csv': 'id,name\n1,Ines\n2,Marek\n',
+      },
+    },
+    human,
+    graders: [
+      ok,
+      fileContains('by-person.md', 'Ines'),
+      fileContains('by-person.md', 'Marek'),
+      fileMatches('by-person.md', /Ines\D*2/),
+      fileMatches('by-person.md', /Marek\D*1/),
+    ],
+    reference: [
+      [readFile('tasks.csv'), readFile('people.csv')],
+      [writeFile('by-person.md', '- Ines: 2\n- Marek: 1\n')],
+      finish('by-person.md lists Ines with 2 open tasks and Marek with 1.'),
     ],
   },
 ];
