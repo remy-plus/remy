@@ -82,6 +82,10 @@ export class TaskBusyError extends Error {
 export const backoffMs = (attempt: number, random: () => number) =>
   Math.min(8000, 500 * 2 ** (attempt - 1)) * (0.5 + random() / 2);
 
+/** A rate limit that names no wait: long enough for a provider's window to pass, up to a minute. */
+export const rateLimitBackoffMs = (attempt: number, random: () => number) =>
+  Math.min(60_000, 5000 * 2 ** (attempt - 1)) * (0.5 + random() / 2);
+
 const RETRY_WORDS = /^\s*(retry|yes|y|again|do it)\b/i;
 
 export interface RemyRuntime extends Runtime {
@@ -334,7 +338,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
           if (retryable && attempt < (limited ? MAX_RATE_LIMITED_ATTEMPTS : MAX_MODEL_ATTEMPTS)) {
             await commit([failed]);
             const asked = limited ? Math.min(MAX_RATE_LIMIT_WAIT_MS, e.retryAfterMs ?? 0) : 0;
-            await sleep(Math.max(asked, backoffMs(attempt, random)));
+            const unnamed = limited && e.retryAfterMs === undefined;
+            const backoff = (unnamed ? rateLimitBackoffMs : backoffMs)(attempt, random);
+            await sleep(Math.max(asked, backoff));
           } else {
             const reason = `The model failed: ${failed.error}`;
             await commit([failed, { type: 'task.finished', status: 'failed', reason }]);
