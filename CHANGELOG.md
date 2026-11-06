@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Remy no longer reports work that did not happen.
+
+- **Claimed work is checked.** If a model says it sent, saved or finished something and no tool did it, the reply goes back with word that nothing happened. A repeat ends the task with "Nothing was done." instead of a success. This holds for plain replies and for `finish`, and when an action was refused or failed.
+- **A promise is not an answer.** "Let's start by reading the file" with no tool call goes back to do the work.
+- **Groq is steadier.** `gpt-oss` models now get room to reason, malformed replies are tried again, and retries raise the temperature so the same bad reply is not repeated. Over-capacity errors wait like rate limits.
+- **Llama 3 on Ollama works**, through JSON tool calls.
+
 ## 0.10.0 (2026-11-04)
 
 Remy can start work by itself, on your schedule.
