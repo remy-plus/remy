@@ -11,6 +11,7 @@ import {
   fileAbsent,
   fileContains,
   fileEquals,
+  fileLacks,
   filesAre,
   llmJudge,
   maxSteps,
@@ -73,6 +74,14 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('fileLacks passes only when the text is gone', async () => {
+    const r = record();
+    const w = { ...world, files: { 'a.yml': 'port: 9090' } };
+    expect((await fileLacks('a.yml', '8080').check(r, w)).pass).toBe(true);
+    expect((await fileLacks('a.yml', '9090').check(r, w)).pass).toBe(false);
+    expect((await fileLacks('b.yml', '9090').check(r, w)).pass).toBe(false);
+  });
+
   it('answer graders', async () => {
     expect(await check(answerContains('1974'))).toBe(true);
     const n = record({ answer: 'It gets 1046 mm.' });
