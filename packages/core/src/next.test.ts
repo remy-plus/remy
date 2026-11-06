@@ -3,6 +3,7 @@ import { argsHash } from './hash.ts';
 import {
   isClaimedWork,
   isEmptyOffer,
+  isPromisedWork,
   isQuestion,
   isStalledAsk,
   nextAction,
@@ -446,6 +447,35 @@ describe('work claimed with no tool run', () => {
     "The email hasn't been sent.",
   ])('does not claim work: %s', (text) => {
     expect(isClaimedWork(text)).toBe(false);
+  });
+
+  it('sends a reply that only promises the work back, once', () => {
+    const promise = 'Let\'s start by listing the files.\n\nlist_files(".")';
+    expect(next(said(promise))).toEqual({ kind: 'gate_claim' });
+    expect(next(said(promise), { type: 'plan.gated', text: 'x' }, said(promise, 2))).toEqual({
+      kind: 'finish',
+      status: 'succeeded',
+      answer: promise,
+    });
+  });
+
+  it.each([
+    "Let's start by reading the file.",
+    "I'll start by checking your inbox.",
+    'I will now read policy.txt.',
+    "First, I'll open the page.",
+    'Let me begin with the first step.',
+  ])('promises work: %s', (text) => {
+    expect(isPromisedWork(text)).toBe(true);
+  });
+
+  it.each([
+    'Paris is the capital of France.',
+    "I'll need your manager's address to send this.",
+    'Let me know which one you prefer.',
+    'You could start by reading the file.',
+  ])('does not promise work: %s', (text) => {
+    expect(isPromisedWork(text)).toBe(false);
   });
 });
 

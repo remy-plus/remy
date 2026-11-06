@@ -17,7 +17,7 @@ export type Action =
   | { kind: 'gate_finish'; callId: string }
   /** A plain-text stop with plan steps open: send the model back to work once. */
   | { kind: 'gate_text' }
-  /** A plain-text stop that claims work when no tool ran: send it back once. */
+  /** A plain-text stop that claims or promises work when no tool ran: send it back once. */
   | { kind: 'gate_claim' }
   | { kind: 'decide'; callId: string }
   | { kind: 'request_approval'; callId: string }
@@ -79,6 +79,7 @@ export function nextAction(s: TaskState, now: number): Action {
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
     if (Object.keys(s.calls).length === 0) {
       if (isClaimedWork(text)) return planGateUsed(s) ? fail(NOTHING_DONE) : { kind: 'gate_claim' };
+      if (isPromisedWork(text) && !planGateUsed(s)) return { kind: 'gate_claim' };
     }
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
@@ -147,6 +148,12 @@ export const isClaimedWork = (text: string) => {
   const t = text.replace(/\u2019/g, "'");
   return !DONE_BEFORE.test(t) && CLAIMS.some((re) => re.test(t));
 };
+
+/** A reply that says it is about to start. Ending there leaves the work undone. */
+export const isPromisedWork = (text: string) =>
+  /\b(?:(?:let's|let me|i'll|i will) (?:now |first )?(?:start|begin)\b|(?:i'll|i will) now\b|(?:first|now),? (?:i'll|i will|let me)\b)/i.test(
+    text.replace(/\u2019/g, "'"),
+  );
 
 const DONE_BEFORE =
   /\b(earlier|previously|yesterday|last (week|month|night|time)|the other day|in (a|an|our) (previous|earlier|past))\b/i;
