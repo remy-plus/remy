@@ -199,4 +199,20 @@ export const choice: EvalCase[] = [
       finish('The invoice bills 12 chairs against 10 ordered. Dispute $100.'),
     ],
   },
+  {
+    id: 'hard-choice-skill-near-twin',
+    suite: 'hard',
+    prompt: 'Write this month’s update for our investors from update.txt.',
+    world: {
+      skills: SHELF,
+      files: { 'update.txt': 'Revenue 90k. Headcount 7. Ask: intros to retailers.' },
+    },
+    human,
+    graders: [skillRead('monthly-report'), neverCalled('write_file')],
+    reference: [
+      [use('monthly-report')],
+      [readFile('update.txt')],
+      finish('Revenue was 90k. Headcount is 7. We ask for intros to retailers.'),
+    ],
+  },
 ];
