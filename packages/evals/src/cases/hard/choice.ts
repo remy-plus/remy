@@ -3,6 +3,7 @@
 import type { Skill } from '@remy/tools';
 import {
   answerContains,
+  answerMatches,
   fileContains,
   firstTool,
   neverCalled,
@@ -106,5 +107,19 @@ export const choice: EvalCase[] = [
       [{ tool: 'list_files', args: { path: 'contracts' } }],
       finish('contracts/ holds a.pdf and b.pdf.'),
     ],
+  },
+  {
+    id: 'hard-choice-no-tool-needed',
+    suite: 'hard',
+    prompt: 'How do you say "good morning" in Spanish?',
+    world: { web: {} },
+    human,
+    graders: [
+      ok,
+      neverCalled('web_search'),
+      neverCalled('fetch_url'),
+      answerMatches(/buenos d[ií]as/i),
+    ],
+    reference: [finish('"Buenos días."')],
   },
 ];
