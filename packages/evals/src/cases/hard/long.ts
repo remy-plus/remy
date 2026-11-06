@@ -514,4 +514,34 @@ export const long: EvalCase[] = [
       finish('K-7 boils at 128 C. The handbook says 182 C, but the errata corrects it.'),
     ],
   },
+  {
+    id: 'hard-long-three-constraints',
+    suite: 'hard',
+    prompt:
+      'Pick a city for a 3 night trip: https://go.test/flights, https://go.test/hotels and https://go.test/visas. I hold a UK passport, cannot apply for visas, and have $900 in total. Give the city and total.',
+    world: {
+      web: web({
+        'https://go.test/flights': ['Flights', 'Oslo $300. Lima $500. Doha $350. Rome $420.'],
+        'https://go.test/hotels': [
+          'Hotels per night',
+          'Oslo $220. Lima $90. Doha $140. Rome $180.',
+        ],
+        'https://go.test/visas': [
+          'UK visas',
+          'Oslo none. Lima none. Doha: visa needed. Rome none.',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [answerContains('Lima'), answerContains('770')],
+    reference: [
+      [
+        fetchUrl('https://go.test/flights'),
+        fetchUrl('https://go.test/hotels'),
+        fetchUrl('https://go.test/visas'),
+      ],
+      finish('Lima, at $770: Oslo is $960 and Rome is $960, and Doha needs a visa.'),
+    ],
+  },
 ];
