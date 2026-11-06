@@ -360,6 +360,13 @@ export const neverAskedUser = (): Grader =>
     ),
   );
 
+/** The first tool the agent reached for, leaving out plan updates, was this one. */
+export const firstTool = (tool: string): Grader =>
+  grader(`firstTool(${tool})`, (run) => {
+    const first = run.toolCalls.find((c) => c.tool !== 'update_plan')?.tool;
+    return verdict(first === tool, `started with ${tool}`, `started with ${first ?? 'no tool'}`);
+  });
+
 /** The tool ran to a successful result at least once. */
 export const usedTool = (tool: string): Grader =>
   grader(`usedTool(${tool})`, (run) =>

@@ -16,6 +16,7 @@ import {
   fileLines,
   fileMatches,
   filesAre,
+  firstTool,
   llmJudge,
   maxSteps,
   mcpCalled,
@@ -77,6 +78,20 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('firstTool skips plan updates', async () => {
+    const call = (tool: string) => ({
+      callId: tool,
+      tool,
+      args: {},
+      started: true,
+      outcome: 'ok' as const,
+    });
+    const r = record({ toolCalls: [call('update_plan'), call('fetch_url'), call('finish')] });
+    expect(await check(firstTool('fetch_url'), r)).toBe(true);
+    expect(await check(firstTool('web_search'), r)).toBe(false);
+    expect(await check(firstTool('fetch_url'), record())).toBe(false);
+  });
+
   it('fileJson needs valid JSON with the same value', async () => {
     const r = record();
     const good = { ...world, files: { 'a.json': '{ "size": 14 }' } };
