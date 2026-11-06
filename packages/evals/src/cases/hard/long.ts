@@ -605,4 +605,27 @@ export const long: EvalCase[] = [
       finish('Neither: they tie at 100 EUR each.'),
     ],
   },
+  {
+    id: 'hard-long-bundle-within-budget',
+    suite: 'hard',
+    prompt:
+      'Prices are at https://kit.test/. I need a tent, a stove and a bag, one of each, for at most $200, and I want the warmest bag that fits. What do I buy, and what does it total?',
+    world: {
+      web: web({
+        'https://kit.test/': [
+          'Kit',
+          'Tents: Ridge $110, Dome $85.',
+          'Stoves: Spark $40, Flame $25.',
+          'Bags: Arctic $110 (rated -20), Alpine $90 (rated -10), Fall $60 (rated 0).',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [answerContains(['Dome', 'Flame', 'Alpine', '200'])],
+    reference: [
+      [fetchUrl('https://kit.test/')],
+      finish('Dome ($85), Flame ($25) and the Alpine bag ($90), $200 in total.'),
+    ],
+  },
 ];
