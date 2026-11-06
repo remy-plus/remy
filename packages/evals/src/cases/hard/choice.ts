@@ -7,7 +7,7 @@ import { fetchUrl, finish, page } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const _ok = status('succeeded');
-const _search = (query: string) => ({ tool: 'web_search', args: { query } });
+const search = (query: string) => ({ tool: 'web_search', args: { query } });
 const _use = (name: string) => ({ tool: 'use_skill', args: { name } });
 
 const skill = (name: string, description: string, body: string): Skill => ({
@@ -54,5 +54,20 @@ export const choice: EvalCase[] = [
     human,
     graders: [firstTool('fetch_url'), answerContains('25')],
     reference: [[fetchUrl('https://docs.test/limits')], finish('The upload limit is 25 MB.')],
+  },
+  {
+    id: 'hard-choice-no-url-is-searched',
+    suite: 'hard',
+    prompt: 'What is the upload limit in the Tessera docs?',
+    world: {
+      web: { 'https://tessera.test/limits': page('Tessera limits', 'Uploads stop at 40 MB.') },
+    },
+    human,
+    graders: [firstTool('web_search'), answerContains('40')],
+    reference: [
+      [search('Tessera upload limit')],
+      [fetchUrl('https://tessera.test/limits')],
+      finish('Tessera uploads stop at 40 MB.'),
+    ],
   },
 ];
