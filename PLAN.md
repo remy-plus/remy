@@ -654,7 +654,7 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **Stage 1:** the `hard` suite is in the replay gate (`packages/evals/src/cases/hard`), and the comparison is in `design/research/engineering/stage-1-comparison.md`. MausBot is OpenMausBot (github.com/milind-soni/OpenMausBot), read from its source; X post 1 is a separate list of four CopilotKit projects, read from their READMEs. Boat.dev is confirmed as boat.dev, a cloud sandbox product for agents.
 
-**First live pass:** nearly every run that reached a result passed on a strong small model, so the first 41 cases do not separate good from great. The gate needs a score there is room to beat, so 24 longer cases were added; they have not run on a live model. No public numbers yet: they need a model the owner can name, and that same key will score the long cases. Live evals now wait out rate limits, and the report keeps provider errors apart from wrong answers.
+**First live pass:** nearly every run that reached a result passed on a strong small model, so the first 41 cases do not separate good from great. The gate needs a score there is room to beat, so 24 longer cases were added, and they also passed on strong small models. The suite still has no room to beat at the strong end, so the gate waits on a cheap named model, and on tasks where real search and real pages can fail. No public numbers yet: they need a model the owner can name, and that same key will show how much room a cheap model leaves. Live evals now wait out rate limits, and the report keeps provider errors apart from wrong answers.
 
 ### Needed from the owner
 
