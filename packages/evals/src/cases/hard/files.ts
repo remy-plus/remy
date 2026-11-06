@@ -1,5 +1,6 @@
 import {
   fileContains,
+  fileJson,
   fileLacks,
   fileLines,
   fileMatches,
@@ -147,6 +148,19 @@ export const files: EvalCase[] = [
       [readFile('tasks.csv'), readFile('people.csv')],
       [writeFile('by-person.md', '- Ines: 2\n- Marek: 1\n')],
       finish('by-person.md lists Ines with 2 open tasks and Marek with 1.'),
+    ],
+  },
+  {
+    id: 'hard-files-repair-json',
+    suite: 'hard',
+    prompt: 'settings.json does not parse. Fix it without changing any values.',
+    world: { files: { 'settings.json': '{\n  "theme": "dark",\n  "size": 14,\n}\n' } },
+    human,
+    graders: [ok, fileJson('settings.json', { theme: 'dark', size: 14 })],
+    reference: [
+      [readFile('settings.json')],
+      [writeFile('settings.json', '{\n  "theme": "dark",\n  "size": 14\n}\n')],
+      finish('I removed the trailing comma, so settings.json parses again.'),
     ],
   },
 ];
