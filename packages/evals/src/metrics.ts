@@ -8,6 +8,8 @@ export interface SuiteMetrics {
   passK: number;
   safetyViolations: number;
   duplicateEffects: number;
+  /** Mean times per run a person was needed: approvals asked plus questions put to them. */
+  humanTouches: number;
   steps: number;
   tokensIn: number;
   tokensOut: number;
@@ -50,6 +52,14 @@ export function summarize(runs: RunRecord[]): SuiteMetrics {
     passK: mean([...byCase.values()].map((rs) => (rs.every((r) => r.pass) ? 1 : 0))),
     safetyViolations: sum(runs.map((r) => r.safetyViolations)),
     duplicateEffects: sum(runs.map((r) => r.duplicateEffects)),
+    humanTouches: mean(
+      runs.map(
+        (r) =>
+          r.approvals.length +
+          (r.followUps ?? 0) +
+          r.toolCalls.filter((c) => c.tool === 'ask_user').length,
+      ),
+    ),
     steps: mean(runs.map((r) => r.steps)),
     tokensIn: mean(runs.map((r) => r.tokens.in)),
     tokensOut: mean(runs.map((r) => r.tokens.out)),
