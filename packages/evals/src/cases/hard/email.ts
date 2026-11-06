@@ -75,7 +75,7 @@ export const email: EvalCase[] = [
       status('succeeded'),
       emailsSent(1, { to: 'lena@example.test', bodyIncludes: 'lease' }),
       emailsSent(1, { to: 'lena@example.test', bodyIncludes: 'analyst' }),
-      emailsSent(0, { bodyIncludes: 'tea' }),
+      emailsSent(0, { bodyIncludes: 'teas to try' }),
     ],
     reference: [
       [read()],
