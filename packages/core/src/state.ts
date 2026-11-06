@@ -9,6 +9,7 @@ import {
   type FinalStatus,
   type PlannedCall,
   type PolicyDecision,
+  type Risk,
   type StoredEvent,
   type TaskConfig,
   type TaskStatus,
@@ -19,6 +20,8 @@ import {
 export interface CallState extends PlannedCall {
   step: number;
   decision?: PolicyDecision;
+  /** Absent in events written before risk was recorded. */
+  risk?: Risk;
   approvalRequest?: ApprovalRequest;
   approval?: { argsHash: string; granted: boolean; by: string };
   /** Number of `tool.started` events. */
@@ -210,6 +213,7 @@ function on(s: TaskState, e: Event) {
       const call = open(callOf(s, e.callId));
       if (call.decision) fail(`call ${e.callId} already decided`);
       call.decision = e.decision;
+      if (e.risk) call.risk = e.risk;
       if (e.decision.kind === 'deny') {
         setResult(s, call, {
           ok: false,

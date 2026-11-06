@@ -521,7 +521,10 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             if (!c) break;
             const tool = tools.get(c.tool);
             const decision = decide(c, tool, s);
-            const events: Event[] = [{ type: 'policy.decided', callId: c.callId, decision }];
+            const risk = tool ? callRisk(tool, c.args) : undefined;
+            const events: Event[] = [
+              { type: 'policy.decided', callId: c.callId, decision, ...(risk ? { risk } : {}) },
+            ];
             if (decision.kind === 'require_approval' && tool)
               events.push(approvalRequest(c, tool, decision.reason));
             await commit(events);

@@ -167,7 +167,7 @@ export type Event =
       latencyMs: number;
     }
   | { type: 'model.failed'; step: number; error: string; retryable: boolean; attempt: number }
-  | { type: 'policy.decided'; callId: string; decision: PolicyDecision }
+  | { type: 'policy.decided'; callId: string; decision: PolicyDecision; risk?: Risk }
   | {
       type: 'approval.requested';
       callId: string;

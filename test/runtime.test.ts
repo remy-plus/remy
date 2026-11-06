@@ -394,6 +394,16 @@ describe('runtime', () => {
     expect(temps).toEqual([0, 0.3, 0.6]);
   });
 
+  it('records the risk of each call in its decision', async () => {
+    const { rt, store } = setup([[{ tool: 'read_web', args: { url: 'https://a.test' } }], 'done']);
+    const id = await rt.start('go', config());
+    await drive(rt, id);
+    const decided = (await store.read(id)).flatMap((r) =>
+      r.event.type === 'policy.decided' ? [r.event] : [],
+    );
+    expect(decided[0]?.risk).toBe('read');
+  });
+
   describe('a reply that claims work with no tool run', () => {
     const claim = 'I have completed the task and emailed the manager.';
     const reply = (text: string) => ({
