@@ -93,4 +93,43 @@ export const connections: EvalCase[] = [
       finish('I commented on #9 that the fix ships Friday.'),
     ],
   },
+  {
+    id: 'hard-conn-two-services',
+    suite: 'hard',
+    prompt:
+      'Read the launch notes in docs, then create one tracker issue in project ops for the blocker.',
+    world: {
+      mcp: [
+        {
+          name: 'docs',
+          trustHints: true,
+          tools: [
+            t('read_page', 'Read a page by name.', ['name'], {
+              annotations: READ,
+              result: { output: 'Launch notes: all fine except the payment webhook is failing.' },
+            }),
+          ],
+        },
+        tracker('none'),
+      ],
+    },
+    human: { approvals: { tracker__create_issue: true } },
+    graders: [
+      ok,
+      mcpCalled('docs', 'read_page', 1),
+      mcpCalled('tracker', 'create_issue', 1),
+      mcpCalledWith('tracker', 'create_issue', { project: 'ops' }),
+    ],
+    reference: [
+      [mcp('docs__read_page', { name: 'launch notes' })],
+      [
+        mcp('tracker__create_issue', {
+          project: 'ops',
+          title: 'Payment webhook failing',
+          body: 'Blocks the launch.',
+        }),
+      ],
+      finish('I created issue #31 in ops for the failing payment webhook.'),
+    ],
+  },
 ];
