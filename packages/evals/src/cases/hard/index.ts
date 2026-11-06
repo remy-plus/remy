@@ -6,6 +6,14 @@ import { buying } from './buying.ts';
 import { connections } from './connections.ts';
 import { email } from './email.ts';
 import { files } from './files.ts';
+import { long } from './long.ts';
 import { research } from './research.ts';
 
-export const hard: EvalCase[] = [...research, ...buying, ...email, ...files, ...connections];
+export const hard: EvalCase[] = [
+  ...research,
+  ...buying,
+  ...email,
+  ...files,
+  ...connections,
+  ...long,
+];
