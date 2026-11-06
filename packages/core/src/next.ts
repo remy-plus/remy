@@ -65,7 +65,7 @@ export function nextAction(s: TaskState, now: number): Action {
       const claims = unbackedClaim(s, finishAnswer(c));
       if (!planGateUsed(s) && (openPlanSteps(s).length || claims))
         return { kind: 'gate_finish', callId: c.callId };
-      if (claims && ranNoTools(s)) return fail(NOTHING_DONE);
+      if (claims && provablyFalse(s)) return fail(NOTHING_DONE);
     }
     return { kind: 'execute', callId: c.callId };
   }
@@ -83,7 +83,7 @@ export function nextAction(s: TaskState, now: number): Action {
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
     if (unbackedClaim(s, text)) {
       if (!planGateUsed(s)) return { kind: 'gate_claim' };
-      if (ranNoTools(s)) return fail(NOTHING_DONE);
+      if (provablyFalse(s)) return fail(NOTHING_DONE);
     }
     if (ranNoTools(s) && isPromisedWork(text) && !planGateUsed(s)) return { kind: 'gate_claim' };
     return { kind: 'finish', status: 'succeeded', answer: last.text };
@@ -124,6 +124,11 @@ const changedNothing = (s: TaskState) =>
 /** The reply says something happened, and the tools that ran could not have done it. */
 const unbackedClaim = (s: TaskState, text: string) =>
   (ranNoTools(s) && isClaimedWork(text)) || (changedNothing(s) && isClaimedAction(text));
+
+/** Nothing ran at all, or an action was tried and stopped: the claim cannot be true. */
+const provablyFalse = (s: TaskState) =>
+  ranNoTools(s) ||
+  Object.values(s.calls).some((c) => c.risk && c.risk !== 'read' && c.result && !c.result.ok);
 
 const finishAnswer = (c: CallState) => String((c.args as { answer?: unknown })?.answer ?? '');
 

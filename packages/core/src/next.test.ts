@@ -482,6 +482,22 @@ describe('work claimed with no tool run', () => {
       expect(next(...ran('read'), said(report, 2))).toMatchObject({ status: 'succeeded' });
     });
 
+    it('never lets a claim stand when the action was refused or failed', () => {
+      const refused: Event[] = [
+        resp(2, call('b', 'email_send')),
+        {
+          type: 'policy.decided',
+          callId: 'b',
+          decision: { kind: 'deny', reason: 'no' },
+          risk: 'send_as_user',
+        },
+      ];
+      const pushed: Event = { type: 'plan.gated', text: 'x' };
+      expect(
+        next(...ran('read'), ...refused, said(emailed, 3), pushed, said(emailed, 4)),
+      ).toMatchObject({ kind: 'finish', status: 'failed' });
+    });
+
     it('believes a claim once something was written', () => {
       expect(next(...ran('write'), said(emailed, 2))).toMatchObject({ status: 'succeeded' });
     });
