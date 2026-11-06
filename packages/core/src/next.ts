@@ -69,7 +69,8 @@ export function nextAction(s: TaskState, now: number): Action {
   const last = s.log.at(-1);
   if (s.step > 0 && calls.length === 0 && last?.kind === 'model') {
     const text = last.text?.trim() ?? '';
-    if (isQuestion(text) || isStalledAsk(text)) return { kind: 'ask', question: text };
+    if (isQuestion(text) || isStalledAsk(text) || isEmptyOffer(text))
+      return { kind: 'ask', question: text };
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
@@ -114,6 +115,26 @@ export const isStalledAsk = (text: string) =>
       .at(-1)
       ?.trim() ?? '',
   );
+
+/**
+ * A reply that says the work came up empty and closes by offering to try something else. It has
+ * no answer in it, so it pauses for the user instead of counting as a success. An answer with an
+ * offer on the end says nothing of the kind.
+ */
+export const isEmptyOffer = (text: string) => {
+  const parts = text.split(/\n\s*\n/);
+  const closing = parts.at(-1)?.trim() ?? '';
+  return (
+    OFFER.test(closing) &&
+    NOTHING_FOUND.test(parts.length > 1 ? parts.slice(0, -1).join(' ') : text)
+  );
+};
+
+const OFFER =
+  /(would you like|do you want|want me to|shall i|should i|if you('d| would) like|if you want|i can (try|also|instead)|i could (try|also|instead)|let me know if)\b/i;
+
+const NOTHING_FOUND =
+  /\b(could ?n[o']t|was ?n[o']t able to|were ?n[o']t able to|unable to|failed to|did ?n[o']t|cannot|can ?not|can't) (find|locate|get|retrieve|load|open|reach|confirm|verify)\b|\bno (reliable |useful |relevant |usable )?(results|sources|information|data|matches)\b|\bsearch(es)? (came back|returned|were|was) (empty|nothing|no\b)/i;
 
 /** "Hello there, ready to help?" is a reply, not a question that needs an answer to go on. */
 const GREETING = /^(hi|hello|hey|good (morning|afternoon|evening))\b/i;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash } from './hash.ts';
-import { isQuestion, isStalledAsk, nextAction } from './next.ts';
+import { isEmptyOffer, isQuestion, isStalledAsk, nextAction } from './next.ts';
 import { PLAN_GATE_PREFIX } from './plan.ts';
 import { fold } from './state.ts';
 import { DEFAULT_BUDGET, type Event } from './types.ts';
@@ -246,6 +246,33 @@ describe('isStalledAsk', () => {
       false,
     );
     expect(isStalledAsk('Sent it.\n\nPlease confirm it arrived.')).toBe(false);
+  });
+});
+
+describe('isEmptyOffer', () => {
+  it('catches a reply that found nothing and offers to go on', () => {
+    expect(
+      isEmptyOffer(
+        "I couldn't find reliable reviews for these headphones.\n\nIf you'd like, I can try a different search.",
+      ),
+    ).toBe(true);
+    expect(
+      isEmptyOffer(
+        'The searches came back empty, so I have no picks. Want me to widen the budget?',
+      ),
+    ).toBe(true);
+    expect(isEmptyOffer('I was unable to open the page.\n\nShould I try another site?')).toBe(true);
+  });
+
+  it('leaves answers with an offer alone', () => {
+    expect(isEmptyOffer('Here are the three picks.\n\nWant me to compare prices too?')).toBe(false);
+    expect(
+      isEmptyOffer('The Halvard Bridge opened in 1974.\n\nLet me know if you need more detail.'),
+    ).toBe(false);
+  });
+
+  it('leaves a plain report of nothing found alone', () => {
+    expect(isEmptyOffer('I could not find any record of that person.')).toBe(false);
   });
 });
 
