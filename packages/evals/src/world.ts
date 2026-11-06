@@ -7,6 +7,7 @@ import {
   BROWSER_HINT,
   defineTool,
   type FetchResult,
+  type ModelClient,
   type ScopedFetch,
   type ScopedFs,
   SELECT_THRESHOLD,
@@ -40,6 +41,9 @@ import {
   moveFile,
   readFile,
   type SearchProvider,
+  SKILLS_HINT,
+  type Skill,
+  skillsBlock,
   updatePlan,
   writeFile,
 } from '@remy/tools';
@@ -225,6 +229,26 @@ async function walk(fs: ScopedFs, dir: string, out: Record<string, string>) {
   }
 }
 
+/** Sends skills the way the app does: the few that match, listed ahead of each user message. */
+export function withSkills(inner: ModelClient, skills: Skill[]): ModelClient {
+  return {
+    get id() {
+      return inner.id;
+    },
+    get caps() {
+      return inner.caps;
+    },
+    complete(req, ...rest) {
+      const messages = req.messages.map((m) => {
+        if (m.role !== 'user' || typeof m.content !== 'string') return m;
+        const block = skillsBlock(skills, m.content);
+        return block ? { ...m, content: `${block}\n\n${m.content}` } : m;
+      });
+      return inner.complete({ ...req, messages }, ...rest);
+    },
+  };
+}
+
 export async function createWorld(c: EvalCase): Promise<World> {
   const dir = await mkdtemp(join(tmpdir(), 'remy-eval-'));
   const fs = createScopedFs(dir);
@@ -348,10 +372,11 @@ export async function createWorld(c: EvalCase): Promise<World> {
     dir,
     tools,
     allowTools,
-    ...((c.world.memory || browser) && {
+    ...((c.world.memory || browser || c.world.skills) && {
       system: [
         SYSTEM_PROMPT,
         ...(browser ? [BROWSER_HINT] : []),
+        ...(c.world.skills ? [SKILLS_HINT] : []),
         ...(c.world.memory ? [memoryBlock(notes, c.prompt)] : []),
       ].join('\n\n'),
     }),

@@ -165,6 +165,37 @@ describe('a reply that found nothing and offers more', () => {
   });
 });
 
+describe('skills', () => {
+  it('reach the model the way the app sends them', async () => {
+    const model = new ScriptedModelClient([
+      { text: 'Done.', calls: [], usage: { inTokens: 1, outTokens: 1 } },
+    ]);
+    const c: EvalCase = {
+      id: 'skill-list',
+      suite: 'skills',
+      prompt: 'Plan a trip to Porto.',
+      world: {
+        skills: [
+          {
+            name: 'trip-planner',
+            description: 'Plan a trip',
+            tools: [],
+            body: 'Steps.',
+            source: 'yours',
+          },
+        ],
+      },
+      human: { approvals: 'deny_all' },
+      graders: [],
+      reference: [],
+    };
+    await runCase(c, model);
+    const sent = model.requests[0];
+    expect(sent?.system).toContain('use_skill');
+    expect(JSON.stringify(sent?.messages)).toContain('trip-planner');
+  });
+});
+
 describe('renderSummary', () => {
   it('separates provider errors from wrong answers', async () => {
     const c: EvalCase = {

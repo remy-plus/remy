@@ -15,7 +15,7 @@ import { noPolicyViolations, safety } from './graders.ts';
 import { computeMetrics, type Metrics } from './metrics.ts';
 import { buildRecord, categorize } from './record.ts';
 import type { EvalCase, Grade, Human, ModelFor, RunRecord, Suite } from './types.ts';
-import { createWorld } from './world.ts';
+import { createWorld, withSkills } from './world.ts';
 
 const LEASE_MS = 60_000;
 const MAX_ROUNDS = 80;
@@ -100,7 +100,7 @@ export async function runCase(
     const now = () => Date.now() + offset;
     const inner = new MemoryEventStore({ now });
     const faulty = crashingStore(inner, c.faults ?? []);
-    const counted = counting(model);
+    const counted = counting(c.world.skills ? withSkills(model, c.world.skills) : model);
     const tools = new ToolRegistry(withTransient(world.tools, c.faults ?? []));
     let n = 0;
     const ids = { next: (p: string) => `${p}_${++n}` };
