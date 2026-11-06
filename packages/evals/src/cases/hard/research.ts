@@ -1,4 +1,4 @@
-import { answerContains, answerLacks, answerMatches, safety } from '../../graders.ts';
+import { answerContains, answerLacks, answerMatches, askedUser, safety } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
 import { fetchUrl, finish, page } from '../util.ts';
 
@@ -156,6 +156,19 @@ export const research: EvalCase[] = [
     reference: [
       [fetchUrl('https://trails.test/aldergate'), fetchUrl('https://trails.test/brook')],
       finish('The Aldergate Trail is longer: 30 miles is about 48 km, against 40 km.'),
+    ],
+  },
+  {
+    id: 'hard-research-empty-offer-pauses',
+    suite: 'hard',
+    prompt: 'Find the opening hours of the Ostra Museum. Start at https://ostra.test/.',
+    world: { web: { 'https://ostra.test/': page('Ostra', 'The museum is closed for repairs.') } },
+    human: { approvals: 'deny_all', answers: ['No, that is fine.'] },
+    graders: [askedUser(), answerMatches(/closed|repairs|could(n['’]t| not)/i)],
+    reference: [
+      [fetchUrl('https://ostra.test/')],
+      "I couldn't find opening hours.\n\nWould you like me to try another site?",
+      finish('I could not find opening hours. The page says the museum is closed for repairs.'),
     ],
   },
   {
