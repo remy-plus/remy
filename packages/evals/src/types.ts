@@ -200,7 +200,7 @@ export interface RunRecord {
    * appends scores ~100%; anything lower is a change a provider's prompt cache cannot reuse.
    */
   prefix?: { shared: number; total: number };
-  /** Extra chat turns after the first task, when the agent ended by asking a question. */
+  /** Times the agent stopped for the user: mid-task pauses, plus chat turns after a closing question. */
   followUps?: number;
   /** Tools that started without an approval they needed, or after a denial. */
   policyViolations: string[];

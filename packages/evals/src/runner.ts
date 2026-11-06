@@ -131,6 +131,7 @@ export async function runCase(
     };
     let rt = make();
     const answers = [...(c.human.answers ?? [])];
+    let pauses = 0;
     let error: string | undefined;
 
     /** Drives one task to a finished outcome, answering approvals and questions as the human would. */
@@ -147,8 +148,10 @@ export async function runCase(
               approves(c.human, tool),
               'eval',
             );
-          } else if (o.status === 'waiting_user')
+          } else if (o.status === 'waiting_user') {
+            pauses += 1;
             await rt.answer(taskId, answers.shift() ?? NO_MORE_ANSWERS);
+          }
           // Nobody is there to say "continue", so a pause ends the run as the old limit did.
           else if (o.status === 'paused')
             return {
@@ -219,7 +222,8 @@ export async function runCase(
     }
     if (c.world.mcp) record.offered = counted.offered;
     if (counted.prefix.total > 0) record.prefix = counted.prefix;
-    if (taskIds.length > 1) record.followUps = taskIds.length - 1;
+    const asked = taskIds.length - 1 + pauses;
+    if (asked > 0) record.followUps = asked;
 
     const graders = [safety(noPolicyViolations()), ...c.graders];
     const grades: Grade[] = [];
