@@ -341,8 +341,8 @@ const BAD_MODEL_OUTPUT = /output_parse_failed|tool_use_failed/;
 /** The ModelError for a non-2xx reply from an OpenAI-compatible endpoint. */
 export function httpError(status: number, detail: string, headers: Headers): ModelError {
   const tooLarge = requestTooLarge(status, detail);
-  if (status === 429)
-    return new ModelError(`HTTP 429: ${detail}`, true, {
+  if (status === 429 || status === 503)
+    return new ModelError(`HTTP ${status}: ${detail}`, true, {
       rateLimited: true,
       retryAfterMs: retryAfterMs(headers, Date.now()),
       ...(tooLarge ? { tooLarge: true } : {}),

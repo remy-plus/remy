@@ -211,6 +211,12 @@ describe('createOpenAIClient', () => {
     expect(err.retryable).toBe(true);
   });
 
+  it('a 503 waits like a rate limit: the provider is over capacity', async () => {
+    const { client } = make(() => new Response('over capacity', { status: 503 }));
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toMatchObject({ retryable: true, rateLimited: true });
+  });
+
   it('a 429 is a rate limit and carries the wait the provider asked for', async () => {
     const { client } = make(
       () => new Response('slow down', { status: 429, headers: { 'retry-after': '7' } }),
