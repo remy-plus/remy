@@ -5,13 +5,14 @@ import {
   answerContains,
   answerMatches,
   fileContains,
+  filesAre,
   firstTool,
   neverCalled,
   status,
   usedTool,
 } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
-import { editFile, fetchUrl, finish, page, readFile } from '../util.ts';
+import { editFile, fetchUrl, finish, moveFile, page, readFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const ok = status('succeeded');
@@ -121,5 +122,14 @@ export const choice: EvalCase[] = [
       answerMatches(/buenos d[ií]as/i),
     ],
     reference: [finish('"Buenos días."')],
+  },
+  {
+    id: 'hard-choice-move-not-copy',
+    suite: 'hard',
+    prompt: 'Rename draft.txt to final.txt.',
+    world: { files: { 'draft.txt': 'The text.' } },
+    human,
+    graders: [ok, firstTool('move_file'), neverCalled('write_file'), filesAre(['final.txt'])],
+    reference: [[moveFile('draft.txt', 'final.txt')], finish('draft.txt is now final.txt.')],
   },
 ];
