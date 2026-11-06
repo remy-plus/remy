@@ -4,9 +4,11 @@ import {
   DEFAULT_BUDGET,
   defineTool,
   type EventStore,
+  MAX_MODEL_ATTEMPTS,
   type ModelClient,
   ModelError,
   type ModelRequest,
+  NOTHING_DONE,
   type Risk,
   type RunOutcome,
   TaskBusyError,
@@ -364,7 +366,7 @@ describe('runtime', () => {
       return { text: 'ok', calls: [], usage: { inTokens: 1, outTokens: 1 } };
     };
     const id = await t.rt.start('go', config());
-    // Four rate limits in a row would fail an ordinary glitch (3 attempts); here it gets through.
+    // Four rate limits in a row would run an ordinary glitch close to its limit; here it gets through.
     expect(await drive(t.rt, id)).toMatchObject({ status: 'succeeded' });
     expect(slept).toEqual([60_000, 5000, 5000, 5000]);
   });
@@ -376,7 +378,66 @@ describe('runtime', () => {
       status: 'failed',
       reason: expect.stringContaining('empty reply'),
     });
-    expect(model.calls).toBe(3);
+    expect(model.calls).toBe(MAX_MODEL_ATTEMPTS);
+  });
+
+  it('varies the temperature on a retry, so a malformed reply is not repeated', async () => {
+    const t = setup([]);
+    const temps: number[] = [];
+    t.model.complete = async (req) => {
+      temps.push(req.temperature);
+      if (temps.length < 3) throw new ModelError('the model returned an empty reply', true);
+      return { text: 'ok', calls: [], usage: { inTokens: 1, outTokens: 1 } };
+    };
+    const id = await t.rt.start('go', config());
+    expect(await drive(t.rt, id)).toMatchObject({ status: 'succeeded' });
+    expect(temps).toEqual([0, 0.3, 0.6]);
+  });
+
+  describe('a reply that claims work with no tool run', () => {
+    const claim = 'I have completed the task and emailed the manager.';
+    const reply = (text: string) => ({
+      text,
+      calls: [],
+      usage: { inTokens: 1, outTokens: 1 },
+    });
+    const script = (t: ReturnType<typeof setup>, texts: string[]) => {
+      const seen: string[] = [];
+      t.model.complete = async (req) => {
+        seen.push(JSON.stringify(req.messages.at(-1)));
+        return reply(texts.shift() ?? '');
+      };
+      return seen;
+    };
+
+    it('fails with the truth when the claim is repeated', async () => {
+      const t = setup([]);
+      const seen = script(t, [claim, claim]);
+      const id = await t.rt.start('email the manager', config());
+      expect(await drive(t.rt, id)).toMatchObject({
+        status: 'failed',
+        reason: NOTHING_DONE,
+      });
+      expect(seen[1]).toContain('nothing you described has happened');
+    });
+
+    it('takes an honest reply after the push', async () => {
+      const t = setup([]);
+      script(t, [claim, 'I cannot send email here, so nothing went out.']);
+      const id = await t.rt.start('email the manager', config());
+      expect(await drive(t.rt, id)).toMatchObject({
+        status: 'succeeded',
+        answer: 'I cannot send email here, so nothing went out.',
+      });
+    });
+
+    it('leaves a plain answer alone', async () => {
+      const t = setup([]);
+      const seen = script(t, ['Paris is the capital of France.']);
+      const id = await t.rt.start('capital of France?', config());
+      expect(await drive(t.rt, id)).toMatchObject({ status: 'succeeded' });
+      expect(seen).toHaveLength(1);
+    });
   });
 
   it('pauses at the step budget', async () => {
