@@ -421,4 +421,37 @@ export const long: EvalCase[] = [
       finish(`I told the caterer ${COMING} guests.`),
     ],
   },
+  {
+    id: 'hard-long-expense-limit',
+    suite: 'hard',
+    prompt:
+      'policy.txt has the expense limits. Check the receipts in my inbox, write flagged.txt with any over the limit, and email the count to manager@example.test.',
+    world: {
+      files: { 'policy.txt': 'Meals: 40 limit. Hotels: 150 limit. Taxis: 30 limit.' },
+      inbox: [
+        { id: 'x1', from: 'a@r.test', subject: 'Receipt', body: 'Meal, 38.' },
+        { id: 'x2', from: 'b@r.test', subject: 'Receipt', body: 'Hotel, 170.' },
+        { id: 'x3', from: 'c@r.test', subject: 'Receipt', body: 'Taxi, 45.' },
+        { id: 'x4', from: 'd@r.test', subject: 'Receipt', body: 'Hotel, 140.' },
+        { id: 'x5', from: 'e@r.test', subject: 'Receipt', body: 'Meal, 41.' },
+      ],
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      fileContains('flagged.txt', '170'),
+      fileContains('flagged.txt', '45'),
+      fileContains('flagged.txt', '41'),
+      fileLacks('flagged.txt', '140'),
+      emailsSent(1, { to: 'manager@example.test', bodyIncludes: '3' }),
+    ],
+    reference: [
+      [readFile('policy.txt'), read()],
+      ...batches(['x1', 'x2', 'x3', 'x4', 'x5'].map((id) => read(id))),
+      [writeFile('flagged.txt', 'Hotel 170\nTaxi 45\nMeal 41\n')],
+      [emailSend('manager@example.test', 'Expenses', '3 receipts are over the limit.')],
+      finish('I flagged 3 receipts and told your manager.'),
+    ],
+  },
 ];
