@@ -8,7 +8,7 @@ I am building it alone and working toward 1.0, a polished web app.
 
 - **Live:** on [npm](https://www.npmjs.com/package/@koryei/remy) and [GitHub](https://github.com/remy-plus/remy), Apache-2.0, 9 public releases in 10 days
 - **Built so far:** a browser it controls, connections to GitHub and Notion, memory, skills, helpers, schedules
-- **Tested:** more than 1,600 automated tests and 162 replayed scenarios, with CI passing
+- **Tested:** more than 1,600 automated tests and 176 replayed scenarios, with CI passing
 - **Safety in code:** after reading anything untrusted, Remy asks before it acts, and an approval covers one exact action
 - **Measured:** results are [public](evals.md), including what is not proven yet
 
