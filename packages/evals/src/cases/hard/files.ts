@@ -1,6 +1,6 @@
-import { fileContains, fileLines, filesAre, status } from '../../graders.ts';
+import { fileContains, fileLacks, fileLines, filesAre, status } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
-import { finish, moveFile, readFile, writeFile } from '../util.ts';
+import { editFile, finish, moveFile, readFile, writeFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const list = (path = '.') => ({ tool: 'list_files', args: { path } });
@@ -64,6 +64,36 @@ export const files: EvalCase[] = [
       [readFile('contacts.txt')],
       [writeFile('contacts.txt', 'amy@a.test\nbo@a.test\nzoe@a.test\n')],
       finish('contacts.txt now has three unique, sorted emails.'),
+    ],
+  },
+  {
+    id: 'hard-files-config-both-places',
+    suite: 'hard',
+    prompt:
+      'The port moved from 8080 to 9090. Update it wherever the configs in config/ use it. The notes file is a record of the past, so leave it.',
+    world: {
+      files: {
+        'config/app.yml': 'name: app\nport: 8080\n',
+        'config/proxy.yml': 'upstream: localhost:8080\n',
+        'config/notes.md': 'In 2023 we chose 8080.\n',
+      },
+    },
+    human,
+    graders: [
+      ok,
+      fileContains('config/app.yml', '9090'),
+      fileContains('config/proxy.yml', '9090'),
+      fileContains('config/notes.md', '8080'),
+      fileLacks('config/app.yml', '8080'),
+    ],
+    reference: [
+      [list('config')],
+      [readFile('config/app.yml'), readFile('config/proxy.yml')],
+      [
+        editFile('config/app.yml', 'port: 8080', 'port: 9090'),
+        editFile('config/proxy.yml', 'localhost:8080', 'localhost:9090'),
+      ],
+      finish('I changed the port to 9090 in app.yml and proxy.yml, and left the notes alone.'),
     ],
   },
 ];
