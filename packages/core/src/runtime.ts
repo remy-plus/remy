@@ -14,6 +14,7 @@ import {
   temperatureFor,
 } from './next.ts';
 import {
+  CLAIM_GATE_ERROR,
   CLAIM_GATE_MESSAGE,
   openPlanSteps,
   planGateMessage,
@@ -509,7 +510,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
                 callId: c.callId,
                 result: {
                   ok: false,
-                  error: planGateMessage(openPlanSteps(s)),
+                  error: openPlanSteps(s).length
+                    ? planGateMessage(openPlanSteps(s))
+                    : CLAIM_GATE_ERROR,
                   retryable: false,
                   phase: 'before_effect',
                 },

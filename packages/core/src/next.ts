@@ -1,6 +1,6 @@
 // nextAction(state) decides the runner's next move from persisted state alone, so a crash
 // anywhere is recovered by re-reading the events and asking again. Pure.
-import { openPlanSteps, planGateUsed } from './plan.ts';
+import { openPlanSteps, planGateUsed, UPDATE_PLAN } from './plan.ts';
 import { type CallState, isTerminal, type TaskState } from './state.ts';
 import { type FinalStatus, PROGRESS_EVERY } from './types.ts';
 
@@ -13,7 +13,7 @@ export type Action =
   | { kind: 'exhaust'; limit: 'steps' | 'cost' | 'time' }
   /** Record a one-line progress note. */
   | { kind: 'progress' }
-  /** `finish` while the plan has open steps: answer it with a tool error, once. */
+  /** `finish` with plan steps open or claiming work no tool did: answer with a tool error, once. */
   | { kind: 'gate_finish'; callId: string }
   /** A plain-text stop with plan steps open: send the model back to work once. */
   | { kind: 'gate_text' }
@@ -61,8 +61,12 @@ export function nextAction(s: TaskState, now: number): Action {
       return { kind: c.userAnswer === undefined ? 'ask_user' : 'answer_call', callId: c.callId };
     if (c.attempts > 0 && c.userAnswer !== undefined)
       return { kind: 'resolve_uncertain', callId: c.callId };
-    if (c.tool === 'finish' && !planGateUsed(s) && openPlanSteps(s).length)
-      return { kind: 'gate_finish', callId: c.callId };
+    if (c.tool === 'finish') {
+      const claims = isClaimedWork(finishAnswer(c)) && ranNoTools(s);
+      if (!planGateUsed(s) && (openPlanSteps(s).length || claims))
+        return { kind: 'gate_finish', callId: c.callId };
+      if (claims) return fail(NOTHING_DONE);
+    }
     return { kind: 'execute', callId: c.callId };
   }
 
@@ -77,7 +81,7 @@ export function nextAction(s: TaskState, now: number): Action {
     if (isQuestion(text) || isStalledAsk(text) || isEmptyOffer(text))
       return { kind: 'ask', question: text };
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
-    if (Object.keys(s.calls).length === 0) {
+    if (ranNoTools(s)) {
       if (isClaimedWork(text)) return planGateUsed(s) ? fail(NOTHING_DONE) : { kind: 'gate_claim' };
       if (isPromisedWork(text) && !planGateUsed(s)) return { kind: 'gate_claim' };
     }
@@ -101,6 +105,15 @@ export function nextAction(s: TaskState, now: number): Action {
     return { kind: 'progress' };
   return { kind: 'call_model' };
 }
+
+/** Tools that report on the work rather than do any of it. */
+const NOT_WORK = new Set(['finish', 'ask_user', UPDATE_PLAN]);
+
+/** No tool has done anything yet: at most the model has planned, asked or tried to finish. */
+const ranNoTools = (s: TaskState) =>
+  !Object.values(s.calls).some((c) => !NOT_WORK.has(c.tool) && c.result?.ok);
+
+const finishAnswer = (c: CallState) => String((c.args as { answer?: unknown })?.answer ?? '');
 
 /**
  * One short sentence that asks ("…?") or asks for something ("Please provide your manager's

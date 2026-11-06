@@ -35,6 +35,9 @@ export const openPlanSteps = (s: TaskState): PlanStep[] =>
 /** Marks the error the plan gate returns, so the gate fires once per task and never loops. */
 export const PLAN_GATE_PREFIX = 'Not finished yet: your plan still has open steps.';
 
+/** Marks the error for a `finish` that claims work no tool did. */
+export const CLAIM_GATE_PREFIX = 'Not finished yet: nothing you described has happened.';
+
 export const planGateUsed = (s: TaskState): boolean =>
   s.planGated ||
   Object.values(s.calls).some(
@@ -42,7 +45,7 @@ export const planGateUsed = (s: TaskState): boolean =>
       c.tool === 'finish' &&
       c.result &&
       !c.result.ok &&
-      c.result.error.startsWith(PLAN_GATE_PREFIX),
+      (c.result.error.startsWith(PLAN_GATE_PREFIX) || c.result.error.startsWith(CLAIM_GATE_PREFIX)),
   );
 
 export function planGateMessage(open: PlanStep[]): string {
@@ -56,9 +59,13 @@ export function planGateTextMessage(open: PlanStep[]): string {
   return `(From Remy, not the user.) ${PLAN_GATE_PREFIX}\n${list}\nThe user asked you to do this work, so do not stop to ask whether to continue: carry on with the next step now. If a step cannot be done, call update_plan with it marked skipped and a reason, then finish. Ask with ask_user only if you need something only the user knows.`;
 }
 
+const CLAIM_GATE_BODY =
+  'No tool has done this work: no file was written and no message was sent. Do the work now by calling your tools. If you cannot do it, say so plainly and do not say that it is done.';
+
 /** Sent back when the model says it did the work but no tool ran. */
-export const CLAIM_GATE_MESSAGE =
-  '(From Remy, not the user.) No tool has run in this task, so nothing you described has happened: no file was written and no message was sent. Do the work now by calling your tools. If you cannot do it, say so plainly and do not say that it is done.';
+export const CLAIM_GATE_MESSAGE = `(From Remy, not the user.) ${CLAIM_GATE_PREFIX} ${CLAIM_GATE_BODY}`;
+/** The same, as the error on a `finish` call. */
+export const CLAIM_GATE_ERROR = `${CLAIM_GATE_PREFIX} ${CLAIM_GATE_BODY}`;
 
 /** One line for a progress note, from the plan. No model call. */
 export function progressLine(s: TaskState): string {

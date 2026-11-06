@@ -431,6 +431,26 @@ describe('runtime', () => {
       expect(seen[1]).toContain('nothing you described has happened');
     });
 
+    it('catches the same claim made through finish', async () => {
+      const claimed = { tool: 'finish', args: { answer: claim } };
+      const { rt, model } = setup([[claimed], [claimed]]);
+      const id = await rt.start('email the manager', config());
+      expect(await drive(rt, id)).toMatchObject({ status: 'failed', reason: NOTHING_DONE });
+      expect(JSON.stringify(model.requests[1]?.messages.at(-1))).toContain(
+        'nothing you described has happened',
+      );
+    });
+
+    it('lets finish through once the work is done', async () => {
+      const { rt } = setup([
+        [{ tool: 'finish', args: { answer: claim } }],
+        [{ tool: 'write_file', args: { path: 'a.txt', content: 'x' } }],
+        [{ tool: 'finish', args: { answer: claim } }],
+      ]);
+      const id = await rt.start('save it', config(['read', 'write']));
+      expect(await drive(rt, id)).toMatchObject({ status: 'succeeded', answer: claim });
+    });
+
     it('takes an honest reply after the push', async () => {
       const t = setup([]);
       script(t, [claim, 'I cannot send email here, so nothing went out.']);
