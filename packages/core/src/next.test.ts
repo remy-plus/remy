@@ -449,6 +449,44 @@ describe('work claimed with no tool run', () => {
     expect(isClaimedWork(text)).toBe(false);
   });
 
+  describe('after only reads', () => {
+    const decided = (id: string, risk: 'read' | 'write'): Event => ({
+      type: 'policy.decided',
+      callId: id,
+      decision: { kind: 'allow' },
+      risk,
+    });
+    const ran = (risk: 'read' | 'write') => [
+      resp(1, call('a')),
+      decided('a', risk),
+      started('a'),
+      done('a'),
+    ];
+    const emailed = 'I emailed the count to the manager.';
+
+    it('sends a claimed action back', () => {
+      expect(next(...ran('read'), said(emailed, 2))).toEqual({ kind: 'gate_claim' });
+    });
+
+    it('lets it stand the second time, since a click counts as a read', () => {
+      const pushed: Event = { type: 'plan.gated', text: 'x' };
+      expect(next(...ran('read'), said(emailed, 2), pushed, said(emailed, 3))).toEqual({
+        kind: 'finish',
+        status: 'succeeded',
+        answer: emailed,
+      });
+    });
+
+    it('leaves a report of finished reading alone', () => {
+      const report = 'I have completed the task. The total is 12.';
+      expect(next(...ran('read'), said(report, 2))).toMatchObject({ status: 'succeeded' });
+    });
+
+    it('believes a claim once something was written', () => {
+      expect(next(...ran('write'), said(emailed, 2))).toMatchObject({ status: 'succeeded' });
+    });
+  });
+
   it('sends a reply that only promises the work back, once', () => {
     const promise = 'Let\'s start by listing the files.\n\nlist_files(".")';
     expect(next(said(promise))).toEqual({ kind: 'gate_claim' });

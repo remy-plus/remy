@@ -62,10 +62,10 @@ export function nextAction(s: TaskState, now: number): Action {
     if (c.attempts > 0 && c.userAnswer !== undefined)
       return { kind: 'resolve_uncertain', callId: c.callId };
     if (c.tool === 'finish') {
-      const claims = isClaimedWork(finishAnswer(c)) && ranNoTools(s);
+      const claims = unbackedClaim(s, finishAnswer(c));
       if (!planGateUsed(s) && (openPlanSteps(s).length || claims))
         return { kind: 'gate_finish', callId: c.callId };
-      if (claims) return fail(NOTHING_DONE);
+      if (claims && ranNoTools(s)) return fail(NOTHING_DONE);
     }
     return { kind: 'execute', callId: c.callId };
   }
@@ -81,10 +81,11 @@ export function nextAction(s: TaskState, now: number): Action {
     if (isQuestion(text) || isStalledAsk(text) || isEmptyOffer(text))
       return { kind: 'ask', question: text };
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
-    if (ranNoTools(s)) {
-      if (isClaimedWork(text)) return planGateUsed(s) ? fail(NOTHING_DONE) : { kind: 'gate_claim' };
-      if (isPromisedWork(text) && !planGateUsed(s)) return { kind: 'gate_claim' };
+    if (unbackedClaim(s, text)) {
+      if (!planGateUsed(s)) return { kind: 'gate_claim' };
+      if (ranNoTools(s)) return fail(NOTHING_DONE);
     }
+    if (ranNoTools(s) && isPromisedWork(text) && !planGateUsed(s)) return { kind: 'gate_claim' };
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
 
@@ -112,6 +113,17 @@ const NOT_WORK = new Set(['finish', 'ask_user', UPDATE_PLAN]);
 /** No tool has done anything yet: at most the model has planned, asked or tried to finish. */
 const ranNoTools = (s: TaskState) =>
   !Object.values(s.calls).some((c) => !NOT_WORK.has(c.tool) && c.result?.ok);
+
+/**
+ * Only reads so far. A call from before risk was recorded counts as an action. Browser clicks are
+ * reads, so this alone is never grounds to fail a task: it earns one push back, no more.
+ */
+const changedNothing = (s: TaskState) =>
+  !Object.values(s.calls).some((c) => !NOT_WORK.has(c.tool) && c.result?.ok && c.risk !== 'read');
+
+/** The reply says something happened, and the tools that ran could not have done it. */
+const unbackedClaim = (s: TaskState, text: string) =>
+  (ranNoTools(s) && isClaimedWork(text)) || (changedNothing(s) && isClaimedAction(text));
 
 const finishAnswer = (c: CallState) => String((c.args as { answer?: unknown })?.answer ?? '');
 
@@ -157,9 +169,14 @@ export const isEmptyOffer = (text: string) => {
  * nothing happened, and reporting it as a success would tell the user that it did. Work done
  * earlier is a fair thing to mention, and so is text written in the reply itself.
  */
-export const isClaimedWork = (text: string) => {
+export const isClaimedWork = (text: string) => claimsAny(text, [...ACTION_CLAIMS, ...DONE_CLAIMS]);
+
+/** A claim of acting in the world in particular. "The task is done" is fair after reading. */
+export const isClaimedAction = (text: string) => claimsAny(text, ACTION_CLAIMS);
+
+const claimsAny = (text: string, claims: RegExp[]) => {
   const t = text.replace(/\u2019/g, "'");
-  return !DONE_BEFORE.test(t) && CLAIMS.some((re) => re.test(t));
+  return !DONE_BEFORE.test(t) && claims.some((re) => re.test(t));
 };
 
 /** A reply that says it is about to start. Ending there leaves the work undone. */
@@ -174,11 +191,13 @@ const ACTED =
   'sent|emailed|saved|deleted|moved|renamed|booked|ordered|purchased|bought|paid|posted|published|uploaded|scheduled|submitted|cancelled';
 const I_DID = "\\b(?:i|i've|we|we've)\\s+(?:(?:have|just|now|also|already|successfully)\\s+)*";
 const FILE_NAME = '(?:\\S+\\.[a-z]{2,4}\\b|(?:the |a |your )?file\\b)';
-const CLAIMS = [
+const ACTION_CLAIMS = [
   new RegExp(`${I_DID}(?:${ACTED})\\b`, 'i'),
   new RegExp(`${I_DID}(?:wrote|written|created|updated)\\s+(?:to\\s+)?${FILE_NAME}`, 'i'),
   new RegExp(`\\b(?:has|have) been (?:successfully )?(?:${ACTED})\\b`, 'i'),
   new RegExp(`^\\s*(?:[-*\u2022]|\\d+[.)])\\s+(?:${ACTED}|wrote|created|updated)\\b`, 'im'),
+];
+const DONE_CLAIMS = [
   /\b(?:completed|finished) (?:the|your|this|all(?: the)?) (?:task|tasks|work|steps)\b/i,
   /\btask is (?:now )?(?:complete|completed|done|finished)\b/i,
 ];
