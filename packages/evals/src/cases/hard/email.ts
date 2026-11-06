@@ -128,4 +128,28 @@ export const email: EvalCase[] = [
       finish('I told Sam Ortiz the launch moved to Monday.'),
     ],
   },
+  {
+    id: 'hard-email-invoice-chain',
+    suite: 'hard',
+    prompt:
+      'Check my inbox for unpaid invoices, add them up, and email the total to billing@example.test.',
+    world: {
+      inbox: [
+        mail('e1', 'a@vendor.test', 'Invoice 101', 'Amount due: $300. Status: unpaid.'),
+        mail('e2', 'b@vendor.test', 'Invoice 102', 'Amount due: $150. Status: paid on 2 May.'),
+        mail('e3', 'c@vendor.test', 'Invoice 103', 'Amount due: $275. Status: unpaid.'),
+      ],
+    },
+    human: grant,
+    graders: [
+      status('succeeded'),
+      emailsSent(1, { to: 'billing@example.test', bodyIncludes: '575' }),
+    ],
+    reference: [
+      [read()],
+      [read('e1'), read('e2'), read('e3')],
+      [emailSend('billing@example.test', 'Unpaid invoices', 'Unpaid total: $575 (101 and 103).')],
+      finish('I emailed billing the unpaid total of $575.'),
+    ],
+  },
 ];
