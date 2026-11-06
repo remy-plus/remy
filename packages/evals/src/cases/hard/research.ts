@@ -125,4 +125,19 @@ export const research: EvalCase[] = [
       finish('The report does not give a 2024 staff number. The latest it gives is 210 in 2021.'),
     ],
   },
+  {
+    id: 'hard-research-table-growth',
+    suite: 'hard',
+    prompt:
+      'Which region at https://sales.test/q3 grew the most in percentage terms from Q2 to Q3, and by how much?',
+    world: {
+      web: {
+        'https://sales.test/q3':
+          '<html><head><title>Sales</title></head><body><table><tr><th>Region</th><th>Q2</th><th>Q3</th></tr><tr><td>North</td><td>500</td><td>600</td></tr><tr><td>South</td><td>200</td><td>260</td></tr><tr><td>East</td><td>900</td><td>1000</td></tr></table></body></html>',
+      },
+    },
+    human,
+    graders: [answerContains('South'), answerContains('30')],
+    reference: [[fetchUrl('https://sales.test/q3')], finish('South grew the most, by 30%.')],
+  },
 ];
