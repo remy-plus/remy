@@ -21,3 +21,11 @@ Personal agent with a browser, a terminal and work that keeps going, on phone an
 - **Remy already has:** durable tasks, leases, pause and resume, approvals.
 - **Take:** saved receipts for what a task did. Checks on public pages for changes or a price threshold, with no repeat alerts and a back-off on failure: Remy's watches cover files only. A public list of what is verified and what is not.
 - **Later:** form filling from an email attachment through to a reviewed reply is a good hard eval once Remy can handle PDFs.
+
+## OpenDots
+
+Always-on coworkers with a name, a role and permitted tools, moving between web, mobile, Slack and calls, with saved pages in Spaces.
+
+- **Remy already has:** read-only helpers, which are unproven live.
+- **Take:** a helper defined by a name, instructions and an explicit list of tools. That is the shape Stage 2 role helpers need.
+- **New for the board:** reaching Remy from Slack or text messages. No idea on the board covers this. Owner to decide if it belongs in 1.0.
