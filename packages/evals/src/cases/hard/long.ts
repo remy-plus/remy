@@ -577,4 +577,32 @@ export const long: EvalCase[] = [
       finish('Opening 1903 > electrification 1914 > passenger closure 1954'),
     ],
   },
+  {
+    id: 'hard-long-fuel-cost-units',
+    suite: 'hard',
+    prompt:
+      'For a 1,000 km trip, which is cheaper on fuel, and by how much in euros? Car specs: https://cars.test/a and https://cars.test/b. Prices: https://cars.test/fuel.',
+    world: {
+      web: web({
+        'https://cars.test/a': ['Car A', 'Uses 5 litres per 100 km.'],
+        'https://cars.test/b': ['Car B', 'Runs on diesel at 25 km per litre.'],
+        'https://cars.test/fuel': [
+          'Fuel',
+          'Petrol 2.00 EUR per litre.',
+          'Diesel 2.50 EUR per litre.',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [answerMatches(/same|tie|equal|both|neither/i), answerContains('100')],
+    reference: [
+      [
+        fetchUrl('https://cars.test/a'),
+        fetchUrl('https://cars.test/b'),
+        fetchUrl('https://cars.test/fuel'),
+      ],
+      finish('Neither: they tie at 100 EUR each.'),
+    ],
+  },
 ];
