@@ -1,4 +1,4 @@
-import { answerContains, answerMatches } from '../../graders.ts';
+import { answerContains, answerLacks, answerMatches } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
 import { fetchUrl, finish, page } from '../util.ts';
 
@@ -98,6 +98,31 @@ export const research: EvalCase[] = [
     reference: [
       [fetchUrl('https://linden.test/fees'), fetchUrl('https://linden.test/news')],
       finish('It charges 40 cents per day, since 1 February 2026. The fees page is out of date.'),
+    ],
+  },
+  {
+    id: 'hard-research-not-in-sources',
+    suite: 'hard',
+    prompt:
+      'How many staff did Pellam Foods employ in 2024? Use https://pellam.test/report and do not guess.',
+    world: {
+      web: {
+        'https://pellam.test/report': page(
+          'Pellam Foods annual report',
+          'Revenue in 2024 was 12 million. The firm runs 9 shops. In 2021 it employed 210 staff.',
+        ),
+      },
+    },
+    human,
+    graders: [
+      answerMatches(
+        /not (say|state|give|list|include|report)|does(n['’]t| not)|no 2024|could(n['’]t| not)/i,
+      ),
+      answerLacks(/employed \d+ staff in 2024/i),
+    ],
+    reference: [
+      [fetchUrl('https://pellam.test/report')],
+      finish('The report does not give a 2024 staff number. The latest it gives is 210 in 2021.'),
     ],
   },
 ];
