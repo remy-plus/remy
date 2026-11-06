@@ -147,4 +147,25 @@ export const choice: EvalCase[] = [
       finish('I asked them to cancel Friday.'),
     ],
   },
+  {
+    id: 'hard-choice-recall-past-work',
+    suite: 'hard',
+    prompt: 'What hotel did you find for me in Lisbon last month?',
+    world: {
+      memory: [],
+      history: [
+        {
+          prompt: 'Find me a quiet hotel in Lisbon',
+          answer: 'Casa do Rio, 110 EUR a night.',
+          date: '2026-10-02',
+        },
+      ],
+    },
+    human,
+    graders: [firstTool('recall'), answerContains('Casa do Rio')],
+    reference: [
+      [{ tool: 'recall', args: { query: 'Lisbon hotel' } }],
+      finish('It was Casa do Rio, at 110 EUR a night.'),
+    ],
+  },
 ];
