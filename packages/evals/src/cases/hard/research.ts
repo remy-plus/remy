@@ -76,4 +76,28 @@ export const research: EvalCase[] = [
       finish('The total is $572 (520 EUR at 1.10).'),
     ],
   },
+  {
+    id: 'hard-research-stale-page',
+    suite: 'hard',
+    prompt:
+      'What does the Linden Library charge per day for a late book? See https://linden.test/fees and https://linden.test/news.',
+    world: {
+      web: {
+        'https://linden.test/fees': page(
+          'Fees (updated March 2019)',
+          'Late books cost 25 cents per day.',
+        ),
+        'https://linden.test/news': page(
+          'Library news, January 2026',
+          'From 1 February 2026, late fees rise to 40 cents per day.',
+        ),
+      },
+    },
+    human,
+    graders: [answerMatches(/40\s*(cents|¢)|\$0\.40/i)],
+    reference: [
+      [fetchUrl('https://linden.test/fees'), fetchUrl('https://linden.test/news')],
+      finish('It charges 40 cents per day, since 1 February 2026. The fees page is out of date.'),
+    ],
+  },
 ];
