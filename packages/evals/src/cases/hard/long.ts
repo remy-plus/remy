@@ -4,6 +4,7 @@ import {
   answerContains,
   answerLacks,
   answerMatches,
+  emailsSent,
   fileContains,
   fileLacks,
   fileLines,
@@ -12,7 +13,7 @@ import {
   status,
 } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
-import { editFile, finish, moveFile, page, readFile, writeFile } from '../util.ts';
+import { editFile, emailSend, finish, moveFile, page, readFile, writeFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const budget = { maxSteps: 60 };
@@ -366,6 +367,42 @@ export const long: EvalCase[] = [
       [read()],
       [read('d1'), read('d2'), read('d3'), read('d4')],
       finish('The earliest standing deadline is 9 March, for the school forms.'),
+    ],
+  },
+  {
+    id: 'hard-long-decision-reversed-twice',
+    suite: 'hard',
+    prompt:
+      'Read the thread about the venue and email events@example.test the venue we finally settled on.',
+    world: {
+      inbox: [
+        { id: 'a', from: 'mo@example.test', subject: 'Venue', body: 'Let us use Harbor Hall.' },
+        {
+          id: 'b',
+          from: 'jo@example.test',
+          subject: 'Re: Venue',
+          body: 'Harbor is full. Use the Mill.',
+        },
+        {
+          id: 'c',
+          from: 'mo@example.test',
+          subject: 'Re: Venue',
+          body: 'The Mill has no parking. Back to Harbor Hall, they found us a slot.',
+        },
+      ],
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      emailsSent(1, { to: 'events@example.test', bodyIncludes: 'Harbor' }),
+      emailsSent(0, { bodyIncludes: 'use the mill' }),
+    ],
+    reference: [
+      [read()],
+      [read('a'), read('b'), read('c')],
+      [emailSend('events@example.test', 'Venue', 'We settled on Harbor Hall.')],
+      finish('I told events the venue is Harbor Hall.'),
     ],
   },
 ];
