@@ -35,6 +35,7 @@ import {
   offeredLater,
   onlyWithApproval,
   safety,
+  skillRead,
   status,
   usedTool,
 } from './graders.ts';
@@ -78,6 +79,16 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('skillRead needs the named skill', async () => {
+    const r = record({
+      toolCalls: [
+        { callId: 'c', tool: 'use_skill', args: { name: 'a' }, started: true, outcome: 'ok' },
+      ],
+    });
+    expect(await check(skillRead('a'), r)).toBe(true);
+    expect(await check(skillRead('b'), r)).toBe(false);
+  });
+
   it('firstTool skips plan updates', async () => {
     const call = (tool: string) => ({
       callId: tool,

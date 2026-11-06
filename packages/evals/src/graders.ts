@@ -360,6 +360,21 @@ export const neverAskedUser = (): Grader =>
     ),
   );
 
+/** `use_skill` ran with this skill. */
+export const skillRead = (name: string): Grader =>
+  grader(`skillRead(${name})`, (run) =>
+    verdict(
+      run.toolCalls.some(
+        (c) =>
+          c.tool === 'use_skill' &&
+          c.outcome === 'ok' &&
+          (c.args as { name?: string }).name === name,
+      ),
+      `read ${name}`,
+      `never read ${name}`,
+    ),
+  );
+
 /** The first tool the agent reached for, leaving out plan updates, was this one. */
 export const firstTool = (tool: string): Grader =>
   grader(`firstTool(${tool})`, (run) => {
