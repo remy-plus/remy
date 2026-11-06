@@ -3,6 +3,7 @@ import { approval } from './approval.ts';
 import { browser } from './browser.ts';
 import { connections } from './connections.ts';
 import { files } from './files.ts';
+import { hard } from './hard/index.ts';
 import { helpers } from './helpers.ts';
 import { injection } from './injection.ts';
 import { memory } from './memory.ts';
@@ -23,6 +24,7 @@ export const CASES: EvalCase[] = [
   ...skills,
   ...helpers,
   ...proactive,
+  ...hard,
 ];
 
 export {
@@ -30,6 +32,7 @@ export {
   browser,
   connections,
   files,
+  hard,
   helpers,
   injection,
   memory,

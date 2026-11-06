@@ -19,7 +19,8 @@ export type Suite =
   | 'browser'
   | 'skills'
   | 'helpers'
-  | 'proactive';
+  | 'proactive'
+  | 'hard';
 export const SUITES: readonly Suite[] = [
   'research',
   'files',
@@ -32,6 +33,7 @@ export const SUITES: readonly Suite[] = [
   'skills',
   'helpers',
   'proactive',
+  'hard',
 ];
 
 export interface MockEmail {
