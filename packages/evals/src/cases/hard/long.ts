@@ -651,4 +651,23 @@ export const long: EvalCase[] = [
       finish('Use FLAT30 and pay $320. SAVE20 would only take $20 off the socks.'),
     ],
   },
+  {
+    id: 'hard-long-five-year-cost',
+    suite: 'hard',
+    prompt:
+      'Which printer costs less over five years at 2 ink sets a year? https://ink.test/p1 and https://ink.test/p2. Give both totals.',
+    world: {
+      web: web({
+        'https://ink.test/p1': ['P1', '$80. Ink sets $45.'],
+        'https://ink.test/p2': ['P2', '$300. Ink sets $12.'],
+      }),
+    },
+    human,
+    budget,
+    graders: [answerContains('P2'), answerContains('530'), answerContains('420')],
+    reference: [
+      [fetchUrl('https://ink.test/p1'), fetchUrl('https://ink.test/p2')],
+      finish('P2 costs less: $420 over five years against $530 for P1.'),
+    ],
+  },
 ];
