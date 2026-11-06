@@ -73,4 +73,24 @@ export const connections: EvalCase[] = [
       finish('I created issue #31 in web.'),
     ],
   },
+  {
+    id: 'hard-conn-comment-right-issue',
+    suite: 'hard',
+    prompt:
+      'In project web, find the issue about the Safari login crash and comment that the fix ships Friday.',
+    world: {
+      mcp: [tracker('#7 Dark mode flicker. #9 Login crash on Safari. #12 Login page typo.')],
+    },
+    human: { approvals: { tracker__add_comment: true } },
+    graders: [
+      ok,
+      mcpCalled('tracker', 'add_comment', 1),
+      mcpCalledWith('tracker', 'add_comment', { issue: '9' }),
+    ],
+    reference: [
+      [mcp('tracker__list_issues', { project: 'web' })],
+      [mcp('tracker__add_comment', { issue: '9', body: 'The fix ships Friday.' })],
+      finish('I commented on #9 that the fix ships Friday.'),
+    ],
+  },
 ];
