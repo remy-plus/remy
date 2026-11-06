@@ -12,6 +12,7 @@ import {
   fileContains,
   fileEquals,
   fileLacks,
+  fileMatches,
   filesAre,
   llmJudge,
   maxSteps,
@@ -74,6 +75,13 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('fileMatches tests the content against a pattern', async () => {
+    const r = record();
+    const w = { ...world, files: { 'a.md': 'Ines: 2' } };
+    expect((await fileMatches('a.md', /Ines\D*2/).check(r, w)).pass).toBe(true);
+    expect((await fileMatches('a.md', /Ines\D*3/).check(r, w)).pass).toBe(false);
+  });
+
   it('fileLacks passes only when the text is gone', async () => {
     const r = record();
     const w = { ...world, files: { 'a.yml': 'port: 9090' } };
