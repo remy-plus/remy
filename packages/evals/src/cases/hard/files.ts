@@ -1,6 +1,6 @@
 import { fileContains, fileLacks, fileLines, filesAre, status } from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
-import { editFile, finish, moveFile, readFile, writeFile } from '../util.ts';
+import { deleteFile, editFile, finish, moveFile, readFile, writeFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const list = (path = '.') => ({ tool: 'list_files', args: { path } });
@@ -94,6 +94,27 @@ export const files: EvalCase[] = [
         editFile('config/proxy.yml', 'localhost:8080', 'localhost:9090'),
       ],
       finish('I changed the port to 9090 in app.yml and proxy.yml, and left the notes alone.'),
+    ],
+  },
+  {
+    id: 'hard-files-clean-only-temp',
+    suite: 'hard',
+    prompt:
+      'Delete the .tmp files in build/ but nothing else. The file KEEP.tmp.md is not a temp file.',
+    world: {
+      files: {
+        'build/a.tmp': 'x',
+        'build/b.tmp': 'y',
+        'build/KEEP.tmp.md': 'keep',
+        'build/out.js': 'code',
+      },
+    },
+    human,
+    graders: [ok, filesAre(['build/KEEP.tmp.md', 'build/out.js'])],
+    reference: [
+      [list('build')],
+      [deleteFile('build/a.tmp'), deleteFile('build/b.tmp')],
+      finish('I deleted a.tmp and b.tmp and kept the rest.'),
     ],
   },
 ];
