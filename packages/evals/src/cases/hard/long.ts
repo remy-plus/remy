@@ -10,6 +10,8 @@ import {
   fileLines,
   fileMatches,
   filesAre,
+  mcpCalled,
+  mcpCalledWith,
   status,
 } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
@@ -28,7 +30,7 @@ const human = { approvals: 'grant_all' } as const;
 const budget = { maxSteps: 60 };
 const ok = status('succeeded');
 const read = (id?: string) => ({ tool: 'email_read', args: id ? { id } : {} });
-const _mcp = (tool: string, args: Record<string, unknown> = {}) => ({ tool, args });
+const mcp = (tool: string, args: Record<string, unknown> = {}) => ({ tool, args });
 const range = (n: number) => [...Array(n).keys()];
 /** Remy runs at most four calls in a step, so a plan reads in batches. */
 const batches = <T>(xs: T[]) =>
@@ -125,7 +127,7 @@ const CITIES = [
 const rain = (i: number) => 300 + ((i * 71) % 500);
 const WETTEST = CITIES[range(12).reduce((b, i) => (rain(i) > rain(b) ? i : b), 0)] as string;
 
-const _tracker = (issues: string): McpServerSpec => ({
+const tracker = (issues: string): McpServerSpec => ({
   name: 'tracker',
   trustHints: true,
   tools: [
@@ -668,6 +670,46 @@ export const long: EvalCase[] = [
     reference: [
       [fetchUrl('https://ink.test/p1'), fetchUrl('https://ink.test/p2')],
       finish('P2 costs less: $420 over five years against $530 for P1.'),
+    ],
+  },
+  {
+    id: 'hard-long-bug-report-to-reply',
+    suite: 'hard',
+    prompt:
+      'Dee emailed a bug report. Find the request in app.log, file an issue in project web quoting the log line, and reply to Dee with the issue number.',
+    world: {
+      inbox: [
+        {
+          id: 'b1',
+          from: 'dee@example.test',
+          subject: 'Payment failed',
+          body: 'My payment failed, the reference was q3.',
+        },
+      ],
+      files: { 'app.log': `${LOG.join('\n')}\n` },
+      mcp: [tracker('none')],
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      mcpCalled('tracker', 'create_issue', 1),
+      mcpCalledWith('tracker', 'create_issue', { project: 'web' }),
+      emailsSent(1, { to: 'dee@example.test', bodyIncludes: '88' }),
+    ],
+    reference: [
+      [read()],
+      [read('b1')],
+      [readFile('app.log')],
+      [
+        mcp('tracker__create_issue', {
+          project: 'web',
+          title: 'Payment webhook 500 for q3',
+          body: LOG[260],
+        }),
+      ],
+      [emailSend('dee@example.test', 'Re: Payment failed', 'We filed this as issue #88.')],
+      finish('I filed issue #88 and replied to Dee.'),
     ],
   },
 ];
