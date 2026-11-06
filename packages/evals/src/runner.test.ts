@@ -145,6 +145,26 @@ describe('runCase', () => {
   });
 });
 
+describe('a reply that found nothing and offers more', () => {
+  it('pauses and asks instead of counting as done', async () => {
+    const c: EvalCase = {
+      id: 'empty-offer',
+      suite: 'research',
+      prompt: 'Find the opening hours of the Ostra Museum.',
+      world: {},
+      human: { approvals: 'deny_all', answers: ['No, that is fine.'] },
+      graders: [askedUser()],
+      reference: [
+        "I couldn't find opening hours.\n\nWould you like me to try another site?",
+        [{ tool: 'finish', args: { answer: 'I could not find opening hours.' } }],
+      ],
+    };
+    const r = await runCase(c, referenceModel(c.reference));
+    expect(r.pass).toBe(true);
+    expect(r.followUps).toBe(1);
+  });
+});
+
 describe('runCase retries', () => {
   const c: EvalCase = {
     id: 'wait',
