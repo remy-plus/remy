@@ -1,6 +1,6 @@
 // The long end of the hard suite: more data than fits in a glance, exact results, and work that
 // crosses tools. Fixtures are generated from fixed rules, so the right answer is computed here too.
-import { fileLines, fileMatches, status } from '../../graders.ts';
+import { answerContains, fileLines, fileMatches, status } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
 import { finish, page, readFile, writeFile } from '../util.ts';
 
@@ -28,7 +28,7 @@ const REFUNDS = range(40).map((i) => ({
   id: i % 10 === 9 ? 1000 + i - 1 : 1000 + i,
   amount: i % 7 === 3 ? -(20 + i) : 50 + i,
 }));
-const _REFUND_TOTAL = [...new Map(REFUNDS.map((r) => [r.id, r.amount])).values()].reduce(
+const REFUND_TOTAL = [...new Map(REFUNDS.map((r) => [r.id, r.amount])).values()].reduce(
   (a, b) => a + b,
   0,
 );
@@ -157,6 +157,24 @@ export const long: EvalCase[] = [
       [readFile('ledger.csv')],
       [writeFile('totals.md', CATS.map((c) => `${c}: ${totalFor(c)}`).join('\n'))],
       finish('totals.md has the four category totals.'),
+    ],
+  },
+  {
+    id: 'hard-long-charges-exported-twice',
+    suite: 'hard',
+    prompt:
+      'charges.csv is an export with refunds as negative amounts. Some charges were exported twice with the same id. What is the true net total?',
+    world: {
+      files: {
+        'charges.csv': `id,amount\n${REFUNDS.map((r) => `${r.id},${r.amount}`).join('\n')}\n`,
+      },
+    },
+    human,
+    budget,
+    graders: [ok, answerContains(String(REFUND_TOTAL))],
+    reference: [
+      [readFile('charges.csv')],
+      finish(`The true net total is ${REFUND_TOTAL}, counting each id once.`),
     ],
   },
 ];
