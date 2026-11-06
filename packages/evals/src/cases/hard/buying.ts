@@ -71,4 +71,27 @@ export const buying: EvalCase[] = [
       finish('The Ash chair is cheapest delivered at $120. The Oak chair comes to $145.'),
     ],
   },
+  {
+    id: 'hard-buy-cheapest-sold-out',
+    suite: 'hard',
+    prompt:
+      'Which of these monitors can I buy today for the least money? https://screens.test/m1 https://screens.test/m2 https://screens.test/m3',
+    world: {
+      web: {
+        'https://screens.test/m1': page('M1 monitor', '$199. Sold out until March.'),
+        'https://screens.test/m2': page('M2 monitor', '$229. In stock.'),
+        'https://screens.test/m3': page('M3 monitor', '$279. In stock.'),
+      },
+    },
+    human,
+    graders: [answerContains('M2'), answerContains('229')],
+    reference: [
+      [
+        fetchUrl('https://screens.test/m1'),
+        fetchUrl('https://screens.test/m2'),
+        fetchUrl('https://screens.test/m3'),
+      ],
+      finish('The M2 at $229. The M1 is cheaper but sold out until March.'),
+    ],
+  },
 ];
