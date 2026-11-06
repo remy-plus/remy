@@ -37,6 +37,9 @@ export const MAX_TOOL_ATTEMPTS = 3;
 
 export function currentCalls(s: TaskState): CallState[] {
   return Object.values(s.calls).filter((c) => c.step === s.step);
+/** The same request at temperature 0 gets the same malformed reply back, so a retry has to vary. */
+export const temperatureFor = (failedAttempts: number) => Math.min(failedAttempts * 0.3, 0.9);
+
 }
 
 export function nextAction(s: TaskState, now: number): Action {

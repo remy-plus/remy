@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash } from './hash.ts';
-import { isEmptyOffer, isQuestion, isStalledAsk, nextAction } from './next.ts';
+import {
+  isClaimedWork,
+  isEmptyOffer,
+  isPromisedWork,
+  isQuestion,
+  isStalledAsk,
+  nextAction,
+  temperatureFor,
+} from './next.ts';
 import { PLAN_GATE_PREFIX } from './plan.ts';
 import { fold } from './state.ts';
 import { DEFAULT_BUDGET, type Event } from './types.ts';

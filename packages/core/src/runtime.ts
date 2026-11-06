@@ -11,6 +11,7 @@ import {
   MAX_RATE_LIMITED_ATTEMPTS,
   MAX_TOOL_ATTEMPTS,
   nextAction,
+  temperatureFor,
 } from './next.ts';
 import { openPlanSteps, planGateMessage, planGateTextMessage, progressLine } from './plan.ts';
 import { authorize, callRisk, decide, reconcileTool, runTool } from './policy.ts';
@@ -293,7 +294,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
                   messages: buildMessages(s, tools, { toolBudgetChars }),
                   tools: specs,
                   maxOutputTokens,
-                  temperature: 0,
+                  temperature: temperatureFor(s.modelAttempts),
                 },
                 signal,
                 deps.onText,
