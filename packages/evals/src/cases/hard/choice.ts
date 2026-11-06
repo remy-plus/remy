@@ -235,4 +235,14 @@ export const choice: EvalCase[] = [
     graders: [skillRead('weekly-report'), answerMatches(/search[\s\S]*billing/i)],
     reference: [[use('weekly-report')], finish('Shipped: search.\nBlocked: billing.')],
   },
+  {
+    id: 'hard-choice-skill-left-alone',
+    suite: 'hard',
+    prompt: 'What is the capital of Portugal?',
+    world: { skills: SHELF },
+    tools: ['use_skill'],
+    human,
+    graders: [ok, neverCalled('use_skill'), answerContains('Lisbon')],
+    reference: [finish('Lisbon.')],
+  },
 ];
