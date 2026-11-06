@@ -1,6 +1,13 @@
 // The long end of the hard suite: more data than fits in a glance, exact results, and work that
 // crosses tools. Fixtures are generated from fixed rules, so the right answer is computed here too.
-import { answerContains, fileContains, fileLines, fileMatches, status } from '../../graders.ts';
+import {
+  answerContains,
+  answerLacks,
+  fileContains,
+  fileLines,
+  fileMatches,
+  status,
+} from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
 import { finish, page, readFile, writeFile } from '../util.ts';
 
@@ -212,6 +219,32 @@ export const long: EvalCase[] = [
     reference: [
       [readFile('app.log')],
       finish('The first error after the deploy was req z9 at 12:03:32.'),
+    ],
+  },
+  {
+    id: 'hard-long-double-booked',
+    suite: 'hard',
+    prompt: 'roster.csv lists shifts. Who is booked on two overlapping shifts, and on which day?',
+    world: {
+      files: {
+        'roster.csv': `person,day,start,end\n${range(24)
+          .map((i) => `P${i},${['Mon', 'Tue', 'Wed'][i % 3]},${8 + (i % 4)},${12 + (i % 4)}`)
+          .join(
+            '\n',
+          )}\nP7,Thu,9,13\nNia,Fri,9,13\nNia,Fri,12,16\nNia,Sat,9,13\nOwen,Fri,9,12\nOwen,Fri,12,16\n`,
+      },
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      answerContains('Nia'),
+      answerContains('Fri'),
+      answerLacks(/Owen is (also )?double/i),
+    ],
+    reference: [
+      [readFile('roster.csv')],
+      finish('Nia is double-booked on Fri: 9-13 overlaps 12-16.'),
     ],
   },
 ];
