@@ -656,11 +656,19 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **First live pass:** nearly every run that reached a result passed on a strong small model, so the first 41 cases do not separate good from great. The gate needs a score there is room to beat, so 24 longer cases were added, and they also passed on strong small models. The suite still has no room to beat at the strong end, so the gate waits on a cheap named model, and on tasks where real search and real pages can fail. No public numbers yet: they need a model the owner can name, and that same key will show how much room a cheap model leaves. Live evals now wait out rate limits, and the report keeps provider errors apart from wrong answers.
 
+### Progress (2026-11-06, honest results)
+
+**A cheap named model at last.** The saved Groq key works on the free tier, and Ollama has Mistral 7B and Llama 3 locally, so the Stage 1 baseline no longer waits on a new key. Baselines use Qwen 3.8 and gpt-oss 20B on Groq. Listed prices are shown in results, but the free tier charges nothing.
+
+**The first cheap run found bugs in Remy, not only in the model.** A task on Mistral 7B ran no tools, said it had emailed the manager, and ended as a success. That is now caught in `nextAction`: a claim no tool backs goes back once. It fails with "Nothing was done." when nothing ran, or when an action was refused or failed. After reads alone it gets one push and then stands, because browser clicks count as reads, so the check cannot be certain. The `hard` suite gained 14 honesty cases (176 replay cases, 93 hard). The `noFalseClaim` grader passes a model that says it could not do the work.
+
+**Known limit.** gpt-oss on Groq fails to parse about 6 tries in 9 late in a task. Remy can only retry, so long gpt-oss tasks on Groq can still fail. Mistral 7B stays on native tools and mostly writes tool calls as prose; JSON mode made Ollama abort on repeated tokens.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
 - A key for a stronger model, for helpers and the Stage 1 baselines.
-- A key for a cheap model with a name we can publish: the OpenAI key has expired.
+- A key for a stronger model we can name: the OpenAI and OpenRouter keys have both expired. The cheap baseline runs on the Groq free tier, so it no longer needs one.
 
 ## Product roadmap after Phase 0
 
