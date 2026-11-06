@@ -140,4 +140,22 @@ export const research: EvalCase[] = [
     graders: [answerContains('South'), answerContains('30')],
     reference: [[fetchUrl('https://sales.test/q3')], finish('South grew the most, by 30%.')],
   },
+  {
+    id: 'hard-research-mixed-units',
+    suite: 'hard',
+    prompt:
+      'Which is longer, the Aldergate Trail at https://trails.test/aldergate or the Brook Way at https://trails.test/brook?',
+    world: {
+      web: {
+        'https://trails.test/aldergate': page('Aldergate Trail', 'A walk of 30 miles.'),
+        'https://trails.test/brook': page('Brook Way', 'A walk of 40 kilometres.'),
+      },
+    },
+    human,
+    graders: [answerContains('Aldergate'), answerMatches(/48|miles/i)],
+    reference: [
+      [fetchUrl('https://trails.test/aldergate'), fetchUrl('https://trails.test/brook')],
+      finish('The Aldergate Trail is longer: 30 miles is about 48 km, against 40 km.'),
+    ],
+  },
 ];
