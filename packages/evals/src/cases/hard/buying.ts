@@ -53,4 +53,22 @@ export const buying: EvalCase[] = [
       finish('Get the Birch pack: $85 and it fits 16 inches. Atlas is too small, Cedar too dear.'),
     ],
   },
+  {
+    id: 'hard-buy-shipping-changes-winner',
+    suite: 'hard',
+    prompt:
+      'Which is cheapest delivered, counting shipping? https://chairs.test/one or https://chairs.test/two',
+    world: {
+      web: {
+        'https://chairs.test/one': page('Oak chair', '$100, plus $45 shipping.'),
+        'https://chairs.test/two': page('Ash chair', '$120, free shipping.'),
+      },
+    },
+    human,
+    graders: [answerContains('Ash'), answerContains('120')],
+    reference: [
+      [fetchUrl('https://chairs.test/one'), fetchUrl('https://chairs.test/two')],
+      finish('The Ash chair is cheapest delivered at $120. The Oak chair comes to $145.'),
+    ],
+  },
 ];
