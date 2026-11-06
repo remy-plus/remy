@@ -6,10 +6,11 @@ import {
   fileContains,
   fileLines,
   fileMatches,
+  filesAre,
   status,
 } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
-import { finish, page, readFile, writeFile } from '../util.ts';
+import { finish, moveFile, page, readFile, writeFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const budget = { maxSteps: 60 };
@@ -17,6 +18,9 @@ const ok = status('succeeded');
 const _read = (id?: string) => ({ tool: 'email_read', args: id ? { id } : {} });
 const _mcp = (tool: string, args: Record<string, unknown> = {}) => ({ tool, args });
 const range = (n: number) => [...Array(n).keys()];
+/** Remy runs at most four calls in a step, so a plan reads in batches. */
+const batches = <T>(xs: T[]) =>
+  range(Math.ceil(xs.length / 4)).map((b) => xs.slice(b * 4, b * 4 + 4));
 const pad = (n: number) => String(n).padStart(2, '0');
 
 // ---------- Fixtures ----------
@@ -245,6 +249,29 @@ export const long: EvalCase[] = [
     reference: [
       [readFile('roster.csv')],
       finish('Nia is double-booked on Fri: 9-13 overlaps 12-16.'),
+    ],
+  },
+  {
+    id: 'hard-long-rename-twenty',
+    suite: 'hard',
+    prompt: 'Rename every photo in shots/ from IMG_N.jpg to trip-NNN.jpg, padded to three digits.',
+    world: {
+      files: Object.fromEntries(range(20).map((i) => [`shots/IMG_${i + 1}.jpg`, `p${i}`])),
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      filesAre(range(20).map((i) => `shots/trip-${String(i + 1).padStart(3, '0')}.jpg`)),
+    ],
+    reference: [
+      [{ tool: 'list_files', args: { path: 'shots' } }],
+      ...batches(range(20).map((i) => i + 1)).map((ns) =>
+        ns.map((n) =>
+          moveFile(`shots/IMG_${n}.jpg`, `shots/trip-${String(n).padStart(3, '0')}.jpg`),
+        ),
+      ),
+      finish('I renamed all 20 photos.'),
     ],
   },
 ];
