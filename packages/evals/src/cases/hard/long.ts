@@ -3,6 +3,7 @@
 import {
   answerContains,
   answerLacks,
+  answerMatches,
   fileContains,
   fileLines,
   fileMatches,
@@ -62,8 +63,8 @@ const LOG = range(300).map((i) => {
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const sales = (i: number) => 400 + ((i * 53) % 170);
-const _SALES_TOTAL = range(12).reduce((a, i) => a + sales(i), 0);
-const _BEST = MONTHS[range(12).reduce((b, i) => (sales(i) > sales(b) ? i : b), 0)] as string;
+const SALES_TOTAL = range(12).reduce((a, i) => a + sales(i), 0);
+const BEST = MONTHS[range(12).reduce((b, i) => (sales(i) > sales(b) ? i : b), 0)] as string;
 
 const RSVP: MockEmail[] = range(20).map((i) => ({
   id: `r${i}`,
@@ -272,6 +273,24 @@ export const long: EvalCase[] = [
         ),
       ),
       finish('I renamed all 20 photos.'),
+    ],
+  },
+  {
+    id: 'hard-long-twelve-month-files',
+    suite: 'hard',
+    prompt: 'sales/ has one file per month. What is the year’s total, and which month was best?',
+    world: {
+      files: Object.fromEntries(
+        MONTHS.map((m, i) => [`sales/${m}.txt`, `Sales for ${m}: ${sales(i)}`]),
+      ),
+    },
+    human,
+    budget,
+    graders: [ok, answerContains(String(SALES_TOTAL)), answerMatches(new RegExp(BEST, 'i'))],
+    reference: [
+      [{ tool: 'list_files', args: { path: 'sales' } }],
+      ...batches(MONTHS.map((m) => readFile(`sales/${m}.txt`))),
+      finish(`The year's total is ${SALES_TOTAL} and ${BEST} was best.`),
     ],
   },
 ];
