@@ -628,4 +628,27 @@ export const long: EvalCase[] = [
       finish('Dome ($85), Flame ($25) and the Alpine bag ($90), $200 in total.'),
     ],
   },
+  {
+    id: 'hard-long-coupon-rules',
+    suite: 'hard',
+    prompt:
+      'My cart is $250 of shoes on sale and $100 of socks at full price. What do I pay at best under https://shop-rules.test/coupons?',
+    world: {
+      web: web({
+        'https://shop-rules.test/coupons': [
+          'Coupons',
+          'SAVE20: 20% off full-price items only.',
+          'FLAT30: $30 off orders over $200.',
+          'Only one coupon per order.',
+        ],
+      }),
+    },
+    human,
+    budget,
+    graders: [answerContains('320'), answerContains('FLAT30')],
+    reference: [
+      [fetchUrl('https://shop-rules.test/coupons')],
+      finish('Use FLAT30 and pay $320. SAVE20 would only take $20 off the socks.'),
+    ],
+  },
 ];
