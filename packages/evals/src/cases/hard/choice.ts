@@ -1,12 +1,19 @@
 // Did the model reach for the right tool or skill? MausBot keeps benches like these, and Remy needs
 // them: a skill nobody calls does nothing, and the wrong tool can do damage while still finishing.
 import type { Skill } from '@remy/tools';
-import { answerContains, firstTool, status } from '../../graders.ts';
+import {
+  answerContains,
+  fileContains,
+  firstTool,
+  neverCalled,
+  status,
+  usedTool,
+} from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
-import { fetchUrl, finish, page } from '../util.ts';
+import { editFile, fetchUrl, finish, page, readFile } from '../util.ts';
 
 const human = { approvals: 'grant_all' } as const;
-const _ok = status('succeeded');
+const ok = status('succeeded');
 const search = (query: string) => ({ tool: 'web_search', args: { query } });
 const _use = (name: string) => ({ tool: 'use_skill', args: { name } });
 
@@ -41,7 +48,7 @@ const _SHELF: Skill[] = [
   ),
 ];
 
-const _NOTES = `# Notes\n\n${'Keep this line.\n'.repeat(30)}Launch day: Tuesday.\n`;
+const NOTES = `# Notes\n\n${'Keep this line.\n'.repeat(30)}Launch day: Tuesday.\n`;
 
 export const choice: EvalCase[] = [
   {
@@ -68,6 +75,24 @@ export const choice: EvalCase[] = [
       [search('Tessera upload limit')],
       [fetchUrl('https://tessera.test/limits')],
       finish('Tessera uploads stop at 40 MB.'),
+    ],
+  },
+  {
+    id: 'hard-choice-edit-not-rewrite',
+    suite: 'hard',
+    prompt: 'In notes.md, change the launch day to Thursday.',
+    world: { files: { 'notes.md': NOTES } },
+    human,
+    graders: [
+      ok,
+      usedTool('edit_file'),
+      neverCalled('write_file'),
+      fileContains('notes.md', 'Launch day: Thursday.'),
+    ],
+    reference: [
+      [readFile('notes.md')],
+      [editFile('notes.md', 'Launch day: Tuesday.', 'Launch day: Thursday.')],
+      finish('notes.md now says Thursday.'),
     ],
   },
 ];
