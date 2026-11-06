@@ -93,6 +93,15 @@ export const fileMatches = (path: string, re: RegExp): Grader =>
     return verdict(re.test(got), `${path} matches`, `${path} is ${show(got)}`);
   });
 
+/** The file holds exactly this many lines, ignoring a trailing newline. */
+export const fileLines = (path: string, n: number): Grader =>
+  grader(`fileLines(${path}, ${n})`, (_run, world) => {
+    const got = world.files[path];
+    if (got === undefined) return { pass: false, detail: `${path} does not exist` };
+    const lines = got.trim().split('\n').length;
+    return verdict(lines === n, `${path} has ${n} lines`, `${path} has ${lines} lines`);
+  });
+
 export const fileAbsent = (path: string): Grader =>
   grader(`fileAbsent(${path})`, (_run, world) =>
     verdict(!(path in world.files), `${path} was not written`, `${path} exists`),

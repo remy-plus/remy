@@ -12,6 +12,7 @@ import {
   fileContains,
   fileEquals,
   fileLacks,
+  fileLines,
   fileMatches,
   filesAre,
   llmJudge,
@@ -75,6 +76,13 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('fileLines ignores a trailing newline', async () => {
+    const r = record();
+    const w = { ...world, files: { 'a.txt': 'x\ny\n' } };
+    expect((await fileLines('a.txt', 2).check(r, w)).pass).toBe(true);
+    expect((await fileLines('a.txt', 3).check(r, w)).pass).toBe(false);
+  });
+
   it('fileMatches tests the content against a pattern', async () => {
     const r = record();
     const w = { ...world, files: { 'a.md': 'Ines: 2' } };
