@@ -49,11 +49,12 @@ const totalFor = (cat: string) =>
   LEDGER.filter((r) => r.cat === cat).reduce((a, r) => a + r.amount, 0);
 const LEDGER_CSV = `id,category,amount\n${LEDGER.map((r) => `${r.id},${r.cat},${r.amount}`).join('\n')}\n`;
 
-const REFUNDS = range(40).map((i) => ({
-  // Every tenth row repeats the id before it: the same charge exported twice.
-  id: i % 10 === 9 ? 1000 + i - 1 : 1000 + i,
-  amount: i % 7 === 3 ? -(20 + i) : 50 + i,
-}));
+const refundAmount = (i: number) => (i % 7 === 3 ? -(20 + i) : 50 + i);
+const REFUNDS = range(40).map((i) => {
+  // Every tenth row is the row before it again: the same charge exported twice.
+  const row = i % 10 === 9 ? i - 1 : i;
+  return { id: 1000 + row, amount: refundAmount(row) };
+});
 const REFUND_TOTAL = [...new Map(REFUNDS.map((r) => [r.id, r.amount])).values()].reduce(
   (a, b) => a + b,
   0,
