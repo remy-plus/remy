@@ -20,6 +20,11 @@ describe('catalog', () => {
     expect(resolveCaps('mystery/model').tpm).toBeUndefined();
   });
 
+  it('uses JSON tool calls for Llama 3, which Ollama refuses tools for', () => {
+    for (const id of ['llama3', 'llama3:8b'])
+      expect(resolveCaps(id).nativeTools).toBe(false);
+  });
+
   it('defaults unknown models', () => {
     expect(resolveCaps('mystery/model')).toEqual(DEFAULT_CAPS);
   });

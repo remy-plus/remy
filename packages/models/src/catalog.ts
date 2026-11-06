@@ -157,6 +157,9 @@ export const BUILTIN_CATALOG: Catalog = {
   // No native tool support in Ollama: use the JSON strategy.
   gemma2: { nativeTools: false, contextTokens: 8192, contextWindow: 8192 },
   phi3: { nativeTools: false, contextTokens: 4096, contextWindow: 4096 },
+  // Ollama refuses tools for Llama 3.
+  llama3: { nativeTools: false, contextTokens: 8192, contextWindow: 8192 },
+  'llama3:8b': { nativeTools: false, contextTokens: 8192, contextWindow: 8192 },
 };
 
 export function resolveCaps(modelId: string, catalog: Catalog = BUILTIN_CATALOG): ModelCaps {
