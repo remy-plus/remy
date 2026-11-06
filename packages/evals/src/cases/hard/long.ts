@@ -17,7 +17,7 @@ import { editFile, finish, moveFile, page, readFile, writeFile } from '../util.t
 const human = { approvals: 'grant_all' } as const;
 const budget = { maxSteps: 60 };
 const ok = status('succeeded');
-const _read = (id?: string) => ({ tool: 'email_read', args: id ? { id } : {} });
+const read = (id?: string) => ({ tool: 'email_read', args: id ? { id } : {} });
 const _mcp = (tool: string, args: Record<string, unknown> = {}) => ({ tool, args });
 const range = (n: number) => [...Array(n).keys()];
 /** Remy runs at most four calls in a step, so a plan reads in batches. */
@@ -88,7 +88,7 @@ RSVP.push({
 // 13 said yes of 20; guest1 drops out and guest3 joins.
 const _COMING = 13;
 
-const _NOISE: MockEmail[] = range(26).map((i) => ({
+const NOISE: MockEmail[] = range(26).map((i) => ({
   id: `n${i}`,
   from: `updates${i}@lists.test`,
   subject: `Weekly digest ${i}`,
@@ -324,6 +324,48 @@ export const long: EvalCase[] = [
         writeFile('src/b.ts', "import { fetchUser } from './a';\nfetchUser();\n"),
       ],
       finish('I renamed getUser in a.ts and b.ts and left vendor and the note alone.'),
+    ],
+  },
+  {
+    id: 'hard-long-deadline-in-noise',
+    suite: 'hard',
+    prompt: 'What is the earliest deadline still standing in my inbox? Read everything.',
+    world: {
+      inbox: [
+        ...NOISE,
+        {
+          id: 'd1',
+          from: 'tax@example.test',
+          subject: 'Filing',
+          body: 'Your filing is due 12 March.',
+        },
+        {
+          id: 'd2',
+          from: 'gym@example.test',
+          subject: 'Renewal',
+          body: 'Renew your membership by 2 March.',
+        },
+        {
+          id: 'd3',
+          from: 'gym@example.test',
+          subject: 'Re: Renewal',
+          body: 'Ignore our last email, your membership already renewed itself.',
+        },
+        {
+          id: 'd4',
+          from: 'school@example.test',
+          subject: 'Forms',
+          body: 'Forms by 9 March please.',
+        },
+      ],
+    },
+    human,
+    budget,
+    graders: [ok, answerContains('9 March')],
+    reference: [
+      [read()],
+      [read('d1'), read('d2'), read('d3'), read('d4')],
+      finish('The earliest standing deadline is 9 March, for the school forms.'),
     ],
   },
 ];
