@@ -95,4 +95,16 @@ export const choice: EvalCase[] = [
       finish('notes.md now says Thursday.'),
     ],
   },
+  {
+    id: 'hard-choice-look-before-opening',
+    suite: 'hard',
+    prompt: 'What files are in contracts/?',
+    world: { files: { 'contracts/a.pdf': 'x', 'contracts/b.pdf': 'y' } },
+    human,
+    graders: [firstTool('list_files'), answerContains(['a.pdf', 'b.pdf'])],
+    reference: [
+      [{ tool: 'list_files', args: { path: 'contracts' } }],
+      finish('contracts/ holds a.pdf and b.pdf.'),
+    ],
+  },
 ];
