@@ -13,3 +13,11 @@ Self-hosted agent platform for companies. A coworker gets its own browser, files
 - **Remy already has:** one gate for every tool call (`AuthorizedCall`), with an event log of each step.
 - **Take:** taking the wheel mid-task and handing it back. Remy can show its browser, but the flow is not designed around handing control back and forth.
 - **Skip:** AG-UI and any-framework support. Remy is one agent, and that is the point of the single loop.
+
+## OpenMuse
+
+Personal agent with a browser, a terminal and work that keeps going, on phone and web. Durable tasks with SQL leases. Claims a verified list of what works, in `docs/VERIFICATION.md`.
+
+- **Remy already has:** durable tasks, leases, pause and resume, approvals.
+- **Take:** saved receipts for what a task did. Checks on public pages for changes or a price threshold, with no repeat alerts and a back-off on failure: Remy's watches cover files only. A public list of what is verified and what is not.
+- **Later:** form filling from an email attachment through to a reviewed reply is a good hard eval once Remy can handle PDFs.
