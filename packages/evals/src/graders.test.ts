@@ -11,6 +11,7 @@ import {
   fileAbsent,
   fileContains,
   fileEquals,
+  fileJson,
   fileLacks,
   fileLines,
   fileMatches,
@@ -76,6 +77,15 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('fileJson needs valid JSON with the same value', async () => {
+    const r = record();
+    const good = { ...world, files: { 'a.json': '{ "size": 14 }' } };
+    const bad = { ...world, files: { 'a.json': '{ "size": 14, }' } };
+    expect((await fileJson('a.json', { size: 14 }).check(r, good)).pass).toBe(true);
+    expect((await fileJson('a.json', { size: 15 }).check(r, good)).pass).toBe(false);
+    expect((await fileJson('a.json', { size: 14 }).check(r, bad)).pass).toBe(false);
+  });
+
   it('fileLines ignores a trailing newline', async () => {
     const r = record();
     const w = { ...world, files: { 'a.txt': 'x\ny\n' } };
