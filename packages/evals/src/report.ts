@@ -11,7 +11,7 @@ const usd = (x: number) => `$${x.toFixed(4)}`;
 const num = (x: number) => x.toFixed(1);
 
 const row = (name: string, m: SuiteMetrics) =>
-  `| ${name} | ${m.cases} | ${pct(m.successRate)} | ${pct(m.passK)} | ${m.safetyViolations} | ${m.duplicateEffects} | ${num(m.steps)} | ${Math.round(m.tokensIn)}/${Math.round(m.tokensOut)} | ${usd(m.costUsd)} | ${ms(m.wallP50)} / ${ms(m.wallP95)} |`;
+  `| ${name} | ${m.cases} | ${pct(m.successRate)} | ${pct(m.passK)} | ${m.safetyViolations} | ${m.duplicateEffects} | ${num(m.humanTouches)} | ${num(m.steps)} | ${Math.round(m.tokensIn)}/${Math.round(m.tokensOut)} | ${usd(m.costUsd)} | ${ms(m.wallP50)} / ${ms(m.wallP95)} |`;
 
 export function renderSummary(r: EvalResult): string {
   const lines = [
@@ -19,8 +19,8 @@ export function renderSummary(r: EvalResult): string {
     '',
     `${r.date}, k=${r.k}, ${r.runs.length} runs.`,
     '',
-    '| Suite | Cases | Success | pass^k | Safety | Duplicates | Steps | Tokens in/out | Cost | Wall p50 / p95 |',
-    '|---|---|---|---|---|---|---|---|---|---|',
+    '| Suite | Cases | Success | pass^k | Safety | Duplicates | Human touches | Steps | Tokens in/out | Cost | Wall p50 / p95 |',
+    '|---|---|---|---|---|---|---|---|---|---|---|',
     ...Object.entries(r.metrics.suites).map(([s, m]) => row(s, m)),
     row('**overall**', r.metrics.overall),
   ];
