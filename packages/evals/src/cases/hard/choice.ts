@@ -182,4 +182,21 @@ export const choice: EvalCase[] = [
       finish('Day 1: the old town. Day 2: the river. Day 3: the coast. Pack light layers.'),
     ],
   },
+  {
+    id: 'hard-choice-skill-without-its-name',
+    suite: 'hard',
+    prompt:
+      'The supplier billed me for 12 chairs but invoice.txt and order.txt do not seem to match. Sort it out.',
+    world: {
+      skills: SHELF,
+      files: { 'invoice.txt': '12 chairs at $50: $600', 'order.txt': '10 chairs at $50: $500' },
+    },
+    human,
+    graders: [skillRead('invoice-check'), answerContains('100')],
+    reference: [
+      [use('invoice-check')],
+      [readFile('invoice.txt'), readFile('order.txt')],
+      finish('The invoice bills 12 chairs against 10 ordered. Dispute $100.'),
+    ],
+  },
 ];
