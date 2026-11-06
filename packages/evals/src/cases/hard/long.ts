@@ -40,7 +40,7 @@ const STOCK = range(60).map((i) => ({
 }));
 const LOW = STOCK.filter((s) => s.have < s.min);
 
-const _LOG = range(300).map((i) => {
+const LOG = range(300).map((i) => {
   const t = `12:${pad(Math.floor(i / 60))}:${pad(i % 60)}`;
   if (i === 40) return `${t} ERROR req=a1 timeout before the deploy`;
   if (i === 150) return `${t} INFO deploy finished v2.4`;
@@ -198,6 +198,20 @@ export const long: EvalCase[] = [
       [readFile('stock.csv')],
       [writeFile('reorder.txt', LOW.map((s) => s.sku).join('\n'))],
       finish(`reorder.txt lists ${LOW.length} SKUs.`),
+    ],
+  },
+  {
+    id: 'hard-long-first-error-after-deploy',
+    suite: 'hard',
+    prompt:
+      'app.log has today’s log. Which request id was the first error after the deploy finished, and what time was it?',
+    world: { files: { 'app.log': `${LOG.join('\n')}\n` } },
+    human,
+    budget,
+    graders: [ok, answerContains('z9'), answerContains('12:03:32')],
+    reference: [
+      [readFile('app.log')],
+      finish('The first error after the deploy was req z9 at 12:03:32.'),
     ],
   },
 ];
