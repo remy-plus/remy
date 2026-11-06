@@ -7,6 +7,7 @@ import { choice } from './choice.ts';
 import { connections } from './connections.ts';
 import { email } from './email.ts';
 import { files } from './files.ts';
+import { honesty } from './honesty.ts';
 import { long } from './long.ts';
 import { research } from './research.ts';
 
@@ -18,4 +19,5 @@ export const hard: EvalCase[] = [
   ...connections,
   ...long,
   ...choice,
+  ...honesty,
 ];
