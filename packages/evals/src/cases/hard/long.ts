@@ -87,7 +87,7 @@ RSVP.push({
   body: 'Good news, I can make it after all.',
 });
 // 13 said yes of 20; guest1 drops out and guest3 joins.
-const _COMING = 13;
+const COMING = 13;
 
 const NOISE: MockEmail[] = range(26).map((i) => ({
   id: `n${i}`,
@@ -403,6 +403,22 @@ export const long: EvalCase[] = [
       [read('a'), read('b'), read('c')],
       [emailSend('events@example.test', 'Venue', 'We settled on Harbor Hall.')],
       finish('I told events the venue is Harbor Hall.'),
+    ],
+  },
+  {
+    id: 'hard-long-rsvp-headcount',
+    suite: 'hard',
+    prompt:
+      'Everyone replied to the dinner invite by email, and some changed their minds. Count who is coming and email the number to caterer@example.test.',
+    world: { inbox: RSVP },
+    human,
+    budget,
+    graders: [ok, emailsSent(1, { to: 'caterer@example.test', bodyIncludes: String(COMING) })],
+    reference: [
+      [read()],
+      ...batches(RSVP.map((m) => read(m.id))),
+      [emailSend('caterer@example.test', 'Headcount', `We expect ${COMING} guests.`)],
+      finish(`I told the caterer ${COMING} guests.`),
     ],
   },
 ];
