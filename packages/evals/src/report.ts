@@ -30,6 +30,15 @@ export function renderSummary(r: EvalResult): string {
       '',
       `Stable prompt prefix: each request repeats ${pct(stable)} of the one before it (100% means it only appends, so a prompt cache can reuse it all).`,
     );
+  const lost = r.runs.filter((x) => x.failure === 'model_error').length;
+  if (lost) {
+    const scored = r.runs.filter((x) => x.failure !== 'model_error');
+    const passed = scored.filter((x) => x.pass).length;
+    lines.push(
+      '',
+      `Provider errors: ${lost} of ${r.runs.length} runs never reached a result. On the other ${scored.length}, ${pct(passed / (scored.length || 1))} passed.`,
+    );
+  }
   const failed = r.runs.filter((x) => !x.pass);
   if (failed.length) {
     lines.push('', '## Failures', '');

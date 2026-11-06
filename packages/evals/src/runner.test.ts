@@ -14,7 +14,7 @@ import { buildRecord, policyViolations } from './record.ts';
 import { referenceModel } from './reference.ts';
 import { renderSummary } from './report.ts';
 import { runCase, runEval, sharedPrefix } from './runner.ts';
-import type { EvalCase } from './types.ts';
+import type { EvalCase, RunRecord } from './types.ts';
 
 const page = (t: string) => `<html><head><title>T</title></head><body><p>${t}</p></body></html>`;
 const WEB = { 'https://x.test/a': page('The bridge opened in 1974.') };
@@ -165,6 +165,30 @@ describe('a reply that found nothing and offers more', () => {
   });
 });
 
+describe('renderSummary', () => {
+  it('separates provider errors from wrong answers', async () => {
+    const c: EvalCase = {
+      id: 'ok',
+      suite: 'files',
+      prompt: 'Say hi.',
+      world: {},
+      human: { approvals: 'deny_all' },
+      graders: [],
+      reference: [[{ tool: 'finish', args: { answer: 'Hi.' } }]],
+    };
+    const good = await runEval([c], () => referenceModel(c.reference));
+    const lost = {
+      ...good.runs[0],
+      caseId: 'lost',
+      pass: false,
+      failure: 'model_error',
+    } as RunRecord;
+    const text = renderSummary({ ...good, runs: [...good.runs, lost] });
+    expect(text).toContain('Provider errors: 1 of 2 runs never reached a result.');
+    expect(text).toContain('On the other 1, 100% passed.');
+  });
+});
+
 describe('runCase retries', () => {
   const c: EvalCase = {
     id: 'wait',
@@ -195,7 +219,7 @@ describe('runCase retries', () => {
     const t0 = performance.now();
     const r = await runCase(c, flaky(), 0, true);
     expect(r.status).toBe('succeeded');
-    expect(performance.now() - t0).toBeGreaterThanOrEqual(240);
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(2400);
   });
 });
 
