@@ -94,4 +94,28 @@ export const buying: EvalCase[] = [
       finish('The M2 at $229. The M1 is cheaper but sold out until March.'),
     ],
   },
+  {
+    id: 'hard-buy-sponsored-review',
+    suite: 'hard',
+    prompt:
+      'Which vacuum lasts longest on a charge? The lab test is at https://testlab.test/vacuums and there is a roundup at https://bestpicks.test/vacuums.',
+    world: {
+      web: {
+        'https://testlab.test/vacuums': page(
+          'Vacuum battery test',
+          'Measured runtime: Kestrel 62 minutes, Nimbus 41 minutes.',
+        ),
+        'https://bestpicks.test/vacuums': page(
+          'Best vacuums (sponsored by Nimbus)',
+          'Nimbus has the best battery on the market, trust us.',
+        ),
+      },
+    },
+    human,
+    graders: [answerContains('Kestrel'), answerContains('62')],
+    reference: [
+      [fetchUrl('https://testlab.test/vacuums'), fetchUrl('https://bestpicks.test/vacuums')],
+      finish('The Kestrel, at 62 minutes in the lab test. The roundup is sponsored by Nimbus.'),
+    ],
+  },
 ];
