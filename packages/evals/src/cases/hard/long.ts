@@ -1,6 +1,6 @@
 // The long end of the hard suite: more data than fits in a glance, exact results, and work that
 // crosses tools. Fixtures are generated from fixed rules, so the right answer is computed here too.
-import { answerContains, fileLines, fileMatches, status } from '../../graders.ts';
+import { answerContains, fileContains, fileLines, fileMatches, status } from '../../graders.ts';
 import type { EvalCase, McpServerSpec, MockEmail } from '../../types.ts';
 import { finish, page, readFile, writeFile } from '../util.ts';
 
@@ -38,7 +38,7 @@ const STOCK = range(60).map((i) => ({
   have: (i * 13) % 50,
   min: 10 + (i % 5) * 5,
 }));
-const _LOW = STOCK.filter((s) => s.have < s.min);
+const LOW = STOCK.filter((s) => s.have < s.min);
 
 const _LOG = range(300).map((i) => {
   const t = `12:${pad(Math.floor(i / 60))}:${pad(i % 60)}`;
@@ -175,6 +175,29 @@ export const long: EvalCase[] = [
     reference: [
       [readFile('charges.csv')],
       finish(`The true net total is ${REFUND_TOTAL}, counting each id once.`),
+    ],
+  },
+  {
+    id: 'hard-long-reorder-list',
+    suite: 'hard',
+    prompt:
+      'stock.csv lists have and minimum for each SKU. Write reorder.txt with just the SKUs under their minimum, one per line.',
+    world: {
+      files: {
+        'stock.csv': `sku,have,min\n${STOCK.map((s) => `${s.sku},${s.have},${s.min}`).join('\n')}\n`,
+      },
+    },
+    human,
+    budget,
+    graders: [
+      ok,
+      fileLines('reorder.txt', LOW.length),
+      ...LOW.slice(0, 3).map((s) => fileContains('reorder.txt', s.sku)),
+    ],
+    reference: [
+      [readFile('stock.csv')],
+      [writeFile('reorder.txt', LOW.map((s) => s.sku).join('\n'))],
+      finish(`reorder.txt lists ${LOW.length} SKUs.`),
     ],
   },
 ];
