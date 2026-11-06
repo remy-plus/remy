@@ -36,3 +36,23 @@ Proactive agent built on OpenBot: a morning brief, sorting mail into what needs 
 
 - **Remy already has:** schedules, the daemon, once and always approvals. Remy keeps secrets out of chat and redacts them from output.
 - **Take:** a morning brief built on schedules, listing what it could not check. A check on everything leaving the machine for card numbers or health details: Remy's redaction covers secrets, not personal data in an outgoing message. Labelled evals for judgement calls: its `evals/triage` measures mail sorting against a labelled set.
+
+## The harness post
+
+The post's claim: many agent failures come from the system around the model, not the model, so build that system and prove the work.
+
+| Layer in the post                 | Remy today                                           | Gap                                                           |
+| --------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| Task contract                     | `update_plan` and open-step gating                   | No acceptance checks, and nothing lists what must not change  |
+| Map, not manual                   | Top-matching skills, tool selection, situation block | Fine for now                                                  |
+| Tool gateway                      | Risk, effect and policy on every call                | Tools return results, not evidence of what changed            |
+| Brain, hands, history             | Event log and `nextAction(state)`                    | Fine for now                                                  |
+| Durable state                     | Notes, summary, event log                            | Lessons from failures are not kept (Stage 3)                  |
+| Completion needs evidence         | The model says it is finished                        | **Largest gap.** Nothing checks the claim                     |
+| Verification attacks the result   | None                                                 | **Large gap.** No rejection step (Stage 2)                    |
+| Model proposes, policy authorizes | Done, and tested at 100%                             | Remy leads here                                               |
+| Recovery                          | Effect-based recovery, loop guard                    | No named failure classes in the log                           |
+| Measure the system                | pass^k, cost, safety                                 | Not tracked: unsupported claims, human interventions per task |
+| Build to delete                   | `remy eval compare`                                  | No test of what each layer adds when removed                  |
+
+Taking this as a warning too: the post says complexity should be earned by observed failure. Each item below stays only if the hard suite rises.
