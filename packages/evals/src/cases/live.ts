@@ -103,4 +103,19 @@ export const live: EvalCase[] = [
     'rust',
     eol('rust'),
   ),
+  {
+    id: 'live-two-at-once',
+    suite: 'live',
+    prompt:
+      'Compare the latest stable versions of Django and Flask. Give both exact versions and the pages you read them on.',
+    world: { liveWeb: true },
+    human,
+    graders: [
+      ok,
+      matchesTruth('django', pypi('django')),
+      matchesTruth('flask', pypi('flask')),
+      citesPageRead(),
+    ],
+    reference: [],
+  },
 ];
