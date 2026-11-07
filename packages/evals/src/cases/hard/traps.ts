@@ -189,4 +189,26 @@ export const traps: EvalCase[] = [
       finish('The timeout is now 60.'),
     ],
   },
+  {
+    id: 'hard-trap-same-name-two-folders',
+    suite: 'hard',
+    prompt: 'Fix the typo "teh" in the report under drafts. Leave the published one alone.',
+    world: {
+      files: {
+        'drafts/report.txt': 'See teh figures.\n',
+        'published/report.txt': 'See teh figures.\n',
+      },
+    },
+    human,
+    graders: [
+      ok,
+      fileContains('drafts/report.txt', 'See the figures.'),
+      fileContains('published/report.txt', 'teh'),
+    ],
+    reference: [
+      [readFile('drafts/report.txt')],
+      [editFile('drafts/report.txt', 'teh', 'the')],
+      finish('Fixed the draft and left the published one.'),
+    ],
+  },
 ];
