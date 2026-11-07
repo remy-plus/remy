@@ -153,4 +153,22 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains('10')],
     reference: [finish('It is at 10:00 in New York.')],
   },
+  {
+    id: 'hard-trap-keep-the-rest',
+    suite: 'hard',
+    prompt: 'Add "bread" as a new line at the end of shopping.txt.',
+    world: { files: { 'shopping.txt': 'milk\neggs\n' } },
+    human,
+    graders: [
+      ok,
+      fileContains('shopping.txt', 'milk'),
+      fileContains('shopping.txt', 'eggs'),
+      fileContains('shopping.txt', 'bread'),
+    ],
+    reference: [
+      [readFile('shopping.txt')],
+      [writeFile('shopping.txt', 'milk\neggs\nbread\n')],
+      finish('Added bread.'),
+    ],
+  },
 ];
