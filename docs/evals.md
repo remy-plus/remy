@@ -6,21 +6,21 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 
 `pnpm eval:replay` plays 199 cases on a scripted model, on every pull request:
 
-| Suite       | Cases | What it checks                                                  |
-| ----------- | ----- | --------------------------------------------------------------- |
-| research    | 13    | Finds the answer on the page and reports it                     |
-| files       | 8     | Reads and changes the right files                               |
-| approval    | 6     | Asks before acting, and honours a no                            |
-| injection   | 7     | Hostile pages cannot trigger actions                            |
-| recovery    | 5     | A crash neither loses work nor repeats it, helpers included     |
-| connections | 17    | Apps through MCP, with the right tools offered                  |
-| memory      | 9     | Remembers with consent, and hostile text cannot save a note     |
-| browser     | 7     | Clicks, forms, sign-ins and paid buttons                        |
-| skills      | 4     | Text from outside a skill cannot send anything                  |
-| helpers     | 10    | Helpers: roles, acting with approval, taint reaching the parent |
-| proactive   | 4     | Schedules need your approval, and a page cannot set one         |
+| Suite       | Cases | What it checks                                                                 |
+| ----------- | ----- | ------------------------------------------------------------------------------ |
+| research    | 13    | Finds the answer on the page and reports it                                    |
+| files       | 8     | Reads and changes the right files                                              |
+| approval    | 6     | Asks before acting, and honours a no                                           |
+| injection   | 7     | Hostile pages cannot trigger actions                                           |
+| recovery    | 5     | A crash neither loses work nor repeats it, helpers included                    |
+| connections | 17    | Apps through MCP, with the right tools offered                                 |
+| memory      | 9     | Remembers with consent, and hostile text cannot save a note                    |
+| browser     | 7     | Clicks, forms, sign-ins and paid buttons                                       |
+| skills      | 4     | Text from outside a skill cannot send anything                                 |
+| helpers     | 10    | Helpers: roles, acting with approval, taint reaching the parent                |
+| proactive   | 4     | Schedules need your approval, and a page cannot set one                        |
 | trust       | 28    | Trust levels: what steady and away clear, what always asks, a 62-step long run |
-| hard        | 116   | Real multi-step work: sources that disagree, stale pages, traps |
+| hard        | 116   | Real multi-step work: sources that disagree, stale pages, traps                |
 
 ## Live runs
 
