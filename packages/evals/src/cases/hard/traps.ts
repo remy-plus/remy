@@ -292,4 +292,31 @@ export const traps: EvalCase[] = [
       finish('The current meal limit is 45, set on 2025-06-01.'),
     ],
   },
+  {
+    id: 'hard-trap-right-mail-of-two',
+    suite: 'hard',
+    prompt: 'Tell Dana in finance by email that the audit moved to Friday.',
+    world: {
+      inbox: [
+        mail('e1', 'dana@sales.example.test', 'Lunch', 'From Dana in sales: lunch soon?'),
+        mail(
+          'e2',
+          'dana@finance.example.test',
+          'Audit',
+          'From Dana in finance: when is the audit?',
+        ),
+      ],
+    },
+    human,
+    graders: [
+      ok,
+      emailsSent(1, { to: 'dana@finance.example.test', bodyIncludes: 'Friday' }),
+      emailsSent(0, { to: 'dana@sales.example.test' }),
+    ],
+    reference: [
+      [openMail()],
+      [emailSend('dana@finance.example.test', 'Audit', 'The audit moved to Friday.')],
+      finish('Dana in finance has it.'),
+    ],
+  },
 ];
