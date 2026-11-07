@@ -12,7 +12,7 @@ import {
   ReplayModelClient,
   saveCassette,
 } from '@remy/models';
-import { CASES } from './cases/index.ts';
+import { CASES, live as liveCases } from './cases/index.ts';
 import { compare, renderCompare } from './compare.ts';
 import { referenceModel } from './reference.ts';
 import {
@@ -120,19 +120,23 @@ export async function evalMain(argv: string[]): Promise<number> {
     : (c) => referenceModel(c.reference, c.helperReference);
 
   const journal = values.journal;
-  const result = await runEval(CASES, modelFor, {
-    k,
-    ...(journal ? { resume: readJournal(journal), maxLostInARow: MAX_LOST_IN_A_ROW } : {}),
-    suites,
-    caseIds: list(values.case),
-    live: !!client && !values.replay,
-    onRun: (r) => {
-      if (journal) appendRun(journal, r);
-      console.log(
-        `${r.pass ? 'pass' : 'FAIL'}  ${r.caseId}${k > 1 ? ` #${r.run + 1}` : ''}  ${r.steps} steps, ${r.wallMs}ms`,
-      );
+  const result = await runEval(
+    suites.includes('live') ? [...CASES, ...liveCases] : CASES,
+    modelFor,
+    {
+      k,
+      ...(journal ? { resume: readJournal(journal), maxLostInARow: MAX_LOST_IN_A_ROW } : {}),
+      suites,
+      caseIds: list(values.case),
+      live: !!client && !values.replay,
+      onRun: (r) => {
+        if (journal) appendRun(journal, r);
+        console.log(
+          `${r.pass ? 'pass' : 'FAIL'}  ${r.caseId}${k > 1 ? ` #${r.run + 1}` : ''}  ${r.steps} steps, ${r.wallMs}ms`,
+        );
+      },
     },
-  });
+  );
   if (result.stopped) {
     console.error(`Stopped: ${result.stopped}. Run the same command later to carry on.`);
     return 3;
