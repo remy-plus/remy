@@ -335,12 +335,17 @@ export function requestTooLarge(status: number, detail: string): boolean {
   return !!m && Number(m[2]) > Number(m[1]);
 }
 
+const DAILY_LIMIT = /tokens per day|requests per day|\b(TPD|RPD)\b/i;
+
 /** Some providers check the model's tool call and answer 400 when it is malformed. The request was fine. */
 const BAD_MODEL_OUTPUT = /output_parse_failed|tool_use_failed/;
 
 /** The ModelError for a non-2xx reply from an OpenAI-compatible endpoint. */
 export function httpError(status: number, detail: string, headers: Headers): ModelError {
   const tooLarge = requestTooLarge(status, detail);
+  // Retries would only spend minutes on a limit that lifts much later.
+  if (status === 429 && DAILY_LIMIT.test(detail))
+    return new ModelError(`this model's daily limit is used up. ${detail}`, false);
   if (status === 429 || status === 503)
     return new ModelError(`HTTP ${status}: ${detail}`, true, {
       rateLimited: true,

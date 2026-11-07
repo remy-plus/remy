@@ -211,6 +211,16 @@ describe('createOpenAIClient', () => {
     expect(err.retryable).toBe(true);
   });
 
+  it('does not wait out a daily limit: it will not lift in time', async () => {
+    const detail = 'Rate limit reached on tokens per day (TPD): Limit 200000, Used 199240';
+    const { client } = make(
+      () => new Response(JSON.stringify({ error: { message: detail } }), { status: 429 }),
+    );
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toMatchObject({ retryable: false });
+    expect(err.message).toContain('daily limit');
+  });
+
   it('a 503 waits like a rate limit: the provider is over capacity', async () => {
     const { client } = make(() => new Response('over capacity', { status: 503 }));
     const err = await client.complete(req, sig()).catch((e) => e);
