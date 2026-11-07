@@ -10,6 +10,8 @@ Remy no longer reports work that did not happen.
 - **Llama 3 on Ollama works**, through JSON tool calls.
 - **11 more providers in `/login` and `/model`:** DeepSeek, Mistral, xAI Grok, Together AI, Fireworks AI, Cerebras, Nebius, Moonshot Kimi, Z.ai GLM, DeepInfra and Alibaba Qwen.
 - Groq now starts on a model it still serves, and a bad xAI key is refused instead of saved.
+- **TinyFish search.** `REMY_SEARCH=tinyfish` with a free `TINYFISH_API_KEY`: 30 searches a minute, nothing on screen.
+- A used-up daily limit now says so at once, and when it lifts, instead of retrying for minutes.
 
 ## 0.10.0 (2026-11-04)
 
