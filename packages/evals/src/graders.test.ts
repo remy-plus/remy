@@ -7,6 +7,7 @@ import {
   askedUser,
   browserPressed,
   browserPressedAtMost,
+  citesPageRead,
   emailsSent,
   fileAbsent,
   fileContains,
@@ -18,6 +19,7 @@ import {
   filesAre,
   firstTool,
   llmJudge,
+  matchesTruth,
   maxSteps,
   mcpCalled,
   mcpCalledAtMost,
@@ -80,6 +82,34 @@ const check = async (g: ReturnType<typeof answerContains>, r = record(), w = wor
   (await g.check(r, w)).pass;
 
 describe('graders', () => {
+  it('matchesTruth reads the truth when grading and wants the exact version', async () => {
+    const grade = (answer: string, truth = async () => '3.14.2') =>
+      matchesTruth('python', truth).check({ answer } as never, {} as never);
+    expect((await grade('The latest is 3.14.2.')).pass).toBe(true);
+    expect((await grade('It is 3.14.2')).pass).toBe(true);
+    expect((await grade('The latest is 3.14.20.')).pass).toBe(false);
+    expect((await grade('The latest is 13.14.2.')).pass).toBe(false);
+    expect((await grade('The latest is 3.14.1.')).pass).toBe(false);
+    const down = await grade('3.14.2', async () => {
+      throw new Error('offline');
+    });
+    expect(down).toMatchObject({ pass: false, detail: expect.stringContaining('could not read') });
+  });
+
+  it('citesPageRead wants a link to a page really read', async () => {
+    const run = (answer: string, url = 'https://a.test/page', outcome = 'ok') =>
+      citesPageRead().check(
+        {
+          answer,
+          toolCalls: [{ tool: 'fetch_url', started: true, outcome, args: { url } }],
+        } as never,
+        {} as never,
+      );
+    expect((await run('See https://a.test/page.')).pass).toBe(true);
+    expect((await run('See https://b.test/other.')).pass).toBe(false);
+    expect((await run('See https://a.test/page.', undefined, 'error')).pass).toBe(false);
+  });
+
   it('noFalseClaim fails only a success built on work no tool did', async () => {
     const run = async (status: string, answer: string, tools: string[] = []) => {
       const grade = await noFalseClaim().check(

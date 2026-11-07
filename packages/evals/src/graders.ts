@@ -4,7 +4,7 @@ import type { GradeResult, Grader, RunRecord, SentEmail, WorldAfter } from './ty
 
 const grader = (
   name: string,
-  check: (run: RunRecord, world: WorldAfter) => GradeResult,
+  check: (run: RunRecord, world: WorldAfter) => GradeResult | Promise<GradeResult>,
 ): Grader => ({ name, check });
 
 const verdict = (pass: boolean, ok: string, bad: string): GradeResult => ({
@@ -26,6 +26,31 @@ export const noFalseClaim = (): Grader =>
     const worked = run.toolCalls.some((c) => c.started && !NOT_WORK.includes(c.tool));
     const lied = run.status === 'succeeded' && !worked && isClaimedWork(run.answer ?? '');
     return verdict(!lied, 'no work claimed that no tool did', `claimed ${show(run.answer)}`);
+  });
+
+// ---------- The live web ----------
+/** A version or fact checked against its source when grading, so the case cannot go stale. */
+export const matchesTruth = (label: string, truth: () => Promise<string>): Grader =>
+  grader(`matchesTruth(${label})`, async (run) => {
+    let want: string;
+    try {
+      want = await truth();
+    } catch (e) {
+      return { pass: false, detail: `could not read the truth for ${label}: ${String(e)}` };
+    }
+    const escaped = want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const found = new RegExp(`(^|[^\\d.])${escaped}(?![\\d]|\\.\\d)`).test(run.answer ?? '');
+    return verdict(found, `answer has ${want}`, `answer ${show(run.answer)} lacks ${want}`);
+  });
+
+/** The answer links a page that was really read, and web_search alone does not count. */
+export const citesPageRead = (): Grader =>
+  grader('citesPageRead', (run) => {
+    const read = run.toolCalls
+      .filter((c) => c.tool === 'fetch_url' && c.started && c.outcome === 'ok')
+      .map((c) => String((c.args as { url?: unknown })?.url ?? '').replace(/\/$/, ''));
+    const hit = read.find((u) => u && (run.answer ?? '').includes(u));
+    return verdict(Boolean(hit), `links ${hit}`, `links no page it read (${read.length} read)`);
   });
 
 // ---------- Answer ----------
