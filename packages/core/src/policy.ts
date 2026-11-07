@@ -11,6 +11,7 @@ import {
   type Tool,
   type ToolContext,
   type ToolResult,
+  TRUST_LEVELS,
 } from './types.ts';
 
 declare const brand: unique symbol;
@@ -111,9 +112,26 @@ export function decide(
       kind: 'require_approval',
       reason: 'this task read untrusted content (a web page, search result, email or pasted text)',
     };
+  // 4b. Trust level. Only a `write` call to a tool that opted in, never in a tainted task (step 4
+  // returned already), never in a helper (a helper's permissions carry no level, and a role or
+  // skill can only shut tools, not open them), and never past the deny list (step 2).
+  if (trustClears(risk, tool, state.config))
+    return {
+      kind: 'allow',
+      via: 'trust',
+      reason: `${state.config.permissions.trust} level covers ${tool.name}`,
+    };
   // 5. Standing permissions.
   if (autoApprove.includes(risk)) return { kind: 'allow' };
   return { kind: 'require_approval', reason: `${label(risk)} isn't auto-approved` };
+}
+
+/** Whether the task's trust level clears this call. Pure: it reads only the recorded config. */
+function trustClears(risk: Risk, tool: Tool, config: TaskState['config']): boolean {
+  const level = config.permissions.trust;
+  if (!level || !tool.trustFrom || risk !== 'write') return false;
+  if (config.parent || config.helperRole) return false;
+  return TRUST_LEVELS.indexOf(level) >= TRUST_LEVELS.indexOf(tool.trustFrom);
 }
 
 const label = (risk: string) =>

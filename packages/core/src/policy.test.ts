@@ -376,3 +376,68 @@ describe('runTool', () => {
     expect(await reconcileTool(a, t, ctx)).toEqual({ unknown: 'api down' });
   });
 });
+
+describe('trust levels', () => {
+  const steadyTool = mk('write', { trustFrom: 'steady' });
+  const awayTool = mk('write', { trustFrom: 'away' });
+  const plainWrite = mk('write');
+  const at = (
+    trust: 'ask' | 'steady' | 'away',
+    extra: Partial<Permissions> = {},
+    tainted = false,
+  ) => state({ trust, ...extra }, tainted);
+  const run = (tool: Tool, s: ReturnType<typeof state>) => decide(planned(tool.name), tool, s);
+
+  it('ask clears nothing beyond the task permissions', () => {
+    expect(run(steadyTool, at('ask')).kind).toBe('require_approval');
+    expect(run(steadyTool, state()).kind).toBe('require_approval');
+  });
+
+  it('steady clears steady tools only; away clears both', () => {
+    expect(run(steadyTool, at('steady'))).toMatchObject({ kind: 'allow', via: 'trust' });
+    expect(run(awayTool, at('steady')).kind).toBe('require_approval');
+    expect(run(steadyTool, at('away')).kind).toBe('allow');
+    expect(run(awayTool, at('away')).kind).toBe('allow');
+  });
+
+  it('a write tool that did not opt in always asks', () => {
+    expect(run(plainWrite, at('away')).kind).toBe('require_approval');
+  });
+
+  it.each(['steady', 'away'] as const)('%s never clears spending, sending or deleting', (level) => {
+    for (const risk of ['send_as_user', 'spend_money', 'irreversible'] as const) {
+      const t = mk(risk, { trustFrom: 'steady' });
+      expect(run(t, at(level)).kind).toBe('require_approval');
+    }
+  });
+
+  it.each(['steady', 'away'] as const)('%s: a call raised past write by riskFor asks', (level) => {
+    const t = mk('write', { trustFrom: 'steady', riskFor: () => 'spend_money' });
+    expect(run(t, at(level)).kind).toBe('require_approval');
+  });
+
+  it.each(['steady', 'away'] as const)('%s: untrusted content overrides the level', (level) => {
+    expect(run(steadyTool, at(level, {}, true)).kind).toBe('require_approval');
+  });
+
+  it.each(['steady', 'away'] as const)('%s: the deny list still blocks', (level) => {
+    expect(run(steadyTool, at(level, { denyTools: [steadyTool.name] })).kind).toBe('deny');
+    expect(run(steadyTool, at(level, { allowTools: ['other'] })).kind).toBe('deny');
+  });
+
+  it.each(['steady', 'away'] as const)('%s: a helper never gets the level', (level) => {
+    const s = at(level);
+    expect(
+      run(steadyTool, { ...s, config: { ...s.config, parent: { taskId: 't', callId: 'c' } } }).kind,
+    ).toBe('require_approval');
+    expect(run(steadyTool, { ...s, config: { ...s.config, helperRole: 'x' } }).kind).toBe(
+      'require_approval',
+    );
+  });
+
+  it('an MCP-style tool is not widened, but its standing approval still works', () => {
+    const mcp = mk('write', { name: 'mcp_notes_add' });
+    expect(run(mcp, at('away')).kind).toBe('require_approval');
+    expect(run(mcp, at('away', { standing: [mcp.name] }))).toMatchObject({ via: 'standing' });
+  });
+});

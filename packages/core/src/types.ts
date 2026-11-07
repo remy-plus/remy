@@ -45,8 +45,8 @@ export const canStandingAllow = (risk: Risk): boolean => STANDING_RISKS.includes
 export const maxRisk = (a: Risk, b: Risk): Risk => (RISKS.indexOf(b) > RISKS.indexOf(a) ? b : a);
 
 export type PolicyDecision =
-  /** `via: 'standing'` means the user's standing approval for this tool cleared the call. */
-  | { kind: 'allow'; via?: 'standing'; reason?: string }
+  /** `via: 'standing'`: the user's standing approval for this tool cleared the call. `via: 'trust'`: the task's trust level did. */
+  | { kind: 'allow'; via?: 'standing' | 'trust'; reason?: string }
   | { kind: 'require_approval'; reason: string }
   | { kind: 'deny'; reason: string };
 
@@ -58,8 +58,24 @@ export interface Budget {
   maxCallsPerStep: number;
 }
 
+/**
+ * How much the user lets Remy do without a card. `ask` is the default. `steady` clears a short
+ * list of low-risk, reversible work in the workspace; `away` clears a little more, for long runs
+ * while the user is gone. Neither ever clears spending, sending, deleting or anything after
+ * untrusted content; see `decide`.
+ */
+export type TrustLevel = 'ask' | 'steady' | 'away';
+export const TRUST_LEVELS: readonly TrustLevel[] = ['ask', 'steady', 'away'];
+export const isTrustLevel = (v: unknown): v is TrustLevel =>
+  typeof v === 'string' && (TRUST_LEVELS as readonly string[]).includes(v);
+
 export interface Permissions {
   autoApprove: Risk[];
+  /**
+   * The trust level the task started with. Recorded in `task.created`, so recovery and replay see
+   * the level the task began with; changing the setting later only affects new tasks. Absent: `ask`.
+   */
+  trust?: TrustLevel;
   allowTools?: string[];
   denyTools?: string[];
   netAllow?: string[];
@@ -439,6 +455,12 @@ export interface Tool<A = unknown> {
    * It can only raise `risk`, never lower it; see `callRisk`.
    */
   riskFor?(args: A): Risk;
+  /**
+   * The lowest trust level at which a `write` call to this tool clears without a card. Absent:
+   * never. A tool opts in on purpose, only when its work stays in the workspace or Remy's own
+   * notes and can be undone. MCP tools never set it.
+   */
+  trustFrom?: Exclude<TrustLevel, 'ask'>;
   effect: Effect;
   outputTrust: Trust;
   timeoutMs: number;
