@@ -20,6 +20,7 @@ export const PROFILES: Record<string, Profile> = {
   deepseek: { baseUrl: 'https://api.deepseek.com', keyEnv: 'DEEPSEEK_API_KEY' },
   mistral: { baseUrl: 'https://api.mistral.ai/v1', keyEnv: 'MISTRAL_API_KEY' },
   xai: { baseUrl: 'https://api.x.ai/v1', keyEnv: 'XAI_API_KEY' },
+  together: { baseUrl: 'https://api.together.xyz/v1', keyEnv: 'TOGETHER_API_KEY' },
   // Native APIs (not OpenAI-compatible), served by the AI SDK client.
   anthropic: {
     kind: 'anthropic',

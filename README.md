@@ -40,6 +40,7 @@ remy
 | DeepSeek      | `deepseek`         | `DEEPSEEK_API_KEY`   | OpenAI-compatible API                                        |
 | Mistral       | `mistral`          | `MISTRAL_API_KEY`    | OpenAI-compatible API                                        |
 | xAI Grok      | `xai`              | `XAI_API_KEY`        | OpenAI-compatible API                                        |
+| Together AI   | `together`         | `TOGETHER_API_KEY`   | OpenAI-compatible API                                        |
 | Ollama        | `ollama`           | none                 | Local models                                                 |
 | Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
 

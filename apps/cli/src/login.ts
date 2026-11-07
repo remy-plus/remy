@@ -24,6 +24,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
   },
   mistral: { label: 'Mistral', model: 'ministral-3b-2512', keyUrl: 'console.mistral.ai/api-keys' },
   xai: { label: 'xAI Grok', model: 'grok-4.3', keyUrl: 'console.x.ai' },
+  together: {
+    label: 'Together AI',
+    model: 'zai-org/GLM-5.3-Flash',
+    keyUrl: 'api.together.ai/settings/api-keys',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -44,6 +49,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
   mistral: ['ministral-3b-2512'],
   xai: ['grok-4.3'],
+  together: ['zai-org/GLM-5.3-Flash'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 
