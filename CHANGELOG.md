@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Remy knows what it can do here.** Each message now carries a short list of what works on this machine (web search, browser, files, schedules, helpers, skills) and, for each gap, the one step you take to fix it. Asked for something it cannot do, such as email with nothing connected, Remy says what is missing and the exact step, instead of trying and failing or claiming it. It reads the same checks as `remy doctor`, once per session.
 - **Sources are checked.** After reading web pages, an answer with a link nobody read, or with no link to a page that was read, goes back once. So does a latest version, a price or today's status seen on only one site: Remy confirms it on a second site and says so if they disagree. It is one push back per task and never a failure.
 
 ## 0.10.1 (2026-11-06)
