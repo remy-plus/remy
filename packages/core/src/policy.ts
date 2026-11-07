@@ -57,6 +57,22 @@ export function decide(
       kind: 'deny',
       reason: `you already made this exact ${call.tool} call and it succeeded. Use that result, or do something different`,
     };
+  // 1b2. The model may not repeat a side effect that may already have happened: no approval
+  // card, no second send. Recovery after a crash asks the user instead; this is the same rule.
+  const uncertain = Object.values(state.calls ?? {}).find(
+    (c) =>
+      c.callId !== call.callId &&
+      c.tool === call.tool &&
+      c.argsHash === call.argsHash &&
+      c.result &&
+      !c.result.ok &&
+      c.result.phase !== 'before_effect',
+  );
+  if (uncertain && (tool.effect === 'unsafe_to_retry' || tool.effect === 'reconcilable'))
+    return {
+      kind: 'deny',
+      reason: `this exact ${call.tool} call may already have gone through, so it was not sent again. Tell the user it may or may not have happened, and do not say it failed or that it worked`,
+    };
   // 1c. A task may ask the user only so many questions; after that it works with what it has.
   if (call.tool === 'ask_user') {
     const asked = Object.values(state.calls ?? {}).filter(

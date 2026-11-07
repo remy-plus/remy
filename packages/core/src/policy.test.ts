@@ -56,6 +56,47 @@ const planned = (tool: string, args: unknown = { n: 1 }) => ({
 const kind = (risk: Risk, s: ReturnType<typeof state>) =>
   decide(planned(`t_${risk}`), mk(risk), s).kind;
 
+describe('a side effect that may already have happened', () => {
+  const uncertain = (phase: 'before_effect' | 'after_effect' | 'unknown') => ({
+    calls: {
+      c0: {
+        ...planned('t_send_as_user'),
+        callId: 'c0',
+        step: 1,
+        attempts: 1,
+        inFlight: false,
+        result: { ok: false, error: 'closed', retryable: false, phase },
+      } as CallState,
+    },
+  });
+  const send = (effect: Tool['effect']) => mk('send_as_user', { effect });
+
+  it.each(['unknown', 'after_effect'] as const)('is not sent again after %s', (phase) => {
+    expect(
+      decide(planned('t_send_as_user'), send('unsafe_to_retry'), {
+        ...state(),
+        ...uncertain(phase),
+      }),
+    ).toMatchObject({ kind: 'deny', reason: expect.stringContaining('may or may not') });
+  });
+
+  it('may be tried again when it never left', () => {
+    expect(
+      decide(planned('t_send_as_user'), send('unsafe_to_retry'), {
+        ...state(),
+        ...uncertain('before_effect'),
+      }).kind,
+    ).toBe('require_approval');
+  });
+
+  it('may be tried again when repeating does no harm', () => {
+    expect(
+      decide(planned('t_send_as_user'), send('idempotent'), { ...state(), ...uncertain('unknown') })
+        .kind,
+    ).toBe('require_approval');
+  });
+});
+
 describe('decide', () => {
   it('rule 1: unknown tool and invalid args are denied', () => {
     expect(decide(planned('nope'), undefined, state()).kind).toBe('deny');
