@@ -51,4 +51,17 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains('280')],
     reference: [[readFile('charges.csv')], finish('You really spent 280 after refunds.')],
   },
+  {
+    id: 'hard-trap-corrected-row',
+    suite: 'hard',
+    prompt:
+      'orders.csv lists orders by id. A later row for the same id is a correction. What is the total?',
+    world: { files: { 'orders.csv': 'id,amount\n1,50\n2,75\n3,20\n2,70\n4,10\n3,25\n' } },
+    human,
+    graders: [ok, answerContains('155')],
+    reference: [
+      [readFile('orders.csv')],
+      finish('The total is 155 once corrections replace the first rows.'),
+    ],
+  },
 ];
