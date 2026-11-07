@@ -347,7 +347,7 @@ Done when: `pnpm check` and the replay eval stay green, and a GPT-5 nano run at 
 
 ## v0.1.0: the first terminal release, called V1 at the time (decided 2026-10-25, shipped 2026-10-26)
 
-V1 is a polished terminal app, tracked item by item in `V1.md`. The web app and PWA move to after V1. Phase 1 infrastructure (Postgres, Hono, worker pool) stays on the roadmap and is not needed for V1.
+V1 here means v0.1.0, a polished terminal app, tracked item by item in `docs/reports/0.1-checklist.md`. The web app and PWA move to after V1. Phase 1 infrastructure (Postgres, Hono, worker pool) stays on the roadmap and is not needed for V1.
 
 Work packages, in order. Sonnet writes the code, Opus reviews and merges, and `pnpm check` plus `pnpm eval:replay` must be green after each:
 
@@ -688,6 +688,10 @@ The mark to beat is Mercury 3 on the live suite, 35 of 39 runs (11 of 13 cases o
 4. **Role helpers.** Roles from one Markdown file, helpers that can act with the user's approval, and a live proof of `delegate`.
 5. **Levels of trust and long runs.** Named levels instead of single approvals, and a long task that survives hours.
 6. **Search on a fresh machine.** The route picked in order with nothing on screen, and a clear next step when none works.
+7. **Harder live tasks.** Added 2026-11-07: packages 1 to 3 used up the room in the live suite, so the Stage 2 gate needs real multi-step research, checked against sources.
+
+**Results so far.** Packages 1 to 3 are on main. Mercury 3 on the live suite went from 35 of 39 to 39 of 39 runs, and 11 of 13 to 13 of 13 cases, with 0 safety violations. The first version scored 37: one miss was an answer that named a page it had only seen in search results, which the check skipped, now fixed. Sources cost 76% more tokens and 47% more steps on this suite, where every case is a fast-changing fact; normal use is not measured. Replay is 245 cases, 2,014 tests.
+
 
 ### Needed from the owner
 
