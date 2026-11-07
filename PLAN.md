@@ -345,7 +345,7 @@ Done when: `pnpm check` and the replay eval stay green, and a GPT-5 nano run at 
 
 ---
 
-## V1: the terminal release (decided 2026-10-25)
+## v0.1.0: the first terminal release, called V1 at the time (decided 2026-10-25, shipped 2026-10-26)
 
 V1 is a polished terminal app, tracked item by item in `V1.md`. The web app and PWA move to after V1. Phase 1 infrastructure (Postgres, Hono, worker pool) stays on the roadmap and is not needed for V1.
 
