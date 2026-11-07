@@ -5,6 +5,7 @@ export * from './next.ts';
 export * from './plan.ts';
 export * from './policy.ts';
 export * from './registry.ts';
+export * from './roles.ts';
 export * from './runtime.ts';
 export * from './select.ts';
 export * from './sources.ts';

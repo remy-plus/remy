@@ -9,6 +9,8 @@ export interface Facts {
   daemon: boolean;
   schedules: number;
   search: string;
+  /** Problems found in the helper roles files, one line each. */
+  helperProblems?: string[];
 }
 
 export interface Check {
@@ -28,6 +30,7 @@ export interface Probes {
   daemonOn: () => boolean;
   schedules: () => number;
   search: string;
+  helperProblems?: () => string[];
 }
 
 /** Facts for the checks. Docker only matters when search falls back to the hidden browser. */
@@ -40,6 +43,7 @@ export function gatherFacts(p: Probes): Facts {
     daemon: p.platform === 'darwin' && p.daemonOn(),
     schedules: p.schedules(),
     search: p.search,
+    ...(p.helperProblems && { helperProblems: p.helperProblems() }),
   };
 }
 
@@ -94,6 +98,16 @@ export function runChecks(f: Facts): Check[] {
           fix: 'Run remy daemon install.',
         }
       : { name: 'Schedules', status: 'ok', detail: `${f.schedules} set` },
+    ...(f.helperProblems?.length
+      ? [
+          {
+            name: 'Helpers',
+            status: 'warning' as const,
+            detail: `${f.helperProblems.length} ${f.helperProblems.length === 1 ? 'problem' : 'problems'} in the roles files`,
+            fix: f.helperProblems.join('\n             '),
+          },
+        ]
+      : []),
   ];
 }
 

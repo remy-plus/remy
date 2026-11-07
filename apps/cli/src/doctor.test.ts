@@ -17,6 +17,15 @@ describe('runChecks', () => {
     expect(checks.filter((c) => c.status === 'problem')).toEqual([]);
   });
 
+  it('lists helper role problems as a warning, never a problem', () => {
+    const c = runChecks({ ...facts, helperProblems: ['a, line 3: bad', 'b, line 1: worse'] }).find(
+      (x) => x.name === 'Helpers',
+    );
+    expect(c?.status).toBe('warning');
+    expect(c?.fix).toContain('line 3: bad');
+    expect(c?.fix).toContain('line 1: worse');
+  });
+
   it('flags an old Node with what to do', () => {
     const c = runChecks({ ...facts, node: 'v20.1.0' }).find((x) => x.name === 'Node');
     expect(c?.status).toBe('problem');
