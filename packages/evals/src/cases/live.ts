@@ -91,4 +91,10 @@ export const live: EvalCase[] = [
     'deno',
     github('denoland/deno'),
   ),
+  version(
+    'live-bun',
+    'What is the latest stable version of Bun? Give the exact version and the page you read it on.',
+    'bun',
+    github('oven-sh/bun', /^bun-v/),
+  ),
 ];
