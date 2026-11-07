@@ -6,7 +6,7 @@ import type { LoginEntry, LoginResult, ProviderChoice } from './login-ui.ts';
 const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }> = {
   openai: { label: 'OpenAI', model: 'gpt-5-nano', keyUrl: 'platform.openai.com/api-keys' },
   openrouter: { label: 'OpenRouter', model: 'openai/gpt-5-nano', keyUrl: 'openrouter.ai/keys' },
-  groq: { label: 'Groq', model: 'llama-3.3-70b-versatile', keyUrl: 'console.groq.com/keys' },
+  groq: { label: 'Groq', model: 'qwen/qwen3.8-27b', keyUrl: 'console.groq.com/keys' },
   anthropic: {
     label: 'Anthropic',
     model: 'claude-haiku-5-5',
@@ -31,7 +31,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
     'meta-llama/llama-3.3-70b-instruct',
     'google/gemma-4-26b-a4b-it:free',
   ],
-  groq: ['llama-3.3-70b-versatile'],
+  groq: ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
   anthropic: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
   google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],

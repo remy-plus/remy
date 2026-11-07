@@ -80,6 +80,13 @@ export const BUILTIN_CATALOG: Catalog = {
     pricing: { inPerMTok: 0.59, outPerMTok: 0.79 },
   },
   // Groq free tier: 8,000 tokens a minute for gpt-oss, 12,000 for Llama 3.3 70B. Paid keys can raise `tpm` in models.json.
+  'qwen/qwen3.8-27b': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 131072,
+    tpm: 8000,
+    pricing: { inPerMTok: 0.8, outPerMTok: 4 },
+  },
   'openai/gpt-oss-120b': {
     jsonSchema: false,
     contextTokens: 131072,

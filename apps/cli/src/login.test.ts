@@ -7,7 +7,7 @@ import { createElement as h } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type CliDeps, cli } from './cli.ts';
 import { openCredentials } from './credentials.ts';
-import { providerChoices } from './login.ts';
+import { providerChoices, SUGGESTED_MODELS } from './login.ts';
 import { LoginFlow, type LoginResult } from './login-ui.ts';
 import { createTheme } from './theme.ts';
 
@@ -292,4 +292,18 @@ describe('the login picker', () => {
     await tick();
     expect(app2.lastFrame()).toContain('Base URL');
   });
+});
+
+describe('every provider', () => {
+  const hosted = providerChoices().filter((c) => c.id !== 'custom' && c.needsKey);
+
+  it.each(hosted.map((c) => c.id))(
+    '%s says where to get a key and which model to start on',
+    (id) => {
+      const c = hosted.find((x) => x.id === id);
+      expect(c?.keyUrl).toBeTruthy();
+      expect(c?.exampleModel).toBeTruthy();
+      expect(SUGGESTED_MODELS[id]).toContain(c?.exampleModel);
+    },
+  );
 });
