@@ -1,7 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { SuiteMetrics } from './metrics.ts';
 import type { EvalResult } from './runner.ts';
+import type { RunRecord } from './types.ts';
 
 export const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '');
 
@@ -58,6 +59,22 @@ export function writeResults(r: EvalResult, dir: string): string {
   writeFileSync(`${base}.json`, `${JSON.stringify(r, null, 2)}\n`);
   writeFileSync(`${base}.md`, renderSummary(r));
   return `${base}.json`;
+}
+
+/** Saves one finished run at once, so a restart loses nothing. */
+export function appendRun(path: string, run: RunRecord): void {
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, `${JSON.stringify(run)}\n`);
+}
+
+/** The runs worth keeping from a journal. A run the provider lost said nothing about the model. */
+export function readJournal(path: string): RunRecord[] {
+  if (!existsSync(path)) return [];
+  return readFileSync(path, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as RunRecord)
+    .filter((r) => r.failure !== 'model_error');
 }
 
 export const readResults = (path: string): EvalResult =>

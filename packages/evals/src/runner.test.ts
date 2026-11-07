@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DEFAULT_BUDGET, type Event, ModelError, type StoredEvent } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
@@ -12,7 +15,7 @@ import {
 import { percentile } from './metrics.ts';
 import { buildRecord, policyViolations } from './record.ts';
 import { referenceModel } from './reference.ts';
-import { renderSummary } from './report.ts';
+import { appendRun, readJournal, renderSummary } from './report.ts';
 import { runCase, runEval, sharedPrefix } from './runner.ts';
 import type { EvalCase, RunRecord } from './types.ts';
 
@@ -323,5 +326,18 @@ describe('sharedPrefix', () => {
     expect(sharedPrefix('abcdef', 'abcxyz')).toBe(3);
     expect(sharedPrefix('abc', 'abcdef')).toBe(3);
     expect(sharedPrefix('', 'a')).toBe(0);
+  });
+});
+
+describe('journal', () => {
+  it('keeps finished runs and drops the ones the provider lost', () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'remy-journal-')), 'nested', 'runs.jsonl');
+    expect(readJournal(path)).toEqual([]);
+    const run = (caseId: string, failure?: RunRecord['failure']) =>
+      ({ caseId, run: 0, pass: !failure, failure }) as RunRecord;
+    appendRun(path, run('good'));
+    appendRun(path, run('wrong', 'wrong_answer'));
+    appendRun(path, run('lost', 'model_error'));
+    expect(readJournal(path).map((r) => r.caseId)).toEqual(['good', 'wrong']);
   });
 });
