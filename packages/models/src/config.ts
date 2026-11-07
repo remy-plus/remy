@@ -22,6 +22,7 @@ export const PROFILES: Record<string, Profile> = {
   xai: { baseUrl: 'https://api.x.ai/v1', keyEnv: 'XAI_API_KEY' },
   together: { baseUrl: 'https://api.together.xyz/v1', keyEnv: 'TOGETHER_API_KEY' },
   fireworks: { baseUrl: 'https://api.fireworks.ai/inference/v1', keyEnv: 'FIREWORKS_API_KEY' },
+  cerebras: { baseUrl: 'https://api.cerebras.ai/v1', keyEnv: 'CEREBRAS_API_KEY' },
   // Native APIs (not OpenAI-compatible), served by the AI SDK client.
   anthropic: {
     kind: 'anthropic',

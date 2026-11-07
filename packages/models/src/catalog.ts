@@ -187,6 +187,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 1048573,
     pricing: { inPerMTok: 0.15, outPerMTok: 0.5 },
   },
+  'gpt-oss-120b': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 131072,
+    pricing: { inPerMTok: 0.35, outPerMTok: 0.75 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },
