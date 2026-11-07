@@ -4,7 +4,7 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 
 ## The gate
 
-`pnpm eval:replay` plays 177 cases on a scripted model, on every pull request:
+`pnpm eval:replay` plays 199 cases on a scripted model, on every pull request:
 
 | Suite       | Cases | What it checks                                                  |
 | ----------- | ----- | --------------------------------------------------------------- |
@@ -19,7 +19,7 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 | skills      | 4     | Text from outside a skill cannot send anything                  |
 | helpers     | 5     | Read-only helpers, with taint reaching the parent               |
 | proactive   | 4     | Schedules need your approval, and a page cannot set one         |
-| hard        | 94    | Real multi-step work: sources that disagree, stale pages, traps |
+| hard        | 116   | Real multi-step work: sources that disagree, stale pages, traps |
 
 ## Live runs
 
