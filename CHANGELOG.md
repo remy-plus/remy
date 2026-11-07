@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Sources are checked.** After reading web pages, an answer with a link nobody read, or with no link to a page that was read, goes back once. So does a latest version, a price or today's status seen on only one site: Remy confirms it on a second site and says so if they disagree. It is one push back per task and never a failure.
+
 ## 0.10.1 (2026-11-06)
 
 Remy no longer reports work that did not happen.
