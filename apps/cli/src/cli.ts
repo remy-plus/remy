@@ -295,9 +295,9 @@ Setup
   this machine (Chrome, Edge or Chromium) with its own profile in REMY_HOME/browser; it shows the
   window when you need to sign in. REMY_BROWSER=off turns it off; REMY_BROWSER_LOCAL=on lets it
   open local addresses.
-  Search: REMY_SEARCH (or "search" in remy.config.json) picks browser, context, brave, tavily,
+  Search: REMY_SEARCH (or "search" in remy.config.json) picks browser, context, brave, tavily, tinyfish,
   searxng or off. Unset, a service whose key is set searches (CONTEXT_DEV_API_KEY, BRAVE_API_KEY,
-  TAVILY_API_KEY, SEARXNG_URL), else the browser.
+  TAVILY_API_KEY, TINYFISH_API_KEY, SEARXNG_URL), else the browser.
 `;
 
 const OPTIONS = {
@@ -345,9 +345,16 @@ const SECRET_ENV = [
   ...PROFILE_KEY_ENVS,
   'BRAVE_API_KEY',
   'TAVILY_API_KEY',
+  'TINYFISH_API_KEY',
   'CONTEXT_DEV_API_KEY',
 ];
-const TOOL_SECRETS = ['BRAVE_API_KEY', 'TAVILY_API_KEY', 'CONTEXT_DEV_API_KEY', 'SEARXNG_URL'];
+const TOOL_SECRETS = [
+  'BRAVE_API_KEY',
+  'TAVILY_API_KEY',
+  'TINYFISH_API_KEY',
+  'CONTEXT_DEV_API_KEY',
+  'SEARXNG_URL',
+];
 
 const list = (v: string | undefined) =>
   v

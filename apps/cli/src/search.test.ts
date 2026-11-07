@@ -10,6 +10,7 @@ describe('pickSearch', () => {
     const env = { BRAVE_API_KEY: 'b', CONTEXT_DEV_API_KEY: 'c' };
     expect(pickSearch(env, undefined).choice).toBe('context');
     expect(pickSearch({ TAVILY_API_KEY: 't' }, undefined).choice).toBe('tavily');
+    expect(pickSearch({ TINYFISH_API_KEY: 't' }, undefined).choice).toBe('tinyfish');
   });
 
   it('follows the pick over the keys', () => {

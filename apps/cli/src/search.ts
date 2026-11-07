@@ -6,6 +6,7 @@ import {
   type SearchProvider,
   searxngSearch,
   tavilySearch,
+  tinyfishSearch,
 } from '@remy/tools';
 
 export const SEARCH_CHOICES = [
@@ -14,6 +15,7 @@ export const SEARCH_CHOICES = [
   'context',
   'brave',
   'tavily',
+  'tinyfish',
   'searxng',
   'off',
 ] as const;
@@ -26,6 +28,7 @@ const SERVICES: Record<
   context: { env: 'CONTEXT_DEV_API_KEY', make: contextDevSearch },
   brave: { env: 'BRAVE_API_KEY', make: braveSearch },
   tavily: { env: 'TAVILY_API_KEY', make: tavilySearch },
+  tinyfish: { env: 'TINYFISH_API_KEY', make: tinyfishSearch },
   searxng: { env: 'SEARXNG_URL', make: searxngSearch },
 };
 
