@@ -2,7 +2,7 @@
 // anywhere is recovered by re-reading the events and asking again. Pure.
 import { openPlanSteps, planGateUsed, UPDATE_PLAN } from './plan.ts';
 import { sourceGateMessage, sourceGateUsed, sourceProblems } from './sources.ts';
-import { type CallState, isTerminal, type TaskState } from './state.ts';
+import { type CallState, isTerminal, type TaskState, waitingCards } from './state.ts';
 import { type FinalStatus, PROGRESS_EVERY } from './types.ts';
 
 export type Action =
@@ -24,6 +24,8 @@ export type Action =
   | { kind: 'gate_sources'; message: string; callId?: string }
   | { kind: 'decide'; callId: string }
   | { kind: 'request_approval'; callId: string }
+  /** The model tried to finish with cards waiting: pause for the user instead. `callId` is its `finish` call. */
+  | { kind: 'hold'; callId?: string }
   | { kind: 'execute'; callId: string }
   | { kind: 'ask_user'; callId: string }
   /** The model asked a question in plain text instead of calling ask_user. */
@@ -54,10 +56,15 @@ export function nextAction(s: TaskState, now: number): Action {
   if (now - s.createdAt > s.config.budget.maxWallMs) return { kind: 'exhaust', limit: 'time' };
 
   const calls = currentCalls(s);
-  for (const c of calls) {
+  // A parked call from an earlier step that the user has since approved runs first, as recorded.
+  const approved = Object.values(s.calls).filter(
+    (c) => c.step !== s.step && c.parked && c.approval?.granted && !c.result,
+  );
+  for (const c of [...approved, ...calls]) {
     if (c.result) continue;
     if (c.inFlight) return { kind: 'recover', callId: c.callId };
     if (!c.decision) return { kind: 'decide', callId: c.callId };
+    if (c.parked && !c.approval) continue;
     if (c.decision.kind === 'require_approval' && !c.approval)
       return { kind: 'request_approval', callId: c.callId };
     if (c.tool === 'ask_user')
@@ -65,6 +72,7 @@ export function nextAction(s: TaskState, now: number): Action {
     if (c.attempts > 0 && c.userAnswer !== undefined)
       return { kind: 'resolve_uncertain', callId: c.callId };
     if (c.tool === 'finish') {
+      if (waitingCards(s).length) return { kind: 'hold', callId: c.callId };
       const claims = unbackedClaim(s, finishAnswer(c));
       if (!planGateUsed(s) && (openPlanSteps(s).length || claims))
         return { kind: 'gate_finish', callId: c.callId };
@@ -86,6 +94,7 @@ export function nextAction(s: TaskState, now: number): Action {
     const text = last.text?.trim() ?? '';
     if (isQuestion(text) || isStalledAsk(text) || isEmptyOffer(text))
       return { kind: 'ask', question: text };
+    if (waitingCards(s).length) return { kind: 'hold' };
     if (!planGateUsed(s) && openPlanSteps(s).length) return { kind: 'gate_text' };
     if (unbackedClaim(s, text)) {
       if (!planGateUsed(s)) return { kind: 'gate_claim' };
@@ -231,3 +240,11 @@ const REQUEST =
   /^(please |kindly )?(provide|share|tell me|send me|give me|specify|confirm|let me know (what|which|who|where|when|your|the))\b/i;
 
 const fail = (reason: string): Action => ({ kind: 'finish', status: 'failed', reason });
+
+/** What the task says when it pauses with cards waiting: what is done, then what waits. */
+export function heldSummary(s: TaskState, said: string): string {
+  const done = Object.values(s.calls).filter((c) => !NOT_WORK.has(c.tool) && c.result?.ok).length;
+  const head = said.trim() || `Done so far: ${done} ${done === 1 ? 'action' : 'actions'}.`;
+  const cards = waitingCards(s).map((c) => `- ${c.approvalRequest?.preview ?? c.tool}`);
+  return `${head}\n\nWaiting for your approval:\n${cards.join('\n')}`;
+}

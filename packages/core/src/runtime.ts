@@ -14,6 +14,7 @@ import {
 import { buildMessages, fencePasted, SYSTEM_PROMPT, toolResultBudgetChars } from './messages.ts';
 import {
   type Action,
+  heldSummary,
   MAX_MODEL_ATTEMPTS,
   MAX_RATE_LIMIT_WAIT_MS,
   MAX_RATE_LIMITED_ATTEMPTS,
@@ -39,7 +40,7 @@ import {
   selectToolNames,
   stickyToolNames,
 } from './select.ts';
-import { type CallState, fold, reduce, type TaskState } from './state.ts';
+import { type CallState, canPark, fold, reduce, type TaskState, waitingCards } from './state.ts';
 import {
   type ApprovalRequest,
   type Clock,
@@ -172,7 +173,11 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
 
   function outcome(s: TaskState): RunOutcome {
     if (s.status === 'waiting_approval' && s.pendingApproval)
-      return { status: 'waiting_approval', request: s.pendingApproval };
+      return {
+        status: 'waiting_approval',
+        request: s.pendingApproval,
+        ...(s.held && { summary: s.held.summary }),
+      };
     if (s.status === 'waiting_user' && s.pendingQuestion)
       return { status: 'waiting_user', question: s.pendingQuestion.question };
     if (s.status === 'paused' && s.pause)
@@ -635,14 +640,40 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
               { type: 'policy.decided', callId: c.callId, decision, ...(risk ? { risk } : {}) },
             ];
             if (decision.kind === 'require_approval' && tool)
-              events.push(approvalRequest(c, tool, decision.reason));
+              events.push(approvalRequest(c, tool, decision.reason, parkAt(s)));
             await commit(events);
             break;
           }
           case 'request_approval': {
             if (!c) break;
             const reason = c.decision?.kind === 'require_approval' ? c.decision.reason : '';
-            await commit([approvalRequest(c, toolFor(c), reason)]);
+            await commit([approvalRequest(c, toolFor(c), reason, parkAt(s))]);
+            break;
+          }
+          case 'hold': {
+            const said = c
+              ? String((c.args as { answer?: unknown })?.answer ?? '')
+              : (s.log.at(-1) as { text?: string } | undefined)?.text;
+            const events: Event[] = c
+              ? [
+                  {
+                    type: 'tool.completed',
+                    callId: c.callId,
+                    result: {
+                      ok: false,
+                      error: HOLD_ERROR,
+                      retryable: false,
+                      phase: 'before_effect',
+                    },
+                    latencyMs: 0,
+                  },
+                ]
+              : [];
+            // The held event is folded after the result, so the summary reads the state as it will be.
+            await commit([
+              ...events,
+              { type: 'approvals.held', summary: heldSummary(s, said ?? '') },
+            ]);
             break;
           }
           case 'execute':
@@ -704,8 +735,20 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     });
   }
 
-  const approvalRequest = (c: CallState, tool: Tool, reason: string): Event => ({
+  /** The place a new card would take among the waiting ones, or undefined when the task stops for it. */
+  const parkAt = (s: TaskState) => (canPark(s) ? waitingCards(s).length + 1 : undefined);
+
+  const HOLD_ERROR =
+    'Not finished: actions are still waiting for the user. The task pauses until they answer.';
+
+  const approvalRequest = (
+    c: CallState,
+    tool: Tool,
+    reason: string,
+    parked: number | undefined,
+  ): Event => ({
     type: 'approval.requested',
+    ...(parked !== undefined && { parked }),
     callId: c.callId,
     argsHash: c.argsHash,
     preview: tool.preview(tool.args.safeParse(c.args).data as never),
@@ -727,14 +770,25 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       // The card may be a helper's, carried by this task. The decision goes to the helper, which
       // checks the arguments hash and uses the approval once, like any other.
       const own = await load(taskId);
-      if (own.pendingApproval?.callId !== callId) {
+      if (
+        own.pendingApproval?.callId !== callId &&
+        !waitingCards(own).some((c) => c.callId === callId)
+      ) {
         const helper = await helperAwaiting(own, callId);
         if (helper) return self.approve(helper, callId, hash, granted, by, note, always);
       }
       await withLease(taskId, async ({ state, commit }) => {
-        const p = state().pendingApproval;
-        if (p?.callId !== callId) throw new Error(`no pending approval for ${callId}`);
+        const s = state();
+        const card = waitingCards(s).find((c) => c.callId === callId);
+        const p = s.pendingApproval?.callId === callId ? s.pendingApproval : card?.approvalRequest;
+        if (!p) throw new Error(`no pending approval for ${callId}`);
         if (p.argsHash !== hash) throw new Error('approval is for different arguments');
+        const others = waitingCards(s).filter((c) => c.callId !== callId).length;
+        const stop =
+          s.pendingApproval &&
+          s.pendingApproval.callId !== callId &&
+          !waitingCards(s).some((c) => c.callId === s.pendingApproval?.callId);
+        const left = others + (stop ? 1 : 0);
         const said = !granted && note?.trim() ? note.trim() : undefined;
         await commit([
           {
@@ -745,6 +799,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             by,
             ...(said && { note: said }),
             ...(granted && always && { always: true }),
+            ...(card && { left }),
           },
         ]);
       });

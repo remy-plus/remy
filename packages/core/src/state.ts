@@ -7,6 +7,7 @@ import {
   type EventType,
   FIND_TOOLS,
   type FinalStatus,
+  MAX_WAITING_CARDS,
   type PlannedCall,
   type PolicyDecision,
   type Risk,
@@ -23,6 +24,8 @@ export interface CallState extends PlannedCall {
   /** Absent in events written before risk was recorded. */
   risk?: Risk;
   approvalRequest?: ApprovalRequest;
+  /** The card waits while the task carries on (see `approval.requested`). Never unset. */
+  parked?: boolean;
   approval?: { argsHash: string; granted: boolean; by: string };
   /** Number of `tool.started` events. */
   attempts: number;
@@ -40,7 +43,11 @@ export interface CallState extends PlannedCall {
 export type LogEntry =
   | { kind: 'user'; text: string; pasted?: string[] }
   | { kind: 'model'; step: number; text?: string; callIds: string[] }
-  | { kind: 'result'; callId: string };
+  | { kind: 'result'; callId: string }
+  /** The outcome of a parked call, told to the model after the step it was proposed in. */
+  | { kind: 'late'; callId: string }
+  /** A parked call's place in the conversation: it is waiting for the user and has not run. */
+  | { kind: 'parked'; callId: string };
 
 export interface TaskState {
   taskId: string;
@@ -63,6 +70,8 @@ export interface TaskState {
   /** Failed model attempts for the next step. Reset on each response. */
   modelAttempts: number;
   pendingApproval?: ApprovalRequest;
+  /** Set while the task is paused with parked cards: what is done and what waits. */
+  held?: { summary: string };
   pendingQuestion?: { question: string; callId?: string };
   /** Set while status is `paused`: which limit ran out and what was spent. */
   pause?: { limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number; elapsedMs: number };
@@ -89,7 +98,8 @@ const ALLOWED_FROM: Record<Exclude<EventType, 'task.created'>, TaskStatus[]> = {
   'model.failed': ['running'],
   'policy.decided': ['running'],
   'approval.requested': ['running'],
-  'approval.resolved': ['waiting_approval'],
+  'approval.resolved': OPEN,
+  'approvals.held': ['running'],
   'tool.started': ['running'],
   'tool.completed': ['running'],
   'tool.failed': ['running'],
@@ -103,6 +113,22 @@ const ALLOWED_FROM: Record<Exclude<EventType, 'task.created'>, TaskStatus[]> = {
   'task.cancel_requested': OPEN,
   'task.finished': OPEN,
 };
+
+/** Parked cards nobody has answered yet, oldest first. Derived from events, so a crash re-derives it. */
+export const waitingCards = (s: Pick<TaskState, 'calls'>): CallState[] =>
+  Object.values(s.calls).filter((c) => c.parked && c.approvalRequest && !c.approval && !c.result);
+
+/**
+ * Whether a new card may wait while the task carries on. Only at the `away` level, only for the
+ * task's own calls (a helper's card goes to the user at once) and only while fewer than
+ * MAX_WAITING_CARDS wait; the next one stops the task as it always has.
+ */
+export const canPark = (s: Pick<TaskState, 'calls' | 'config' | 'pendingApproval'>) =>
+  s.config.permissions.trust === 'away' &&
+  !s.config.parent &&
+  !s.config.helperRole &&
+  !s.pendingApproval &&
+  waitingCards(s).length < MAX_WAITING_CARDS;
 
 export const isTerminal = (status: TaskStatus) => !OPEN.includes(status);
 
@@ -179,7 +205,7 @@ function setResult(s: TaskState, call: CallState, result: ToolResult) {
       for (const n of names)
         if (typeof n === 'string' && !s.discovered.includes(n)) s.discovered.push(n);
   }
-  s.log.push({ kind: 'result', callId: call.callId });
+  s.log.push({ kind: call.parked ? 'late' : 'result', callId: call.callId });
 }
 
 function on(s: TaskState, e: Event) {
@@ -188,7 +214,9 @@ function on(s: TaskState, e: Event) {
       return fail('unreachable');
     case 'model.responded': {
       if (e.step !== s.step + 1) fail(`expected step ${s.step + 1}, got ${e.step}`);
-      const unresolved = Object.values(s.calls).find((c) => !c.result);
+      const unresolved = Object.values(s.calls).find(
+        (c) => !c.result && !(c.parked && !c.approval),
+      );
       if (unresolved) fail(`model.responded while ${unresolved.callId} is unresolved`);
       s.step = e.step;
       s.modelAttempts = 0;
@@ -235,20 +263,48 @@ function on(s: TaskState, e: Event) {
         fail(`approval request for ${e.callId} has the wrong argsHash`);
       const { type: _, ...request } = e;
       call.approvalRequest = request;
+      if (e.parked !== undefined) {
+        const n = waitingCards(s).length + 1;
+        if (e.parked !== n || n > MAX_WAITING_CARDS)
+          fail(`card for ${e.callId} cannot wait as number ${e.parked}`);
+        if (s.config.permissions.trust !== 'away' || s.config.parent || s.config.helperRole)
+          fail(`card for ${e.callId} cannot wait at this trust level`);
+        call.parked = true;
+        s.log.push({ kind: 'parked', callId: call.callId });
+        return;
+      }
       s.pendingApproval = request;
       s.status = 'waiting_approval';
       return;
     }
     case 'approval.resolved': {
       const call = open(callOf(s, e.callId));
-      if (s.pendingApproval?.callId !== e.callId) fail(`no pending approval for ${e.callId}`);
+      const pending = s.pendingApproval?.callId === e.callId;
+      if (!pending && !(call.parked && call.approvalRequest && !call.approval))
+        fail(`no pending approval for ${e.callId}`);
+      if (!call.parked && s.status !== 'waiting_approval')
+        fail(`approval.resolved not allowed while ${s.status}`);
       if (e.argsHash !== call.argsHash)
         fail(`approval for ${e.callId} doesn't match its arguments`);
       call.approval = { argsHash: e.argsHash, granted: e.granted, by: e.by };
       if (e.granted && e.always && !s.alwaysAllowed.includes(call.tool))
         s.alwaysAllowed.push(call.tool);
-      s.pendingApproval = undefined;
-      s.status = 'running';
+      if (pending) s.pendingApproval = undefined;
+      const cards = waitingCards(s);
+      const stop = s.pendingApproval && !cards.some((c) => c.callId === s.pendingApproval?.callId);
+      const left = cards.length + (stop ? 1 : 0);
+      if (call.parked && e.left !== left) fail(`${e.callId}: ${left} approvals left`);
+      if (s.status === 'waiting_approval') {
+        if (s.held) {
+          const next = cards[0]?.approvalRequest;
+          if (next) s.pendingApproval = next;
+          else {
+            s.held = undefined;
+            s.pendingApproval = undefined;
+            s.status = 'running';
+          }
+        } else if (!s.pendingApproval) s.status = 'running';
+      }
       if (!e.granted) {
         setResult(s, call, {
           ok: false,
@@ -259,6 +315,14 @@ function on(s: TaskState, e: Event) {
           phase: 'before_effect',
         });
       }
+      return;
+    }
+    case 'approvals.held': {
+      const cards = waitingCards(s);
+      if (!cards.length) fail('approvals.held with no card waiting');
+      s.held = { summary: e.summary };
+      s.pendingApproval = cards[0]?.approvalRequest;
+      s.status = 'waiting_approval';
       return;
     }
     case 'tool.started': {
@@ -341,6 +405,7 @@ function on(s: TaskState, e: Event) {
       s.status = e.status;
       s.final = { status: e.status, answer: e.answer, reason: e.reason };
       s.pendingApproval = undefined;
+      s.held = undefined;
       s.pendingQuestion = undefined;
       s.pause = undefined;
       return;

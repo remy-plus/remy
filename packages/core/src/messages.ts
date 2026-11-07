@@ -1,7 +1,7 @@
 // Builds the model's view of a task from its state. Full outputs stay in the event log;
 // the model sees them truncated, with untrusted content fenced.
 import type { ToolRegistry } from './registry.ts';
-import type { TaskState } from './state.ts';
+import { type CallState, type TaskState, waitingCards } from './state.ts';
 import type { ConversationTurn, Message, ModelCaps, ToolResult } from './types.ts';
 
 export const SYSTEM_PROMPT = `You are Remy, an agent that completes digital tasks for the user.
@@ -174,7 +174,9 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry, opts: BuildOptions)
     caps.set(callId, max);
     rendered.set(callId, renderResult(c.result, c.tool, max));
   };
-  const resultIds = s.log.flatMap((e) => (e.kind === 'result' ? [e.callId] : []));
+  const resultIds = s.log.flatMap((e) =>
+    e.kind === 'result' || e.kind === 'late' ? [e.callId] : [],
+  );
   for (const id of resultIds) render(id);
   // Over budget, older results are cut in whole steps (a quarter, then the minimum), oldest
   // first, and the newest only as a last resort. Steps rather than exactly the overflow: a result
@@ -207,7 +209,7 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry, opts: BuildOptions)
       }
     }
   }
-  return s.log.map((entry): Message => {
+  const messages = s.log.map((entry): Message => {
     if (entry.kind === 'user')
       return {
         role: 'user',
@@ -220,6 +222,20 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry, opts: BuildOptions)
       });
       return { role: 'assistant', content: entry.text, ...(calls.length ? { calls } : {}) };
     }
+    if (entry.kind === 'parked')
+      return {
+        role: 'tool',
+        callId: entry.callId,
+        tool: s.calls[entry.callId]?.tool ?? '',
+        content: PARKED_RESULT,
+      };
+    if (entry.kind === 'late') {
+      const c = s.calls[entry.callId];
+      return {
+        role: 'user',
+        content: `Update on a waiting action (${c?.approvalRequest?.preview ?? c?.tool ?? entry.callId}, call ${entry.callId}): ${c?.result?.ok ? 'the user approved it and it ran. Result: ' : ''}${rendered.get(entry.callId) ?? ''}`,
+      };
+    }
     return {
       role: 'tool',
       callId: entry.callId,
@@ -227,4 +243,20 @@ function buildLogMessages(s: TaskState, tools: ToolRegistry, opts: BuildOptions)
       content: rendered.get(entry.callId) ?? '',
     };
   });
+  const waiting = waitingCards(s);
+  if (waiting.length) messages.push({ role: 'user', content: waitingNote(waiting) });
+  return messages;
+}
+
+const PARKED_RESULT =
+  'Not run yet. This needs the user to approve it, and they have been asked. It runs only if they approve these exact arguments.';
+
+/** Told to the model at every step while cards wait, so it knows what is pending and keeps going. */
+export function waitingNote(cards: CallState[]): string {
+  const list = cards
+    .map((c) => `- ${c.approvalRequest?.preview ?? c.tool} (call ${c.callId})`)
+    .join('\n');
+  return `${cards.length === 1 ? 'One action is' : `${cards.length} actions are`} waiting for the user's approval and ${cards.length === 1 ? 'has' : 'have'} not run:
+${list}
+Do not repeat ${cards.length === 1 ? 'it' : 'them'}. Carry on with the parts of the task that do not depend on ${cards.length === 1 ? 'it' : 'them'}. When only the waiting actions are left, finish with what is done and what waits. If you try to finish now, the task pauses until the user answers.`;
 }

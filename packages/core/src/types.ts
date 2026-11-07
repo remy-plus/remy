@@ -195,6 +195,11 @@ export type Event =
       preview: string;
       risk: Risk;
       reason: string;
+      /**
+       * The task carries on while this card waits (the `away` level). The value is the card's place
+       * among the waiting ones, 1 to MAX_WAITING_CARDS. Absent: the task stops here, as at any other level.
+       */
+      parked?: number;
     }
   | {
       type: 'approval.resolved';
@@ -202,6 +207,8 @@ export type Event =
       argsHash: string;
       granted: boolean;
       by: string;
+      /** Approvals still unanswered after this one. Recorded for a parked card, so the cached status needs no state. */
+      left?: number;
       /** Why a call was denied, in the user's words. The model sees it as the tool result. */
       note?: string;
       /** Granted with "always allow": later calls of the tool in this task skip the card too. */
@@ -240,6 +247,11 @@ export type Event =
    */
   /** `source` marks the once-only source check, separate from the plan gate. */
   | { type: 'plan.gated'; text: string; source?: boolean }
+  /**
+   * The model tried to finish while cards were waiting. The task pauses as waiting for the user
+   * instead of ending; `summary` says what is done and what waits.
+   */
+  | { type: 'approvals.held'; summary: string }
   | { type: 'task.finished'; status: FinalStatus; answer?: string; reason?: string };
 
 export type EventType = Event['type'];
@@ -485,10 +497,14 @@ export interface ApprovalRequest {
   preview: string;
   risk: Risk;
   reason: string;
+  parked?: number;
 }
 
+/** Cards that may wait at once while a task carries on (the `away` level). The next one stops the task. */
+export const MAX_WAITING_CARDS = 3;
+
 export type RunOutcome =
-  | { status: 'waiting_approval'; request: ApprovalRequest }
+  | { status: 'waiting_approval'; request: ApprovalRequest; summary?: string }
   | { status: 'waiting_user'; question: string }
   | { status: 'paused'; limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number }
   | { status: FinalStatus; answer?: string; reason?: string };
