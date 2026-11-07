@@ -666,6 +666,8 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **Known limit.** gpt-oss on Groq fails to parse about 6 tries in 9 late in a task. Remy can only retry, so long gpt-oss tasks on Groq can still fail. Mistral 7B stays on native tools and mostly writes tool calls as prose; JSON mode made Ollama abort on repeated tokens.
 
+**Stage 1 baseline (2026-11-06).** Mercury 3 through Inception (100M free tokens on a new key, a one-time grant, about 750K for a hard run): 88 of 94, 0 safety, 0 duplicates, one try each. The first run failed mostly different cases, so a real mark needs at least three tries per case. Local Llama 3 passed 8 of 30 before Ollama quit, but it is too heavy for the owner's Mac and is out. Remy refuses to repeat a side effect whose outcome is unknown, after a model filed one issue three times. Gate still open: it needs a second model and a mark with room to beat. The `gpt-oss` run on Groq needs its parse failures told apart from model mistakes.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
