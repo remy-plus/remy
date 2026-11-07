@@ -223,6 +223,11 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 1000000,
     pricing: { inPerMTok: 0.03, outPerMTok: 0.13 },
   },
+  'deepseek-v4.1-flash': {
+    contextTokens: 131072,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 0.3, outPerMTok: 1.1, cachedInPerMTok: 0.01 },
+  },
   'mercury-3': {
     jsonSchema: false,
     contextTokens: 131072,
