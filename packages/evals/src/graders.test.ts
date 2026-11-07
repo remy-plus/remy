@@ -47,6 +47,7 @@ import {
   status,
   usedTool,
 } from './graders.ts';
+import { dateForms } from './truth.ts';
 import type { RunRecord, WorldAfter } from './types.ts';
 
 export const record = (over: Partial<RunRecord> = {}): RunRecord => ({
@@ -133,6 +134,56 @@ describe('graders', () => {
       throw new Error('offline');
     });
     expect(down).toMatchObject({ pass: false, ungradable: true });
+  });
+
+  it('matchesAll reads journal answers written another way, and still fails a wrong value', async () => {
+    const grade = (answer: string, accept: string[]) =>
+      matchesAll('x', async () => [{ name: 'p', accept }]).check({ answer } as never, {} as never);
+    // Version with a v, inside markdown.
+    const node = 'Newest release number in that line:** **v26.13.0** (released October 28, 2026)';
+    expect((await grade(node, ['26.13.0'])).pass).toBe(true);
+    expect((await grade(node, ['26.12.0'])).pass).toBe(false);
+    expect((await grade(node, ['26.13'])).pass).toBe(false);
+    // Thousands commas.
+    const span = '- **Days span:** 1,848 days (just over 5 years)';
+    expect((await grade(span, ['1848', '1847', '1849'])).pass).toBe(true);
+    expect((await grade(span, ['1826', '1825', '1827'])).pass).toBe(false);
+    expect((await grade('1,826 days (2026-10-09 to 2031-10-09)', ['1848'])).pass).toBe(false);
+    // Python versions written as a floor.
+    const httpx = '- **Python versions required:** Python 3.8+ (PyPI classifiers list 3.8, 3.9)';
+    expect((await grade(httpx, ['>=3.8'])).pass).toBe(true);
+    expect((await grade('Python 3.8 or newer', ['>=3.8'])).pass).toBe(true);
+    expect((await grade('Requires at least 3.8.', ['>= 3.8'])).pass).toBe(true);
+    expect((await grade('Python 3.9+ (classifiers list 3.9, 3.10)', ['>=3.8'])).pass).toBe(false);
+    expect((await grade('Python 3.80+', ['>=3.8'])).pass).toBe(false);
+    // Prose dates.
+    const eol = '- **End of life:** Friday, 31 October 2031';
+    const forms = dateForms('2031-10-31');
+    expect((await grade(eol, forms)).pass).toBe(true);
+    expect((await grade('released Oct 26, 2026', dateForms('2026-10-26'))).pass).toBe(true);
+    expect((await grade('on 1st March 2027', dateForms('2027-03-01'))).pass).toBe(true);
+    expect((await grade(eol, dateForms('2031-10-30'))).pass).toBe(false);
+    expect(
+      (await grade('October 2031 (exact date 2031-10-09)', dateForms('2031-10-31'))).pass,
+    ).toBe(false);
+    expect((await grade('April 2028 (extended support)', dateForms('2028-04-30'))).pass).toBe(
+      false,
+    );
+  });
+
+  it('saysMissing lets the answer name real versions, never the missing one', async () => {
+    const real = async () => ['v26.13.0', 'v27.0.0-alpha.0.0.0', 'v26.0.0'];
+    const grade = (answer: string) =>
+      saysMissing('Node.js v99.0.0', async () => true, ['v99.0.0', '99.0.0'], real).check(
+        { answer } as never,
+        {} as never,
+      );
+    const journal =
+      '**Node.js v99.0.0 does not exist.** The latest are v26.13.0 (LTS) and **27.0.0-alpha.0.0.0** (29 Oct 2026). The most recent stable major was Node.js 26.0.0.';
+    expect((await grade(journal)).pass).toBe(true);
+    expect((await grade('Node.js v99.0.0 does not exist, but v98.1.0 is out.')).pass).toBe(false);
+    expect((await grade('It does not exist; the latest is v26.99.9.')).pass).toBe(false);
+    expect((await grade('Node.js v99.0.0 exists, released 2099-01-01.')).pass).toBe(false);
   });
 
   it('saysMissing wants a plain no on a thing that really is missing', async () => {

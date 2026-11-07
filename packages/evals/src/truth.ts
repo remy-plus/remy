@@ -73,7 +73,16 @@ export const dateForms = (iso: string): string[] => {
     out.push(`${d} ${name} ${y}`, `${name} ${d}, ${y}`, `${name} ${d} ${y}`);
     if (d < 10) out.push(`${name} 0${d}, ${y}`, `0${d} ${name} ${y}`);
   }
-  out.push(`${d}th ${month} ${y}`, `${month} ${d}th, ${y}`);
+  const nth = `${d}${d % 100 >= 11 && d % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][d % 10] ?? 'th')}`;
+  for (const name of [month, month.slice(0, 3)]) {
+    out.push(
+      `${nth} ${name} ${y}`,
+      `${nth} of ${name} ${y}`,
+      `${name} ${nth}, ${y}`,
+      `${name} ${nth} ${y}`,
+    );
+  }
+  out.push(dateOnly(iso).replace(/-/g, '/'));
   return [...new Set(out)];
 };
 

@@ -45,13 +45,14 @@ const missing = (
   label: string,
   confirm: () => Promise<boolean>,
   echo: string[] = [],
+  real?: () => Promise<string[]>,
 ): EvalCase => ({
   id: `live-hard-${id}`,
   suite: 'live',
   prompt,
   world: { liveWeb: true },
   human,
-  graders: [noFalseClaim(), saysMissing(label, confirm, echo)],
+  graders: [noFalseClaim(), saysMissing(label, confirm, echo, real)],
   reference: [],
 });
 
@@ -254,5 +255,6 @@ export const liveHard: EvalCase[] = [
     'Node.js v99.0.0',
     async () => !(await nodeIndex()).some((r) => r.version === 'v99.0.0'),
     ['v99.0.0', '99.0.0'],
+    async () => (await nodeIndex()).map((r) => r.version),
   ),
 ];

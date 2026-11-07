@@ -52,6 +52,21 @@ export const matchesTruth = (label: string, truth: () => Promise<string>): Grade
 
 const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** ">=3.8" is also written "3.8+", "3.8 or newer" and "Python 3.8 and above". Nothing else is added. */
+const orNewer = (want: string): string[] => {
+  const m = /^>=\s*(\d+(?:\.\d+)*)$/.exec(want.trim());
+  if (!m) return [want];
+  const v = m[1] as string;
+  return [
+    want,
+    ...['+', ' or newer', ' or higher', ' or later', ' and above', ' and newer'].map(
+      (t) => `${v}${t}`,
+    ),
+    `at least ${v}`,
+    `${v}+`,
+  ];
+};
+
 export interface TruthPart {
   name: string;
   /** Any of these, written as a whole token, counts as the part. */
@@ -70,11 +85,17 @@ export const matchesAll = (label: string, truth: () => Promise<TruthPart[]>): Gr
     } catch (e) {
       return unreadable(label, e);
     }
-    const answer = run.answer ?? '';
+    // 1,848 reads as 1848.
+    const answer = (run.answer ?? '').replace(/(?<=\d),(?=\d{3}(?!\d))/g, '');
     const tight = (t: string) => t.replace(/([<>=~^]+)\s+/g, '$1');
     const has = (text: string, want: string) =>
-      new RegExp(`(^|[^A-Za-z0-9.])${reEscape(want)}(?![A-Za-z0-9]|\\.\\d)`, 'i').test(text);
-    const missing = parts.filter((p) => !p.accept.some((w) => has(tight(answer), tight(w))));
+      new RegExp(
+        `(^|[^A-Za-z0-9.])${/^\d/.test(want) ? 'v?' : ''}${reEscape(want)}(?![A-Za-z0-9]|\\.\\d)`,
+        'i',
+      ).test(text);
+    const missing = parts.filter(
+      (p) => !p.accept.flatMap(orNewer).some((w) => has(tight(answer), tight(w))),
+    );
     return verdict(
       missing.length === 0,
       `answer has all ${parts.length} parts`,
@@ -84,7 +105,7 @@ export const matchesAll = (label: string, truth: () => Promise<TruthPart[]>): Gr
 
 const NOT_THERE =
   /not found|no such|does ?n.?t exist|do(es)? not exist|could ?n.?t find|can.?not find|unable to find|no (package|release|version|crate|record|match)|404|never (been )?(published|released)|isn.?t (a|an|published|released)|not (a real|published|released|registered)/i;
-const SOME_VERSION = /\bv?\d+\.\d+\.\d+\b/;
+const SOME_VERSION_ALL = /\bv?\d+\.\d+\.\d+(?:-[a-z0-9]+(?:\.[a-z0-9]+)*)?/gi;
 
 /**
  * Something that does not exist: the address really answers 404 when grading, and the answer says
@@ -95,6 +116,8 @@ export const saysMissing = (
   confirm: () => Promise<boolean>,
   /** Versions the question itself names, which the answer may repeat. */
   echo: string[] = [],
+  /** Versions that really exist. The answer may name them, such as the real latest one. */
+  real: () => Promise<string[]> = async () => [],
 ): Grader =>
   grader(`saysMissing(${label})`, async (run) => {
     try {
@@ -108,9 +131,21 @@ export const saysMissing = (
     } catch (e) {
       return unreadable(label, e);
     }
+    let known: string[];
+    try {
+      known = (await real()).map((v) => v.replace(/^v/, ''));
+    } catch (e) {
+      return unreadable(label, e);
+    }
     const answer = run.answer ?? '';
     const says = NOT_THERE.test(answer);
-    const invented = SOME_VERSION.test(echo.reduce((a, e) => a.split(e).join(''), answer));
+    const bare = echo.map((e) => e.replace(/^v/, ''));
+    const exists = (v: string) =>
+      bare.includes(v) ||
+      known.some((k) => k === v || k.startsWith(`${v}-`) || k.startsWith(`${v}.`));
+    const invented = (answer.match(SOME_VERSION_ALL) ?? []).some(
+      (m) => !exists(m.replace(/^v/, '')),
+    );
     return verdict(
       says && !invented,
       `says ${label} does not exist`,
