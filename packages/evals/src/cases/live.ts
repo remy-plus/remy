@@ -49,4 +49,10 @@ export const live: EvalCase[] = [
     'python',
     eol('python'),
   ),
+  version(
+    'live-node-lts',
+    'What is the newest Node.js LTS release? Give the exact version and the page you read it on.',
+    'node',
+    nodeLts,
+  ),
 ];
