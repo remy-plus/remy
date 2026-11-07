@@ -86,6 +86,8 @@ export interface TaskConfig {
   parent?: { taskId: string; callId: string };
   /** A helper of a tainted task starts tainted. */
   startTainted?: boolean;
+  /** Set on a helper: the role it was given, for approval cards. */
+  helperRole?: string;
 }
 
 export interface ConversationTurn {
@@ -415,6 +417,8 @@ export interface HelperResult {
   tainted: boolean;
   costUsd: number;
   steps: number;
+  /** It stopped to ask the user to approve a call. The parent task carries the card. */
+  waiting?: ApprovalRequest;
 }
 
 /** Name of the built-in tool that searches selectable tools. Its results feed `TaskState.discovered`. */

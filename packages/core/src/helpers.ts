@@ -2,6 +2,7 @@
 // they can be tested on their own: what a helper may use, what it may spend, and its id.
 import { createHash } from 'node:crypto';
 import type { ToolRegistry } from './registry.ts';
+import type { HelperRole } from './roles.ts';
 import type { Budget, HelperRequest, Permissions, Tool, ToolResult } from './types.ts';
 
 export const DELEGATE = 'delegate';
@@ -13,17 +14,29 @@ export const HELPER_MAX_COST_USD = 0.25;
 const HELPER_MAX_WALL_MS = 5 * 60_000;
 
 /**
- * Read tools only. A helper never inherits the parent's wider approvals, cannot ask the user or
- * start helpers, and keeps whatever the parent is denied. `allow` lets the host narrow it further.
+ * Read tools only, unless the role has `act` and the host allows acting: then write tools are open
+ * too, but still need the user's approval each time (`autoApprove` stays read-only). A helper
+ * never inherits the parent's wider approvals, cannot ask the user or start helpers, and keeps
+ * whatever the parent is denied. `allow` lets the host narrow it further, and a role can only
+ * shut more tools, never open one.
  */
 export function helperPermissions(
   tools: ToolRegistry,
   parent: Permissions,
   allow: (tool: Tool) => boolean = () => true,
+  role?: Pick<HelperRole, 'tools'>,
+  mayAct = false,
 ): Permissions {
   const shut = tools
     .list()
-    .filter((t) => t.risk !== 'read' || t.name === 'ask_user' || t.name === DELEGATE || !allow(t))
+    .filter(
+      (t) =>
+        (t.risk !== 'read' && !mayAct) ||
+        t.name === 'ask_user' ||
+        t.name === DELEGATE ||
+        !allow(t) ||
+        (role?.tools !== undefined && !role.tools.includes(t.name) && t.name !== 'finish'),
+    )
     .map((t) => t.name);
   return {
     autoApprove: ['read'],
@@ -32,6 +45,10 @@ export function helperPermissions(
     ...(parent.netAllow && { netAllow: parent.netAllow }),
   };
 }
+
+/** Whether a helper with this role acts: the role asks for it and the host allows it. */
+export const helperActs = (role: Pick<HelperRole, 'act'> | undefined, hostAllows: boolean) =>
+  Boolean(role?.act && hostAllows);
 
 /** The defaults, or an even share of what the parent has left, whichever is less. */
 export function helperBudget(
@@ -63,10 +80,13 @@ export function helperIds(s: { calls: Record<string, { tool: string; result?: To
 /** Helpers are details of a task, so lists of the user's tasks leave them out. */
 export const isHelperTask = (taskId: string) => taskId.startsWith(HELPER_PREFIX);
 
-export function helperPrompt(r: HelperRequest): string {
+export function helperPrompt(r: HelperRequest, role?: HelperRole, acts = false): string {
   return [
     r.role ? `You are a ${r.role} helper for Remy.` : 'You are a helper for Remy.',
-    'Do this one job with read-only tools and give your answer with its sources. You cannot ask the user anything.',
+    acts
+      ? 'Do this one job. You may use tools that change things, but each one needs the user to approve it first, and a denial is final: do not look for another way round it. You cannot ask the user anything.'
+      : 'Do this one job with read-only tools and give your answer with its sources. You cannot ask the user anything.',
+    ...(role ? ['', `How to do this job: ${role.instructions}`] : []),
     '',
     r.task,
     ...(r.context ? ['', `What you need to know: ${r.context}`] : []),

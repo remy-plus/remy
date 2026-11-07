@@ -42,6 +42,7 @@ import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
   calculate,
+  createDelegate,
   createMemoryTools,
   createRecallTool,
   createRedactor,
@@ -50,7 +51,6 @@ import {
   createScopedFs,
   createSkillTools,
   createWebSearch,
-  delegate,
   deleteFile,
   type Episode,
   editFile,
@@ -106,6 +106,7 @@ import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
 import { type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
+import { loadHelperRoles } from './helper-roles.ts';
 import {
   defaultModelFor,
   listLogins,
@@ -738,6 +739,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       daemonOn: () => has('launchctl', ['list', LAUNCH_LABEL]),
       schedules: () => openSchedules(home).list().length,
       search: env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : 'browser'),
+      helperProblems: () => loadHelperRoles(home, process.cwd()).problems,
     });
   };
   const vmRun: Run = (cmd, args) => {
@@ -815,7 +817,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       connected: (name) => Boolean(mcp?.list().some((c) => c.name === name)),
     }))
       tools.add(t);
-    if (env.REMY_HELPERS === 'on') tools.add(delegate);
+    const helpersOn = env.REMY_HELPERS === 'on' || env.REMY_HELPERS === 'act';
+    const helpersAct = env.REMY_HELPERS === 'act';
+    const helperRoles = loadHelperRoles(home, process.cwd()).roles;
+    if (helpersOn) tools.add(createDelegate(helperRoles, { act: helpersAct }));
     const schedules = openSchedules(home);
     for (const t of createScheduleTools({
       add: (when, prompt) => schedules.add(when, prompt, new Date()),
@@ -826,7 +831,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const capabilities = onceCapabilities(() =>
       capabilitiesBlock({
         facts: machineFacts(),
-        helpers: env.REMY_HELPERS === 'on',
+        helpers: helpersOn,
         skills: skills().list().length,
       }),
     );
@@ -879,6 +884,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       model,
       // Browser tools share one page, so helpers working side by side cannot use them.
       helperTools: (t) => !t.name.startsWith('browser_'),
+      helperRoles,
+      helpersAct,
       systemPrompt: [
         SYSTEM_PROMPT,
         ...(browserOn() ? [BROWSER_HINT] : []),

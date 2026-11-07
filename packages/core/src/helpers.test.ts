@@ -4,6 +4,7 @@ import {
   DELEGATE,
   HELPER_MAX_COST_USD,
   HELPER_MAX_STEPS,
+  helperActs,
   helperBudget,
   helperId,
   helperIds,
@@ -12,6 +13,7 @@ import {
   isHelperTask,
 } from './helpers.ts';
 import { defineTool, ToolRegistry } from './registry.ts';
+import { parseRoles } from './roles.ts';
 import { DEFAULT_BUDGET, type Risk } from './types.ts';
 
 const tool = (name: string, risk: Risk) =>
@@ -72,6 +74,67 @@ describe('helperPermissions', () => {
   it('keeps an allow list from the parent', () => {
     const p = helperPermissions(tools, { autoApprove: ['read'], allowTools: ['fetch_url'] });
     expect(p.allowTools).toEqual(['fetch_url']);
+  });
+});
+
+describe('helperPermissions with a role', () => {
+  const tools = new ToolRegistry([
+    tool('read_file', 'read'),
+    tool('fetch_url', 'read'),
+    tool('write_file', 'write'),
+    tool('ask_user', 'read'),
+    tool(DELEGATE, 'read'),
+    tool('finish', 'read'),
+  ]);
+  const parent = { autoApprove: ['read' as const] };
+
+  it('narrows tools to the role list, and keeps finish', () => {
+    const p = helperPermissions(tools, parent, undefined, { tools: ['fetch_url'] });
+    expect(p.denyTools).toEqual(expect.arrayContaining(['read_file', 'write_file']));
+    expect(p.denyTools).not.toContain('fetch_url');
+    expect(p.denyTools).not.toContain('finish');
+  });
+
+  it('cannot widen: a role that lists a write tool does not open it', () => {
+    const p = helperPermissions(tools, parent, undefined, { tools: ['write_file', 'fetch_url'] });
+    expect(p.denyTools).toContain('write_file');
+  });
+
+  it('cannot lift a deny, a host filter, ask_user or delegate', () => {
+    const p = helperPermissions(
+      tools,
+      { autoApprove: ['read'], denyTools: ['fetch_url'] },
+      (t) => t.name !== 'read_file',
+      { tools: ['fetch_url', 'read_file', 'ask_user', DELEGATE] },
+      true,
+    );
+    expect(p.denyTools).toEqual(
+      expect.arrayContaining(['fetch_url', 'read_file', 'ask_user', DELEGATE]),
+    );
+  });
+
+  it('opens write tools only when acting, and still never auto-approves them', () => {
+    const p = helperPermissions(tools, parent, undefined, undefined, true);
+    expect(p.denyTools).not.toContain('write_file');
+    expect(p.autoApprove).toEqual(['read']);
+    expect(p.standing).toBeUndefined();
+  });
+
+  it('acts only when the role asks and the host allows', () => {
+    expect(helperActs({ act: true }, true)).toBe(true);
+    expect(helperActs({ act: true }, false)).toBe(false);
+    expect(helperActs({ act: false }, true)).toBe(false);
+    expect(helperActs(undefined, true)).toBe(false);
+  });
+
+  it('puts the role instructions in the prompt', () => {
+    const role = parseRoles('## r\nCheck twice.', 'user').roles[0];
+    expect(helperPrompt({ role: 'r', task: 'go' }, role)).toContain(
+      'How to do this job: Check twice.',
+    );
+    expect(helperPrompt({ task: 'go' }, role, true)).toContain(
+      'each one needs the user to approve',
+    );
   });
 });
 

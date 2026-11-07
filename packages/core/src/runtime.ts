@@ -2,7 +2,15 @@
 // or finishes. PLAN.md "The runner" and "Persistence, recovery, retries, duplicate protection".
 import { randomUUID } from 'node:crypto';
 import { argsHash, idempotencyKey } from './hash.ts';
-import { helperBudget, helperId, helperPermissions, helperPrompt } from './helpers.ts';
+import {
+  DELEGATE,
+  HELPERS_AT_ONCE,
+  helperActs,
+  helperBudget,
+  helperId,
+  helperPermissions,
+  helperPrompt,
+} from './helpers.ts';
 import { buildMessages, fencePasted, SYSTEM_PROMPT, toolResultBudgetChars } from './messages.ts';
 import {
   type Action,
@@ -23,6 +31,7 @@ import {
 } from './plan.ts';
 import { authorize, callRisk, decide, reconcileTool, runTool } from './policy.ts';
 import type { ToolRegistry } from './registry.ts';
+import type { HelperRole } from './roles.ts';
 import {
   createFindTools,
   FIND_TOOLS_HINT,
@@ -32,6 +41,7 @@ import {
 } from './select.ts';
 import { type CallState, fold, reduce, type TaskState } from './state.ts';
 import {
+  type ApprovalRequest,
   type Clock,
   ConcurrencyError,
   type Event,
@@ -81,6 +91,10 @@ export interface RuntimeDeps {
   onModelStart?: () => void;
   /** Narrows the read tools helpers get, e.g. tools that cannot run side by side. */
   helperTools?: (tool: Tool) => boolean;
+  /** Named roles a `delegate` call may use. A name not here is just a label. */
+  helperRoles?: HelperRole[];
+  /** The host lets helpers whose role says `act` ask to change things (with approval each time). */
+  helpersAct?: boolean;
 }
 
 export class TaskBusyError extends Error {
@@ -203,15 +217,21 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     count: number,
   ): Promise<HelperResult> {
     const taskId = helperId(idempotencyKey(s.taskId, c.callId), index);
+    const role = request.role
+      ? deps.helperRoles?.find((r) => r.name === request.role?.toLowerCase())
+      : undefined;
+    const acts = helperActs(role, deps.helpersAct === true);
     // A helper from before a crash has events already: carry on with it.
     if (!(await store.read(taskId)).length)
-      await store.createTask(taskId, redact(helperPrompt(request)), {
+      await store.createTask(taskId, redact(helperPrompt(request, role, acts)), {
         ...s.config,
         context: undefined,
         pasted: undefined,
         parent: { taskId: s.taskId, callId: c.callId },
-        startTainted: s.tainted,
-        permissions: helperPermissions(tools, s.config.permissions, deps.helperTools),
+        // A role written in a project folder is text anyone could have put there: it starts tainted.
+        startTainted: s.tainted || role?.source === 'project',
+        ...(request.role && { helperRole: request.role }),
+        permissions: helperPermissions(tools, s.config.permissions, deps.helperTools, role, acts),
         budget: helperBudget(s.config.budget, s, count),
       });
     const done = await helpers().advance(taskId);
@@ -222,14 +242,55 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         : done.status === 'waiting_user'
           ? `Stopped with a question: ${done.question}`
           : `Stopped without an answer (${done.status}).`;
+    const waiting =
+      done.status === 'waiting_approval'
+        ? {
+            ...done.request,
+            preview: `Helper${request.role ? ` (${request.role})` : ''} asks: ${done.request.preview}`,
+          }
+        : undefined;
     return {
       taskId,
+      ...(waiting && { waiting }),
       ok: done.status === 'succeeded',
       answer,
       tainted: h.tainted,
       costUsd: h.costUsd,
       steps: h.step,
     };
+  }
+
+  /** Parents with a helper waiting for the user's approval, until the host has been told. */
+  const helperWaits = new Map<string, ApprovalRequest>();
+
+  /** Helpers run together. One that needs approval holds the parent's call open (see `advance`). */
+  async function runHelpers(s: TaskState, c: CallState, requests: HelperRequest[]) {
+    const acting = requests.filter((r) =>
+      helperActs(
+        r.role ? deps.helperRoles?.find((x) => x.name === r.role?.toLowerCase()) : undefined,
+        deps.helpersAct === true,
+      ),
+    ).length;
+    if (acting > 1) throw new Error('only one helper that can act may run in one delegate call');
+    const results = await Promise.all(
+      requests.map((r, i) => runHelper(s, c, r, i, requests.length)),
+    );
+    const waiting = results.find((r) => r.waiting)?.waiting;
+    if (waiting) helperWaits.set(s.taskId, waiting);
+    return results;
+  }
+
+  /** The helper of this task that is waiting on this approval, if any. */
+  async function helperAwaiting(s: TaskState, callId: string): Promise<string | undefined> {
+    for (const c of Object.values(s.calls)) {
+      if (c.tool !== DELEGATE || c.result) continue;
+      for (let i = 0; i < HELPERS_AT_ONCE; i++) {
+        const id = helperId(idempotencyKey(s.taskId, c.callId), i);
+        const events = await store.read(id);
+        if (events.length && fold(events).pendingApproval?.callId === callId) return id;
+      }
+    }
+    return undefined;
   }
 
   const ctxFor = (s: TaskState, c: CallState, signal: AbortSignal): ToolContext => ({
@@ -241,8 +302,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     signal,
     clock,
     ...(!s.config.parent && {
-      delegate: (requests: HelperRequest[]) =>
-        Promise.all(requests.map((r, i) => runHelper(s, c, r, i, requests.length))),
+      delegate: (requests: HelperRequest[]) => runHelpers(s, c, requests),
     }),
   });
 
@@ -388,6 +448,8 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         ]);
         const t0 = clock.now();
         const result = clean(await runTool(call, tool, ctxFor(s, c, signal)));
+        // A helper is waiting for the user: leave the call open, `advance` hands the card up.
+        if (helperWaits.has(s.taskId)) return;
         const safeToRetry =
           !result.ok &&
           result.retryable &&
@@ -420,10 +482,30 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
           `${why} Check, then reply "retry" to do it again or "skip" to move on.`,
       });
 
+      // A helper cannot ask the user, so an interrupted call it cannot confirm ends as unknown.
+      // The model reads that and the policy refuses a repeat; nothing is run twice.
+      const uncertain = (s: TaskState, c: CallState, why: string): Event[] =>
+        s.config.parent
+          ? [
+              {
+                type: 'tool.completed',
+                callId: c.callId,
+                result: {
+                  ok: false,
+                  error:
+                    'Interrupted while running. It may or may not have happened; do not repeat it, and say so in your answer.',
+                  retryable: false,
+                  phase: 'unknown',
+                },
+                latencyMs: 0,
+              },
+            ]
+          : [askAboutUncertain(c, why)];
+
       const recover = async (s: TaskState, c: CallState) => {
         const tool = toolFor(c);
         if (c.reconciled === 'unknown')
-          return commit([askAboutUncertain(c, 'I could not confirm whether it happened.')]);
+          return commit(uncertain(s, c, 'I could not confirm whether it happened.'));
         if (tool.effect === 'none' || tool.effect === 'idempotent') {
           if (c.attempts >= MAX_TOOL_ATTEMPTS)
             return commit([
@@ -451,10 +533,11 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         }
         if (tool.effect === 'reconcilable') {
           const r = await reconcileTool(authorize(c, tool), tool, ctxFor(s, c, signal));
+          if (helperWaits.has(s.taskId)) return;
           if ('unknown' in r)
             return commit([
               { type: 'tool.reconciled', callId: c.callId, outcome: 'unknown' },
-              askAboutUncertain(c, 'I could not confirm whether it happened.'),
+              ...uncertain(s, c, 'I could not confirm whether it happened.'),
             ]);
           if (r.done)
             return commit([
@@ -463,7 +546,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             ]);
           return commit([{ type: 'tool.reconciled', callId: c.callId, outcome: 'not_done' }]);
         }
-        return commit([askAboutUncertain(c, 'It may or may not have happened.')]);
+        return commit(uncertain(s, c, 'It may or may not have happened.'));
       };
 
       for (;;) {
@@ -610,6 +693,11 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
               ]);
             break;
         }
+        const waiting = helperWaits.get(taskId);
+        if (waiting) {
+          helperWaits.delete(taskId);
+          return { status: 'waiting_approval', request: waiting };
+        }
       }
     });
   }
@@ -623,7 +711,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     reason,
   });
 
-  return {
+  const self: RemyRuntime = {
     state: load,
     advance,
 
@@ -634,6 +722,13 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     },
 
     async approve(taskId, callId, hash, granted, by, note, always) {
+      // The card may be a helper's, carried by this task. The decision goes to the helper, which
+      // checks the arguments hash and uses the approval once, like any other.
+      const own = await load(taskId);
+      if (own.pendingApproval?.callId !== callId) {
+        const helper = await helperAwaiting(own, callId);
+        if (helper) return self.approve(helper, callId, hash, granted, by, note, always);
+      }
       await withLease(taskId, async ({ state, commit }) => {
         const p = state().pendingApproval;
         if (p?.callId !== callId) throw new Error(`no pending approval for ${callId}`);
@@ -689,4 +784,5 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       });
     },
   };
+  return self;
 }
