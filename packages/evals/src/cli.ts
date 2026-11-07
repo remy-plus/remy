@@ -24,10 +24,11 @@ import {
   writeResults,
 } from './report.ts';
 import { runEval } from './runner.ts';
+import { resolveGroups } from './suite-alias.ts';
 import { type ModelFor, SUITES, type Suite } from './types.ts';
 
 const USAGE = `Usage:
-  eval [run] [--model <id|reference>] [--profile <name>] [--suite <a,b>] [--case <id,...>]
+  eval [run] [--model <id|reference>] [--profile <name>] [--suite <a,b|live-hard>] [--case <id,...>]
              [--k <n>] [--record] [--replay <cassette>] [--out <dir>] [--strict] [--no-write]
              [--journal <file>]
   eval compare <base.json> <next.json>
@@ -75,7 +76,8 @@ export async function evalMain(argv: string[]): Promise<number> {
     return 2;
   }
 
-  const suites = list(values.suite) as Suite[];
+  const picked = resolveGroups(list(values.suite), list(values.case), liveCases);
+  const suites = picked.suites as Suite[];
   const bad = suites.find((s) => !SUITES.includes(s));
   if (bad) {
     console.error(`Unknown suite "${bad}". Suites: ${SUITES.join(', ')}`);
@@ -127,7 +129,7 @@ export async function evalMain(argv: string[]): Promise<number> {
       k,
       ...(journal ? { resume: readJournal(journal), maxLostInARow: MAX_LOST_IN_A_ROW } : {}),
       suites,
-      caseIds: list(values.case),
+      caseIds: picked.caseIds,
       live: !!client && !values.replay,
       onRun: (r) => {
         if (journal) appendRun(journal, r);
