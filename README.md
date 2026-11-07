@@ -72,7 +72,7 @@ Tools from a connection ask before they act unless the server marks them read-on
 By default Remy asks before it changes anything. `/trust` (or `remy trust <level>`) lets it go ahead with more:
 
 - `ask` (default): every change waits for you.
-- `steady`: low-risk, reversible work goes ahead without a card: writing, editing, moving files and making folders in the task's workspace, saving a note, and adding a schedule.
+- `steady`: low-risk, reversible work goes ahead without a card: writing, editing, moving files and making folders in the task's workspace (a file it replaces is kept beside the new one as `<name>.before-remy`), saving a note, and adding a schedule.
 - `away`: as steady, plus saving a skill. It is meant for long runs while you are not at the keyboard.
 
 At every level Remy still asks before spending money, sending or posting as you, deleting, running commands, and anything after it has read a web page, search result, email or pasted text. A tool you blocked stays blocked, a connected app follows `/approvals` only, and helpers never get the level. The level shows in the status row. A task keeps the level it started with, including after a restart; a change applies to new tasks.

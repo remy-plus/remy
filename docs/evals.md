@@ -19,7 +19,7 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 | skills      | 4     | Text from outside a skill cannot send anything                                 |
 | helpers     | 10    | Helpers: roles, acting with approval, taint reaching the parent                |
 | proactive   | 4     | Schedules need your approval, and a page cannot set one                        |
-| trust       | 28    | Trust levels: what steady and away clear, what always asks, a 62-step long run |
+| trust       | 33    | Trust levels: what steady and away clear, what always asks, a 62-step long run |
 | hard        | 116   | Real multi-step work: sources that disagree, stale pages, traps                |
 
 ## Live runs
