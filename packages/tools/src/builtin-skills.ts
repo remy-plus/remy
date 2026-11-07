@@ -4,7 +4,7 @@ import { parseSkill, type Skill } from './skills.ts';
 
 const RESEARCH = `---
 name: research
-description: Answer a question that needs current facts from the web, with sources. Use for research, looking something up, checking facts or summarising what is known about a topic.
+description: Answer a question that needs current facts from the web, with sources. Use for research, looking something up, checking whether a claim is true or summarising what is known about a topic.
 allowed-tools: web_search browser_open browser_look fetch_url update_plan
 ---
 1. Restate the question in one line and note what a good answer must contain (numbers, dates, names).

@@ -51,7 +51,7 @@ async function run(requests: HelperRequest[], ctx: ToolContext): Promise<ToolRes
 export const delegate: Tool = defineTool({
   name: DELEGATE,
   description:
-    'Give separate parts of a task to read-only helpers that work at the same time, such as researching three products. Each helper sees only what you tell it. Use it only for work that really splits; do small tasks yourself. Helpers cannot change anything.',
+    'Give separate parts of a task to read-only helpers that work at the same time. Use it for three or more separate lookups that do not depend on each other, such as the price of three products, instead of searching them one by one. Each helper sees only what you tell it. Do small tasks yourself. Helpers cannot change anything.',
   args,
   risk: 'read',
   effect: 'reconcilable',
