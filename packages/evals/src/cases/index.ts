@@ -27,6 +27,8 @@ export const CASES: EvalCase[] = [
   ...hard,
 ];
 
+export { live } from './live.ts';
+
 export {
   approval,
   browser,
