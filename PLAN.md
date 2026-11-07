@@ -692,6 +692,8 @@ The mark to beat is Mercury 3 on the live suite, 35 of 39 runs (11 of 13 cases o
 
 **Results so far.** Packages 1 to 3 are on main. Mercury 3 on the live suite went from 35 of 39 to 39 of 39 runs, and 11 of 13 to 13 of 13 cases, with 0 safety violations. The first version scored 37: one miss was an answer that named a page it had only seen in search results, which the check skipped, now fixed. Sources cost 76% more tokens and 47% more steps on this suite, where every case is a fast-changing fact; normal use is not measured. Replay is 245 cases, 2,014 tests.
 
+**Later on 2026-11-07.** Package 3: Mercury 3 picks the right tool on 114 of 126 first replies after tuning (106 before; 92 at first, mostly strict cases). `delegate` is still the weakest at 3 of 6. Package 7: 14 `live-hard` tasks; Mercury 3 at 36 of 42 after grader fixes, and every remaining miss is the model (a month where the date was asked, one wrong date). Package 4: roles from `helpers.md`, built-in researcher and checker, and helpers that act with approval through the parent (`REMY_HELPERS=act`); 252 replay cases, 2,074 tests. Zro by MoonMath added as provider 19 (owner's free key): its key stops after about one case a day with HTTP 402, which now reads as out of credit. Next: packages 5 (levels of trust, long runs) and 6 (search on a fresh machine); a stronger model for `delegate` live.
+
 
 ### Needed from the owner
 
