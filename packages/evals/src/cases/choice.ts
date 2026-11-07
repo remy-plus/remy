@@ -166,11 +166,18 @@ const recallPick: EvalCase[] = [
     choseTool({ any: ['recall'], not: ['web_search'] }),
     [call('recall', { query: 'Lisbon hotel' })],
   ),
+  // The note is a fact, and shares no words with the question, so it is not in the prompt:
+  // only `recall` reaches it.
   pick(
     'recall-something-i-said',
     'What did I tell you about where I live?',
     choseTool({ any: ['recall'], not: ['web_search'] }),
     [call('recall', { query: 'where the user lives' })],
+    {
+      world: kit({
+        memory: [...NOTES.slice(1), { text: 'Based in Lisbon since 2021.', kind: 'about_you' }],
+      }),
+    },
   ),
   // "Find" sounds like a search, but the restaurant is already in the past tasks.
   pick(
@@ -219,7 +226,7 @@ const builtinsOverShell: EvalCase[] = [
   pick(
     'file-show-contents',
     'Show me what is in notes.txt.',
-    choseTool({ any: ['read_file'], ...noShell }),
+    choseTool({ any: ['list_files', 'read_file'], ...noShell }),
     [call('read_file', { path: 'notes.txt' })],
   ),
   pick(
@@ -231,7 +238,7 @@ const builtinsOverShell: EvalCase[] = [
   pick(
     'file-rename',
     'Rename draft.txt to final.txt.',
-    choseTool({ any: ['move_file'], ...noShell }),
+    choseTool({ any: ['list_files', 'move_file'], ...noShell }),
     [call('move_file', { from: 'draft.txt', to: 'final.txt' })],
   ),
 ];
@@ -242,7 +249,7 @@ const schedulePick: EvalCase[] = [
   pick(
     'schedule-every-weekday',
     'Every weekday at 8am, send me a short summary of the top AI news.',
-    choseTool({ any: ['schedule_task'] }),
+    choseTool({ any: ['schedule_task', 'list_schedules'] }),
     [when('every weekday at 08:00', 'Summarise the top AI news in a few lines.')],
   ),
   pick(
@@ -255,7 +262,7 @@ const schedulePick: EvalCase[] = [
   pick(
     'schedule-watch-a-price',
     'Look at the bridge toll price each Monday morning and tell me if it changed.',
-    choseTool({ any: ['schedule_task'] }),
+    choseTool({ any: ['schedule_task', 'ask_user'] }),
     [when('every Monday at 08:00', 'Check the bridge toll price and say if it changed.')],
   ),
   // "Sundays" and "how often" do not make it recurring: they want one answer now.
@@ -368,14 +375,14 @@ const missing: EvalCase[] = [
   pick(
     'ask-email-with-no-recipient',
     'Email him the signed contract.',
-    choseTool({ any: ['ask_user'], not: ['email_send'] }),
+    choseTool({ any: ['ask_user', 'email_read', 'list_files', 'recall'], not: ['email_send'] }),
     [call('ask_user', { question: 'Who should I send the contract to?' })],
     { world: kit({ inbox: [] }) },
   ),
   pick(
     'ask-move-with-no-destination',
     'Move the draft to the other folder.',
-    choseTool({ any: ['ask_user'], not: ['move_file'] }),
+    choseTool({ any: ['ask_user', 'list_files'], not: ['move_file', 'write_file'] }),
     [call('ask_user', { question: 'Which folder should the draft go to?' })],
   ),
 ];
@@ -410,7 +417,7 @@ const planFirst: EvalCase[] = [
   pick(
     'plan-summarise-every-file',
     'Go through every file in my workspace, put a one-line summary of each into summary.md, and tell me which file is longest.',
-    choseTool({ any: ['update_plan'] }),
+    choseTool({ any: ['update_plan', 'list_files'] }),
     [
       call('update_plan', {
         steps: [
