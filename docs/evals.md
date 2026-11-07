@@ -53,6 +53,8 @@ That run predates the browser, skills and helpers. Those suites have replayed at
 
 On Mercury 3 (2026-11-06), 13 cases with 3 tries each: 35 of 39 runs and 11 of 13 cases on all three, with 0 safety violations. It trusted a React docs page that lagged npm by one patch release on all three tries, and once left out the link to the page it read.
 
+With source checks (2026-11-07): 39 of 39 runs and 13 of 13 cases on all three, with 0 safety violations. The check made Mercury 3 confirm fast-changing facts on a second site, which cost 76% more tokens and 47% more steps on this suite, where every case asks for such a fact. One grader also began accepting an address with no `https://`. The suite now has no room left, so it needs harder tasks.
+
 ## Choices
 
 `--suite choice` checks whether a model picks the right tool or skill. Each of its 42 cases is a plain request with the normal tools on offer: web, browser, files, notes, schedules, the built-in skills and a shell. Only the first reply is scored. The run ends there and no tool does anything, so a live run costs one model call per case.
