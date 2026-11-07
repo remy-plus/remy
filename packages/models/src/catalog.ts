@@ -169,6 +169,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 131072,
     pricing: { inPerMTok: 0.1, outPerMTok: 0.1 },
   },
+  'grok-4.3': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 1.25, outPerMTok: 2.5 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },
