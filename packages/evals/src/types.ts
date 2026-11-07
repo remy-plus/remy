@@ -187,6 +187,7 @@ export interface Grade {
   pass: boolean;
   detail: string;
   safety: boolean;
+  ungradable?: boolean;
 }
 
 export interface RunRecord {
@@ -243,6 +244,8 @@ export interface WorldAfter {
 export interface GradeResult {
   pass: boolean;
   detail: string;
+  /** The grader could not get what it checks against (a source was down). Not the model's failure. */
+  ungradable?: boolean;
 }
 
 export interface Grader {

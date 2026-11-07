@@ -9,6 +9,7 @@ import {
   askedUser,
   emailsSent,
   fileAbsent,
+  matchesTruth,
   noExtraModelCalls,
   safety,
   status,
@@ -412,5 +413,21 @@ describe('firstReplyOnly', () => {
   it('records nothing for ordinary cases', async () => {
     const r = await runCase(base, referenceModel(base.reference));
     expect(r.firstReply).toBeUndefined();
+  });
+
+  it('files a run whose truth could not be read apart from the model failing', async () => {
+    const c: EvalCase = {
+      ...base,
+      graders: [
+        status('succeeded'),
+        matchesTruth('x', async () => {
+          throw new Error('offline');
+        }),
+      ],
+    };
+    const r = await runCase(c, referenceModel(c.reference), 0);
+    expect(r.pass).toBe(false);
+    expect(r.failure).toBe('model_error');
+    expect(r.grades.some((g) => g.ungradable)).toBe(true);
   });
 });

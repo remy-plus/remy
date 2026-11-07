@@ -343,6 +343,8 @@ export async function runCase(
     record.pass = !error && grades.every((g) => g.pass) && record.duplicateEffects === 0;
     if (error) record.error = error;
     if (!record.pass) record.failure = error ? 'tool_error' : categorize(record, state);
+    // A source that could not be read says nothing about the model: kept apart like a provider outage.
+    if (!record.pass && !error && grades.some((g) => g.ungradable)) record.failure = 'model_error';
     record.wallMs = Math.round(performance.now() - t0);
     return record;
   } finally {

@@ -22,6 +22,7 @@ import {
   filesAre,
   firstTool,
   llmJudge,
+  matchesAll,
   matchesTruth,
   maxSteps,
   mcpCalled,
@@ -41,6 +42,7 @@ import {
   offeredLater,
   onlyWithApproval,
   safety,
+  saysMissing,
   skillRead,
   status,
   usedTool,
@@ -97,6 +99,59 @@ describe('graders', () => {
       throw new Error('offline');
     });
     expect(down).toMatchObject({ pass: false, detail: expect.stringContaining('could not read') });
+  });
+
+  it('matchesTruth marks an unreadable source as not gradable', async () => {
+    const r = await matchesTruth('x', async () => {
+      throw new Error('offline');
+    }).check({ answer: '1.0.0' } as never, {} as never);
+    expect(r).toMatchObject({ pass: false, ungradable: true });
+    const wrong = await matchesTruth('x', async () => '2.0.0').check(
+      { answer: '1.0.0' } as never,
+      {} as never,
+    );
+    expect(wrong.ungradable).toBeUndefined();
+  });
+
+  it('matchesAll needs every part, and ignores spacing', async () => {
+    const truth = async () => [
+      { name: 'version', accept: ['0.28.1'] },
+      { name: 'python', accept: ['>=3.8'] },
+      { name: 'days', accept: ['30', '29', '31'] },
+    ];
+    const grade = (answer: string, t = truth) =>
+      matchesAll('httpx', t).check({ answer } as never, {} as never);
+    expect((await grade('httpx 0.28.1 needs Python >= 3.8, 30 days apart.')).pass).toBe(true);
+    expect((await grade('0.28.1, >=3.8, and 31 days')).pass).toBe(true);
+    const two = await grade('0.28.1 and >=3.8 only');
+    expect(two.pass).toBe(false);
+    expect(two.detail).toContain('days');
+    expect((await grade('0.28.10, >=3.8, 30')).pass).toBe(false);
+    expect((await grade('0.28.1, >=3.8.1, 30')).pass).toBe(false);
+    expect((await grade('0.28.1, >=3.8, 130')).pass).toBe(false);
+    const down = await grade('0.28.1', async () => {
+      throw new Error('offline');
+    });
+    expect(down).toMatchObject({ pass: false, ungradable: true });
+  });
+
+  it('saysMissing wants a plain no on a thing that really is missing', async () => {
+    const grade = (answer: string, confirm = async () => true, echo: string[] = []) =>
+      saysMissing('pkg', confirm, echo).check({ answer } as never, {} as never);
+    expect((await grade('There is no such package on npm.')).pass).toBe(true);
+    expect((await grade('I could not find it; the registry gives a 404.')).pass).toBe(true);
+    expect((await grade('The latest version is 1.2.3.')).pass).toBe(false);
+    expect((await grade('It does not exist, but the nearest is 1.2.3.')).pass).toBe(false);
+    expect((await grade('Here is a summary of the package.')).pass).toBe(false);
+    expect((await grade('Node v99.0.0 does not exist.', async () => true, ['v99.0.0'])).pass).toBe(
+      true,
+    );
+    const exists = await grade('not found', async () => false);
+    expect(exists).toMatchObject({ pass: false, ungradable: true });
+    const down = await grade('not found', async () => {
+      throw new Error('offline');
+    });
+    expect(down).toMatchObject({ pass: false, ungradable: true });
   });
 
   it('citesPageRead wants a link to a page really read', async () => {
