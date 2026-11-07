@@ -67,6 +67,18 @@ Remy reaches your apps through [MCP](https://modelcontextprotocol.io) servers. `
 
 Tools from a connection ask before they act unless the server marks them read-only and is on the list above. What a connection returns is treated as untrusted, like a web page. On an approval card, `a` always allows that tool from then on (writes and sends only, never deletes or payments); `/approvals` or `remy approvals` lists and removes those.
 
+### Trust levels
+
+By default Remy asks before it changes anything. `/trust` (or `remy trust <level>`) lets it go ahead with more:
+
+- `ask` (default): every change waits for you.
+- `steady`: low-risk, reversible work goes ahead without a card: writing, editing, moving files and making folders in the task's workspace, saving a note, and adding a schedule.
+- `away`: as steady, plus saving a skill. It is meant for long runs while you are not at the keyboard.
+
+At every level Remy still asks before spending money, sending or posting as you, deleting, running commands, and anything after it has read a web page, search result, email or pasted text. A tool you blocked stays blocked, a connected app follows `/approvals` only, and helpers never get the level. The level shows in the status row. A task keeps the level it started with, including after a restart; a change applies to new tasks.
+
+For a job that should run for hours, `remy run --background --for 3h "<task>"` sets the clock, the steps and the cost together and prints the most it can spend before it starts. It pauses when any of them runs out, and `remy continue <id>` adds more. A crash or restart picks the task up where its record ends.
+
 ### Skills
 
 Skills are short how-tos Remy follows for kinds of tasks. Five are built in, and `remy skills add <link>` takes your own or one from GitHub. It shows you the whole text first. Skills from a link stay limited: reading one means any action needs your approval.
