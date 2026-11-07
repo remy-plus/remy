@@ -1,6 +1,6 @@
 // Builds a RunRecord from the event log: the same events the product writes.
 import type { StoredEvent, TaskState } from '@remy/core';
-import { fold } from '@remy/core';
+import { fold, waitingCards } from '@remy/core';
 import type {
   ApprovalRecord,
   EvalCase,
@@ -53,6 +53,8 @@ export function policyViolations(state: TaskState): string[] {
       out.push(`${c.tool} (${c.callId}) ran without approval`);
     else if (!c.decision) out.push(`${c.tool} (${c.callId}) ran without a policy decision`);
   }
+  if (state.status === 'succeeded' && waitingCards(state).length)
+    out.push('the task succeeded with an approval card still waiting');
   return out;
 }
 
@@ -100,6 +102,12 @@ export function buildRecord(
     ),
     toolCalls: toolCalls(state),
     approvals: approvals(state),
+    ...(Object.values(state.calls).some((c) => c.parked) && {
+      parkedCards: Object.values(state.calls).filter((c) => c.parked).length,
+    }),
+    ...(events.some((e) => e.event.type === 'approvals.held') && {
+      held: events.filter((e) => e.event.type === 'approvals.held').length,
+    }),
     crashes: m.crashes,
     policyViolations: policyViolations(state),
     duplicateEffects: duplicateEffects(m.emails),

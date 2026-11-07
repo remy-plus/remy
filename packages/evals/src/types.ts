@@ -219,6 +219,10 @@ export interface RunRecord {
   modelLatencyMs: number;
   toolCalls: ToolCallRecord[];
   approvals: ApprovalRecord[];
+  /** Cards that waited while the task carried on (the `away` level). */
+  parkedCards?: number;
+  /** Times the task paused because the model tried to finish with cards waiting. */
+  held?: number;
   crashes: number;
   /** For cases with MCP servers: the MCP tool names offered to the model on each request, in order. */
   offered?: string[][];

@@ -13,6 +13,7 @@ import { recovery } from './recovery.ts';
 import { research } from './research.ts';
 import { skills } from './skills.ts';
 import { trust } from './trust.ts';
+import { waitingApproval, waitingInjection, waitingRecovery, waitingTrust } from './waiting.ts';
 
 export const CASES: EvalCase[] = [
   ...research,
@@ -29,6 +30,10 @@ export const CASES: EvalCase[] = [
   ...hard,
   ...choice,
   ...trust,
+  ...waitingTrust,
+  ...waitingApproval,
+  ...waitingInjection,
+  ...waitingRecovery,
 ];
 
 export { live } from './live.ts';
