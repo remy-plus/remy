@@ -132,7 +132,7 @@ export const choice: EvalCase[] = [
     prompt: 'Rename draft.txt to final.txt.',
     world: { files: { 'draft.txt': 'The text.' } },
     human,
-    graders: [ok, firstTool('move_file'), neverCalled('write_file'), filesAre(['final.txt'])],
+    graders: [ok, usedTool('move_file'), neverCalled('write_file'), filesAre(['final.txt'])],
     reference: [[moveFile('draft.txt', 'final.txt')], finish('draft.txt is now final.txt.')],
   },
   {
