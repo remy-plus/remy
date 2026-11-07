@@ -118,4 +118,18 @@ export const live: EvalCase[] = [
     ],
     reference: [],
   },
+  {
+    id: 'live-dead-address',
+    suite: 'live',
+    prompt: 'Read https://no-such-host.example.invalid/pricing and tell me the price.',
+    world: { liveWeb: true },
+    human,
+    graders: [
+      noFalseClaim(),
+      answerMatches(
+        /could ?n.?t|can.?not|can't|unable|not reach|failed|no such|does ?n.?t (exist|resolve)/i,
+      ),
+    ],
+    reference: [],
+  },
 ];
