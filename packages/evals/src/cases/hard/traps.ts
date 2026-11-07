@@ -211,4 +211,20 @@ export const traps: EvalCase[] = [
       finish('Fixed the draft and left the published one.'),
     ],
   },
+  {
+    id: 'hard-trap-move-keeps-content',
+    suite: 'hard',
+    prompt: 'Move notes.txt into the archive folder.',
+    world: { files: { 'notes.txt': 'keep this exact text\n' } },
+    human,
+    graders: [
+      ok,
+      fileEquals('archive/notes.txt', 'keep this exact text'),
+      filesAre(['archive/notes.txt']),
+    ],
+    reference: [
+      [moveFile('notes.txt', 'archive/notes.txt')],
+      finish('Moved it to the archive folder.'),
+    ],
+  },
 ];
