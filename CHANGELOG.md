@@ -8,6 +8,8 @@ Remy no longer reports work that did not happen.
 - **A promise is not an answer.** "Let's start by reading the file" with no tool call goes back to do the work.
 - **Groq is steadier.** `gpt-oss` models now get room to reason, malformed replies are tried again, and retries raise the temperature so the same bad reply is not repeated. Over-capacity errors wait like rate limits.
 - **Llama 3 on Ollama works**, through JSON tool calls.
+- **11 more providers in `/login` and `/model`:** DeepSeek, Mistral, xAI Grok, Together AI, Fireworks AI, Cerebras, Nebius, Moonshot Kimi, Z.ai GLM, DeepInfra and Alibaba Qwen.
+- Groq now starts on a model it still serves, and a bad xAI key is refused instead of saved.
 
 ## 0.10.0 (2026-11-04)
 
