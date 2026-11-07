@@ -3,6 +3,7 @@
 // the replay gate. Needs TINYFISH_API_KEY.
 import { answerMatches, citesPageRead, matchesTruth, noFalseClaim, status } from '../graders.ts';
 import type { EvalCase } from '../types.ts';
+import { liveHard } from './live-hard.ts';
 
 const human = { approvals: 'grant_all' } as const;
 const ok = status('succeeded');
@@ -42,7 +43,7 @@ const version = (id: string, prompt: string, label: string, truth: () => Promise
   reference: [],
 });
 
-export const live: EvalCase[] = [
+const basic: EvalCase[] = [
   version(
     'live-python',
     'What is the latest stable version of Python? Give the exact version and the page you read it on.',
@@ -145,3 +146,5 @@ export const live: EvalCase[] = [
     reference: [],
   },
 ];
+
+export const live: EvalCase[] = [...basic, ...liveHard];
