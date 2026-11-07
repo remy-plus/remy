@@ -64,4 +64,17 @@ export const traps: EvalCase[] = [
       finish('The total is 155 once corrections replace the first rows.'),
     ],
   },
+  {
+    id: 'hard-trap-one-currency',
+    suite: 'hard',
+    prompt: 'Add up only the EUR invoices in invoices.csv.',
+    world: {
+      files: {
+        'invoices.csv': 'id,amount,currency\nA,100,EUR\nB,250,USD\nC,40,EUR\nD,60,GBP\nE,15,EUR\n',
+      },
+    },
+    human,
+    graders: [ok, answerContains('155')],
+    reference: [[readFile('invoices.csv')], finish('The EUR invoices add up to 155.')],
+  },
 ];
