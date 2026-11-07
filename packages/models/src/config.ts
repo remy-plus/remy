@@ -10,6 +10,8 @@ export interface Profile {
   baseUrl: string;
   /** Env var holding the API key, if the provider needs one. */
   keyEnv?: string;
+  /** Set when listing models proves nothing about the key: a key check asks this model instead. */
+  keyCheckModel?: string;
 }
 
 export const PROFILES: Record<string, Profile> = {

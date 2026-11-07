@@ -5,6 +5,8 @@ export interface VerifyOptions {
   kind?: 'openai' | 'anthropic' | 'google';
   baseUrl: string;
   key?: string;
+  /** For a provider that lists models to anyone: send this model one token instead. */
+  chatModel?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }
@@ -27,8 +29,23 @@ export async function verifyKey(o: VerifyOptions): Promise<KeyCheck> {
     // OpenRouter lists its models to anyone, any key; its key endpoint checks the key.
     if (/^https?:\/\/([^/]+\.)?openrouter\.ai(\/|$)/i.test(base)) url = `${base}/key`;
   }
+  const chat = o.chatModel
+    ? {
+        method: 'POST',
+        body: JSON.stringify({
+          model: o.chatModel,
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'hi' }],
+        }),
+      }
+    : undefined;
+  if (chat) {
+    url = `${base}/chat/completions`;
+    headers['content-type'] = 'application/json';
+  }
   try {
     const res = await (o.fetchImpl ?? fetch)(url, {
+      ...chat,
       headers,
       signal: AbortSignal.timeout(o.timeoutMs ?? 10_000),
     });

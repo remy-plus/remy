@@ -133,6 +133,7 @@ export async function saveLogin(deps: LoginDeps, entry: LoginEntry): Promise<Log
     ...(profile?.kind && { kind: profile.kind }),
     baseUrl,
     ...(entry.key && { key: entry.key }),
+    ...(profile?.keyCheckModel && { chatModel: profile.keyCheckModel }),
     ...(deps.fetch && { fetchImpl: deps.fetch }),
   });
   if (check === 'rejected')
