@@ -4,13 +4,15 @@
 // each other: a cassette is keyed on the request.
 import { BROWSER_TOOL_NAMES } from '@remy/browser';
 import { BUILTIN_SKILLS } from '@remy/tools';
-import { choseTool } from '../graders.ts';
+import { choseSkill, choseTool } from '../graders.ts';
 import type { EvalCase, Grader, Move } from '../types.ts';
 import { fetchUrl, finish } from './util.ts';
 
 const search = (query: string) => ({ tool: 'web_search', args: { query } });
 
 const call = (tool: string, args: unknown = {}) => ({ tool, args });
+
+const use = (name: string) => call('use_skill', { name });
 
 const NOTES = [{ text: 'Lives in Lisbon.' }, { text: 'Prefers short answers.' }];
 const HISTORY = [
@@ -265,6 +267,63 @@ const schedulePick: EvalCase[] = [
   ),
 ];
 
+const skillPick: EvalCase[] = [
+  pick(
+    'skill-research-differences',
+    'What are the main differences between Postgres 17 and Postgres 18? I want sources.',
+    choseSkill('research'),
+    [use('research')],
+  ),
+  // A claim to check is research, even with no one asking for "research".
+  pick(
+    'skill-research-check-a-claim',
+    'Is it true that the Great Wall of China can be seen from space? Show me where that is from.',
+    choseSkill('research'),
+    [use('research')],
+  ),
+  pick(
+    'skill-research-what-is-known',
+    'Find out what is known about the safety of creatine for teenagers.',
+    choseSkill('research'),
+    [use('research')],
+  ),
+  pick(
+    'skill-compare-two-phones',
+    'Fairphone 5 or Pixel 9a: which should I get? Pick one and help me buy it.',
+    choseSkill('compare-and-buy'),
+    [use('compare-and-buy')],
+  ),
+  // Shopping with no "compare" in it. A search tool alone would find a page, not a pick.
+  pick(
+    'skill-compare-best-deal',
+    'I need a standing desk for under 400 euros. Find me the best deal.',
+    choseSkill('compare-and-buy'),
+    [use('compare-and-buy')],
+  ),
+  pick(
+    'skill-write-and-send-email',
+    'Write an email to Priya saying the launch moved to Thursday, and send it once I have seen it.',
+    choseSkill('write-and-send'),
+    [use('write-and-send')],
+    { world: kit({ inbox: [] }) },
+  ),
+  // Short and casual, with no word like "email" or "draft".
+  pick(
+    'skill-write-and-send-reply',
+    'Tell the landlord I will pay the rent on the 5th.',
+    choseSkill('write-and-send'),
+    [use('write-and-send')],
+    { world: kit({ inbox: [] }) },
+  ),
+  // A skill on the shelf is not a reason to open it.
+  pick(
+    'skill-not-for-a-quick-fact',
+    'What is the capital of Peru?',
+    choseTool({ not: ['use_skill'] }),
+    'Lima.',
+  ),
+];
+
 export const choice: EvalCase[] = [
   ...web,
   ...browserPick,
@@ -273,4 +332,5 @@ export const choice: EvalCase[] = [
   ...rememberPick,
   ...builtinsOverShell,
   ...schedulePick,
+  ...skillPick,
 ];
