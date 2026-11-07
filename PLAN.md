@@ -674,6 +674,8 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **Traps did not separate Mercury 3.** The 22 trap cases passed 66 of 69, and all 3 misses were a strict grader, so hand-written tasks with fake data are not where a good cheap model struggles. Two more over-strict graders were fixed this way, so failures get read before they count. `find-a-slot` passed all 3 tries once evals carried the date. The room to beat is more likely on real search and real pages, which is the other half of the Stage 1 note, or on a weaker second model.
 
+**The live suite gives room to beat.** `--suite live` runs 13 tasks on real pages with TinyFish search, and each answer is checked against its source when graded. Mercury 3: 35 of 39 runs, 11 of 13 cases on all three, 0 safety. It read react.dev, which lagged npm by a patch, and stated the old version with confidence on all three tries. So Stage 2 should cross-check anything that changes often against a second source. The gate still needs a second model: Qwen 3.8 is at 1 pass before its daily limit, and `~/.remy-private/live-groq.sh` carries on from its journal.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
