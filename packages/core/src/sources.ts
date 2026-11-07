@@ -1,5 +1,6 @@
 // The source check: a web answer is tested before the task finishes. Pure, and derived from
 // events alone (tool results list the pages they read), so a crash re-derives it.
+import { UPDATE_PLAN } from './plan.ts';
 import type { TaskState } from './state.ts';
 
 /** Marks the error the source check returns on a `finish`, so it fires once per task. */
@@ -22,6 +23,11 @@ export function normalizeUrl(raw: string): string {
 export const linksIn = (text: string): string[] => [
   ...new Set((text.match(URL_RE) ?? []).map((u) => u.replace(/[.,;:!?*_]+$/, ''))),
 ];
+
+/** github.com/oven-sh/bun names the page too, and needs a path so `Node.js` is not a link. */
+const BARE_RE = /(?<![\w@/.-])(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s<>"'`)\]]*/gi;
+const bareLinksIn = (text: string): string[] =>
+  (text.replace(URL_RE, ' ').match(BARE_RE) ?? []).map((u) => `https://${u}`);
 
 /** Roughly the registrable host: github.com/a and gist.github.com are one site. */
 export function siteOf(url: string): string {
@@ -75,10 +81,31 @@ export const sourceGateUsed = (s: TaskState): boolean =>
       c.result.error.startsWith(SOURCE_GATE_PREFIX),
   );
 
+/** Tools that report on the work rather than do any of it. */
+const NOT_WORK = new Set(['finish', 'ask_user', UPDATE_PLAN]);
+
+/** Something changed, so the reply reports an action: a page read on the way needs no link. */
+const acted = (s: TaskState) =>
+  Object.values(s.calls).some(
+    (c) => !NOT_WORK.has(c.tool) && c.result?.ok && c.risk && c.risk !== 'read',
+  );
+
+/** Search showed links but no page was opened, and the answer leans on them. */
+function unopened(s: TaskState, answer: string): string[] {
+  const seen = linksSeen(s).map(normalizeUrl);
+  if (!seen.length || acted(s)) return [];
+  const given = new Set(linksGiven(s).map(normalizeUrl));
+  const cited = [...linksIn(answer), ...bareLinksIn(answer)]
+    .map(normalizeUrl)
+    .some((u) => seen.includes(u) && !given.has(u));
+  if (!cited && !isFastFact(s.prompt) && !isFastFact(answer)) return [];
+  return ['You have not opened a page yet. Read one before you answer from it.'];
+}
+
 /** What is wrong with the answer's sources, as lines for the model; empty when it is fine. */
 export function sourceProblems(s: TaskState, answer: string): string[] {
   const read = pagesRead(s);
-  if (!read.length) return [];
+  if (!read.length) return unopened(s, answer);
   const readKeys = new Set(read.map(normalizeUrl));
   const known = new Set([...linksSeen(s), ...linksGiven(s)].map(normalizeUrl));
   const links = linksIn(answer);
@@ -88,7 +115,8 @@ export function sourceProblems(s: TaskState, answer: string): string[] {
     problems.push(
       `These links are in your answer but you never read them or saw them in a result: ${unread.join(', ')}. Read them, or leave them out.`,
     );
-  if (!links.some((u) => readKeys.has(normalizeUrl(u))))
+  const named = [...links, ...bareLinksIn(answer)];
+  if (!acted(s) && !named.some((u) => readKeys.has(normalizeUrl(u))))
     problems.push(
       'Your answer links no page you read. Add the link to the page each fact came from.',
     );

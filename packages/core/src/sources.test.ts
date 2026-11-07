@@ -151,6 +151,53 @@ describe('source check on finish', () => {
   });
 });
 
+describe('source check when no page was opened', () => {
+  /** A search that went through and showed a link, with no page read. */
+  const search = (step: number, url: string): Event[] => [
+    resp(step, undefined, call(`s${step}`, 'web_search', { query: 'q' })),
+    { type: 'policy.decided', callId: `s${step}`, decision: { kind: 'allow' } },
+    { type: 'tool.started', callId: `s${step}`, idempotencyKey: 'k', attempt: 1 },
+    {
+      type: 'tool.completed',
+      callId: `s${step}`,
+      result: { ok: true, content: `Result: ${url}`, trust: 'untrusted' },
+      latencyMs: 1,
+    },
+  ];
+
+  it('pushes back an answer that cites a search hit it never opened', () => {
+    const a = mk(P, ...search(1, A), ...finishCall(2, `I read it on ${A}`));
+    expect(a).toMatchObject({ kind: 'gate_sources' });
+  });
+
+  it('pushes back a fast fact taken from search alone, even with no link', () => {
+    const a = mk(
+      'What is the latest version of Rust?',
+      ...search(1, A),
+      ...finishCall(2, '1.99.1'),
+    );
+    expect(a).toMatchObject({ kind: 'gate_sources' });
+  });
+
+  it('leaves an unlinked plain answer alone', () => {
+    expect(mk(P, ...search(1, A), ...finishCall(2, 'About 200 metres.')).kind).toBe('execute');
+  });
+});
+
+describe('addresses and actions', () => {
+  it('counts an address with no scheme as naming the page', () => {
+    expect(mk(P, ...read(1, A), ...finishCall(2, 'See a.test/page for this.')).kind).toBe(
+      'execute',
+    );
+  });
+
+  it('does not take a version or a file name for an address', () => {
+    expect(mk(P, ...read(1, A), ...finishCall(2, 'Node.js 24.1 in src/app.ts')).kind).toBe(
+      'gate_sources',
+    );
+  });
+});
+
 describe('source check on a plain-text reply', () => {
   const said = (step: number, text: string) => resp(step, text);
 

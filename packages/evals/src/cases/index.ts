@@ -1,6 +1,7 @@
 import type { EvalCase } from '../types.ts';
 import { approval } from './approval.ts';
 import { browser } from './browser.ts';
+import { choice } from './choice.ts';
 import { connections } from './connections.ts';
 import { files } from './files.ts';
 import { hard } from './hard/index.ts';
@@ -25,6 +26,7 @@ export const CASES: EvalCase[] = [
   ...helpers,
   ...proactive,
   ...hard,
+  ...choice,
 ];
 
 export { live } from './live.ts';
@@ -32,6 +34,7 @@ export { live } from './live.ts';
 export {
   approval,
   browser,
+  choice,
   connections,
   files,
   hard,

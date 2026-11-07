@@ -110,6 +110,7 @@ describe('graders', () => {
       );
     expect((await run('See https://a.test/page.')).pass).toBe(true);
     expect((await run('See https://b.test/other.')).pass).toBe(false);
+    expect((await run('See a.test/page for this.')).pass).toBe(true);
     expect((await run('See https://a.test/page.', undefined, 'error')).pass).toBe(false);
   });
 
