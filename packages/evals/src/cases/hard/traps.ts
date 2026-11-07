@@ -125,4 +125,22 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains(['Power', '7'])],
     reference: [[readFile('bills.csv')], finish('Power is overdue by 7 days.')],
   },
+  {
+    id: 'hard-trap-due-this-week',
+    suite: 'hard',
+    prompt:
+      'Which items in tasks.csv are due in the next seven days? Do not count anything already past.',
+    world: {
+      files: {
+        'tasks.csv':
+          'task,due\nTax form,2026-11-09\nOld report,2026-11-02\nBudget,2026-11-30\nReview,2026-11-13\n',
+      },
+    },
+    human,
+    graders: [ok, answerContains(['Tax form', 'Review']), answerLacks(/Old report|Budget/)],
+    reference: [
+      [readFile('tasks.csv')],
+      finish('Tax form and Review are due in the next seven days.'),
+    ],
+  },
 ];
