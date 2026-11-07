@@ -120,7 +120,7 @@ import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { type MemoryStore, openMemory, personaliseOn, plainMemory } from './memory.ts';
-import { notificationFor, notify, type RunScript } from './notify.ts';
+import { cardNotification, notificationFor, notify, type RunScript } from './notify.ts';
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
@@ -925,6 +925,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       },
       onEvent: (e) => {
         debug?.write('event', e);
+        if (e.event.type === 'approval.requested' && e.event.parked === 1) firstCard?.();
         opts.hooks?.onEvent?.(e);
         if (opts.hooks) return;
         const line = timeline.line(e);
@@ -937,6 +938,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return { runtime, timeline, tools };
   }
   type Rt = ReturnType<typeof makeRuntime>['runtime'];
+  /** Set by a background worker: called when the first approval card of a task starts waiting. */
+  let firstCard: (() => void) | undefined;
 
   const followUp = async (
     id: string,
@@ -1078,6 +1081,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     await exists(id);
     writeMarker(home, id, { pid: process.pid, startedAt: new Date().toISOString() });
     out(`worker ${process.pid} started for ${id}`);
+    // The task carries on while a card waits, so say so when the first one does.
+    const prompt = fold(await store.read(id)).prompt;
+    firstCard = () =>
+      notify(cardNotification({ id, prompt }), {
+        env,
+        ...(deps.platform && { platform: deps.platform }),
+        ...(deps.notifyRun && { run: deps.notifyRun }),
+      });
     let code = 1;
     try {
       code = await resumeFlow(id);

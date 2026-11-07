@@ -42,6 +42,14 @@ export function notificationFor(p: {
   }
 }
 
+/** The task carries on while its first approval card waits (the `away` level). */
+export function cardNotification(p: { id: string; prompt: string }): Note {
+  return {
+    title: 'Remy needs your OK',
+    body: `"${notifyTitle(p.prompt)}" has an action waiting. It carries on meanwhile. Run: ${nextCommand('waiting_approval', p.id)}`,
+  };
+}
+
 export type RunScript = (script: string) => void;
 
 const defaultRun: RunScript = (script) => {

@@ -16,7 +16,7 @@ import {
   writeMarker,
 } from './background.ts';
 import { type CliDeps, cli } from './cli.ts';
-import { appleScriptString, notificationFor, notify } from './notify.ts';
+import { appleScriptString, cardNotification, notificationFor, notify } from './notify.ts';
 
 let home: string;
 beforeEach(() => {
@@ -175,6 +175,13 @@ describe('notifications', () => {
     );
     expect(notificationFor({ status: 'cancelled', id: 't', prompt: 'p' })).toBeUndefined();
     expect(notifyTitle('a\nb\u0007c')).toBe('a b c');
+  });
+
+  it('says when a card waits and the task carries on', () => {
+    const n = cardNotification({ id: 't', prompt: 'Email Erin' });
+    expect(n.title).toBe('Remy needs your OK');
+    expect(n.body).toContain('carries on');
+    expect(n.body).toContain('remy attach t');
   });
 
   it('runs osascript text on macOS and nowhere else', () => {

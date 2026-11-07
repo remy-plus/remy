@@ -76,11 +76,15 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
           ? `blocked ${nameOf(ev.callId)}: ${ev.decision.reason}`
           : undefined;
       case 'approval.requested':
+        if (ev.parked !== undefined)
+          return `waiting for your OK, carrying on: ${ev.preview} ${st.dim(`(${ev.risk}; ${ev.reason})`)}`;
         return opts.live
           ? undefined
           : `needs approval: ${ev.preview} ${st.dim(`(${ev.risk}; ${ev.reason})`)}`;
       case 'approval.resolved':
         return `${ev.granted ? 'approved' : 'denied'} ${nameOf(ev.callId)} ${st.dim(`by ${ev.by}`)}`;
+      case 'approvals.held':
+        return `paused for your OK on what is waiting`;
       case 'tool.started': {
         const c = calls.get(ev.callId);
         const retry = ev.attempt > 1 ? st.dim(` (attempt ${ev.attempt})`) : '';

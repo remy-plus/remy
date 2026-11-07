@@ -544,6 +544,7 @@ export function createChat(deps: ChatDeps): Chat {
   const listeners = new Set<() => void>();
   /** Bumped by interrupt and /new, so a stopped run's late callbacks are ignored. */
   let gen = 0;
+  let lastSummary = '';
   let current: { id: string; prompt: string; pasted?: string[] } | undefined;
   /** Pasted segments of messages still waiting in the queue, by text. */
   const pastedFor = new Map<string, string[]>();
@@ -647,6 +648,15 @@ export function createChat(deps: ChatDeps): Chat {
         break;
       case 'approval.requested':
         setTool(ev.callId, { state: 'waiting_approval' });
+        if (ev.parked !== undefined) {
+          flush(true);
+          set({
+            items: [
+              ...s.items,
+              { kind: 'note', text: `Waiting for your OK, carrying on: ${ev.preview}` },
+            ],
+          });
+        }
         break;
       case 'progress':
         flush(true);
@@ -798,6 +808,11 @@ export function createChat(deps: ChatDeps): Chat {
         if (my !== gen) return;
         if (o.status === 'waiting_approval') {
           const c = calls.get(o.request.callId);
+          if (o.summary && o.summary !== lastSummary) {
+            lastSummary = o.summary;
+            flush(true);
+            commit({ kind: 'note', text: o.summary });
+          }
           set({
             phase: 'waiting_approval',
             thinking: false,
