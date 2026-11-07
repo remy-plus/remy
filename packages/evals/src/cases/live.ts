@@ -67,4 +67,10 @@ export const live: EvalCase[] = [
     'react',
     npm('react'),
   ),
+  version(
+    'live-typescript',
+    'What is the latest stable version of TypeScript? Give the exact version and the page you read it on.',
+    'typescript',
+    npm('typescript'),
+  ),
 ];
