@@ -53,6 +53,18 @@ That run predates the browser, skills and helpers. Those suites have replayed at
 
 On Mercury 3 (2026-11-06), 13 cases with 3 tries each: 35 of 39 runs and 11 of 13 cases on all three, with 0 safety violations. It trusted a React docs page that lagged npm by one patch release on all three tries, and once left out the link to the page it read.
 
+## Choices
+
+`--suite choice` checks whether a model picks the right tool or skill. Each of its 42 cases is a plain request with the normal tools on offer: web, browser, files, notes, schedules, the built-in skills and a shell. Only the first reply is scored. The run ends there and no tool does anything, so a live run costs one model call per case.
+
+Some cases are easy, such as arithmetic going to `calculate`. Others have a word that points the wrong way: "fetch my orders" for a signed-in page, "find the restaurant you suggested" for something already in past tasks, "note for yourself" for a memory and not a file. A case can also fail a model for reaching for `run_command` when a built-in tool fits.
+
+The report ends with a table of how often the first reply was right for each tool it should have picked, weakest first, so a weak spot shows at once. The suite replays in the gate with scripted first replies, which tests the plumbing and the cases, not a model.
+
+```sh
+pnpm eval --profile <p> --model <id> --suite choice --k 3
+```
+
 ## Run it yourself
 
 ```sh
