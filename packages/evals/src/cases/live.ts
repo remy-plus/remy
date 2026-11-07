@@ -97,4 +97,10 @@ export const live: EvalCase[] = [
     'bun',
     github('oven-sh/bun', /^bun-v/),
   ),
+  version(
+    'live-rust',
+    'What is the latest stable version of Rust? Give the exact version and the page you read it on.',
+    'rust',
+    eol('rust'),
+  ),
 ];
