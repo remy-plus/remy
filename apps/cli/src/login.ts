@@ -22,6 +22,7 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'deepseek-flash',
     keyUrl: 'platform.deepseek.com/api_keys',
   },
+  mistral: { label: 'Mistral', model: 'ministral-3b-2512', keyUrl: 'console.mistral.ai/api-keys' },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -40,6 +41,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   anthropic: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
   google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
   deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
+  mistral: ['ministral-3b-2512'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 
