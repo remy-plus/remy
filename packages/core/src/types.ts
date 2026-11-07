@@ -24,6 +24,8 @@ export type ToolResult =
       data?: unknown;
       /** Spent by the tool on the task's behalf (helpers); added to the task's cost. */
       spentUsd?: number;
+      /** Pages this call read (addresses as asked and as served). Absent on results that read none. */
+      sources?: string[];
     }
   | {
       ok: false;
@@ -218,7 +220,8 @@ export type Event =
    * `text` goes back to it as a message and it carries on. Once per task, like the plan gate
    * on `finish`.
    */
-  | { type: 'plan.gated'; text: string }
+  /** `source` marks the once-only source check, separate from the plan gate. */
+  | { type: 'plan.gated'; text: string; source?: boolean }
   | { type: 'task.finished'; status: FinalStatus; answer?: string; reason?: string };
 
 export type EventType = Event['type'];

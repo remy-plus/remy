@@ -72,6 +72,8 @@ export interface TaskState {
   progressAt: number;
   /** A gate already sent a plain-text stop back to work (see `plan.gated`). */
   planGated: boolean;
+  /** The source check has pushed back once on a plain-text reply. */
+  sourceGated: boolean;
   cancelRequested: boolean;
   final?: { status: FinalStatus; answer?: string; reason?: string };
 }
@@ -132,6 +134,7 @@ function apply(s: TaskState | undefined, stored: StoredEvent): TaskState {
       initialBudget: { ...e.config.budget },
       progressAt: 0,
       planGated: false,
+      sourceGated: false,
       status: 'running',
       seq: 1,
       createdAt: Date.parse(stored.at),
@@ -327,7 +330,8 @@ function on(s: TaskState, e: Event) {
       s.progressAt = e.step;
       return;
     case 'plan.gated':
-      s.planGated = true;
+      if (e.source) s.sourceGated = true;
+      else s.planGated = true;
       s.log.push({ kind: 'user', text: e.text });
       return;
     case 'task.cancel_requested':
