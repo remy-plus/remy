@@ -83,6 +83,18 @@ Remy searches in a hidden browser on your machine with no extra key. Search engi
 
 `REMY_HELPERS=on` lets Remy hand separate parts of a task to up to 3 read-only helpers working at once.
 
+Roles are optional. Write them in `~/.remy/helpers.md`, or in `.remy/helpers.md` in a project (the project wins by name):
+
+```
+## scout
+Tools: web_search, fetch_url
+Look the thing up and give each claim with its link.
+```
+
+A role adds instructions and narrows the helper's tools; it never widens them. `researcher` and `checker` are built in. Roles from a project folder start the helper tainted, so any change it asks for needs your approval. `remy doctor` lists mistakes in the files.
+
+`REMY_HELPERS=act` also lets a helper whose role has an `Act: yes` line ask to change things. Each change shows up as an approval card marked with the helper's name, and nothing runs until you approve those exact arguments. Only one acting helper runs per call.
+
 Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Remy searches and browses in its own hidden browser on your computer, no key needed; `remy browser show` opens it so you can sign in to sites. `REMY_SEARCH` picks another search (`context`, `brave`, `tavily`, `searxng` or `off`).
 
 ## From source

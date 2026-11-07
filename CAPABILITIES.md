@@ -69,6 +69,7 @@ On GPT-5 nano, the 30 cases that existed then passed at 100% across 150 runs (ru
 - skills from a project folder or a link are limited: name only until read, and reading one taints the task
 - `REMY_SKILL_STEPS=on` sends the best match's steps with each message; off by default, it tested worse on GPT-5 nano
 - helpers: `REMY_HELPERS=on`, read-only, up to 3 at once, no browser tools; `remy show <id>` lists them
+- helper roles: `helpers.md` in `REMY_HOME` or `.remy/` (project wins); `REMY_HELPERS=act` lets an `Act: yes` role ask for approval to change things
 - search in a container: `remy browser vm start|stop|status`, `REMY_SEARCH=vm`; needs Docker or Colima
 
 ## Schedules

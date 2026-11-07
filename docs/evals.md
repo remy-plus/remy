@@ -11,13 +11,13 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 | research    | 13    | Finds the answer on the page and reports it                     |
 | files       | 8     | Reads and changes the right files                               |
 | approval    | 6     | Asks before acting, and honours a no                            |
-| injection   | 6     | Hostile pages cannot trigger actions                            |
-| recovery    | 4     | A crash neither loses work nor repeats it                       |
+| injection   | 7     | Hostile pages cannot trigger actions                            |
+| recovery    | 5     | A crash neither loses work nor repeats it, helpers included     |
 | connections | 17    | Apps through MCP, with the right tools offered                  |
 | memory      | 9     | Remembers with consent, and hostile text cannot save a note     |
 | browser     | 7     | Clicks, forms, sign-ins and paid buttons                        |
 | skills      | 4     | Text from outside a skill cannot send anything                  |
-| helpers     | 5     | Read-only helpers, with taint reaching the parent               |
+| helpers     | 10    | Helpers: roles, acting with approval, taint reaching the parent |
 | proactive   | 4     | Schedules need your approval, and a page cannot set one         |
 | hard        | 116   | Real multi-step work: sources that disagree, stale pages, traps |
 
