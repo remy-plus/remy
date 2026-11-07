@@ -45,6 +45,7 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'kimi-k2.6',
     keyUrl: 'platform.moonshot.ai/console/api-keys',
   },
+  zai: { label: 'Z.ai GLM', model: 'glm-5.3-flash', keyUrl: 'z.ai/manage-apikey/apikey-list' },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -70,6 +71,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   cerebras: ['gpt-oss-120b', 'qwen-3.8-27b'],
   nebius: ['nvidia/Nemotron-3_5-Lightning'],
   moonshot: ['kimi-k2.6'],
+  zai: ['glm-5.3-flash', 'glm-4.7-flashx'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 

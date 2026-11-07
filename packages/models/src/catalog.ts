@@ -205,6 +205,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 262144,
     pricing: { inPerMTok: 0.95, outPerMTok: 4 },
   },
+  'glm-5.3-flash': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 0.15, outPerMTok: 0.5 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },

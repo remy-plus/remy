@@ -25,6 +25,7 @@ export const PROFILES: Record<string, Profile> = {
   cerebras: { baseUrl: 'https://api.cerebras.ai/v1', keyEnv: 'CEREBRAS_API_KEY' },
   nebius: { baseUrl: 'https://api.tokenfactory.nebius.com/v1', keyEnv: 'NEBIUS_API_KEY' },
   moonshot: { baseUrl: 'https://api.moonshot.ai/v1', keyEnv: 'MOONSHOT_API_KEY' },
+  zai: { baseUrl: 'https://api.z.ai/api/paas/v4', keyEnv: 'ZHIPU_API_KEY' },
   // Native APIs (not OpenAI-compatible), served by the AI SDK client.
   anthropic: {
     kind: 'anthropic',

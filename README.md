@@ -45,6 +45,7 @@ remy
 | Cerebras      | `cerebras`         | `CEREBRAS_API_KEY`   | OpenAI-compatible API                                        |
 | Nebius        | `nebius`           | `NEBIUS_API_KEY`     | OpenAI-compatible API                                        |
 | Moonshot Kimi | `moonshot`         | `MOONSHOT_API_KEY`   | OpenAI-compatible API                                        |
+| Z.ai GLM      | `zai`              | `ZHIPU_API_KEY`      | OpenAI-compatible API                                        |
 | Ollama        | `ollama`           | none                 | Local models                                                 |
 | Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
 
