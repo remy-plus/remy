@@ -114,6 +114,7 @@ import {
   SUGGESTED_MODELS,
   saveLogin,
 } from './login.ts';
+import { forBudget, forNotice, parseDuration } from './long-run.ts';
 import { CATALOG, findCatalog } from './mcp-catalog.ts';
 import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
@@ -261,6 +262,7 @@ Options for run
   --max-cost <usd>      Cost budget (default ${DEFAULT_BUDGET.maxCostUsd})
   --background          Start the task and return at once; follow it with remy attach
   --long                A bigger budget for long jobs: ${LONG_BUDGET.maxSteps} steps, $${LONG_BUDGET.maxCostUsd}, 4 hours
+  --for <time>          Set steps, clock and cost for a long job together, e.g. --for 3h (up to 24h); prints the most it can spend first
   --net-allow <hosts>   Only allow these domains. Example: example.com,docs.example.com
 
 Options for every command
@@ -315,6 +317,7 @@ const OPTIONS = {
   steps: { type: 'string' },
   cost: { type: 'string' },
   long: { type: 'boolean' },
+  for: { type: 'string' },
   background: { type: 'boolean' },
   'net-allow': { type: 'string' },
   list: { type: 'boolean' },
@@ -1179,6 +1182,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const maxSteps = num(flags['max-steps'], '--max-steps');
     const maxCostUsd = num(flags['max-cost'], '--max-cost');
     const long = flags.long ? LONG_BUDGET : undefined;
+    const forMs = flags.for !== undefined ? parseDuration(flags.for) : undefined;
     const netAllow = list(flags['net-allow']) ?? file.netAllow;
     const always = standingNames();
     return {
@@ -1194,6 +1198,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         ...DEFAULT_BUDGET,
         ...file.budget,
         ...(long && { ...long }),
+        ...(forMs !== undefined && forBudget(forMs)),
         ...(maxSteps && { maxSteps }),
         ...(maxCostUsd && { maxCostUsd }),
       },
@@ -1535,9 +1540,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         await mcp?.ready;
         await runtime.start(prompt, config);
         if (flags.background) {
+          if (flags.for !== undefined) out(st.dim(forNotice(config.budget)));
           startBackground(id);
           return 0;
         }
+        if (flags.for !== undefined) out(st.dim(forNotice(config.budget)));
         out(st.dim(`Task ${id}. Workspace ${config.workspaceDir}`));
         return await drive(runtime, id);
       }

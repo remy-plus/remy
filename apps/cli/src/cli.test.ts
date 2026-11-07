@@ -232,6 +232,13 @@ describe('remy run', () => {
     });
   });
 
+  it('run --for prints the most it can spend before the task starts', async () => {
+    const h = harness({ model: new ScriptedModelClient([call('finish', { answer: 'Done.' })]) });
+    const r = await h.run('run', 'x', '--for', '2h');
+    expect(r.out).toContain('Long run: up to 2h, 100 steps and $2.50.');
+    expect(await h.run('run', 'x', '--for', 'soon')).toMatchObject({ code: 1 });
+  });
+
   describe('trust levels', () => {
     it('remy trust shows, sets and rejects', async () => {
       const h = harness({ model: new ScriptedModelClient([]) });
