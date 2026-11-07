@@ -193,6 +193,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 131072,
     pricing: { inPerMTok: 0.35, outPerMTok: 0.75 },
   },
+  'nvidia/Nemotron-3_5-Lightning': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 1048576,
+    pricing: { inPerMTok: 0.06, outPerMTok: 0.24 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },

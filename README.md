@@ -43,6 +43,7 @@ remy
 | Together AI   | `together`         | `TOGETHER_API_KEY`   | OpenAI-compatible API                                        |
 | Fireworks AI  | `fireworks`        | `FIREWORKS_API_KEY`  | OpenAI-compatible API                                        |
 | Cerebras      | `cerebras`         | `CEREBRAS_API_KEY`   | OpenAI-compatible API                                        |
+| Nebius        | `nebius`           | `NEBIUS_API_KEY`     | OpenAI-compatible API                                        |
 | Ollama        | `ollama`           | none                 | Local models                                                 |
 | Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
 

@@ -35,6 +35,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     keyUrl: 'fireworks.ai/api-keys',
   },
   cerebras: { label: 'Cerebras', model: 'gpt-oss-120b', keyUrl: 'cloud.cerebras.ai' },
+  nebius: {
+    label: 'Nebius',
+    model: 'nvidia/Nemotron-3_5-Lightning',
+    keyUrl: 'tokenfactory.nebius.com',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -58,6 +63,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   together: ['zai-org/GLM-5.3-Flash'],
   fireworks: ['accounts/fireworks/models/glm-5p3-flash'],
   cerebras: ['gpt-oss-120b', 'qwen-3.8-27b'],
+  nebius: ['nvidia/Nemotron-3_5-Lightning'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 
