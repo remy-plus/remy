@@ -40,6 +40,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'nvidia/Nemotron-3_5-Lightning',
     keyUrl: 'tokenfactory.nebius.com',
   },
+  moonshot: {
+    label: 'Moonshot Kimi',
+    model: 'kimi-k2.6',
+    keyUrl: 'platform.moonshot.ai/console/api-keys',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -64,6 +69,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   fireworks: ['accounts/fireworks/models/glm-5p3-flash'],
   cerebras: ['gpt-oss-120b', 'qwen-3.8-27b'],
   nebius: ['nvidia/Nemotron-3_5-Lightning'],
+  moonshot: ['kimi-k2.6'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 
