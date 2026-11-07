@@ -52,10 +52,11 @@ export function renderSnapshot(s: PageSnapshot, maxChars = PAGE_MAX_CHARS): stri
   ].join('\n');
 }
 
-const page = (s: PageSnapshot, maxChars?: number): ToolResult => ({
+const page = (s: PageSnapshot, maxChars?: number, asked?: string): ToolResult => ({
   ok: true,
   content: renderSnapshot(s, maxChars),
   trust: 'untrusted',
+  ...(s.url ? { sources: [...new Set([asked, s.url].filter((u): u is string => !!u))] } : {}),
 });
 
 const refused = (error: string): ToolResult => ({
@@ -135,7 +136,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
     async execute({ url, max_chars }) {
       if (!/^https?:\/\//i.test(url)) return refused('Only http and https addresses open.');
       try {
-        return page(await browser.open(url), max_chars);
+        return page(await browser.open(url), max_chars, url);
       } catch (e) {
         return failed(e);
       }

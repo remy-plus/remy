@@ -56,7 +56,12 @@ export const fetchUrl = defineTool({
       }
       const isHtml = /html/i.test(r.contentType) || /^\s*(<!doctype html|<html)/i.test(r.body);
       const text = isHtml ? htmlToText(r.body) : r.body;
-      return untrusted(`${r.url}\n\n${capText(text, max_chars ?? FETCH_MAX_CHARS)}`);
+      return {
+        ok: true,
+        content: `${r.url}\n\n${capText(text, max_chars ?? FETCH_MAX_CHARS)}`,
+        trust: 'untrusted',
+        sources: [...new Set([url, r.url])],
+      };
     } catch (e) {
       return {
         ok: false,
