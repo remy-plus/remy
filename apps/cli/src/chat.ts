@@ -427,6 +427,10 @@ export function parsePlan(args: unknown): PlanStep[] | undefined {
 
 /** A model failure in plain words, ending with the one thing to do. Undefined when unknown. */
 export function explainModelError(msg: string): string | undefined {
+  if (/daily limit is used up|tokens per day|requests per day/i.test(msg)) {
+    const wait = /try again in ([\dhm.]+s?)/i.exec(msg)?.[1]?.replace(/\.\d+s$/, 's');
+    return `${providerName(msg)}'s daily limit for this model is used up. ${wait ? `Try again in ${wait}, or switch` : 'Switch'} with /model.`;
+  }
   const large = explainTooLarge(msg);
   if (large) return large;
   const m = msg.toLowerCase();

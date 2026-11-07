@@ -16,6 +16,14 @@ describe('provider errors in plain words', () => {
     expect(explainModelError(after)).toContain('17,786');
   });
 
+  it('says a daily limit is used up, and when it lifts', () => {
+    const raw =
+      "The model failed: this model's daily limit is used up. HTTP 429: service tier `on_demand` on tokens per day (TPD): Limit 200000. Please try again in 7m44.4s.";
+    expect(explainModelError(raw)).toBe(
+      "Groq's daily limit for this model is used up. Try again in 7m44s, or switch with /model.",
+    );
+  });
+
   it('names the provider when it is rate limiting and ends with the next step', () => {
     expect(explainModelError(groq429)).toBe(
       'Groq is rate-limiting this key. Wait a minute and send your message again, or switch with /model.',
