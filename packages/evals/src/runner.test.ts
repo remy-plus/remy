@@ -329,6 +329,16 @@ describe('sharedPrefix', () => {
   });
 });
 
+describe('the situation', () => {
+  it('sends the moment with the message, as the app does', async () => {
+    const model = new ScriptedModelClient([
+      { calls: finish('1974'), usage: { inTokens: 1, outTokens: 1 } },
+    ]);
+    await runCase(base, model);
+    expect(JSON.stringify(model.requests[0]?.messages)).toContain('6 November 2026');
+  });
+});
+
 describe('resuming', () => {
   it('counts the runs already done and plays only the rest', async () => {
     const other = { ...base, id: 'other' };

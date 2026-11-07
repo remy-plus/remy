@@ -23,6 +23,28 @@ const MAX_FOLLOW_UPS = 2;
 /** What the scripted human says once its answers run out, as a real person would. */
 const NO_MORE_ANSWERS = 'I have nothing more to add. Finish with what you have.';
 
+/** What the app says before each message. A fixed moment, so runs repeat and cassettes hold. */
+export const EVAL_SITUATION = `Situation when the user sent the next message (from Remy, not the user):
+- Local time: Friday, 6 November 2026 at 10:00 (UTC).`;
+
+/** Sends the moment with each user message, as the app does, so "tomorrow" means something. */
+function withSituation(inner: ModelClient): ModelClient {
+  return {
+    id: inner.id,
+    caps: inner.caps,
+    complete: (req, ...rest) =>
+      inner.complete(
+        {
+          ...req,
+          messages: req.messages.map((m) =>
+            m.role === 'user' ? { ...m, content: `${EVAL_SITUATION}\n\n${m.content}` } : m,
+          ),
+        },
+        ...rest,
+      ),
+  };
+}
+
 export interface EvalResult {
   version: 1;
   model: string;
@@ -106,7 +128,9 @@ export async function runCase(
     const now = () => Date.now() + offset;
     const inner = new MemoryEventStore({ now });
     const faulty = crashingStore(inner, c.faults ?? []);
-    const counted = counting(c.world.skills ? withSkills(model, c.world.skills) : model);
+    const counted = counting(
+      withSituation(c.world.skills ? withSkills(model, c.world.skills) : model),
+    );
     const tools = new ToolRegistry(withTransient(world.tools, c.faults ?? []));
     let n = 0;
     const ids = { next: (p: string) => `${p}_${++n}` };
