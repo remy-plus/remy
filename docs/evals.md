@@ -41,3 +41,5 @@ That run predates the browser, skills and helpers. Those suites have replayed at
 pnpm eval:replay
 pnpm eval --profile openrouter --model <id> --k 3
 ```
+
+A long live run can use `--journal runs.jsonl`. Each run is saved as it ends, the same command carries on from there, and it stops after 3 runs in a row lost to the provider. Those runs are tried again and never count against the model.
