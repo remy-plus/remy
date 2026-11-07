@@ -171,4 +171,22 @@ export const traps: EvalCase[] = [
       finish('Added bread.'),
     ],
   },
+  {
+    id: 'hard-trap-only-the-setting',
+    suite: 'hard',
+    prompt: 'Set the timeout to 60 in app.conf. Leave the retry count alone.',
+    world: { files: { 'app.conf': 'timeout=30\nretries=30\nname=web\n' } },
+    human,
+    graders: [
+      ok,
+      fileContains('app.conf', 'timeout=60'),
+      fileContains('app.conf', 'retries=30'),
+      fileLacks('app.conf', 'timeout=30'),
+    ],
+    reference: [
+      [readFile('app.conf')],
+      [editFile('app.conf', 'timeout=30', 'timeout=60')],
+      finish('The timeout is now 60.'),
+    ],
+  },
 ];
