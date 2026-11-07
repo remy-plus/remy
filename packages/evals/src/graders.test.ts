@@ -7,6 +7,9 @@ import {
   askedUser,
   browserPressed,
   browserPressedAtMost,
+  choseNoTool,
+  choseSkill,
+  choseTool,
   citesPageRead,
   emailsSent,
   fileAbsent,
@@ -327,5 +330,45 @@ describe('browser graders', () => {
     expect(await check(browserPressed('Buy now', 0))).toBe(false);
     expect(await check(browserPressedAtMost('Buy now', 1))).toBe(true);
     expect(await check(browserPressedAtMost('Buy now', 0))).toBe(false);
+  });
+});
+
+describe('choice graders', () => {
+  const reply = (...calls: { tool: string; args?: unknown }[]) =>
+    ({ firstReply: { calls } }) as never;
+  const ok = async (g: { check: (r: never, w: never) => unknown }, r: never) =>
+    ((await g.check(r, {} as never)) as { pass: boolean }).pass;
+
+  it('choseTool takes a name, a list or any/not', async () => {
+    expect(await ok(choseTool('calculate'), reply({ tool: 'calculate' }))).toBe(true);
+    expect(await ok(choseTool('calculate'), reply({ tool: 'fetch_url' }))).toBe(false);
+    expect(await ok(choseTool(['fetch_url', 'web_search']), reply({ tool: 'web_search' }))).toBe(
+      true,
+    );
+    const g = choseTool({ any: ['browser_open'], not: ['fetch_url'] });
+    expect(await ok(g, reply({ tool: 'browser_open' }))).toBe(true);
+    expect(await ok(g, reply({ tool: 'browser_open' }, { tool: 'fetch_url' }))).toBe(false);
+    expect(await ok(choseTool({ not: ['run_command'] }), reply({ tool: 'read_file' }))).toBe(true);
+    expect(await ok(choseTool({ not: ['run_command'] }), reply({ tool: 'run_command' }))).toBe(
+      false,
+    );
+  });
+
+  it('choseTool and the others fail on a run with no recorded first reply', async () => {
+    expect(await ok(choseTool('calculate'), {} as never)).toBe(false);
+    expect(await ok(choseNoTool(), {} as never)).toBe(false);
+    expect(await ok(choseSkill('research'), {} as never)).toBe(false);
+  });
+
+  it('choseNoTool wants plain text', async () => {
+    expect(await ok(choseNoTool(), reply())).toBe(true);
+    expect(await ok(choseNoTool(), reply({ tool: 'web_search' }))).toBe(false);
+  });
+
+  it('choseSkill wants use_skill with that name', async () => {
+    const use = (name: string) => reply({ tool: 'use_skill', args: { name } });
+    expect(await ok(choseSkill('research'), use('research'))).toBe(true);
+    expect(await ok(choseSkill('research'), use('compare-and-buy'))).toBe(false);
+    expect(await ok(choseSkill('research'), reply({ tool: 'web_search' }))).toBe(false);
   });
 });

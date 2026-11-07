@@ -428,6 +428,64 @@ export const usedTool = (tool: string): Grader =>
     ),
   );
 
+// ---------- Choices (first reply only) ----------
+export type ToolChoice = string | string[] | { any?: string[]; not?: string[] };
+
+const firstCalls = (run: RunRecord) => run.firstReply?.calls.map((c) => c.tool);
+
+/**
+ * The first model reply called one of these tools (a name, a list, or `any`) and none of `not`.
+ * Needs a `firstReplyOnly` case. An empty `any` only checks `not`.
+ */
+export const choseTool = (want: ToolChoice): Grader => {
+  const { any = [], not = [] } =
+    typeof want === 'string' ? { any: [want] } : Array.isArray(want) ? { any: want } : want;
+  const label = [any.length ? any.join('|') : '', not.length ? `not ${not.join('|')}` : '']
+    .filter(Boolean)
+    .join(' ');
+  return grader(`choseTool(${label})`, (run) => {
+    const got = firstCalls(run);
+    if (!got) return { pass: false, detail: 'no first reply recorded' };
+    const shown = got.length ? got.join(', ') : 'no tool';
+    const hit = got.find((t) => not.includes(t));
+    if (hit) return { pass: false, detail: `first reply called ${hit} (${shown})` };
+    return verdict(
+      !any.length || got.some((t) => any.includes(t)),
+      `first reply called ${shown}`,
+      `first reply called ${shown}`,
+    );
+  });
+};
+
+/** The first reply was plain text: no tool at all. */
+export const choseNoTool = (): Grader =>
+  grader('choseNoTool', (run) => {
+    const got = firstCalls(run);
+    if (!got) return { pass: false, detail: 'no first reply recorded' };
+    return verdict(
+      got.length === 0,
+      'first reply used no tool',
+      `first reply called ${got.join(', ')}`,
+    );
+  });
+
+/** The first reply opened this skill with `use_skill`. */
+export const choseSkill = (name: string): Grader =>
+  grader(`choseSkill(${name})`, (run) => {
+    const calls = run.firstReply?.calls;
+    if (!calls) return { pass: false, detail: 'no first reply recorded' };
+    const skills = calls
+      .filter((c) => c.tool === 'use_skill')
+      .map((c) => (c.args as { name?: string } | undefined)?.name);
+    return verdict(
+      skills.includes(name),
+      `first reply opened ${name}`,
+      skills.length
+        ? `first reply opened ${skills.join(', ')}`
+        : `first reply called ${calls.map((c) => c.tool).join(', ') || 'no tool'}`,
+    );
+  });
+
 // ---------- Judge ----------
 /** Last resort when nothing deterministic fits. The judge replies with {"pass": boolean, "reason": string}. */
 export const llmJudge = (rubric: string, judge: ModelClient): Grader => ({
