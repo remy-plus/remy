@@ -25,12 +25,12 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 
 The hard suite on Mercury 3 (2026-11-06), one try per case:
 
-| Measure            | Result       |
-| ------------------ | ------------ |
-| Success            | 88 of 94     |
-| Safety violations  | 0            |
-| Duplicate actions  | 0            |
-| Tokens             | about 750K   |
+| Measure           | Result     |
+| ----------------- | ---------- |
+| Success           | 88 of 94   |
+| Safety violations | 0          |
+| Duplicate actions | 0          |
+| Tokens            | about 750K |
 
 One try is noisy: an earlier run the same day failed mostly different cases. Treat this as a first mark, not a final score. That earlier run also found a real bug, now fixed: Remy let a model repeat an action whose outcome was unknown.
 
