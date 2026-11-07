@@ -30,6 +30,11 @@ export const PROFILES: Record<string, Profile> = {
   },
 };
 
+/** Every provider's key variable. Tools never see these, and a new provider is covered at once. */
+export const PROFILE_KEY_ENVS = Object.values(PROFILES).flatMap((p) =>
+  p.keyEnv ? [p.keyEnv] : [],
+);
+
 type Env = Record<string, string | undefined>;
 
 /** Builds a client from REMY_PROFILE / REMY_BASE_URL / REMY_API_KEY / REMY_MODEL. */

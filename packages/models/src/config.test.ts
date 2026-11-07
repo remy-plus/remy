@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { modelFromEnv, PROFILES } from './config.ts';
+import { modelFromEnv, PROFILE_KEY_ENVS, PROFILES } from './config.ts';
 
 describe('modelFromEnv', () => {
   it('builds from a profile with catalog caps', () => {
@@ -64,5 +64,13 @@ describe('modelFromEnv', () => {
     expect(() => modelFromEnv({ REMY_MODEL: 'm' })).toThrow(/REMY_PROFILE or REMY_BASE_URL/);
     expect(() => modelFromEnv({ REMY_PROFILE: 'ollama' })).toThrow(/REMY_MODEL/);
     expect(() => modelFromEnv({ REMY_PROFILE: 'zzz', REMY_MODEL: 'm' })).toThrow(/unknown/);
+  });
+});
+
+describe('PROFILE_KEY_ENVS', () => {
+  it('holds every key variable, so a new provider is never handed to a tool', () => {
+    expect(PROFILE_KEY_ENVS).toEqual(expect.arrayContaining(['OPENAI_API_KEY', 'GROQ_API_KEY']));
+    for (const p of Object.values(PROFILES))
+      if (p.keyEnv) expect(PROFILE_KEY_ENVS).toContain(p.keyEnv);
   });
 });

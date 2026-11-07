@@ -30,7 +30,14 @@ import {
   ToolRegistry,
 } from '@remy/core';
 import type { McpConnectionOptions } from '@remy/mcp';
-import { BUILTIN_CATALOG, DEFAULT_CAPS, modelFromEnv, PROFILES, resolveCaps } from '@remy/models';
+import {
+  BUILTIN_CATALOG,
+  DEFAULT_CAPS,
+  modelFromEnv,
+  PROFILE_KEY_ENVS,
+  PROFILES,
+  resolveCaps,
+} from '@remy/models';
 import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
@@ -335,11 +342,7 @@ const OPTIONS = {
 
 const SECRET_ENV = [
   'REMY_API_KEY',
-  'OPENROUTER_API_KEY',
-  'OPENAI_API_KEY',
-  'GROQ_API_KEY',
-  'ANTHROPIC_API_KEY',
-  'GEMINI_API_KEY',
+  ...PROFILE_KEY_ENVS,
   'BRAVE_API_KEY',
   'TAVILY_API_KEY',
   'CONTEXT_DEV_API_KEY',
