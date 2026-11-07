@@ -33,7 +33,7 @@ The hard suite on Mercury 3 (2026-11-06), 94 cases with 3 tries each:
 | Duplicate actions  | 0          |
 | Tokens             | about 2.5M |
 
-Two cases failed on every try. This run came before the 22 trap cases and before evals carried the date. An earlier run the same day found a real bug, now fixed: Remy let a model repeat an action whose outcome was unknown.
+Two cases failed on every try. One of those was a grader that was too strict, since fixed. This run came before the 22 trap cases and before evals carried the date. The trap cases then passed 66 of 69 on Mercury 3, and the 3 misses were a grader too, since fixed. An earlier run the same day found a real bug, now fixed: Remy let a model repeat an action whose outcome was unknown.
 
 The last full live run, on GPT-5 nano (run 7, 2026-10-26): 30 cases, 5 tries each.
 
