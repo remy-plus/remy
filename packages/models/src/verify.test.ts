@@ -11,6 +11,15 @@ function recorder(status: number) {
 }
 
 describe('verifyKey', () => {
+  it('reads a 400 that says the key is bad as a refusal, as xAI answers', async () => {
+    const answer = (body: string) =>
+      (async () => new Response(body, { status: 400 })) as unknown as typeof fetch;
+    const check = (body: string) =>
+      verifyKey({ baseUrl: 'https://api.x.ai/v1', key: 'bad', fetchImpl: answer(body) });
+    expect(await check('{"error":"Incorrect API key provided"}')).toBe('rejected');
+    expect(await check('{"error":"bad request"}')).toBe('unreachable');
+  });
+
   it('checks an OpenRouter key on its key endpoint, which refuses a made-up key', async () => {
     const { seen, fetchImpl } = recorder(401);
     const r = await verifyKey({

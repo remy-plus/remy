@@ -36,6 +36,8 @@ export async function verifyKey(o: VerifyOptions): Promise<KeyCheck> {
     // Google answers a bad key with 400 (API_KEY_INVALID); the others use 401 or 403.
     if (res.status === 401 || res.status === 403) return 'rejected';
     if (kind === 'google' && res.status === 400) return 'rejected';
+    // xAI answers a bad key with 400 and says so in the body.
+    if (res.status === 400 && /api.?key/i.test(await res.text())) return 'rejected';
     return 'unreachable';
   } catch {
     return 'unreachable';
