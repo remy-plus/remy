@@ -18,6 +18,7 @@ import {
   type Permissions,
   RISKS,
   type Risk,
+  type TaskConfig,
   type Tool,
   type ToolContext,
 } from './types.ts';
@@ -427,12 +428,11 @@ describe('trust levels', () => {
 
   it.each(['steady', 'away'] as const)('%s: a helper never gets the level', (level) => {
     const s = at(level);
-    expect(
-      run(steadyTool, { ...s, config: { ...s.config, parent: { taskId: 't', callId: 'c' } } }).kind,
-    ).toBe('require_approval');
-    expect(run(steadyTool, { ...s, config: { ...s.config, helperRole: 'x' } }).kind).toBe(
+    const withCfg = (extra: Partial<TaskConfig>) => ({ ...s, config: { ...s.config, ...extra } });
+    expect(run(steadyTool, withCfg({ parent: { taskId: 't', callId: 'c' } })).kind).toBe(
       'require_approval',
     );
+    expect(run(steadyTool, withCfg({ helperRole: 'x' })).kind).toBe('require_approval');
   });
 
   it('an MCP-style tool is not widened, but its standing approval still works', () => {
