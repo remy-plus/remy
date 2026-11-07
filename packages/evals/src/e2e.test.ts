@@ -28,7 +28,7 @@ describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
     expect(SUITES.filter((s) => s !== 'hard' && s !== 'choice' && s !== 'live').map(count)).toEqual(
-      [13, 8, 6, 6, 4, 17, 9, 7, 4, 5, 4],
+      [13, 8, 6, 7, 5, 17, 9, 7, 4, 10, 4],
     );
     expect(count('hard')).toBeGreaterThanOrEqual(41);
   });
@@ -64,6 +64,7 @@ describe('the starting cases', () => {
       'recovery-transient-fetch': 0,
       'recovery-crash-in-write-file': 1,
       'conn-crash-after-unsafe-tool-ran': 1,
+      'recovery-helper-crash-mid-action': 1,
     });
   });
 
@@ -100,6 +101,7 @@ describe('the starting cases', () => {
       const worse = await runEval(CASES, (c) =>
         referenceModel(
           c.suite === 'research' ? [...c.reference.slice(0, -1), 'No idea.'] : c.reference,
+          c.helperReference,
         ),
       );
       expect(compare(base, base)).toEqual([]);

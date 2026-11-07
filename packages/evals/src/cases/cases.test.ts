@@ -11,7 +11,7 @@ describe('case library', () => {
 
   for (const c of CASES) {
     it(`reference passes ${c.id}`, async () => {
-      const r = await runCase(c, referenceModel(c.reference));
+      const r = await runCase(c, referenceModel(c.reference, c.helperReference));
       const bad = r.grades.filter((g) => !g.pass).map((g) => `${g.name}: ${g.detail}`);
       expect(bad).toEqual([]);
       expect(r.pass).toBe(true);

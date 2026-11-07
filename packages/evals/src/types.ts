@@ -127,6 +127,10 @@ export interface EvalCase {
     shell?: boolean;
     /** Offer `delegate`. Helpers play `helperReference`. */
     helpers?: boolean;
+    /** Helper roles, as the Markdown file reads, and where the file lives. */
+    helperRoles?: { markdown: string; source?: 'user' | 'project' };
+    /** The host allows helpers whose role says `act` (REMY_HELPERS=act). */
+    helpersAct?: boolean;
   };
   /** Tools the model may use. Defaults to the ones the world makes useful, plus finish and ask_user. */
   tools?: string[];

@@ -3,6 +3,8 @@ import {
   type ConversationTurn,
   createRuntime,
   DEFAULT_BUDGET,
+  fold,
+  isHelperTask,
   type ModelClient,
   type ModelResponse,
   type RunOutcome,
@@ -210,6 +212,10 @@ export async function runCase(
         // A live provider that says wait has to be waited for, or its rate limit reads as a failure.
         ...(live ? {} : { sleep: async () => {} }),
         random: () => 0,
+        ...(world.helperRoles && {
+          helperRoles: world.helperRoles,
+          helpersAct: world.helpersAct === true,
+        }),
       });
 
     const base: TaskConfig = {
@@ -227,13 +233,25 @@ export async function runCase(
     let pauses = 0;
     let error: string | undefined;
 
+    /** The tool behind an approval card: the task's own call, or a helper's. */
+    const toolOf = async (taskId: string, callId: string) => {
+      const own = (await rt.state(taskId)).calls[callId]?.tool;
+      if (own) return own;
+      for (const t of await inner.listTasks())
+        if (isHelperTask(t.taskId)) {
+          const found = fold(await inner.read(t.taskId)).calls[callId]?.tool;
+          if (found) return found;
+        }
+      return '';
+    };
+
     /** Drives one task to a finished outcome, answering approvals and questions as the human would. */
     const drive = async (taskId: string): Promise<RunOutcome | undefined> => {
       for (let i = 0; i < MAX_ROUNDS; i++) {
         try {
           const o = await rt.advance(taskId);
           if (o.status === 'waiting_approval') {
-            const tool = (await rt.state(taskId)).calls[o.request.callId]?.tool ?? '';
+            const tool = await toolOf(taskId, o.request.callId);
             await rt.approve(
               taskId,
               o.request.callId,
@@ -312,6 +330,21 @@ export async function runCase(
       record.toolCalls.unshift(...r.toolCalls);
       record.approvals.unshift(...r.approvals);
       record.policyViolations.unshift(...r.policyViolations);
+    }
+    // What helpers did is part of the run: their calls, cards and policy slips are graded too.
+    for (const t of await inner.listTasks()) {
+      if (!isHelperTask(t.taskId)) continue;
+      const h = buildRecord(await inner.read(t.taskId), {
+        c,
+        run,
+        modelCalls: 0,
+        wallMs: 0,
+        crashes: 0,
+        emails: [],
+      }).record;
+      record.toolCalls.push(...h.toolCalls);
+      record.approvals.push(...h.approvals);
+      record.policyViolations.push(...h.policyViolations);
     }
     if (stopper?.first)
       record.firstReply = {

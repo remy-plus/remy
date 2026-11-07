@@ -40,6 +40,9 @@ export function crashingStore(inner: EventStore, faults: Fault[]): CrashingStore
           dead ? Promise.resolve() : target.releaseLease(...a);
       if (prop !== 'append') return Reflect.get(target, prop, recv);
       return async (...args: Parameters<EventStore['append']>) => {
+        // A dead process writes nothing. A tool that swallows the crash error (a helper's whole
+        // run happens inside one) must not be able to carry on and record a result.
+        if (dead) throw new Crash('the process is dead');
         const events = args[2];
         for (const e of events)
           if (e.type === 'model.responded') for (const c of e.calls) toolOf.set(c.callId, c.tool);

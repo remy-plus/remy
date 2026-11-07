@@ -5,9 +5,13 @@ import { join } from 'node:path';
 import { BROWSER_TOOL_NAMES, createBrowserTools, fixtureBrowser } from '@remy/browser';
 import {
   BROWSER_HINT,
+  BUILTIN_ROLES,
   defineTool,
   type FetchResult,
+  type HelperRole,
   type ModelClient,
+  mergeRoles,
+  parseRoles,
   type ScopedFetch,
   type ScopedFs,
   SELECT_THRESHOLD,
@@ -20,6 +24,7 @@ import { type FakeServer, fakeServer } from '@remy/mcp/testing';
 import {
   askUser,
   calculate,
+  createDelegate,
   createMemoryTools,
   createRecallTool,
   createScheduleTools,
@@ -27,7 +32,6 @@ import {
   createScopedFs,
   createSkillTools,
   createWebSearch,
-  delegate,
   deleteFile,
   type Episode,
   editFile,
@@ -226,6 +230,8 @@ export interface World {
   allowTools: string[];
   /** A system prompt that replaces the default (notes about the user), when the case has memory. */
   system?: string;
+  helperRoles?: HelperRole[];
+  helpersAct?: boolean;
   capabilities: () => Pick<ToolContext, 'fs' | 'net' | 'secrets'>;
   after: () => Promise<WorldAfter>;
   cleanup: () => Promise<void>;
@@ -372,8 +378,15 @@ export async function createWorld(c: EvalCase): Promise<World> {
     tools.push(runCommand);
     allowTools.push('run_command');
   }
+  let helperRoles: HelperRole[] | undefined;
   if (c.world.helpers) {
-    tools.push(delegate);
+    helperRoles = mergeRoles(
+      BUILTIN_ROLES,
+      c.world.helperRoles
+        ? parseRoles(c.world.helperRoles.markdown, c.world.helperRoles.source ?? 'user').roles
+        : [],
+    );
+    tools.push(createDelegate(helperRoles, { act: c.world.helpersAct === true }));
     allowTools.push('delegate');
   }
   const mcp = c.world.mcp?.length ? await createMcpWorld(c.world.mcp) : undefined;
@@ -389,6 +402,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
     dir,
     tools,
     allowTools,
+    ...(helperRoles && { helperRoles, helpersAct: c.world.helpersAct === true }),
     ...((c.world.memory || browser || c.world.skills) && {
       system: [
         SYSTEM_PROMPT,
