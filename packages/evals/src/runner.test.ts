@@ -329,6 +329,20 @@ describe('sharedPrefix', () => {
   });
 });
 
+describe('resuming', () => {
+  it('counts the runs already done and plays only the rest', async () => {
+    const other = { ...base, id: 'other' };
+    const first = await runEval([base], (c) => referenceModel(c.reference));
+    const played: string[] = [];
+    const second = await runEval([base, other], (c) => referenceModel(c.reference), {
+      resume: first.runs,
+      onRun: (r) => played.push(r.caseId),
+    });
+    expect(played).toEqual(['other']);
+    expect(second.runs.map((r) => r.caseId)).toEqual(['lookup', 'other']);
+  });
+});
+
 describe('journal', () => {
   it('keeps finished runs and drops the ones the provider lost', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'remy-journal-')), 'nested', 'runs.jsonl');

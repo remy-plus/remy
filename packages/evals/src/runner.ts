@@ -39,6 +39,8 @@ export interface RunOptions {
   onRun?: (r: RunRecord) => void;
   /** The model is a real provider: retries wait for real instead of at once. */
   live?: boolean;
+  /** Runs already done, from a journal. They count, and are not run again. */
+  resume?: RunRecord[];
 }
 
 function approves(h: Human, tool: string): boolean {
@@ -264,11 +266,17 @@ export async function runEval(
       (!opts.caseIds?.length || opts.caseIds.includes(c.id)),
   );
   const runs: RunRecord[] = [];
+  const done = new Map(opts.resume?.map((r) => [`${r.caseId}#${r.run}`, r]));
   let modelId = 'none';
   for (const c of picked) {
     const model = modelFor(c);
     modelId = model.id;
     for (let i = 0; i < k; i++) {
+      const kept = done.get(`${c.id}#${i}`);
+      if (kept) {
+        runs.push(kept);
+        continue;
+      }
       const r = await runCase(c, model, i, opts.live);
       runs.push(r);
       opts.onRun?.(r);
