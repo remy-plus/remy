@@ -232,6 +232,43 @@ describe('remy run', () => {
     });
   });
 
+  describe('trust levels', () => {
+    it('remy trust shows, sets and rejects', async () => {
+      const h = harness({ model: new ScriptedModelClient([]) });
+      expect((await h.run('trust')).out).toContain('* ask');
+      expect((await h.run('trust', 'steady')).out).toContain('Trust is now steady');
+      expect((await h.run('trust')).out).toContain('* steady');
+      expect(await h.run('trust', 'bold')).toMatchObject({
+        code: 1,
+        err: expect.stringMatching(/ask, steady or away/),
+      });
+    });
+
+    it('steady writes without a card and records the level the task started with', async () => {
+      const model = new ScriptedModelClient([write, call('finish', { answer: 'Done.' })]);
+      const h = harness({ model });
+      await h.run('trust', 'steady');
+      const r = await h.run('run', 'write a file');
+      expect(r.out).not.toContain('needs approval');
+      const id = taskIdOf(r.out);
+      await h.run('trust', 'away');
+      const created = (await h.store.read(id))
+        .map((e) => e.event)
+        .find((e) => e.type === 'task.created');
+      expect(created).toMatchObject({ config: { permissions: { trust: 'steady' } } });
+    });
+
+    it('ask leaves the level out of the recorded config', async () => {
+      const model = new ScriptedModelClient([write]);
+      const h = harness({ model });
+      const id = taskIdOf((await h.run('run', 'write a file')).out);
+      const created = (await h.store.read(id))
+        .map((e) => e.event)
+        .find((e) => e.type === 'task.created');
+      expect(JSON.stringify(created)).not.toContain('"trust"');
+    });
+  });
+
   it('refuses --note without --deny', async () => {
     const h = harness({ model: new ScriptedModelClient([write, done]) });
     const id = taskIdOf((await h.run('run', 'write a file')).out);

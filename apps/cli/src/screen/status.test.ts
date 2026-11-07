@@ -71,3 +71,13 @@ describe('status line send-now hint', () => {
     expect(s.hint).not.toContain('send now');
   });
 });
+
+describe('trust in the status row', () => {
+  const base = { width: 80, workspace: '/w' };
+  it('shows a level above ask', () => {
+    expect(statusLine({ ...base, trust: 'steady' }).right).toBe('trust steady · ctrl+p commands');
+  });
+  it('shows nothing for ask', () => {
+    expect(statusLine({ ...base, trust: 'ask' }).right).toBe('ctrl+p commands');
+  });
+});

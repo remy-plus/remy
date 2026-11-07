@@ -144,6 +144,7 @@ import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.t
 import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
+import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
 
 export interface CliDeps {
   env: Record<string, string | undefined>;
@@ -216,6 +217,7 @@ Usage
                                   Answer a pending approval, then continue; a note
                                   goes to the model with the denial; --always also
                                   allows that tool for good (writes and sends only)
+  remy trust [ask|steady|away]   See or set how much Remy does without asking
   remy approvals [list|remove <tool>]
                                   See the tools you always allow, or stop allowing one
   remy memory [list|forget <id>|clear]
@@ -418,6 +420,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'logout',
       'connect',
       'approvals',
+      'trust',
       'memory',
       'skills',
       'browser',
@@ -833,6 +836,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         facts: machineFacts(),
         helpers: helpersOn,
         skills: skills().list().length,
+        trust: loadPrefs(home).trust ?? 'ask',
       }),
     );
     const model = withRecall(inner, {
@@ -1151,6 +1155,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     }
   }
 
+  const trustNow = (): TrustLevel => loadPrefs(home).trust ?? 'ask';
+
   /** The task config shared by `run` and the chat: flags beat the config file, which beats defaults. */
   function taskConfig(
     file: FileConfig,
@@ -1179,6 +1185,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       model: modelId,
       permissions: {
         autoApprove,
+        // Read now, at the start of the task; the task keeps it for its whole life.
+        ...(trustNow() !== 'ask' && { trust: trustNow() }),
         ...(netAllow && { netAllow }),
         ...(always.length && { standing: always }),
       },
@@ -1403,6 +1411,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       newClears: !minimal,
       minimal: prefs.minimal ?? false,
       saveMinimal: (on) => savePrefs(home, { minimal: on }),
+      trust: {
+        get: trustNow,
+        set: (level) => savePrefs(home, { trust: level }),
+      },
       runtime: (hooks) => {
         const made = makeRuntime(file, { model, hooks });
         registry = made.tools;
@@ -1602,6 +1614,18 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             ),
           );
         });
+      }
+
+      case 'trust': {
+        const want = rest[0];
+        if (want === undefined) {
+          out(trustSummary(trustNow()));
+          return 0;
+        }
+        if (!isTrustLevel(want)) throw new Error('Use remy trust ask, steady or away.');
+        if (!savePrefs(home, { trust: want })) throw new Error('Could not save the trust level.');
+        out(trustChanged(want));
+        return 0;
       }
 
       case 'approvals': {

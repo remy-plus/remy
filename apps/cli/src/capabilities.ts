@@ -2,12 +2,16 @@
 // takes to fix it. Built from the same checks as `remy doctor`, so the model says what is missing
 // instead of guessing. It goes in the per-message situation block (setup can change between
 // sessions), never the cached system prompt, and holds names and counts only: no keys or paths.
+
+import type { TrustLevel } from '@remy/core';
 import { type Facts, runChecks } from './doctor.ts';
+import { trustCapability } from './trust.ts';
 
 export interface CapabilityInput {
   facts: Facts;
   helpers: boolean;
   skills: number;
+  trust?: TrustLevel;
 }
 
 /** The block never grows past this many lines. */
@@ -49,6 +53,7 @@ export function capabilitiesBlock(i: CapabilityInput): string {
       : '- Helpers: off. Ask the user to set REMY_HELPERS=on to use them.',
   );
   lines.push(`- Skills: ${i.skills}.`);
+  if (i.trust && i.trust !== 'ask') lines.push(trustCapability(i.trust));
   return lines.slice(0, MAX_CAPABILITY_LINES + 1).join('\n');
 }
 

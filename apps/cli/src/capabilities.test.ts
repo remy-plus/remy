@@ -15,6 +15,18 @@ const bare: Facts = {
 };
 const full: Facts = { ...bare, browser: true, docker: true, daemon: true, search: 'tinyfish' };
 
+describe('capabilitiesBlock trust line', () => {
+  it('is absent at ask and names what still asks above it', () => {
+    expect(
+      capabilitiesBlock({ facts: full, helpers: true, skills: 1, trust: 'ask' }),
+    ).not.toContain('Trust');
+    const out = capabilitiesBlock({ facts: full, helpers: true, skills: 1, trust: 'away' });
+    expect(out).toContain('- Trust: away');
+    expect(out).toContain('sending, spending, deleting');
+    expect(out.split('\n').length).toBeLessThanOrEqual(MAX_CAPABILITY_LINES + 1);
+  });
+});
+
 describe('capabilitiesBlock', () => {
   it('names each gap with the single step that fixes it when nothing is set up', () => {
     const out = capabilitiesBlock({ facts: bare, helpers: false, skills: 0 });

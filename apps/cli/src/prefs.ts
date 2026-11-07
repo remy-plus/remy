@@ -2,6 +2,7 @@
 // apart from remy.config.json, which the user edits by hand.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { isTrustLevel, type TrustLevel } from '@remy/core';
 
 export type ThemeChoice = 'auto' | 'light' | 'dark';
 export const THEME_CHOICES: readonly ThemeChoice[] = ['auto', 'light', 'dark'];
@@ -12,6 +13,8 @@ export interface Prefs {
   minimal?: boolean;
   /** The first-run tour was finished or skipped. */
   onboarded?: boolean;
+  /** How much Remy does without a card; absent means `ask`. See `remy trust`. */
+  trust?: TrustLevel;
 }
 
 export const isThemeChoice = (v: unknown): v is ThemeChoice =>
@@ -28,6 +31,7 @@ export function loadPrefs(home: string): Prefs {
     return {
       ...(isThemeChoice(raw.theme) && { theme: raw.theme }),
       ...(typeof raw.minimal === 'boolean' && { minimal: raw.minimal }),
+      ...(isTrustLevel(raw.trust) && { trust: raw.trust }),
       ...(typeof raw.onboarded === 'boolean' && { onboarded: raw.onboarded }),
     };
   } catch {

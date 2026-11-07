@@ -79,6 +79,7 @@ function StatusRow(p: {
   contextPct?: number;
   costUsd?: number;
   hasInput?: boolean;
+  trust?: string;
 }): ReactElement {
   const { theme } = p;
   const muted = theme.props('muted');
@@ -490,6 +491,7 @@ export function FullApp(props: ChatAppProps): ReactElement {
                   : undefined,
               costUsd: state.costUsd,
               hasInput: k.input.text.length > 0,
+              trust: state.trust,
             })
           : null,
       ),

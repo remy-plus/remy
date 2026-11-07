@@ -47,6 +47,7 @@ import {
   type ToolState,
   toolDetail,
 } from './transcript.ts';
+import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
 
 export type { ApprovalView, FileTouch, PlanStep, ToolLine, ToolState };
 
@@ -190,6 +191,8 @@ export interface ChatState {
   overlay?: Overlay;
   /** The colour theme in use: `auto` follows the terminal. */
   theme: ThemeChoice;
+  /** The trust level new tasks start with; shown in the status row unless it is `ask`. */
+  trust: TrustLevel;
 }
 
 export interface RuntimeHooks {
@@ -248,6 +251,8 @@ export interface ChatDeps {
   minimal?: boolean;
   /** Saves the minimal-screen preference; false when it could not be written. */
   saveMinimal?: (on: boolean) => boolean;
+  /** The trust level for new tasks, and a way to save a new one. */
+  trust?: { get(): TrustLevel; set(level: TrustLevel): boolean };
   /** /profile opens when the host keeps a profile. */
   profileEnabled?: boolean;
   /** /memory: the saved notes about the user, and whether they are in use. */
@@ -477,6 +482,7 @@ const initial = (): ChatState => ({
   showThinking: false,
   clears: 0,
   theme: 'auto',
+  trust: 'ask',
 });
 
 /** Finished tool lines beyond this many leave the live area at once. */
@@ -492,6 +498,7 @@ export function createChat(deps: ChatDeps): Chat {
     contextWindow: deps.contextWindow,
     ...(deps.model && { model: deps.model }),
     ...(deps.theme && { theme: deps.theme }),
+    ...(deps.trust && { trust: deps.trust.get() }),
     items: resumedItems((deps.conversation?.turns ?? []).map((t) => t.turn)),
     // With no model yet, the chat opens on the login panel.
     ...(deps.connect && !deps.model && { overlay: 'login' as const }),
@@ -1073,6 +1080,17 @@ export function createChat(deps: ChatDeps): Chat {
         kind: 'note',
         text: `${plainApprovals(deps.approvals.load(), (t) => deps.riskOf?.(t))}\nRemove one with /approvals remove <tool>.`,
       });
+    } else if (name === 'trust') {
+      if (!deps.trust)
+        return void commit({ kind: 'note', text: 'Trust levels are not available here.' });
+      const word = args[0]?.toLowerCase();
+      if (!word) return void commit({ kind: 'note', text: trustSummary(deps.trust.get()) });
+      if (!isTrustLevel(word))
+        return void commit({ kind: 'error', text: 'Use /trust ask, steady or away.' });
+      if (!deps.trust.set(word))
+        return void commit({ kind: 'error', text: 'Could not save the trust level.' });
+      set({ trust: word });
+      commit({ kind: 'note', text: trustChanged(word) });
     } else if (name === 'schedules') {
       commit({
         kind: 'note',

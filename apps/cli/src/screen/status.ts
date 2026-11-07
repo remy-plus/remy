@@ -13,6 +13,8 @@ export interface StatusInput {
   costUsd?: number;
   /** Something is typed, so "send now" is worth mentioning while a task runs. */
   hasInput?: boolean;
+  /** A level above `ask`, shown so the user knows Remy will go ahead without a card. */
+  trust?: string;
 }
 
 export interface Status {
@@ -43,10 +45,11 @@ export function statusLine(i: StatusInput): Status {
     i.contextPct === undefined ? '' : `${Math.round(i.contextPct)}%`,
     i.costUsd && i.costUsd > 0 ? fmtCostShort(i.costUsd) : '',
   ];
+  const level = i.trust && i.trust !== 'ask' ? `trust ${i.trust}` : '';
   const rights = [
-    [...figures, 'ctrl+p commands'],
-    [figures[0] ?? '', 'ctrl+p commands'],
-    ['ctrl+p commands'],
+    [level, ...figures, 'ctrl+p commands'],
+    [level, figures[0] ?? '', 'ctrl+p commands'],
+    [level, 'ctrl+p commands'],
     [],
   ].map((parts) => parts.filter(Boolean).join(SEP));
   const hints = i.working
