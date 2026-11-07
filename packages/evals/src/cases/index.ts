@@ -12,6 +12,7 @@ import { proactive } from './proactive.ts';
 import { recovery } from './recovery.ts';
 import { research } from './research.ts';
 import { skills } from './skills.ts';
+import { trust } from './trust.ts';
 
 export const CASES: EvalCase[] = [
   ...research,
@@ -27,6 +28,7 @@ export const CASES: EvalCase[] = [
   ...proactive,
   ...hard,
   ...choice,
+  ...trust,
 ];
 
 export { live } from './live.ts';
@@ -45,4 +47,5 @@ export {
   recovery,
   research,
   skills,
+  trust,
 };

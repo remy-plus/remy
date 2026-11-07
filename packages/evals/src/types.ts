@@ -5,6 +5,7 @@ import type {
   ModelClient,
   Risk,
   TaskStatus,
+  TrustLevel,
 } from '@remy/core';
 import type { MemoryKind, Skill } from '@remy/tools';
 
@@ -22,6 +23,7 @@ export type Suite =
   | 'proactive'
   | 'hard'
   | 'choice'
+  | 'trust'
   | 'live';
 export const SUITES: readonly Suite[] = [
   'research',
@@ -37,6 +39,7 @@ export const SUITES: readonly Suite[] = [
   'proactive',
   'hard',
   'choice',
+  'trust',
   'live',
 ];
 
@@ -65,6 +68,11 @@ export interface Human {
   /** A record lists decisions per tool; tools it doesn't mention are declined. */
   approvals: 'grant_all' | 'deny_all' | Record<string, boolean>;
   answers?: string[];
+  /**
+   * Answers a budget pause: each time the task pauses, the human adds this much (at most
+   * three times). Absent: a pause ends the run, as the old limit did.
+   */
+  extend?: { steps?: number; costUsd?: number; wallMs?: number };
 }
 
 /** One tool of a fake MCP server. Every parameter is a required string. */
@@ -141,6 +149,8 @@ export interface EvalCase {
   context?: ConversationTurn[];
   /** Risks the user pre-approved. Defaults to read only. */
   autoApprove?: Risk[];
+  /** The trust level the task starts with. Default `ask`. */
+  trust?: TrustLevel;
   /** Tool names with a standing approval ("always allow"). */
   standing?: string[];
   faults?: Fault[];

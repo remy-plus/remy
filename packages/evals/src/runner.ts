@@ -20,6 +20,8 @@ import { buildRecord, categorize } from './record.ts';
 import type { EvalCase, Grade, Human, ModelFor, RunRecord, Suite } from './types.ts';
 import { createWorld, withSkills } from './world.ts';
 
+/** Budget pauses a case's human extends before giving up. */
+const MAX_EXTENDS = 3;
 const LEASE_MS = 60_000;
 const MAX_ROUNDS = 80;
 const MAX_FOLLOW_UPS = 2;
@@ -224,6 +226,7 @@ export async function runCase(
         autoApprove: c.autoApprove ?? ['read'],
         allowTools: world.allowTools,
         ...(c.standing && { standing: c.standing }),
+        ...(c.trust && c.trust !== 'ask' && { trust: c.trust }),
       },
       budget: { ...DEFAULT_BUDGET, ...c.budget },
       workspaceDir: world.dir,
@@ -231,6 +234,7 @@ export async function runCase(
     let rt = make();
     const answers = [...(c.human.answers ?? [])];
     let pauses = 0;
+    let extended = 0;
     let error: string | undefined;
 
     /** The tool behind an approval card: the task's own call, or a helper's. */
@@ -264,7 +268,10 @@ export async function runCase(
             await rt.answer(taskId, answers.shift() ?? NO_MORE_ANSWERS);
           }
           // Nobody is there to say "continue", so a pause ends the run as the old limit did.
-          else if (o.status === 'paused')
+          else if (o.status === 'paused' && c.human.extend && extended < MAX_EXTENDS) {
+            extended += 1;
+            await rt.extend(taskId, c.human.extend, 'eval');
+          } else if (o.status === 'paused')
             return {
               status: 'failed',
               reason: `Stopped: reached the ${o.limit} limit after ${o.steps} steps.`,

@@ -28,7 +28,7 @@ describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
     expect(SUITES.filter((s) => s !== 'hard' && s !== 'choice' && s !== 'live').map(count)).toEqual(
-      [13, 8, 6, 7, 5, 17, 9, 7, 4, 10, 4],
+      [13, 8, 6, 7, 5, 17, 9, 7, 4, 10, 4, 28],
     );
     expect(count('hard')).toBeGreaterThanOrEqual(41);
   });
@@ -65,6 +65,9 @@ describe('the starting cases', () => {
       'recovery-crash-in-write-file': 1,
       'conn-crash-after-unsafe-tool-ran': 1,
       'recovery-helper-crash-mid-action': 1,
+      'trust-steady-crash-keeps-level': 1,
+      'trust-steady-crash-mid-write-keeps-level': 1,
+      'trust-long-run-crash-and-pause': 1,
     });
   });
 
