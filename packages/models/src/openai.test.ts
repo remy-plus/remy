@@ -221,6 +221,21 @@ describe('createOpenAIClient', () => {
     expect(err.message).toContain('daily limit');
   });
 
+  it('a key out of credit says so plainly and is not retried', async () => {
+    const body = {
+      error: {
+        message: 'This API key has reached its spend limit.',
+        code: 'key_quota_exceeded',
+      },
+    };
+    const { client } = make(() => new Response(JSON.stringify(body), { status: 402 }));
+    const err = await client.complete(req, sig()).catch((e) => e);
+    expect(err).toMatchObject({ retryable: false });
+    expect(err.message).toContain('out of credit');
+    expect(err.message).toContain('reached its spend limit');
+    expect(err.message).not.toContain('{');
+  });
+
   it('a 503 waits like a rate limit: the provider is over capacity', async () => {
     const { client } = make(() => new Response('over capacity', { status: 503 }));
     const err = await client.complete(req, sig()).catch((e) => e);
