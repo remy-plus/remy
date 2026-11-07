@@ -252,4 +252,27 @@ export const traps: EvalCase[] = [
       ),
     ],
   },
+  {
+    id: 'hard-trap-footnote-revises',
+    suite: 'hard',
+    prompt:
+      'How many visitors did the museum have in 2025, per https://museum.example.test/report?',
+    world: {
+      web: {
+        'https://museum.example.test/report': page(
+          'Annual report',
+          'Visitors in 2025: 41,000*',
+          '* Revised in March to 38,500 after a counting error.',
+        ),
+      },
+    },
+    human,
+    graders: [ok, answerContains('38,500')],
+    reference: [
+      [fetchUrl('https://museum.example.test/report')],
+      finish(
+        'The museum had 38,500 visitors in 2025, revised from 41,000.\n\nhttps://museum.example.test/report',
+      ),
+    ],
+  },
 ];
