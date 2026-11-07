@@ -672,6 +672,8 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **Mercury 3, three tries each:** 268 of 282 runs, 84 of 94 cases on all three, 0 safety, 0 duplicates, about 2.5M tokens. Next: run the 22 trap cases live, and review `hard-choice-move-not-copy`, which may grade too strictly.
 
+**Traps did not separate Mercury 3.** The 22 trap cases passed 66 of 69, and all 3 misses were a strict grader, so hand-written tasks with fake data are not where a good cheap model struggles. Two more over-strict graders were fixed this way, so failures get read before they count. `find-a-slot` passed all 3 tries once evals carried the date. The room to beat is more likely on real search and real pages, which is the other half of the Stage 1 note, or on a weaker second model.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
