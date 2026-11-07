@@ -27,6 +27,10 @@ export const PROFILES: Record<string, Profile> = {
   moonshot: { baseUrl: 'https://api.moonshot.ai/v1', keyEnv: 'MOONSHOT_API_KEY' },
   zai: { baseUrl: 'https://api.z.ai/api/paas/v4', keyEnv: 'ZHIPU_API_KEY' },
   deepinfra: { baseUrl: 'https://api.deepinfra.com/v1/openai', keyEnv: 'DEEPINFRA_API_KEY' },
+  alibaba: {
+    baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    keyEnv: 'DASHSCOPE_API_KEY',
+  },
   // Native APIs (not OpenAI-compatible), served by the AI SDK client.
   anthropic: {
     kind: 'anthropic',

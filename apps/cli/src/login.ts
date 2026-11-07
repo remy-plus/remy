@@ -51,6 +51,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'google/gemma-3-12b-it',
     keyUrl: 'deepinfra.com/dash/api_keys',
   },
+  alibaba: {
+    label: 'Alibaba Qwen',
+    model: 'qwen3.7-flash',
+    keyUrl: 'modelstudio.console.alibabacloud.com',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -78,6 +83,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   moonshot: ['kimi-k2.6'],
   zai: ['glm-5.3-flash', 'glm-4.7-flashx'],
   deepinfra: ['google/gemma-3-12b-it'],
+  alibaba: ['qwen3.7-flash'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 

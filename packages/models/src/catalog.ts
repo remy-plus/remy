@@ -217,6 +217,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 131072,
     pricing: { inPerMTok: 0.05, outPerMTok: 0.15 },
   },
+  'qwen3.7-flash': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 0.03, outPerMTok: 0.13 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },
