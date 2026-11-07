@@ -47,6 +47,10 @@ The last full live run, on GPT-5 nano (run 7, 2026-10-26): 30 cases, 5 tries eac
 
 That run predates the browser, skills and helpers. Those suites have replayed at 100%; live results differ, and web search quality depends on the search engine on the day.
 
+## The live web
+
+`--suite live` runs 13 tasks on real pages with real search. Each answer is checked against its source when graded, such as the npm registry for the latest React, so a case cannot go stale and a model cannot pass from memory. It needs `TINYFISH_API_KEY`, and it stays out of the replay gate, which must never depend on the web.
+
 ## Run it yourself
 
 ```sh
