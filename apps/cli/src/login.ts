@@ -46,6 +46,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     keyUrl: 'platform.moonshot.ai/console/api-keys',
   },
   zai: { label: 'Z.ai GLM', model: 'glm-5.3-flash', keyUrl: 'z.ai/manage-apikey/apikey-list' },
+  deepinfra: {
+    label: 'DeepInfra',
+    model: 'google/gemma-3-12b-it',
+    keyUrl: 'deepinfra.com/dash/api_keys',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -72,6 +77,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   nebius: ['nvidia/Nemotron-3_5-Lightning'],
   moonshot: ['kimi-k2.6'],
   zai: ['glm-5.3-flash', 'glm-4.7-flashx'],
+  deepinfra: ['google/gemma-3-12b-it'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 

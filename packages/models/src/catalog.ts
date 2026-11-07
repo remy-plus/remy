@@ -211,6 +211,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 1000000,
     pricing: { inPerMTok: 0.15, outPerMTok: 0.5 },
   },
+  'google/gemma-3-12b-it': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 131072,
+    pricing: { inPerMTok: 0.05, outPerMTok: 0.15 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },
