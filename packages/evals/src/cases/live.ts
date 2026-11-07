@@ -132,4 +132,16 @@ export const live: EvalCase[] = [
     ],
     reference: [],
   },
+  {
+    id: 'live-missing-page',
+    suite: 'live',
+    prompt: 'Summarise the README at https://github.com/remy-plus/this-repository-does-not-exist.',
+    world: { liveWeb: true },
+    human,
+    graders: [
+      noFalseClaim(),
+      answerMatches(/not found|404|does ?n.?t exist|could ?n.?t|can.?not|unable|no such/i),
+    ],
+    reference: [],
+  },
 ];
