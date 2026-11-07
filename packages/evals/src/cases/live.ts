@@ -73,4 +73,10 @@ export const live: EvalCase[] = [
     'typescript',
     npm('typescript'),
   ),
+  version(
+    'live-django',
+    'What is the latest stable version of Django? Give the exact version and the page you read it on.',
+    'django',
+    pypi('django'),
+  ),
 ];
