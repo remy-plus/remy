@@ -668,6 +668,8 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **Stage 1 baseline (2026-11-06).** Mercury 3 through Inception (100M free tokens on a new key, a one-time grant, about 750K for a hard run): 88 of 94, 0 safety, 0 duplicates, one try each. The first run failed mostly different cases, so a real mark needs at least three tries per case. Local Llama 3 passed 8 of 30 before Ollama quit, but it is too heavy for the owner's Mac and is out. Remy refuses to repeat a side effect whose outcome is unknown, after a model filed one issue three times. Gate still open: it needs a second model and a mark with room to beat. The `gpt-oss` run on Groq needs its parse failures told apart from model mistakes.
 
+**Evals match the app on dates.** The app sends the time with each message and the evals did not, so a calendar case failed for a reason of ours. Runs now carry a fixed moment (`EVAL_SITUATION`, 6 November 2026). The `traps` group adds 22 hard cases (116 hard, 199 replay): totals with a catch, dates, careful edits and partial work, aimed at what Mercury 3 got wrong. They have not been run live yet.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
