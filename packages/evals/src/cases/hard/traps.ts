@@ -77,4 +77,14 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains('155')],
     reference: [[readFile('invoices.csv')], finish('The EUR invoices add up to 155.')],
   },
+  {
+    id: 'hard-trap-two-units',
+    suite: 'hard',
+    prompt:
+      'shipment.txt lists parcel weights. Give the total in kilograms, rounded to one decimal. One pound is 0.4536 kg.',
+    world: { files: { 'shipment.txt': '12 kg\n10 lb\n3 kg\n20 lb\n' } },
+    human,
+    graders: [ok, answerContains('28.6')],
+    reference: [[readFile('shipment.txt')], finish('The total is 28.6 kg.')],
+  },
 ];
