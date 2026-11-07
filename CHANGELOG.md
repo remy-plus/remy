@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.1 (2026-11-06)
 
 Remy no longer reports work that did not happen.
 
@@ -8,7 +8,8 @@ Remy no longer reports work that did not happen.
 - **A promise is not an answer.** "Let's start by reading the file" with no tool call goes back to do the work.
 - **Groq is steadier.** `gpt-oss` models now get room to reason, malformed replies are tried again, and retries raise the temperature so the same bad reply is not repeated. Over-capacity errors wait like rate limits.
 - **Llama 3 on Ollama works**, through JSON tool calls.
-- **11 more providers in `/login` and `/model`:** DeepSeek, Mistral, xAI Grok, Together AI, Fireworks AI, Cerebras, Nebius, Moonshot Kimi, Z.ai GLM, DeepInfra and Alibaba Qwen.
+- **12 more providers in `/login` and `/model`:** DeepSeek, Mistral, xAI Grok, Together AI, Fireworks AI, Cerebras, Nebius, Moonshot Kimi, Z.ai GLM, DeepInfra, Alibaba Qwen and Inception Mercury.
+- **An unknown outcome is not repeated.** If a server goes away mid-action, Remy will not send it again, and the model is told to say it may or may not have happened.
 - Groq now starts on a model it still serves, and a bad xAI key is refused instead of saved.
 - **TinyFish search.** `REMY_SEARCH=tinyfish` with a free `TINYFISH_API_KEY`: 30 searches a minute, nothing on screen.
 - A used-up daily limit now says so at once, and when it lifts, instead of retrying for minutes.
