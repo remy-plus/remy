@@ -349,4 +349,14 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains('3')],
     reference: [[readFile('app.log')], finish('There are 3 ERROR lines from payments.')],
   },
+  {
+    id: 'hard-trap-budget-choice',
+    suite: 'hard',
+    prompt:
+      'menu.txt lists add-ons with prices. I have 100 to spend. Which two add-ons give the highest total price without going over?',
+    world: { files: { 'menu.txt': 'Backup 70\nSupport 45\nDomain 30\nEmail 25\n' } },
+    human,
+    graders: [ok, answerContains(['Backup', 'Domain'])],
+    reference: [[readFile('menu.txt')], finish('Backup and Domain, for 100.')],
+  },
 ];
