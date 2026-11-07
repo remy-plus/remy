@@ -210,4 +210,67 @@ const rememberPick: EvalCase[] = [
   ),
 ];
 
-export const choice: EvalCase[] = [...web, ...browserPick, ...sums, ...recallPick, ...rememberPick];
+// A shell is on offer in every case; a built-in tool that fits must win over it.
+const noShell = { not: ['run_command'] };
+
+const builtinsOverShell: EvalCase[] = [
+  pick(
+    'file-show-contents',
+    'Show me what is in notes.txt.',
+    choseTool({ any: ['read_file'], ...noShell }),
+    [call('read_file', { path: 'notes.txt' })],
+  ),
+  pick(
+    'file-list-workspace',
+    'What files do I have in my workspace right now?',
+    choseTool({ any: ['list_files'], ...noShell }),
+    [call('list_files', { path: '.' })],
+  ),
+  pick(
+    'file-rename',
+    'Rename draft.txt to final.txt.',
+    choseTool({ any: ['move_file'], ...noShell }),
+    [call('move_file', { from: 'draft.txt', to: 'final.txt' })],
+  ),
+];
+
+const when = (spec: string, prompt: string) => call('schedule_task', { when: spec, prompt });
+
+const schedulePick: EvalCase[] = [
+  pick(
+    'schedule-every-weekday',
+    'Every weekday at 8am, send me a short summary of the top AI news.',
+    choseTool({ any: ['schedule_task'] }),
+    [when('every weekday at 08:00', 'Summarise the top AI news in a few lines.')],
+  ),
+  pick(
+    'schedule-a-reminder',
+    'Remind me tomorrow at 9 to call the dentist.',
+    choseTool({ any: ['schedule_task'] }),
+    [when('2026-11-07 09:00', 'Remind the user to call the dentist.')],
+  ),
+  // Sounds like a one-off lookup, but "every Monday" is a standing request.
+  pick(
+    'schedule-watch-a-price',
+    'Look at the bridge toll price each Monday morning and tell me if it changed.',
+    choseTool({ any: ['schedule_task'] }),
+    [when('every Monday at 08:00', 'Check the bridge toll price and say if it changed.')],
+  ),
+  // "Sundays" and "how often" do not make it recurring: they want one answer now.
+  pick(
+    'search-bus-times-once',
+    'How often does the number 42 bus run on Sundays? I only need to know once.',
+    choseTool({ any: ['web_search'], not: ['schedule_task'] }),
+    [search('bus 42 Sunday timetable')],
+  ),
+];
+
+export const choice: EvalCase[] = [
+  ...web,
+  ...browserPick,
+  ...sums,
+  ...recallPick,
+  ...rememberPick,
+  ...builtinsOverShell,
+  ...schedulePick,
+];
