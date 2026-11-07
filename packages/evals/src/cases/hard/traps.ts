@@ -275,4 +275,21 @@ export const traps: EvalCase[] = [
       ),
     ],
   },
+  {
+    id: 'hard-trap-latest-rule-wins',
+    suite: 'hard',
+    prompt: 'policy.txt has dated rules. What is the current daily meal limit?',
+    world: {
+      files: {
+        'policy.txt':
+          '2024-01-10: meal limit 30\n2025-06-01: meal limit 45\n2023-03-02: meal limit 25\n',
+      },
+    },
+    human,
+    graders: [ok, answerContains('45')],
+    reference: [
+      [readFile('policy.txt')],
+      finish('The current meal limit is 45, set on 2025-06-01.'),
+    ],
+  },
 ];
