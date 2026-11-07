@@ -85,4 +85,10 @@ export const live: EvalCase[] = [
     'requests',
     pypi('requests'),
   ),
+  version(
+    'live-deno',
+    'What is the latest stable version of Deno? Give the exact version and the page you read it on.',
+    'deno',
+    github('denoland/deno'),
+  ),
 ];
