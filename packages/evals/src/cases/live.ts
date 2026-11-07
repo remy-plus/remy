@@ -55,4 +55,10 @@ export const live: EvalCase[] = [
     'node',
     nodeLts,
   ),
+  version(
+    'live-postgres',
+    'What is the latest stable version of PostgreSQL? Give the exact version and the page you read it on.',
+    'postgres',
+    eol('postgresql'),
+  ),
 ];
