@@ -96,7 +96,7 @@ describe('createOpenAIClient', () => {
     },
   );
 
-  it.each(['openai/gpt-oss-20b', 'openai/gpt-oss-120b'])(
+  it.each(['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'mercury-3'])(
     'gives %s room to reason, with the usual parameters',
     async (id) => {
       const { client, seen } = make(() => json({ choices: [{ message: { content: 'x' } }] }), id);

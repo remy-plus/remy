@@ -29,7 +29,7 @@ type Json = Record<string, unknown>;
 const REASONING_MODEL = /^(?:openai\/)?(?:gpt-5|o[134])(?![a-z0-9])/i;
 export const isReasoningModel = (id: string): boolean => REASONING_MODEL.test(id);
 /** Open-weight models that reason too, but take the usual `max_tokens` and `temperature`. */
-const OPEN_REASONING_MODEL = /^(?:openai\/)?gpt-oss(?![a-z0-9])/i;
+const OPEN_REASONING_MODEL = /^(?:(?:openai\/)?gpt-oss|mercury-\d)(?![a-z0-9])/i;
 /** Reasoning tokens count against the output limit, so reasoning models get at least this many. */
 export const REASONING_MIN_OUTPUT_TOKENS = 8192;
 
