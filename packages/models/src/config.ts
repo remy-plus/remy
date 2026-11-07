@@ -38,6 +38,11 @@ export const PROFILES: Record<string, Profile> = {
     keyEnv: 'INCEPTION_API_KEY',
     keyCheckModel: 'mercury-2',
   },
+  zro: {
+    baseUrl: 'https://zro.moonmath.ai/v1',
+    keyEnv: 'ZRO_API_KEY',
+    keyCheckModel: 'deepseek-v4.1-flash',
+  },
   // Native APIs (not OpenAI-compatible), served by the AI SDK client.
   anthropic: {
     kind: 'anthropic',
