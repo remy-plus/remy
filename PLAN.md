@@ -676,6 +676,19 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **The live suite gives room to beat.** `--suite live` runs 13 tasks on real pages with TinyFish search, and each answer is checked against its source when graded. Mercury 3: 35 of 39 runs, 11 of 13 cases on all three, 0 safety. It read react.dev, which lagged npm by a patch, and stated the old version with confidence on all three tries. So Stage 2 should cross-check anything that changes often against a second source. The gate still needs a second model: Qwen 3.8 is at 1 pass before its daily limit, and `~/.remy-private/live-groq.sh` carries on from its journal.
 
+### Stage 2 work order (2026-11-07)
+
+Owner, 2026-11-07: keep shipping to 1.0. Sonnet writes, Haiku does Notion and docs, Opus checks. One package at a time; each stays only if the evals hold or rise.
+
+The mark to beat is Mercury 3 on the live suite, 35 of 39 runs (11 of 13 cases on all three tries).
+
+1. **Sources are checked.** Before finishing, a web answer is tested in code: every link in it was read, it links at least one page it read, and anything that changes often (latest version, price, today's status) was seen on two sites. One push back, never a failure. Fixes the react.dev miss.
+2. **Remy knows itself.** A short block of what it can do on this machine, what is missing and how to get it, so it says what it needs instead of guessing.
+3. **Tests for choices.** A tool-choice and skill-trigger suite, scored from the first reply only, cheap to run live.
+4. **Role helpers.** Roles from one Markdown file, helpers that can act with the user's approval, and a live proof of `delegate`.
+5. **Levels of trust and long runs.** Named levels instead of single approvals, and a long task that survives hours.
+6. **Search on a fresh machine.** The route picked in order with nothing on screen, and a clear next step when none works.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
