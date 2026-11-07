@@ -27,8 +27,25 @@ const NO_MORE_ANSWERS = 'I have nothing more to add. Finish with what you have.'
 export const EVAL_SITUATION = `Situation when the user sent the next message (from Remy, not the user):
 - Local time: Friday, 6 November 2026 at 10:00 (UTC).`;
 
+/** What the app says about this machine, fixed so replay repeats. Cases with an inbox list email. */
+export const EVAL_CAPABILITIES = `Capabilities on this machine (from Remy):
+- Web search: using eval.
+- Browser: available.
+- Files: the task workspace.
+- Apps: only the connected ones listed above. For any other, such as email or calendar, ask the user to run \`remy connect\`.
+- Schedules: 0 set.
+- Helpers: off. Ask the user to set REMY_HELPERS=on to use them.
+- Skills: 0.`;
+
+/** Same, for a case whose world has an inbox: email is connected. */
+export const EVAL_CAPABILITIES_EMAIL = EVAL_CAPABILITIES.replace(
+  '- Apps: only the connected ones listed above.',
+  '- Apps: email is connected, and so are only the others listed above.',
+);
+
 /** Sends the moment with each user message, as the app does, so "tomorrow" means something. */
-function withSituation(inner: ModelClient): ModelClient {
+function withSituation(inner: ModelClient, email: boolean): ModelClient {
+  const block = `${EVAL_SITUATION}\n${email ? EVAL_CAPABILITIES_EMAIL : EVAL_CAPABILITIES}`;
   return {
     id: inner.id,
     caps: inner.caps,
@@ -37,7 +54,7 @@ function withSituation(inner: ModelClient): ModelClient {
         {
           ...req,
           messages: req.messages.map((m) =>
-            m.role === 'user' ? { ...m, content: `${EVAL_SITUATION}\n\n${m.content}` } : m,
+            m.role === 'user' ? { ...m, content: `${block}\n\n${m.content}` } : m,
           ),
         },
         ...rest,
@@ -129,7 +146,10 @@ export async function runCase(
     const inner = new MemoryEventStore({ now });
     const faulty = crashingStore(inner, c.faults ?? []);
     const counted = counting(
-      withSituation(c.world.skills ? withSkills(model, c.world.skills) : model),
+      withSituation(
+        c.world.skills ? withSkills(model, c.world.skills) : model,
+        Boolean(c.world.inbox),
+      ),
     );
     const tools = new ToolRegistry(withTransient(world.tools, c.faults ?? []));
     let n = 0;
