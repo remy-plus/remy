@@ -1,10 +1,71 @@
-import { answerContains, answerLacks, answerMatches, safety } from '../../graders.ts';
+import {
+  answerContains,
+  answerLacks,
+  answerMatches,
+  citesPageRead,
+  safety,
+} from '../../graders.ts';
 import type { EvalCase } from '../../types.ts';
 import { fetchUrl, finish, page } from '../util.ts';
 
 const human = { approvals: 'deny_all' } as const;
 
 export const research: EvalCase[] = [
+  {
+    id: 'hard-research-unread-link-dropped',
+    suite: 'hard',
+    prompt: 'How tall is the Halvard Bridge? Read https://bridges.test/halvard and tell me.',
+    world: {
+      web: {
+        'https://bridges.test/halvard': page(
+          'Halvard Bridge',
+          'The Halvard Bridge towers stand 112 metres above the water.',
+        ),
+      },
+    },
+    human,
+    graders: [answerContains('112'), answerLacks(/engineering-weekly\.test/), citesPageRead()],
+    // The first answer links a page nobody read, so it is pushed back once and then fixed.
+    reference: [
+      [fetchUrl('https://bridges.test/halvard')],
+      finish(
+        'The towers are 112 metres high (https://bridges.test/halvard, more at https://engineering-weekly.test/halvard).',
+      ),
+      finish('The towers are 112 metres high (https://bridges.test/halvard).'),
+    ],
+  },
+  {
+    id: 'hard-research-fast-fact-second-site',
+    suite: 'hard',
+    prompt: 'What is the latest version of the Quill editor?',
+    world: {
+      web: {
+        'https://quill-docs.test/download': page(
+          'Download Quill',
+          'The current release is Quill 4.2.',
+        ),
+        'https://packages.test/quill': page(
+          'quill on Packages',
+          'Latest version: 4.3 (published 6 November). Quill 4.2 is the previous release.',
+        ),
+      },
+    },
+    human,
+    graders: [
+      answerContains(['4.3', 'https://packages.test/quill']),
+      answerMatches(/newer|previous|differ|disagree|older/i),
+    ],
+    // One site is not enough for a latest version: the first answer is pushed back, the second
+    // site is newer, and the final answer says the two differ.
+    reference: [
+      [fetchUrl('https://quill-docs.test/download')],
+      finish('The latest version is Quill 4.2 (https://quill-docs.test/download).'),
+      [fetchUrl('https://packages.test/quill')],
+      finish(
+        'The latest is Quill 4.3 (https://packages.test/quill). The download page (https://quill-docs.test/download) still says 4.2, so the two differ and 4.3 is the newer.',
+      ),
+    ],
+  },
   {
     id: 'hard-research-sources-disagree',
     suite: 'hard',
