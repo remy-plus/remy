@@ -135,4 +135,79 @@ const browserPick: EvalCase[] = [
   ),
 ];
 
-export const choice: EvalCase[] = [...web, ...browserPick];
+const calc = (expression: string) => call('calculate', { op: 'eval', expression });
+
+const sums: EvalCase[] = [
+  pick('calculate-percentage', 'What is 18.5% of 2,340,000?', choseTool({ any: ['calculate'] }), [
+    calc('2340000 * 0.185'),
+  ]),
+  // The dates are in the prompt, so a search would only add noise.
+  pick(
+    'calculate-days-between',
+    'How many days are there from 1 March 2026 to 6 November 2026?',
+    choseTool({ any: ['calculate'], not: ['web_search'] }),
+    [call('calculate', { op: 'days_between', from: '2026-03-01', to: '2026-11-06' })],
+  ),
+  // A plain reply would do the sum in its head.
+  pick(
+    'calculate-split-the-bill',
+    'We are seven at dinner and the bill is 482.60 with an 18% tip. What does each person pay?',
+    choseTool({ any: ['calculate'] }),
+    [calc('482.60 * 1.18 / 7')],
+  ),
+];
+
+const recallPick: EvalCase[] = [
+  pick(
+    'recall-last-months-hotel',
+    'What was the name of the hotel you found for me in Lisbon last month?',
+    choseTool({ any: ['recall'], not: ['web_search'] }),
+    [call('recall', { query: 'Lisbon hotel' })],
+  ),
+  pick(
+    'recall-something-i-said',
+    'What did I tell you about where I live?',
+    choseTool({ any: ['recall'], not: ['web_search'] }),
+    [call('recall', { query: 'where the user lives' })],
+  ),
+  // "Find" sounds like a search, but the restaurant is already in the past tasks.
+  pick(
+    'recall-find-the-dinner-place',
+    'Find the vegetarian restaurant you suggested in Porto again.',
+    choseTool({ any: ['recall'], not: ['web_search'] }),
+    [call('recall', { query: 'vegetarian restaurant Porto' })],
+  ),
+];
+
+const remember = (text: string) => call('remember', { text, kind: 'preference' });
+
+const rememberPick: EvalCase[] = [
+  pick(
+    'remember-a-preference',
+    'Remember that I prefer window seats on flights.',
+    choseTool({ any: ['remember'] }),
+    [remember('Prefers window seats on flights.')],
+  ),
+  pick(
+    'remember-a-name',
+    'From now on call me Sam, not Samuel.',
+    choseTool({ any: ['remember'] }),
+    [remember('Goes by Sam, not Samuel.')],
+  ),
+  // "Note" sounds like writing a file, but this is something for Remy to keep.
+  pick(
+    'remember-note-for-yourself',
+    'Note for yourself: my sister’s birthday is 3 May.',
+    choseTool({ any: ['remember'], not: ['write_file'] }),
+    [remember('Sister’s birthday is 3 May.')],
+  ),
+  // And the other way: they asked for a file.
+  pick(
+    'write-file-when-asked',
+    'Put my packing list (passport, charger, umbrella) into a file called packing.txt.',
+    choseTool({ any: ['write_file'], not: ['remember'] }),
+    [call('write_file', { path: 'packing.txt', content: 'passport\ncharger\numbrella\n' })],
+  ),
+];
+
+export const choice: EvalCase[] = [...web, ...browserPick, ...sums, ...recallPick, ...rememberPick];
