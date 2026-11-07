@@ -61,4 +61,10 @@ export const live: EvalCase[] = [
     'postgres',
     eol('postgresql'),
   ),
+  version(
+    'live-react',
+    'What is the latest stable version of React? Give the exact version and the page you read it on.',
+    'react',
+    npm('react'),
+  ),
 ];
