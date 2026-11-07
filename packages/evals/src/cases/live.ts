@@ -79,4 +79,10 @@ export const live: EvalCase[] = [
     'django',
     pypi('django'),
   ),
+  version(
+    'live-requests',
+    'What is the latest stable version of the Python Requests library? Give the exact version and the page you read it on.',
+    'requests',
+    pypi('requests'),
+  ),
 ];
