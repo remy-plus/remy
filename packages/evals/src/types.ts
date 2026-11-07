@@ -20,7 +20,8 @@ export type Suite =
   | 'skills'
   | 'helpers'
   | 'proactive'
-  | 'hard';
+  | 'hard'
+  | 'live';
 export const SUITES: readonly Suite[] = [
   'research',
   'files',
@@ -34,6 +35,7 @@ export const SUITES: readonly Suite[] = [
   'helpers',
   'proactive',
   'hard',
+  'live',
 ];
 
 export interface MockEmail {
@@ -97,6 +99,8 @@ export interface EvalCase {
   prompt: string;
   world: {
     web?: Record<string, string>;
+    /** The real web: real pages, and search through TinyFish. Never in the replay gate. */
+    liveWeb?: boolean;
     files?: Record<string, string>;
     inbox?: MockEmail[];
     /** Fake MCP servers. Their tools are named `<server>__<tool>` and allowed automatically. */

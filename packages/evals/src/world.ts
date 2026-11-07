@@ -23,6 +23,7 @@ import {
   createMemoryTools,
   createRecallTool,
   createScheduleTools,
+  createScopedFetch,
   createScopedFs,
   createSkillTools,
   createWebSearch,
@@ -44,6 +45,7 @@ import {
   SKILLS_HINT,
   type Skill,
   skillsBlock,
+  tinyfishSearch,
   updatePlan,
   writeFile,
 } from '@remy/tools';
@@ -62,6 +64,13 @@ export function fixtureFetch(web: Record<string, string>): ScopedFetch {
 }
 
 const flat = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+/** Search for the real web. It needs a key, so a live run says so instead of failing on every case. */
+function liveSearch(): SearchProvider {
+  const key = process.env.TINYFISH_API_KEY;
+  if (!key) throw new Error('The live suite needs TINYFISH_API_KEY for search.');
+  return tinyfishSearch(key);
+}
 
 /** Ranks fixture pages by how many query words they contain. Deterministic. */
 export function fixtureSearch(web: Record<string, string>): SearchProvider {
@@ -264,7 +273,9 @@ export async function createWorld(c: EvalCase): Promise<World> {
       })
     : undefined;
   const tools: Tool[] = [
-    ...(browser ? createBrowserTools(browser) : [fetchUrl, createWebSearch(fixtureSearch(web))]),
+    ...(browser
+      ? createBrowserTools(browser)
+      : [fetchUrl, createWebSearch(c.world.liveWeb ? liveSearch() : fixtureSearch(web))]),
     readFile,
     writeFile,
     listFiles,
@@ -280,7 +291,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
   ];
 
   const useful = [
-    ...(c.world.web && !browser ? ['fetch_url', 'web_search'] : []),
+    ...((c.world.web || c.world.liveWeb) && !browser ? ['fetch_url', 'web_search'] : []),
     ...(browser ? BROWSER_TOOL_NAMES : []),
     ...(c.world.files
       ? [
@@ -367,7 +378,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
     if (mcp.tools.length > SELECT_THRESHOLD) allowTools.push('find_tools');
   }
 
-  const net = fixtureFetch(web);
+  const net = c.world.liveWeb ? createScopedFetch() : fixtureFetch(web);
   return {
     dir,
     tools,
