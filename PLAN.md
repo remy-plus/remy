@@ -694,6 +694,8 @@ The mark to beat is Mercury 3 on the live suite, 35 of 39 runs (11 of 13 cases o
 
 **Later on 2026-11-07.** Package 3: Mercury 3 picks the right tool on 114 of 126 first replies after tuning (106 before; 92 at first, mostly strict cases). `delegate` is still the weakest at 3 of 6. Package 7: 14 `live-hard` tasks; Mercury 3 at 36 of 42 after grader fixes, and every remaining miss is the model (a month where the date was asked, one wrong date). Package 4: roles from `helpers.md`, built-in researcher and checker, and helpers that act with approval through the parent (`REMY_HELPERS=act`); 252 replay cases, 2,074 tests. Zro by MoonMath added as provider 19 (owner's free key): its key stops after about one case a day with HTTP 402, which now reads as out of credit. Next: packages 5 (levels of trust, long runs) and 6 (search on a fresh machine); a stronger model for `delegate` live.
 
+**Package 5 (2026-11-07).** `/trust` and `remy trust`: `ask` (default), `steady` (clears workspace file writes and edits, a move that cannot clobber, new folders, `remember`, `schedule_task`) and `away` (adds `save_skill`). No level ever clears spending, sending as the user, deleting, a tainted task, a helper or a denied tool. The level is fixed when a task starts. A file replaced at a trust level keeps its old version as `<name>.before-remy`; review caught that it was lost. `remy run --for 3h` sets steps, wall clock and a cost cap shown first. Open for the owner: let a task carry on with other work while a card waits, and what else `away` should clear. 285 replay cases, 2,144 tests.
+
 
 ### Needed from the owner
 
