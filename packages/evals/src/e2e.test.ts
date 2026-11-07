@@ -21,6 +21,9 @@ const stable = (r: EvalResult) =>
 
 afterEach(() => vi.restoreAllMocks());
 
+/** These play the whole library twice, which on a busy machine can pass five seconds. */
+const FULL_RUNS_MS = 30_000;
+
 describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
@@ -30,20 +33,24 @@ describe('the starting cases', () => {
     expect(count('hard')).toBeGreaterThanOrEqual(41);
   });
 
-  it('pass on the reference model with no safety or duplicate failures, deterministically', async () => {
-    const a = await runEval(CASES, byRef);
-    const b = await runEval(CASES, byRef);
-    const failed = a.runs.filter((r) => !r.pass).map((r) => r.caseId);
-    expect(failed).toEqual([]);
-    expect(a.metrics.overall).toMatchObject({
-      cases: CASES.length,
-      successRate: 1,
-      passK: 1,
-      safetyViolations: 0,
-      duplicateEffects: 0,
-    });
-    expect(stable(a)).toBe(stable(b));
-  });
+  it(
+    'pass on the reference model with no safety or duplicate failures, deterministically',
+    async () => {
+      const a = await runEval(CASES, byRef);
+      const b = await runEval(CASES, byRef);
+      const failed = a.runs.filter((r) => !r.pass).map((r) => r.caseId);
+      expect(failed).toEqual([]);
+      expect(a.metrics.overall).toMatchObject({
+        cases: CASES.length,
+        successRate: 1,
+        passK: 1,
+        safetyViolations: 0,
+        duplicateEffects: 0,
+      });
+      expect(stable(a)).toBe(stable(b));
+    },
+    FULL_RUNS_MS,
+  );
 
   it('really inject their faults', async () => {
     const r = await runEval(
@@ -72,26 +79,34 @@ describe('the starting cases', () => {
     }
   });
 
-  it('replays a recorded cassette to the same results', async () => {
-    const cassette = new Map();
-    const recorded = await runEval(CASES, (c) => new RecordingModelClient(byRef(c), cassette));
-    const replayed = await runEval(
-      CASES,
-      () => new ReplayModelClient(cassette, { id: 'reference', caps: referenceModel([]).caps }),
-    );
-    expect(stable(replayed)).toBe(stable(recorded));
-  });
+  it(
+    'replays a recorded cassette to the same results',
+    async () => {
+      const cassette = new Map();
+      const recorded = await runEval(CASES, (c) => new RecordingModelClient(byRef(c), cassette));
+      const replayed = await runEval(
+        CASES,
+        () => new ReplayModelClient(cassette, { id: 'reference', caps: referenceModel([]).caps }),
+      );
+      expect(stable(replayed)).toBe(stable(recorded));
+    },
+    FULL_RUNS_MS,
+  );
 
-  it('compare flags a seeded regression', async () => {
-    const base = await runEval(CASES, byRef);
-    const worse = await runEval(CASES, (c) =>
-      referenceModel(
-        c.suite === 'research' ? [...c.reference.slice(0, -1), 'No idea.'] : c.reference,
-      ),
-    );
-    expect(compare(base, base)).toEqual([]);
-    expect(compare(base, worse).map((r) => r.kind)).toEqual(['success']);
-  });
+  it(
+    'compare flags a seeded regression',
+    async () => {
+      const base = await runEval(CASES, byRef);
+      const worse = await runEval(CASES, (c) =>
+        referenceModel(
+          c.suite === 'research' ? [...c.reference.slice(0, -1), 'No idea.'] : c.reference,
+        ),
+      );
+      expect(compare(base, base)).toEqual([]);
+      expect(compare(base, worse).map((r) => r.kind)).toEqual(['success']);
+    },
+    FULL_RUNS_MS,
+  );
 });
 
 describe('evalMain', () => {
