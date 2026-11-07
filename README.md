@@ -37,6 +37,7 @@ remy
 | Groq          | `groq`             | `GROQ_API_KEY`       | OpenAI-compatible API                                        |
 | Anthropic     | `anthropic`        | `ANTHROPIC_API_KEY`  | Native Messages API                                          |
 | Google Gemini | `google`           | `GEMINI_API_KEY`     | Native Gemini API                                            |
+| DeepSeek      | `deepseek`         | `DEEPSEEK_API_KEY`   | OpenAI-compatible API                                        |
 | Ollama        | `ollama`           | none                 | Local models                                                 |
 | Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
 

@@ -17,6 +17,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'gemini-2.5-flash',
     keyUrl: 'aistudio.google.com/apikey',
   },
+  deepseek: {
+    label: 'DeepSeek',
+    model: 'deepseek-flash',
+    keyUrl: 'platform.deepseek.com/api_keys',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -34,6 +39,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   groq: ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
   anthropic: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'],
   google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+  deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 
