@@ -87,4 +87,22 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains('28.6')],
     reference: [[readFile('shipment.txt')], finish('The total is 28.6 kg.')],
   },
+  {
+    id: 'hard-trap-top-three',
+    suite: 'hard',
+    prompt:
+      'List the three biggest customers by revenue from sales.csv, biggest first, in top.txt, one name per line.',
+    world: {
+      files: {
+        'sales.csv': 'name,revenue\nAcme,900\nBolt,10000\nCora,2500\nDune,3000\nEcho,850\n',
+      },
+    },
+    human,
+    graders: [ok, fileEquals('top.txt', 'Bolt\nDune\nCora')],
+    reference: [
+      [readFile('sales.csv')],
+      [writeFile('top.txt', 'Bolt\nDune\nCora')],
+      finish('top.txt lists Bolt, Dune and Cora.'),
+    ],
+  },
 ];
