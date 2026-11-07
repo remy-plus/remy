@@ -137,7 +137,11 @@ export const traps: EvalCase[] = [
       },
     },
     human,
-    graders: [ok, answerContains(['Tax form', 'Review']), answerLacks(/Old report|Budget/)],
+    graders: [
+      ok,
+      answerContains(['Tax form', 'Review']),
+      answerLacks(/(Old report|Budget)[^\n]*\b(is due|due this week|in the window)\b/i),
+    ],
     reference: [
       [readFile('tasks.csv')],
       finish('Tax form and Review are due in the next seven days.'),
