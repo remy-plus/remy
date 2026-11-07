@@ -7,6 +7,7 @@ import {
   type ModelResponse,
   type RunOutcome,
   type TaskConfig,
+  type Tool,
   ToolRegistry,
 } from '@remy/core';
 import { MemoryEventStore } from '@remy/store';
@@ -61,6 +62,42 @@ function withSituation(inner: ModelClient, email: boolean): ModelClient {
       ),
   };
 }
+
+/**
+ * For `firstReplyOnly`: passes the first reply through and keeps it, then answers every later
+ * request with `finish`, so the run ends without a second model call.
+ */
+export function firstReplyOnly(inner: ModelClient) {
+  const m = {
+    id: inner.id,
+    caps: inner.caps,
+    first: undefined as ModelResponse | undefined,
+    async complete(
+      req: Parameters<ModelClient['complete']>[0],
+      signal: AbortSignal,
+    ): Promise<ModelResponse> {
+      if (m.first)
+        return {
+          calls: [{ tool: 'finish', args: { answer: 'Stopped after the first reply.' } }],
+          usage: { inTokens: 0, outTokens: 0 },
+        };
+      m.first = await inner.complete(req, signal);
+      return m.first;
+    },
+  };
+  return m;
+}
+
+/** Tools that report success and do nothing, for runs that only look at which tool was chosen. */
+export const inert = (tools: Tool[]): Tool[] =>
+  tools.map((t) =>
+    t.name === 'finish' || t.name === 'ask_user'
+      ? t
+      : {
+          ...t,
+          execute: async () => ({ ok: true, content: 'Skipped.', trust: 'trusted' as const }),
+        },
+  );
 
 export interface EvalResult {
   version: 1;
@@ -145,13 +182,16 @@ export async function runCase(
     const now = () => Date.now() + offset;
     const inner = new MemoryEventStore({ now });
     const faulty = crashingStore(inner, c.faults ?? []);
+    const stopper = c.firstReplyOnly ? firstReplyOnly(model) : undefined;
     const counted = counting(
       withSituation(
-        c.world.skills ? withSkills(model, c.world.skills) : model,
+        c.world.skills ? withSkills(stopper ?? model, c.world.skills) : (stopper ?? model),
         Boolean(c.world.inbox),
       ),
     );
-    const tools = new ToolRegistry(withTransient(world.tools, c.faults ?? []));
+    const tools = new ToolRegistry(
+      withTransient(c.firstReplyOnly ? inert(world.tools) : world.tools, c.faults ?? []),
+    );
     let n = 0;
     const ids = { next: (p: string) => `${p}_${++n}` };
     const make = () =>
@@ -270,6 +310,11 @@ export async function runCase(
       record.approvals.unshift(...r.approvals);
       record.policyViolations.unshift(...r.policyViolations);
     }
+    if (stopper?.first)
+      record.firstReply = {
+        ...(stopper.first.text !== undefined && { text: stopper.first.text }),
+        calls: stopper.first.calls,
+      };
     if (c.world.mcp) record.offered = counted.offered;
     if (counted.prefix.total > 0) record.prefix = counted.prefix;
     const asked = taskIds.length - 1 + pauses;

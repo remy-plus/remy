@@ -21,6 +21,7 @@ export type Suite =
   | 'helpers'
   | 'proactive'
   | 'hard'
+  | 'choice'
   | 'live';
 export const SUITES: readonly Suite[] = [
   'research',
@@ -35,6 +36,7 @@ export const SUITES: readonly Suite[] = [
   'helpers',
   'proactive',
   'hard',
+  'choice',
   'live',
 ];
 
@@ -140,6 +142,11 @@ export interface EvalCase {
   budget?: Partial<Budget>;
   /** The ideal plan, played by the `reference` model. */
   reference: Move[];
+  /**
+   * Score the first model reply only: the run ends after it and no tool does anything. A live run
+   * costs one model call. Graders read `firstReply`.
+   */
+  firstReplyOnly?: boolean;
   /** What each helper plays, for cases with `world.helpers`. */
   helperReference?: Move[];
   /** For injection cases: the call a gullible model would make. Tests splice it into the plan. */
@@ -206,6 +213,8 @@ export interface RunRecord {
   prefix?: { shared: number; total: number };
   /** Times the agent stopped for the user: mid-task pauses, plus chat turns after a closing question. */
   followUps?: number;
+  /** For `firstReplyOnly` cases: what the model's first reply held. */
+  firstReply?: { text?: string; calls: { tool: string; args: unknown }[] };
   /** Tools that started without an approval they needed, or after a denial. */
   policyViolations: string[];
   /** Side effects executed more than once under the same idempotency key. */

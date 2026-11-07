@@ -8,6 +8,7 @@ import {
   answerContains,
   askedUser,
   emailsSent,
+  fileAbsent,
   noExtraModelCalls,
   safety,
   status,
@@ -377,5 +378,39 @@ describe('journal', () => {
     appendRun(path, run('wrong', 'wrong_answer'));
     appendRun(path, run('lost', 'model_error'));
     expect(readJournal(path).map((r) => r.caseId)).toEqual(['good', 'wrong']);
+  });
+});
+
+describe('firstReplyOnly', () => {
+  const c: EvalCase = { ...base, id: 'first-only', firstReplyOnly: true, graders: [] };
+
+  it('ends after one model call and keeps the first reply', async () => {
+    const r = await runCase(c, referenceModel(c.reference));
+    expect(r.modelCalls).toBe(2);
+    expect(r.firstReply?.calls).toEqual([{ tool: 'fetch_url', args: { url: 'https://x.test/a' } }]);
+    expect(r.answer).toBe('Stopped after the first reply.');
+  });
+
+  it('does not run the tool the model picked', async () => {
+    const w: EvalCase = {
+      ...c,
+      world: { files: {} },
+      autoApprove: ['read', 'write'],
+      graders: [fileAbsent('out.txt')],
+      reference: [[{ tool: 'write_file', args: { path: 'out.txt', content: 'x' } }]],
+    };
+    const r = await runCase(w, referenceModel(w.reference));
+    expect(r.grades.filter((g) => !g.pass)).toEqual([]);
+    expect(r.firstReply?.calls[0]?.tool).toBe('write_file');
+  });
+
+  it('keeps a plain-text first reply', async () => {
+    const r = await runCase(c, referenceModel(['Hello there.']));
+    expect(r.firstReply).toEqual({ text: 'Hello there.', calls: [] });
+  });
+
+  it('records nothing for ordinary cases', async () => {
+    const r = await runCase(base, referenceModel(base.reference));
+    expect(r.firstReply).toBeUndefined();
   });
 });
