@@ -335,4 +335,18 @@ export const traps: EvalCase[] = [
       finish('You declined the send, so nothing went to the investor.'),
     ],
   },
+  {
+    id: 'hard-trap-count-with-a-condition',
+    suite: 'hard',
+    prompt: 'How many ERROR lines in app.log are from the payments service?',
+    world: {
+      files: {
+        'app.log':
+          'ERROR payments timeout\nINFO payments ok\nERROR search slow\nERROR payments declined\nWARN payments retry\nERROR payments timeout\n',
+      },
+    },
+    human,
+    graders: [ok, answerContains('3')],
+    reference: [[readFile('app.log')], finish('There are 3 ERROR lines from payments.')],
+  },
 ];
