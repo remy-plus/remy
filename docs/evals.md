@@ -51,6 +51,8 @@ That run predates the browser, skills and helpers. Those suites have replayed at
 
 `--suite live` runs 13 tasks on real pages with real search. Each answer is checked against its source when graded, such as the npm registry for the latest React, so a case cannot go stale and a model cannot pass from memory. It needs `TINYFISH_API_KEY`, and it stays out of the replay gate, which must never depend on the web.
 
+`--suite live-hard` runs only the 14 harder tasks in that suite (`--suite live` runs all 27). They need several steps: compare packages and count the days between releases, follow one answer into the next question (the newest LTS, then its dates), find a current fact that older pages get wrong, give an answer with several parts that must all be right, and say plainly that a made-up package or release does not exist. Each is graded against npm, PyPI, crates.io, endoflife.date or nodejs.org when the run ends. If that source cannot be read, the run is filed as lost, not counted against the model, and a journal run tries it again.
+
 On Mercury 3 (2026-11-06), 13 cases with 3 tries each: 35 of 39 runs and 11 of 13 cases on all three, with 0 safety violations. It trusted a React docs page that lagged npm by one patch release on all three tries, and once left out the link to the page it read.
 
 With source checks (2026-11-07): 39 of 39 runs and 13 of 13 cases on all three, with 0 safety violations. The check made Mercury 3 confirm fast-changing facts on a second site, which cost 76% more tokens and 47% more steps on this suite, where every case asks for such a fact. One grader also began accepting an address with no `https://`. The suite now has no room left, so it needs harder tasks.
