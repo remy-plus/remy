@@ -123,6 +123,8 @@ export interface EvalCase {
     skills?: Skill[];
     /** Offer the schedule tools, on a store that lives for the run. */
     schedules?: boolean;
+    /** Offer `run_command`, the real tool. Only for cases that must not reach for it. */
+    shell?: boolean;
     /** Offer `delegate`. Helpers play `helperReference`. */
     helpers?: boolean;
   };

@@ -45,8 +45,11 @@ export const EVAL_CAPABILITIES_EMAIL = EVAL_CAPABILITIES.replace(
 );
 
 /** Sends the moment with each user message, as the app does, so "tomorrow" means something. */
-function withSituation(inner: ModelClient, email: boolean): ModelClient {
-  const block = `${EVAL_SITUATION}\n${email ? EVAL_CAPABILITIES_EMAIL : EVAL_CAPABILITIES}`;
+function withSituation(inner: ModelClient, c: EvalCase): ModelClient {
+  let caps = c.world.inbox ? EVAL_CAPABILITIES_EMAIL : EVAL_CAPABILITIES;
+  if (c.world.helpers) caps = caps.replace(/- Helpers: off\..*/, '- Helpers: on.');
+  if (c.world.skills) caps = caps.replace('- Skills: 0.', `- Skills: ${c.world.skills.length}.`);
+  const block = `${EVAL_SITUATION}\n${caps}`;
   return {
     id: inner.id,
     caps: inner.caps,
@@ -186,7 +189,7 @@ export async function runCase(
     const counted = counting(
       withSituation(
         c.world.skills ? withSkills(stopper ?? model, c.world.skills) : (stopper ?? model),
-        Boolean(c.world.inbox),
+        c,
       ),
     );
     const tools = new ToolRegistry(

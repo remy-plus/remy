@@ -41,6 +41,7 @@ import {
   memoryBlock,
   moveFile,
   readFile,
+  runCommand,
   type SearchProvider,
   SKILLS_HINT,
   type Skill,
@@ -274,7 +275,8 @@ export async function createWorld(c: EvalCase): Promise<World> {
     : undefined;
   const tools: Tool[] = [
     ...(browser
-      ? createBrowserTools(browser)
+      ? // fetch_url stays registered: the app has it beside the browser. Cases list it to offer it.
+        [...createBrowserTools(browser), fetchUrl]
       : [fetchUrl, createWebSearch(c.world.liveWeb ? liveSearch() : fixtureSearch(web))]),
     readFile,
     writeFile,
@@ -365,6 +367,10 @@ export async function createWorld(c: EvalCase): Promise<World> {
       }),
     );
     allowTools.push('schedule_task', 'list_schedules');
+  }
+  if (c.world.shell) {
+    tools.push(runCommand);
+    allowTools.push('run_command');
   }
   if (c.world.helpers) {
     tools.push(delegate);
