@@ -105,4 +105,13 @@ export const traps: EvalCase[] = [
       finish('top.txt lists Bolt, Dune and Cora.'),
     ],
   },
+  {
+    id: 'hard-trap-tomorrow-weekday',
+    suite: 'hard',
+    prompt: 'What day of the week is tomorrow?',
+    world: {},
+    human,
+    graders: [ok, answerContains('Saturday')],
+    reference: [finish('Tomorrow is Saturday.')],
+  },
 ];
