@@ -73,9 +73,11 @@ By default Remy asks before it changes anything. `/trust` (or `remy trust <level
 
 - `ask` (default): every change waits for you.
 - `steady`: low-risk, reversible work goes ahead without a card: writing, editing, moving files and making folders in the task's workspace (a file it replaces is kept beside the new one as `<name>.before-remy`), saving a note, and adding a schedule.
-- `away`: as steady, plus saving a skill. It is meant for long runs while you are not at the keyboard.
+- `away`: as steady, plus saving a skill. It is meant for long runs while you are not at the keyboard. When something still needs a card, the task carries on with the rest of the work while the card waits.
 
 At every level Remy still asks before spending money, sending or posting as you, deleting, running commands, and anything after it has read a web page, search result, email or pasted text. A tool you blocked stays blocked, a connected app follows `/approvals` only, and helpers never get the level. The level shows in the status row. A task keeps the level it started with, including after a restart; a change applies to new tasks.
+
+At `away`, a card does not stop the task. The action waits, unrun, and the model is told which actions wait and to carry on with whatever does not depend on them. Up to three cards wait at once; a fourth stops the task, as at every other level. A waiting action runs only if you approve those exact arguments, once. If you decline, it is recorded as declined and the model is told. The task never finishes as done while a card waits: when the model tries to finish, the task pauses with what is done and what waits, and carries on once you have answered the last card. A card from a task that read untrusted content, and every helper's card, is still a card you answer. A restart with cards waiting brings back the same cards and runs nothing twice.
 
 For a job that should run for hours, `remy run --background --for 3h "<task>"` sets the clock, the steps and the cost together and prints the most it can spend before it starts. It pauses when any of them runs out, and `remy continue <id>` adds more. A crash or restart picks the task up where its record ends.
 
