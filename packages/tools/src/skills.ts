@@ -304,6 +304,8 @@ export function createSkillTools(port: SkillsPort): Tool[] {
         .describe('The steps as a short numbered Markdown list'),
     }),
     risk: 'write',
+    // Writes a Markdown file Remy can read later, removable with remy skills rm. Not steady: a saved skill shapes later tasks, so it waits for a level meant for time away.
+    trustFrom: 'away',
     effect: 'idempotent',
     outputTrust: 'trusted',
     timeoutMs: 5_000,

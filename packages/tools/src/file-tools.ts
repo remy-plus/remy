@@ -38,6 +38,8 @@ export const writeFile = defineTool({
     content: z.string().describe('Full new contents of the file'),
   }),
   risk: 'write',
+  // Workspace only (ScopedFs); the user can read and restore the file, and the task keeps its own folder.
+  trustFrom: 'steady',
   effect: 'idempotent',
   outputTrust: 'trusted',
   timeoutMs: 15_000,

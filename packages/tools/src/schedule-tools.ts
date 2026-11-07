@@ -27,6 +27,8 @@ export function createScheduleTools(port: SchedulesPort): Tool[] {
         'Set up a task that runs by itself on a schedule. Use it only when the user asks for something to happen regularly.',
       args: addArgs,
       risk: 'write',
+      // Only adds a schedule; each run is its own task with its own policy, so a scheduled write still asks. The user can remove it.
+      trustFrom: 'steady',
       effect: 'unsafe_to_retry',
       outputTrust: 'trusted',
       timeoutMs: 5_000,

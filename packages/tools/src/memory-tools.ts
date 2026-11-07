@@ -97,6 +97,8 @@ export function createMemoryTools(port: MemoryPort): Tool[] {
         .describe('Several notes at once, instead of text and kind'),
     }),
     risk: 'write',
+    // Adds a note to Remy's own memory; the user can see and remove it with /memory.
+    trustFrom: 'steady',
     effect: 'idempotent',
     outputTrust: 'trusted',
     timeoutMs: 5_000,
@@ -147,6 +149,7 @@ export function createMemoryTools(port: MemoryPort): Tool[] {
       id: z.string().optional().describe('The note id, such as mem_ab12cd'),
       text: z.string().optional().describe('Words from the note, when you do not have the id'),
     }),
+    // No trustFrom: forgetting deletes, and a trust level never clears a delete.
     risk: 'write',
     effect: 'idempotent',
     outputTrust: 'trusted',

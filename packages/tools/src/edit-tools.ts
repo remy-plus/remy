@@ -24,6 +24,8 @@ export const editFile = defineTool({
     all: z.boolean().default(false).describe('Replace every match instead of requiring one'),
   }),
   risk: 'write',
+  // Exact-text replacement inside one workspace file; fails when the text is not found.
+  trustFrom: 'steady',
   // Same reasoning as write_file: the same call leaves the same file. A retry after the edit
   // landed fails with "not found", which is safe; the model re-reads the file.
   effect: 'idempotent',
@@ -69,6 +71,8 @@ export const moveFile = defineTool({
     to: z.string().describe('Relative path of the new location'),
   }),
   risk: 'write',
+  // Workspace only; fails if the destination exists, so it overwrites nothing and can be moved back.
+  trustFrom: 'steady',
   effect: 'reconcilable',
   outputTrust: 'trusted',
   timeoutMs: 15_000,
@@ -122,6 +126,8 @@ export const makeDir = defineTool({
   description: 'Create a folder in the workspace, including missing parent folders.',
   args: z.object({ path: z.string().describe('Relative folder path, e.g. reports/2026') }),
   risk: 'write',
+  // Creates an empty folder in the workspace; harmless and idempotent.
+  trustFrom: 'steady',
   effect: 'idempotent',
   outputTrust: 'trusted',
   timeoutMs: 15_000,
