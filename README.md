@@ -49,6 +49,7 @@ remy
 | DeepInfra     | `deepinfra`        | `DEEPINFRA_API_KEY`  | OpenAI-compatible API                                        |
 | Alibaba Qwen  | `alibaba`          | `DASHSCOPE_API_KEY`  | OpenAI-compatible API                                        |
 | Inception     | `inception`        | `INCEPTION_API_KEY`  | Mercury models, free tokens on a new key                     |
+| Zro           | `zro`              | `ZRO_API_KEY`        | DeepSeek and GLM Flash models, free daily use                |
 | Ollama        | `ollama`           | none                 | Local models                                                 |
 | Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
 
