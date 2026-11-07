@@ -343,6 +343,17 @@ describe('resuming', () => {
   });
 });
 
+describe('an outage', () => {
+  it('stops after enough runs in a row lost to the provider', async () => {
+    const down = () =>
+      new ScriptedModelClient(Array(5).fill(new ModelError('over capacity', false)));
+    const cases = ['a', 'b', 'c'].map((id) => ({ ...base, id }));
+    const r = await runEval(cases, down, { maxLostInARow: 2 });
+    expect(r.runs).toHaveLength(2);
+    expect(r.stopped).toContain('2 runs');
+  });
+});
+
 describe('journal', () => {
   it('keeps finished runs and drops the ones the provider lost', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'remy-journal-')), 'nested', 'runs.jsonl');

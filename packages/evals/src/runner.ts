@@ -28,6 +28,8 @@ export interface EvalResult {
   model: string;
   date: string;
   k: number;
+  /** Why the run ended early, when it did. */
+  stopped?: string;
   runs: RunRecord[];
   metrics: Metrics;
 }
@@ -41,6 +43,8 @@ export interface RunOptions {
   live?: boolean;
   /** Runs already done, from a journal. They count, and are not run again. */
   resume?: RunRecord[];
+  /** Stop after this many runs in a row lost to the provider: that is an outage, not a score. */
+  maxLostInARow?: number;
 }
 
 function approves(h: Human, tool: string): boolean {
@@ -268,7 +272,10 @@ export async function runEval(
   const runs: RunRecord[] = [];
   const done = new Map(opts.resume?.map((r) => [`${r.caseId}#${r.run}`, r]));
   let modelId = 'none';
+  let lost = 0;
+  let stopped = false;
   for (const c of picked) {
+    if (stopped) break;
     const model = modelFor(c);
     modelId = model.id;
     for (let i = 0; i < k; i++) {
@@ -280,6 +287,11 @@ export async function runEval(
       const r = await runCase(c, model, i, opts.live);
       runs.push(r);
       opts.onRun?.(r);
+      lost = r.failure === 'model_error' ? lost + 1 : 0;
+      if (opts.maxLostInARow && lost >= opts.maxLostInARow) {
+        stopped = true;
+        break;
+      }
     }
   }
   return {
@@ -287,6 +299,7 @@ export async function runEval(
     model: modelId,
     date: new Date().toISOString().slice(0, 10),
     k,
+    ...(stopped ? { stopped: `${lost} runs in a row lost to the provider` } : {}),
     runs,
     metrics: computeMetrics(runs),
   };

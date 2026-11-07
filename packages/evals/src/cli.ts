@@ -15,17 +15,29 @@ import {
 import { CASES } from './cases/index.ts';
 import { compare, renderCompare } from './compare.ts';
 import { referenceModel } from './reference.ts';
-import { fileSafe, readResults, renderSummary, writeResults } from './report.ts';
+import {
+  appendRun,
+  fileSafe,
+  readJournal,
+  readResults,
+  renderSummary,
+  writeResults,
+} from './report.ts';
 import { runEval } from './runner.ts';
 import { type ModelFor, SUITES, type Suite } from './types.ts';
 
 const USAGE = `Usage:
   eval [run] [--model <id|reference>] [--profile <name>] [--suite <a,b>] [--case <id,...>]
              [--k <n>] [--record] [--replay <cassette>] [--out <dir>] [--strict] [--no-write]
+             [--journal <file>]
   eval compare <base.json> <next.json>
 
 Models: "reference" plays each case's ideal plan (deterministic, free). Anything else is a live
-model id sent through REMY_PROFILE / REMY_BASE_URL / REMY_API_KEY, or --profile.`;
+model id sent through REMY_PROFILE / REMY_BASE_URL / REMY_API_KEY, or --profile.
+--journal saves each run as it ends. The same command again carries on from there, and stops
+after 3 runs in a row lost to the provider.`;
+
+const MAX_LOST_IN_A_ROW = 3;
 
 const list = (s: string | undefined) => (s ? s.split(',').map((x) => x.trim()) : []);
 
@@ -107,16 +119,24 @@ export async function evalMain(argv: string[]): Promise<number> {
     ? () => client
     : (c) => referenceModel(c.reference, c.helperReference);
 
+  const journal = values.journal;
   const result = await runEval(CASES, modelFor, {
     k,
+    ...(journal ? { resume: readJournal(journal), maxLostInARow: MAX_LOST_IN_A_ROW } : {}),
     suites,
     caseIds: list(values.case),
     live: !!client && !values.replay,
-    onRun: (r) =>
+    onRun: (r) => {
+      if (journal) appendRun(journal, r);
       console.log(
         `${r.pass ? 'pass' : 'FAIL'}  ${r.caseId}${k > 1 ? ` #${r.run + 1}` : ''}  ${r.steps} steps, ${r.wallMs}ms`,
-      ),
+      );
+    },
   });
+  if (result.stopped) {
+    console.error(`Stopped: ${result.stopped}. Run the same command later to carry on.`);
+    return 3;
+  }
   if (result.runs.length === 0) {
     console.error('No cases matched.');
     return 2;
@@ -158,6 +178,7 @@ function parse(argv: string[]) {
       record: { type: 'boolean' },
       replay: { type: 'string' },
       out: { type: 'string' },
+      journal: { type: 'string' },
       cassettes: { type: 'string' },
       strict: { type: 'boolean' },
       'no-write': { type: 'boolean' },
