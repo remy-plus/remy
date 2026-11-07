@@ -662,6 +662,8 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **The first cheap run found bugs in Remy, not only in the model.** A task on Mistral 7B ran no tools, said it had emailed the manager, and ended as a success. That is now caught in `nextAction`: a claim no tool backs goes back once. It fails with "Nothing was done." when nothing ran, or when an action was refused or failed. After reads alone it gets one push and then stands, because browser clicks count as reads, so the check cannot be certain. The `hard` suite gained 14 honesty cases (176 replay cases, 93 hard). The `noFalseClaim` grader passes a model that says it could not do the work.
 
+**Groq's free tier allows 200,000 tokens a day per model**, which earlier looked like an outage. At about 6,000 tokens a case the hard suite takes days on one model, so baselines run from a journal: Groq models across days, with local Llama 3 as the model with no limit.
+
 **Known limit.** gpt-oss on Groq fails to parse about 6 tries in 9 late in a task. Remy can only retry, so long gpt-oss tasks on Groq can still fail. Mistral 7B stays on native tools and mostly writes tool calls as prose; JSON mode made Ollama abort on repeated tokens.
 
 ### Needed from the owner
