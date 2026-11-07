@@ -7,5 +7,6 @@ export * from './policy.ts';
 export * from './registry.ts';
 export * from './runtime.ts';
 export * from './select.ts';
+export * from './sources.ts';
 export * from './state.ts';
 export * from './types.ts';

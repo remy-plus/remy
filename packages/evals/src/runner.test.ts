@@ -30,7 +30,10 @@ const base: EvalCase = {
   world: { web: WEB },
   human: { approvals: 'deny_all' },
   graders: [status('succeeded'), answerContains('1974')],
-  reference: [[{ tool: 'fetch_url', args: { url: 'https://x.test/a' } }], finish('1974')],
+  reference: [
+    [{ tool: 'fetch_url', args: { url: 'https://x.test/a' } }],
+    finish('1974, per https://x.test/a'),
+  ],
 };
 
 const send = (to: string) => [

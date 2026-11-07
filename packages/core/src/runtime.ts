@@ -469,7 +469,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       for (;;) {
         const s = state();
         const a: Action = nextAction(s, clock.now());
-        const c = 'callId' in a ? s.calls[a.callId] : undefined;
+        const c = 'callId' in a && a.callId ? s.calls[a.callId] : undefined;
         switch (a.kind) {
           case 'done':
           case 'pause':
@@ -501,6 +501,27 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             break;
           case 'gate_claim':
             await commit([{ type: 'plan.gated', text: CLAIM_GATE_MESSAGE }]);
+            break;
+          case 'gate_sources':
+            if (a.callId) {
+              if (!c) break;
+              await commit([
+                {
+                  type: 'tool.completed',
+                  callId: c.callId,
+                  result: { ok: false, error: a.message, retryable: false, phase: 'before_effect' },
+                  latencyMs: 0,
+                },
+              ]);
+            } else {
+              await commit([
+                {
+                  type: 'plan.gated',
+                  text: `(From Remy, not the user.) ${a.message}`,
+                  source: true,
+                },
+              ]);
+            }
             break;
           case 'gate_finish':
             if (!c) break;

@@ -1,6 +1,7 @@
 // nextAction(state) decides the runner's next move from persisted state alone, so a crash
 // anywhere is recovered by re-reading the events and asking again. Pure.
 import { openPlanSteps, planGateUsed, UPDATE_PLAN } from './plan.ts';
+import { sourceGateMessage, sourceGateUsed, sourceProblems } from './sources.ts';
 import { type CallState, isTerminal, type TaskState } from './state.ts';
 import { type FinalStatus, PROGRESS_EVERY } from './types.ts';
 
@@ -19,6 +20,8 @@ export type Action =
   | { kind: 'gate_text' }
   /** A plain-text stop that claims or promises work when no tool ran: send it back once. */
   | { kind: 'gate_claim' }
+  /** A web answer with unchecked sources: push back once, as a tool error on `finish` or as a note. */
+  | { kind: 'gate_sources'; message: string; callId?: string }
   | { kind: 'decide'; callId: string }
   | { kind: 'request_approval'; callId: string }
   | { kind: 'execute'; callId: string }
@@ -66,6 +69,9 @@ export function nextAction(s: TaskState, now: number): Action {
       if (!planGateUsed(s) && (openPlanSteps(s).length || claims))
         return { kind: 'gate_finish', callId: c.callId };
       if (claims && provablyFalse(s)) return fail(NOTHING_DONE);
+      const problems = sourceGateUsed(s) ? [] : sourceProblems(s, finishAnswer(c));
+      if (problems.length)
+        return { kind: 'gate_sources', callId: c.callId, message: sourceGateMessage(problems) };
     }
     return { kind: 'execute', callId: c.callId };
   }
@@ -86,6 +92,8 @@ export function nextAction(s: TaskState, now: number): Action {
       if (provablyFalse(s)) return fail(NOTHING_DONE);
     }
     if (ranNoTools(s) && isPromisedWork(text) && !planGateUsed(s)) return { kind: 'gate_claim' };
+    const problems = sourceGateUsed(s) ? [] : sourceProblems(s, text);
+    if (problems.length) return { kind: 'gate_sources', message: sourceGateMessage(problems) };
     return { kind: 'finish', status: 'succeeded', answer: last.text };
   }
 
