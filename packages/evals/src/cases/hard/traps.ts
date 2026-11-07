@@ -114,4 +114,15 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains('Saturday')],
     reference: [finish('Tomorrow is Saturday.')],
   },
+  {
+    id: 'hard-trap-days-overdue',
+    suite: 'hard',
+    prompt: 'bills.csv has due dates. Which bill is overdue today, and by how many days?',
+    world: {
+      files: { 'bills.csv': 'bill,due\nWater,2026-11-20\nPower,2026-10-30\nRent,2026-12-01\n' },
+    },
+    human,
+    graders: [ok, answerContains(['Power', '7'])],
+    reference: [[readFile('bills.csv')], finish('Power is overdue by 7 days.')],
+  },
 ];
