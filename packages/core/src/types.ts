@@ -412,6 +412,11 @@ export interface ToolContext {
    * list other tools (find_tools) use it so they do not reveal what the task cannot call.
    */
   permits?: (tool: string) => boolean;
+  /**
+   * `'trust'` when the task's trust level cleared this call rather than the user's own approval.
+   * Read from the recorded policy decision, so a recovered call sees the same value.
+   */
+  clearedBy?: 'trust';
   /** Runs helpers, one child task each, together. Absent inside a helper. */
   delegate?: (requests: HelperRequest[]) => Promise<HelperResult[]>;
 }

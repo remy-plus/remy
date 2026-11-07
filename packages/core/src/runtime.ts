@@ -299,6 +299,8 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
     taskId: s.taskId,
     callId: c.callId,
     idempotencyKey: idempotencyKey(s.taskId, c.callId),
+    ...(c.decision?.kind === 'allow' &&
+      c.decision.via === 'trust' && { clearedBy: 'trust' as const }),
     signal,
     clock,
     ...(!s.config.parent && {

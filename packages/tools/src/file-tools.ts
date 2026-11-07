@@ -1,5 +1,6 @@
 import { defineTool, type ToolResult } from '@remy/core';
 import { z } from 'zod';
+import { fullFs } from './scoped-fs.ts';
 
 const fail = (e: unknown): ToolResult => ({
   ok: false,
@@ -38,7 +39,8 @@ export const writeFile = defineTool({
     content: z.string().describe('Full new contents of the file'),
   }),
   risk: 'write',
-  // Workspace only (ScopedFs); the user can read and restore the file, and the task keeps its own folder.
+  // Workspace only (ScopedFs). Replacing a file under a trust level keeps the old version beside it
+  // as <name>.before-remy, because the old contents are not in the event log.
   trustFrom: 'steady',
   effect: 'idempotent',
   outputTrust: 'trusted',
@@ -48,8 +50,38 @@ export const writeFile = defineTool({
     `Write ${content.length} characters to ${path}, replacing it if it exists`,
   async execute({ path, content }, ctx) {
     try {
+      let kept = '';
+      if (ctx.clearedBy === 'trust') {
+        const fs = fullFs(ctx.fs);
+        if (await fs.exists(path)) {
+          const old = await fs.readText(path);
+          // Already the new contents: a retry after a crash. Never back up the new file.
+          if (old !== content) {
+            let found: string | undefined;
+            for (let n = 1; ; n++) {
+              const b = `${path}.before-remy${n === 1 ? '' : `-${n}`}`;
+              if (!(await fs.exists(b))) break;
+              // A copy of these exact contents is already there (crash between copy and write).
+              if ((await fs.readText(b).catch(() => undefined)) === old) {
+                found = b;
+                break;
+              }
+            }
+            if (!found) {
+              for (let n = 1; ; n++) {
+                const b = `${path}.before-remy${n === 1 ? '' : `-${n}`}`;
+                if (await fs.exists(b)) continue;
+                await fs.writeText(b, old);
+                found = b;
+                break;
+              }
+            }
+            kept = `. The old version is kept at ${found}`;
+          }
+        }
+      }
       await ctx.fs.writeText(path, content);
-      return ok(`Wrote ${content.length} characters to ${path}`);
+      return ok(`Wrote ${content.length} characters to ${path}${kept}`);
     } catch (e) {
       return fail(e);
     }
