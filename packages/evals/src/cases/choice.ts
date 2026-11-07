@@ -4,7 +4,7 @@
 // each other: a cassette is keyed on the request.
 import { BROWSER_TOOL_NAMES } from '@remy/browser';
 import { BUILTIN_SKILLS } from '@remy/tools';
-import { choseSkill, choseTool } from '../graders.ts';
+import { choseNoTool, choseSkill, choseTool } from '../graders.ts';
 import type { EvalCase, Grader, Move } from '../types.ts';
 import { fetchUrl, finish } from './util.ts';
 
@@ -324,6 +324,106 @@ const skillPick: EvalCase[] = [
   ),
 ];
 
+const helperKit = kit({ helpers: true });
+const helperTask = (task: string) => ({ role: 'researcher', task });
+
+const delegatePick: EvalCase[] = [
+  pick(
+    'delegate-three-pricing-pages',
+    'Find out what Notion, Linear and Asana each charge per seat, then tell me which is cheapest.',
+    choseTool({ any: ['delegate'] }),
+    [
+      call('delegate', {
+        helpers: ['Notion', 'Linear', 'Asana'].map((n) =>
+          helperTask(`Find the price per seat of ${n}.`),
+        ),
+      }),
+    ],
+    { world: helperKit },
+  ),
+  pick(
+    'delegate-five-laptops',
+    'Look into these five laptops one by one and report battery life for each: Framework 13, ThinkPad X1, MacBook Air, XPS 13, Zenbook S14.',
+    choseTool({ any: ['delegate'] }),
+    [
+      call('delegate', {
+        helpers: ['Framework 13', 'ThinkPad X1'].map((n) =>
+          helperTask(`Find the battery life of ${n}.`),
+        ),
+      }),
+    ],
+    { world: helperKit },
+  ),
+  // Helpers are on, but one named page is not work that splits.
+  pick(
+    'fetch-one-page-with-helpers-on',
+    'Read https://example.test/team and tell me who runs design.',
+    choseTool({ any: ['fetch_url'], not: ['delegate'] }),
+    [fetchUrl('https://example.test/team')],
+    { world: helperKit },
+  ),
+];
+
+const missing: EvalCase[] = [
+  pick(
+    'ask-email-with-no-recipient',
+    'Email him the signed contract.',
+    choseTool({ any: ['ask_user'], not: ['email_send'] }),
+    [call('ask_user', { question: 'Who should I send the contract to?' })],
+    { world: kit({ inbox: [] }) },
+  ),
+  pick(
+    'ask-move-with-no-destination',
+    'Move the draft to the other folder.',
+    choseTool({ any: ['ask_user'], not: ['move_file'] }),
+    [call('ask_user', { question: 'Which folder should the draft go to?' })],
+  ),
+];
+
+const noToolNeeded: EvalCase[] = [
+  pick('plain-thanks', 'Thanks, that was really helpful.', choseNoTool(), 'You are welcome.'),
+  // A search is tempting, but a settled language fact needs no tool.
+  pick(
+    'plain-python-list-or-tuple',
+    'In one sentence, what is the difference between a list and a tuple in Python?',
+    choseNoTool(),
+    'A list can change after it is made; a tuple cannot.',
+  ),
+];
+
+const planFirst: EvalCase[] = [
+  pick(
+    'plan-three-cities',
+    'Compare rent and weather in Porto, Valencia and Split, write the comparison to cities.md, then email me the link.',
+    choseTool({ any: ['update_plan'] }),
+    [
+      call('update_plan', {
+        steps: [
+          { text: 'Find rent and weather for the three cities', status: 'doing' },
+          { text: 'Write cities.md', status: 'pending' },
+          { text: 'Email the result', status: 'pending' },
+        ],
+      }),
+    ],
+    { world: kit({ inbox: [] }) },
+  ),
+  pick(
+    'plan-summarise-every-file',
+    'Go through every file in my workspace, put a one-line summary of each into summary.md, and tell me which file is longest.',
+    choseTool({ any: ['update_plan'] }),
+    [
+      call('update_plan', {
+        steps: [
+          { text: 'List the files', status: 'doing' },
+          { text: 'Read each file', status: 'pending' },
+          { text: 'Write summary.md', status: 'pending' },
+          { text: 'Name the longest', status: 'pending' },
+        ],
+      }),
+    ],
+  ),
+];
+
 export const choice: EvalCase[] = [
   ...web,
   ...browserPick,
@@ -333,4 +433,8 @@ export const choice: EvalCase[] = [
   ...builtinsOverShell,
   ...schedulePick,
   ...skillPick,
+  ...delegatePick,
+  ...missing,
+  ...noToolNeeded,
+  ...planFirst,
 ];
