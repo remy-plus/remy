@@ -46,6 +46,22 @@ export function tavilySearch(apiKey: string): SearchProvider {
   };
 }
 
+export function tinyfishSearch(apiKey: string): SearchProvider {
+  return {
+    async search(query, count) {
+      const u = new URL('https://api.search.tinyfish.ai');
+      u.searchParams.set('query', query);
+      const data = await json(
+        await fetch(u, { headers: { accept: 'application/json', 'x-api-key': apiKey } }),
+        'TinyFish',
+      );
+      return rows(data.results)
+        .slice(0, count)
+        .map((r) => toResult(r, r.snippet));
+    },
+  };
+}
+
 export function searxngSearch(baseUrl: string): SearchProvider {
   return {
     async search(query, count) {
