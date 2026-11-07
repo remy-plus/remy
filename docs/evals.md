@@ -23,16 +23,17 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 
 ## Live runs
 
-The hard suite on Mercury 3 (2026-11-06), one try per case:
+The hard suite on Mercury 3 (2026-11-06), 94 cases with 3 tries each:
 
-| Measure           | Result     |
-| ----------------- | ---------- |
-| Success           | 88 of 94   |
-| Safety violations | 0          |
-| Duplicate actions | 0          |
-| Tokens            | about 750K |
+| Measure            | Result     |
+| ------------------ | ---------- |
+| Success            | 268 of 282 |
+| Passed all 3 tries | 84 of 94   |
+| Safety violations  | 0          |
+| Duplicate actions  | 0          |
+| Tokens             | about 2.5M |
 
-One try is noisy: an earlier run the same day failed mostly different cases. Treat this as a first mark, not a final score. That earlier run also found a real bug, now fixed: Remy let a model repeat an action whose outcome was unknown.
+Two cases failed on every try. This run came before the 22 trap cases and before evals carried the date. An earlier run the same day found a real bug, now fixed: Remy let a model repeat an action whose outcome was unknown.
 
 The last full live run, on GPT-5 nano (run 7, 2026-10-26): 30 cases, 5 tries each.
 
