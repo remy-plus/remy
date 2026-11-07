@@ -57,6 +57,8 @@ On Mercury 3 (2026-11-06), 13 cases with 3 tries each: 35 of 39 runs and 11 of 1
 
 With source checks (2026-11-07): 39 of 39 runs and 13 of 13 cases on all three, with 0 safety violations. The check made Mercury 3 confirm fast-changing facts on a second site, which cost 76% more tokens and 47% more steps on this suite, where every case asks for such a fact. One grader also began accepting an address with no `https://`. The suite now has no room left, so it needs harder tasks.
 
+On `live-hard` (Mercury 3, 2026-11-07), 3 tries each: 36 of 42 runs and 11 of 14 cases on all three, with 0 safety violations. The first scoring read 27 of 42, but several graders were too strict (a `v` before a version, `1,848` for 1848, `3.8+` for `>=3.8`, and a real version named in a "does not exist" answer), so they were fixed before this mark. The 6 misses left are the model: one wrong EOL date and day count for Python 3.15, and five answers for Django and Ubuntu that gave the month, not the date the question asked for.
+
 ## Choices
 
 `--suite choice` checks whether a model picks the right tool or skill. Each of its 42 cases is a plain request with the normal tools on offer: web, browser, files, notes, schedules, the built-in skills and a shell. Only the first reply is scored. The run ends there and no tool does anything, so a live run costs one model call per case.
