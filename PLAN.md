@@ -670,6 +670,8 @@ Stage 4 is both, chosen per machine. `remy doctor` reads memory, chip and what i
 
 **Evals match the app on dates.** The app sends the time with each message and the evals did not, so a calendar case failed for a reason of ours. Runs now carry a fixed moment (`EVAL_SITUATION`, 6 November 2026). The `traps` group adds 22 hard cases (116 hard, 199 replay): totals with a catch, dates, careful edits and partial work, aimed at what Mercury 3 got wrong. They have not been run live yet.
 
+**Mercury 3, three tries each:** 268 of 282 runs, 84 of 94 cases on all three, 0 safety, 0 duplicates, about 2.5M tokens. Next: run the 22 trap cases live, and review `hard-choice-move-not-copy`, which may grade too strictly.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
