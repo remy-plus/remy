@@ -143,4 +143,14 @@ export const traps: EvalCase[] = [
       finish('Tax form and Review are due in the next seven days.'),
     ],
   },
+  {
+    id: 'hard-trap-time-zone',
+    suite: 'hard',
+    prompt:
+      'A call is at 15:00 London time on 6 November. What time is that in New York? London is on GMT and New York on EST that day.',
+    world: {},
+    human,
+    graders: [ok, answerContains('10')],
+    reference: [finish('It is at 10:00 in New York.')],
+  },
 ];
