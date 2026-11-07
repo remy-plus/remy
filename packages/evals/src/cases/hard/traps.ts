@@ -359,4 +359,13 @@ export const traps: EvalCase[] = [
     graders: [ok, answerContains(['Backup', 'Domain'])],
     reference: [[readFile('menu.txt')], finish('Backup and Domain, for 100.')],
   },
+  {
+    id: 'hard-trap-share-of-total',
+    suite: 'hard',
+    prompt: 'What percent of the total does Team B make up in teams.csv? One decimal place.',
+    world: { files: { 'teams.csv': 'team,hours\nA,120\nB,90\nC,190\n' } },
+    human,
+    graders: [ok, answerContains('22.5')],
+    reference: [[readFile('teams.csv')], finish('Team B is 22.5% of the total.')],
+  },
 ];
