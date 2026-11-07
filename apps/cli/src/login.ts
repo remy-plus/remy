@@ -56,6 +56,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'qwen3.7-flash',
     keyUrl: 'modelstudio.console.alibabacloud.com',
   },
+  inception: {
+    label: 'Inception Mercury',
+    model: 'mercury-3',
+    keyUrl: 'platform.inceptionlabs.ai',
+  },
   ollama: { label: 'Ollama (on this computer, no key)', model: 'llama3.1' },
 };
 
@@ -84,6 +89,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   zai: ['glm-5.3-flash', 'glm-4.7-flashx'],
   deepinfra: ['google/gemma-3-12b-it'],
   alibaba: ['qwen3.7-flash'],
+  inception: ['mercury-3', 'mercury-2.5', 'mercury-2'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
 

@@ -33,6 +33,11 @@ export const PROFILES: Record<string, Profile> = {
     baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     keyEnv: 'DASHSCOPE_API_KEY',
   },
+  inception: {
+    baseUrl: 'https://api.inceptionlabs.ai/v1',
+    keyEnv: 'INCEPTION_API_KEY',
+    keyCheckModel: 'mercury-2',
+  },
   // Native APIs (not OpenAI-compatible), served by the AI SDK client.
   anthropic: {
     kind: 'anthropic',

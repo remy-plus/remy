@@ -223,6 +223,12 @@ export const BUILTIN_CATALOG: Catalog = {
     contextWindow: 1000000,
     pricing: { inPerMTok: 0.03, outPerMTok: 0.13 },
   },
+  'mercury-3': {
+    jsonSchema: false,
+    contextTokens: 131072,
+    contextWindow: 1000000,
+    pricing: { inPerMTok: 0.1, outPerMTok: 0.35, cachedInPerMTok: 0.01 },
+  },
   // Ollama local models run for free.
   'llama3.1': { contextTokens: 32768, contextWindow: 32768 },
   'llama3.2': { contextTokens: 32768, contextWindow: 32768 },
