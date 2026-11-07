@@ -18,6 +18,31 @@ export interface Check {
   fix?: string;
 }
 
+/** What the machine can tell us, each probe called at most once and only when its answer is needed. */
+export interface Probes {
+  node: string;
+  platform: string;
+  model?: string | undefined;
+  hasChromeApp: () => boolean;
+  hasDocker: () => boolean;
+  daemonOn: () => boolean;
+  schedules: () => number;
+  search: string;
+}
+
+/** Facts for the checks. Docker only matters when search falls back to the hidden browser. */
+export function gatherFacts(p: Probes): Facts {
+  return {
+    node: p.node,
+    ...(p.model !== undefined && { model: p.model }),
+    browser: p.hasChromeApp() || p.platform !== 'darwin',
+    docker: p.search === 'browser' ? p.hasDocker() : false,
+    daemon: p.platform === 'darwin' && p.daemonOn(),
+    schedules: p.schedules(),
+    search: p.search,
+  };
+}
+
 const MIN_NODE = [22, 18];
 
 function nodeOk(version: string): boolean {

@@ -16,6 +16,8 @@ export interface SituationInput {
   timeZone?: string;
   background: BackgroundTask[];
   connections: ConnectionRow[];
+  /** What this machine can and cannot do now, from capabilities.ts. */
+  capabilities?: string;
 }
 
 /** At most this many background tasks are listed. */
@@ -51,5 +53,6 @@ export function situationBlock(i: SituationInput): string {
   const signin = i.connections.filter((c) => c.status === 'needs_signin').map((c) => c.name);
   if (on.length) lines.push(`- Connected apps: ${on.join(', ')}.`);
   if (signin.length) lines.push(`- Need sign-in (remy connect auth <name>): ${signin.join(', ')}.`);
+  if (i.capabilities) lines.push(i.capabilities);
   return lines.join('\n');
 }

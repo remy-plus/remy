@@ -99,11 +99,12 @@ import { pickSearch } from './search.ts';
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
 
+import { capabilitiesBlock, onceCapabilities } from './capabilities.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
 import { LAUNCH_LABEL, launchAgentPlist, TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
-import { plainChecks, runChecks } from './doctor.ts';
+import { type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
 import {
   defaultModelFor,
@@ -721,6 +722,24 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const browserOn = () => env.REMY_BROWSER !== 'off';
   const browserDir = () => join(home, 'browser');
   const vmFile = () => join(home, 'search-vm.json');
+  /** What this machine has set up; shared by `remy doctor` and the capabilities block. */
+  const machineFacts = (): Facts => {
+    const file = cfg();
+    const has = (cmd: string, args: string[]) => spawnSync(cmd, args).status === 0;
+    return gatherFacts({
+      node: process.version,
+      platform: process.platform,
+      model: credentials().defaultProvider() ?? env.REMY_PROFILE ?? file.profile,
+      hasChromeApp: () =>
+        ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
+          existsSync(p),
+        ),
+      hasDocker: () => has('docker', ['info']),
+      daemonOn: () => has('launchctl', ['list', LAUNCH_LABEL]),
+      schedules: () => openSchedules(home).list().length,
+      search: env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : 'browser'),
+    });
+  };
   const vmRun: Run = (cmd, args) => {
     const r = spawnSync(cmd, args, { encoding: 'utf8' });
     return { ok: r.status === 0, out: r.stdout ?? '' };
@@ -803,6 +822,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       list: () => schedules.list(),
     }))
       tools.add(t);
+    // Probes can be slow, so the block is built once per process, at the first message.
+    const capabilities = onceCapabilities(() =>
+      capabilitiesBlock({
+        facts: machineFacts(),
+        helpers: env.REMY_HELPERS === 'on',
+        skills: skills().list().length,
+      }),
+    );
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),
@@ -817,6 +844,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           now: new Date(),
           background: await backgroundTasks(),
           connections: mcp?.list() ?? [],
+          capabilities: capabilities(),
         }),
     });
     const search = pickSearch(
@@ -1692,26 +1720,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       }
 
       case 'doctor': {
-        const file = cfg();
-        const has = (cmd: string, args: string[]) => spawnSync(cmd, args).status === 0;
-        const chrome = ['chrome', 'msedge'].some(
-          (c) =>
-            process.platform === 'darwin' &&
-            existsSync(
-              c === 'chrome'
-                ? '/Applications/Google Chrome.app'
-                : '/Applications/Microsoft Edge.app',
-            ),
-        );
-        const facts = {
-          node: process.version,
-          model: credentials().defaultProvider() ?? env.REMY_PROFILE ?? file.profile,
-          browser: chrome || process.platform !== 'darwin',
-          docker: has('docker', ['info']),
-          daemon: process.platform === 'darwin' && has('launchctl', ['list', LAUNCH_LABEL]),
-          schedules: openSchedules(home).list().length,
-          search: env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : 'browser'),
-        };
+        const facts = machineFacts();
         const checks = runChecks(facts);
         out(plainChecks(checks));
         return checks.some((c) => c.status === 'problem') ? 1 : 0;
