@@ -717,6 +717,8 @@ Started while Stage 2 waits on live marks. Same pattern: one Sonnet package at a
 
 **Stage 3 package 3.** After a correction Remy offers once to save a short how-to (`save_howto`: title, when it applies, 1 to 5 steps, no secrets). A learned how-to is matched like a skill and its steps travel with the message when it is the top match, so a repeated task follows it in replay. Not shown on a live model yet.
 
+**Stage 3 package 4.** `remy improve propose|check|apply`: Remy reads failed runs from a journal and proposes at most 3 small edits, only to texts marked editable (18: nine system-rule lines, six tool descriptions, three skill descriptions). Safety text, approval and policy are locked by default, a fingerprint test fails if any locked text changes, and every edit is re-validated at check and apply. An edit is kept only if the replay gate holds, the target cases pass more often, no other case passes less, `eval compare` finds no regression and the run was not cut short. `apply` needs a passing verdict and a typed yes, and never commits. Scripted-model tests only; the first live proposal is still to run. 320 replay cases, 2,361 tests.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
