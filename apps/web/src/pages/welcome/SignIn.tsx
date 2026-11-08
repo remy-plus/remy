@@ -81,7 +81,7 @@ export function SignIn({
   return (
     <div className="grid min-h-screen place-items-center bg-[radial-gradient(ellipse_at_center,#171917_0%,transparent_62%)] px-5 py-12">
       <div className="w-full max-w-[460px]">
-        <Logo size={11} />
+        <Logo size="min(11px, 2.8vw)" />
         <h1 className="mt-10 mb-0 text-[28px] leading-tight font-medium tracking-tight">
           Sign in to your Remy.
         </h1>

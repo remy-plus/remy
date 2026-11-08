@@ -70,7 +70,7 @@ function Frame({
     <div className="mx-auto grid min-h-screen max-w-[1440px] gap-10 px-5 pt-10 pb-12 sm:px-14 lg:grid-cols-[minmax(0,588px)_minmax(0,1fr)] lg:gap-[120px]">
       <div className="min-w-0">
         <a href="#/" aria-label="Remy, home" className="inline-block">
-          <Logo size={8} />
+          <Logo size="min(8px, 2.5vw)" />
         </a>
         <div className="mt-9">
           <Trace at={at} />
@@ -220,7 +220,7 @@ function StepTwo() {
         {APPS.map((a) => (
           <li
             key={a.name}
-            className="flex list-none items-center gap-4 rounded-[10px] border border-line bg-surface px-4 py-4"
+            className="flex list-none flex-wrap items-center gap-x-4 gap-y-3 rounded-[10px] border border-line bg-surface px-4 py-4"
           >
             <span
               aria-hidden="true"
@@ -228,7 +228,7 @@ function StepTwo() {
             >
               {a.name[0]}
             </span>
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0 flex-1 basis-40">
               <span className="block text-[16px] font-medium">{a.name}</span>
               <span className="mt-0.5 block text-[14px] text-muted">{a.text}</span>
             </span>

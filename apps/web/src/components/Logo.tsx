@@ -8,14 +8,14 @@ const LINES = [
   ' MMMM   "W"   """"YUMMM  MMM  M\'  "MMM    mM"',
 ];
 
-/** The wordmark. `size` is the font size in px; the header uses the default. */
-export function Logo({ size = 5.6 }: { size?: number }) {
+/** The wordmark. `size` is the font size: px, or any CSS length; the header uses the default. */
+export function Logo({ size = 5.6 }: { size?: number | string }) {
   return (
     <pre
       role="img"
       aria-label="Remy"
       className="m-0 select-none bg-linear-to-b from-text to-stone bg-clip-text font-mono font-bold text-transparent"
-      style={{ fontSize: `${size}px`, lineHeight: 1.1 }}
+      style={{ fontSize: typeof size === 'number' ? `${size}px` : size, lineHeight: 1.1 }}
     >
       {LINES.join('\n')}
     </pre>
