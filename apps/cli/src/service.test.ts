@@ -34,6 +34,7 @@ describe('launchd installer', () => {
   it('is the one chosen on macOS and nowhere unknown', () => {
     expect(installerFor('darwin', fake().ctx)?.kind).toBe('launchd');
     expect(installerFor('freebsd', fake().ctx)).toBeUndefined();
+    expect(installerFor('linux', fake().ctx)?.kind).toBe('systemd');
   });
 
   it('writes the LaunchAgent and loads it', () => {
@@ -117,5 +118,58 @@ describe('systemdUnit', () => {
     expect(() => systemdUnit({ execPath: 'node', execArgv: [], script: '/x' })).toThrow(
       'full path',
     );
+  });
+});
+
+describe('systemd installer', () => {
+  const unitPath = '/Users/a/.config/systemd/user/remy.service';
+  const sys = (...a: string[]) => ['systemctl', '--user', ...a];
+
+  it('writes the unit, reloads and enables it', () => {
+    const f = fake();
+    expect(installerFor('linux', f.ctx)?.install()).toContain('starts when you log in');
+    expect(f.written[unitPath]).toBe(systemdUnit(f.ctx.entry, '/opt/bin'));
+    expect(f.commands).toEqual([
+      sys('show-environment'),
+      sys('daemon-reload'),
+      sys('enable', '--now', 'remy.service'),
+    ]);
+  });
+
+  it('suggests linger and never runs it', () => {
+    const f = fake();
+    expect(installerFor('linux', f.ctx)?.install()).toContain('loginctl enable-linger');
+    expect(f.commands.flat()).not.toContain('loginctl');
+  });
+
+  it('says so and prints the foreground command when systemd is not there', () => {
+    const f = fake({ fail: () => ({ status: null }) });
+    const entry = { execPath: '/opt/my node/node', execArgv: [], script: "/x/it's.js" };
+    expect(() => installerFor('linux', { ...f.ctx, entry })?.install()).toThrow(
+      "not available here (no systemctl, a container, or WSL without systemd).\nRun this in your own service or a terminal instead:\n  '/opt/my node/node' '/x/it'\\''s.js' daemon run",
+    );
+    expect(f.written).toEqual({});
+  });
+
+  it('says so when enable fails', () => {
+    const f = fake({ fail: (_c, a) => (a[1] === 'enable' ? { status: 1 } : undefined) });
+    expect(() => installerFor('linux', f.ctx)?.install()).toThrow(
+      'systemd did not start the daemon',
+    );
+  });
+
+  it('disables, removes and reloads', () => {
+    const f = fake();
+    expect(installerFor('linux', f.ctx)?.uninstall()).toBe('The daemon is off.');
+    expect(f.commands).toEqual([sys('disable', '--now', 'remy.service'), sys('daemon-reload')]);
+    expect(f.removed).toEqual([unitPath]);
+  });
+
+  it('reads status from is-active', () => {
+    const on = fake({ fail: () => ({ status: 0, stdout: 'active\n' }) });
+    expect(installerFor('linux', on.ctx)?.status().on).toBe(true);
+    expect(on.commands[0]).toEqual(sys('is-active', 'remy.service'));
+    const off = fake({ fail: () => ({ status: 3, stdout: 'inactive\n' }) });
+    expect(installerFor('linux', off.ctx)?.status().on).toBe(false);
   });
 });

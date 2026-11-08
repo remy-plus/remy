@@ -1983,7 +1983,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           );
           return 0;
         }
-        if (sub) throw new Error('Use remy daemon, or remy daemon install, uninstall or status.');
+        if (sub && sub !== 'run')
+          throw new Error('Use remy daemon, or remy daemon install, uninstall or status.');
         const store = openSchedules(home);
         const start = (prompt: string) =>
           new Promise<string>((done, fail) => {

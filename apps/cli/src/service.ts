@@ -124,8 +124,64 @@ export function launchdInstaller(ctx: ServiceContext): ServiceInstaller {
   };
 }
 
+const UNIT = 'remy.service';
+
+/** One word for a POSIX shell, in single quotes, for the line we print and never run. */
+export function shellQuote(text: string): string {
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(text) ? text : `'${text.replaceAll("'", "'\\''")}'`;
+}
+
+/** Linux: a systemd user unit that starts at login. */
+export function systemdInstaller(ctx: ServiceContext): ServiceInstaller {
+  const unit = join(ctx.homeDir, '.config', 'systemd', 'user', UNIT);
+  const ctl = (...args: string[]) => ctx.run('systemctl', ['--user', ...args]);
+  const isOn = () => {
+    const r = ctl('is-active', UNIT);
+    return r.status === 0 && (r.stdout ?? '').trim() === 'active';
+  };
+  return {
+    kind: 'systemd',
+    label: 'systemd user unit',
+    enableStep: 'Run remy daemon install.',
+    unavailable: () =>
+      ctl('show-environment').status === 0
+        ? undefined
+        : 'systemd user services are not available here (no systemctl, a container, or WSL without systemd).',
+    install() {
+      const why = this.unavailable();
+      if (why) {
+        const run = [ctx.entry.execPath, ...ctx.entry.execArgv, ctx.entry.script, 'daemon', 'run'];
+        throw new Error(
+          `${why}\nRun this in your own service or a terminal instead:\n  ${run.map(shellQuote).join(' ')}`,
+        );
+      }
+      ctx.files.write(unit, systemdUnit(ctx.entry, ctx.path));
+      ctl('daemon-reload');
+      if (ctl('enable', '--now', UNIT).status !== 0)
+        throw new Error(
+          'systemd did not start the daemon. Check: systemctl --user status remy.service',
+        );
+      return 'The daemon is on and starts when you log in. To keep it running while you are logged out, run loginctl enable-linger yourself.';
+    },
+    uninstall() {
+      ctl('disable', '--now', UNIT);
+      ctx.files.remove(unit);
+      ctl('daemon-reload');
+      return 'The daemon is off.';
+    },
+    status: () => ({
+      on: isOn(),
+      message: isOn()
+        ? 'The daemon is on.'
+        : 'The daemon is off. Turn it on with remy daemon install.',
+    }),
+    isOn,
+  };
+}
+
 /** The installer for this platform, or undefined where there is none. */
 export function installerFor(platform: string, ctx: ServiceContext): ServiceInstaller | undefined {
   if (platform === 'darwin') return launchdInstaller(ctx);
+  if (platform === 'linux') return systemdInstaller(ctx);
   return undefined;
 }
