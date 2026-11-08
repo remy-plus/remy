@@ -4,7 +4,7 @@ import { Orb } from '../components/Orb.tsx';
 import type { HomeState } from '../hooks.ts';
 
 const mono = 'font-mono';
-const button = `${mono} cursor-pointer rounded-md border px-3 py-2 text-[13px] disabled:cursor-default disabled:opacity-50`;
+const button = `${mono} cursor-pointer rounded-md border px-3 py-[7px] text-[12px] whitespace-nowrap disabled:cursor-default disabled:opacity-50`;
 const quiet = `${button} border-stone bg-transparent text-text hover:bg-raise`;
 const primary = `${button} border-signal bg-signal font-medium text-signal-ink hover:brightness-95`;
 
@@ -182,7 +182,7 @@ function CommandBar({
         type="button"
         disabled
         title="Voice comes later"
-        className={`${quiet} hidden size-11 rounded-full p-0 sm:block`}
+        className={`${quiet} hidden size-11 rounded-full! p-0 sm:block`}
       >
         talk
       </button>
@@ -275,32 +275,34 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
         </Section>
       </div>
 
-      {brain && (
-        <div
-          className={`${mono} mt-10 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-line pt-5 text-[13px] text-muted`}
-        >
-          <span>
-            <span className="text-signal">Second brain</span>{' '}
-            <span className="ml-2">
-              <span className="text-text">{brain.notes.toLocaleString('en')}</span> notes linked ·{' '}
-              {brain.newToday} new today
-            </span>
-          </span>
-          <span>
-            Most connected:{' '}
-            {brain.connected.map((c, i) => (
-              <span key={c.name}>
-                {i > 0 && ' · '}
-                <a href="#/brain" className="text-text underline">
-                  {c.name}
-                </a>{' '}
-                ({c.links})
+      <div className="sticky bottom-0 -mx-5 bg-bg px-5 pb-5 sm:-mx-8 sm:px-8">
+        {brain && (
+          <div
+            className={`${mono} mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-line pt-5 text-[13px] text-muted`}
+          >
+            <span>
+              <span className="text-signal">Second brain</span>{' '}
+              <span className="ml-2">
+                <span className="text-text">{brain.notes.toLocaleString('en')}</span> notes linked ·{' '}
+                {brain.newToday} new today
               </span>
-            ))}
-          </span>
-        </div>
-      )}
-      <CommandBar input={input} value={draft} setValue={setDraft} />
+            </span>
+            <span>
+              Most connected:{' '}
+              {brain.connected.map((c, i) => (
+                <span key={c.name}>
+                  {i > 0 && ' · '}
+                  <a href="#/brain" className="text-text underline">
+                    {c.name}
+                  </a>{' '}
+                  ({c.links})
+                </span>
+              ))}
+            </span>
+          </div>
+        )}
+        <CommandBar input={input} value={draft} setValue={setDraft} />
+      </div>
     </div>
   );
 }
