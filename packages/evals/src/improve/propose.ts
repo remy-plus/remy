@@ -1,8 +1,12 @@
 // Reads failed runs, groups them, and asks the model for a few small edits to editable prompt text.
+import { type ModelClient, usageCostUsd } from '@remy/core';
 import type { RunRecord, Suite } from '../types.ts';
 import { editableEntries, type PromptEntry } from './registry.ts';
 import { MAX_EDIT_CHARS, MAX_EDITS } from './validate.ts';
 
+const CHARS_PER_TOKEN = 3.5;
+/** The most the model may write back. Three short edits fit well inside it. */
+export const PROPOSE_MAX_OUTPUT_TOKENS = 1200;
 const MAX_GROUPS = 8;
 const MAX_CASES_PER_GROUP = 6;
 const MAX_DETAIL_CHARS = 160;
@@ -80,4 +84,10 @@ export function proposePrompt(groups: readonly FailureGroup[], editable: readonl
     .join('\n\n');
   const list = editable.map((e) => `[${e.id}]\n${e.text}`).join('\n\n');
   return `Failed cases:\n\n${failed}\n\nPrompt texts you may edit:\n\n${list}`;
+}
+
+/** Dollars a call with this prompt may cost: the input as sent, plus the largest reply allowed. */
+export function estimateUsd(model: ModelClient, system: string, user: string): number {
+  const inTokens = Math.ceil((system.length + user.length) / CHARS_PER_TOKEN);
+  return usageCostUsd({ inTokens, outTokens: PROPOSE_MAX_OUTPUT_TOKENS }, model.caps.pricing);
 }

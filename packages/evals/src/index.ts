@@ -6,6 +6,7 @@ export * from './graders.ts';
 export * from './improve/proposal.ts';
 export * from './improve/proposal.ts';
 export * from './improve/proposal.ts';
+export * from './improve/proposal.ts';
 export * from './improve/registry.ts';
 export * from './improve/validate.ts';
 export * from './metrics.ts';

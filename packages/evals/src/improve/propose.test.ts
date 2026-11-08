@@ -1,6 +1,8 @@
+import type { ModelCaps } from '@remy/core';
+import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
 import type { RunRecord } from '../types.ts';
-import { groupFailures } from './propose.ts';
+import { estimateUsd, groupFailures } from './propose.ts';
 
 const fail = (caseId: string, suite: RunRecord['suite'], bad = 'answerContains'): RunRecord =>
   ({
@@ -34,6 +36,11 @@ const runs = [
   lost('e'),
 ];
 
+const priced = (inPerMTok: number): ModelCaps => ({
+  ...DEFAULT_CAPS,
+  pricing: { inPerMTok, outPerMTok: inPerMTok },
+});
+
 describe('groupFailures', () => {
   it('groups failed runs by suite and failure, biggest first, and skips passes and lost runs', () => {
     const g = groupFailures(runs);
@@ -43,5 +50,12 @@ describe('groupFailures', () => {
     ]);
     expect(g[0]?.checks).toEqual(['answerContains']);
     expect(g[0]?.details[0]).toContain('a: answerContains: missing 1974');
+  });
+});
+
+describe('estimateUsd', () => {
+  it('estimates from the prompt size and the price', () => {
+    const m = new ScriptedModelClient([], { caps: priced(1000000) });
+    expect(estimateUsd(m, 'x'.repeat(350), 'y'.repeat(350))).toBeCloseTo(200 + 1200, 5);
   });
 });
