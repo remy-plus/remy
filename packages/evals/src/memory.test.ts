@@ -1,4 +1,5 @@
 import type { ModelClient, ModelRequest } from '@remy/core';
+import { NOTES_BUDGET_TOKENS, NOTES_MAX } from '@remy/tools';
 import { describe, expect, it } from 'vitest';
 import { CASES } from './cases/index.ts';
 import { referenceModel } from './reference.ts';
@@ -26,6 +27,27 @@ function spy(plan: Parameters<typeof referenceModel>[0]) {
 }
 
 describe('memory suite', () => {
+  it('keeps the notes shown to the model inside the budget with 500 saved', async () => {
+    const c = byId('memory-500-notes-budget');
+    const a = spy(c.reference);
+    await runCase(c, a.model);
+    const system = a.seen[0]?.system ?? '';
+    const shown = system.split('\n').filter((l) => l.startsWith('- [mem_'));
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.length).toBeLessThanOrEqual(NOTES_MAX);
+    expect(shown.join('\n').length / 4).toBeLessThanOrEqual(NOTES_BUDGET_TOKENS * 1.2);
+    expect(system).toContain('Dr. Okafor');
+  });
+
+  it('offers no notes and no memory tools when personalising is off', async () => {
+    const c = byId('memory-off-does-not-recall');
+    const a = spy(c.reference);
+    await runCase(c, a.model);
+    expect(a.seen[0]?.system).not.toContain('oolong');
+    expect(a.seen[0]?.tools.map((t) => t.name)).not.toEqual(expect.arrayContaining(['remember']));
+    expect(a.seen[0]?.tools.map((t) => t.name)).not.toContain('recall');
+  });
+
   it('shows the saved notes and the memory tools only to cases with memory', async () => {
     const withMemory = byId('memory-recall-preference');
     const a = spy(withMemory.reference);
