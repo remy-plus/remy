@@ -7,6 +7,7 @@ export * from './html.ts';
 export * from './memory-match.ts';
 export * from './memory-tools.ts';
 export * from './plan-tool.ts';
+export * from './recall-rank.ts';
 export * from './redact.ts';
 export * from './run-command.ts';
 export * from './schedule-tools.ts';
