@@ -4,6 +4,7 @@
 import {
   answerContains,
   answerLacks,
+  answerMatches,
   emailsSent,
   fileContains,
   fileEquals,
@@ -350,7 +351,7 @@ export const traps: EvalCase[] = [
       },
     },
     human,
-    graders: [ok, answerContains('3')],
+    graders: [ok, answerMatches(/\b(3|three)\b/i)],
     reference: [[readFile('app.log')], finish('There are 3 ERROR lines from payments.')],
   },
   {
