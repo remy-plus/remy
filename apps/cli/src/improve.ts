@@ -2,7 +2,16 @@
 // applied without the owner: apply shows the diff and waits for a typed yes, and never commits.
 
 import type { ModelClient } from '@remy/core';
-import { listProposals, propose, readJournal, saveProposal } from '@remy/evals';
+import {
+  checkProposal,
+  listProposals,
+  loadProposal,
+  propose,
+  readJournal,
+  SUITES,
+  type Suite,
+  saveProposal,
+} from '@remy/evals';
 import { modelFromEnv } from '@remy/models';
 
 export interface ImproveFlags {
@@ -27,6 +36,7 @@ export interface ImproveDeps {
 
 const USAGE = `Usage:
   remy improve propose --from <journal.jsonl> [--profile <p> --model <id>] --max-usd <dollars>
+  remy improve check <proposal> [--suite <a,b>] [--max-usd <dollars>]
   remy improve list`;
 
 const usd = (n: number) => `$${n.toFixed(4)}`;
@@ -92,6 +102,41 @@ export async function improve(
     for (const e of p.edits) out(`${e.id}: ${e.reason} (cases: ${e.cases.join(', ')})`);
     out(`\nSaved ${path}\nNext: remy improve check ${p.id} --max-usd <dollars>`);
     return 0;
+  }
+
+  if (sub === 'check') {
+    if (!arg) throw new Error(`Say which proposal to check.\n\n${USAGE}`);
+    const { proposal, path } = loadProposal(d.home, arg);
+    const maxUsd = cap(f['max-usd'], 0.5);
+    const suites = f.suite
+      ?.split(',')
+      .map((x) => x.trim())
+      .filter(Boolean) as Suite[] | undefined;
+    const bad = suites?.find((s) => !SUITES.includes(s));
+    if (bad) throw new Error(`Unknown suite "${bad}". Suites: ${SUITES.join(', ')}`);
+    const model = f.model ?? proposal.baseline.model;
+    const profile = f.profile ?? proposal.baseline.profile;
+    const verdict = await checkProposal({
+      proposal,
+      baselineRuns: readJournal(proposal.baseline.journal),
+      baselineModel: proposal.baseline.model,
+      live: liveModel(d, model, profile),
+      maxUsd,
+      ...(suites?.length && { suites }),
+      onEstimate: (u) => out(`Estimated cost of the live runs: ${usd(u)} (cap ${usd(maxUsd)}).`),
+      onRun: (r) => out(`${r.pass ? 'pass' : 'FAIL'}  ${r.caseId}`),
+    });
+    saveProposal(d.home, { ...proposal, verdict });
+    out(
+      `\n${verdict.passed ? 'Kept' : 'Not kept'}: target cases ${verdict.targets.before} -> ${verdict.targets.after} passing of ${verdict.targets.runs}. Spent ${usd(verdict.spentUsd)}.`,
+    );
+    for (const r of verdict.reasons) out(`- ${r}`);
+    out(
+      verdict.passed
+        ? `Verdict saved in ${path}. Apply it with: remy improve apply ${proposal.id}`
+        : `Verdict saved in ${path}.`,
+    );
+    return verdict.passed ? 0 : 1;
   }
 
   throw new Error(USAGE);
