@@ -43,6 +43,7 @@ describe('launchd installer', () => {
     expect(installerFor('darwin', fake().ctx)?.kind).toBe('launchd');
     expect(installerFor('freebsd', fake().ctx)).toBeUndefined();
     expect(installerFor('linux', fake().ctx)?.kind).toBe('systemd');
+    expect(installerFor('win32', fake().ctx)?.kind).toBe('schtasks');
   });
 
   it('writes the LaunchAgent and loads it', () => {
@@ -231,5 +232,62 @@ describe('scheduled task string', () => {
     expect(() => taskCommand({ execPath: 'n', execArgv: [], script: 'x'.repeat(300) })).toThrow(
       '261',
     );
+  });
+});
+
+describe('schtasks installer', () => {
+  const win = () => {
+    const f = fake();
+    f.ctx.entry = {
+      execPath: 'C:\\Program Files\\nodejs\\node.exe',
+      execArgv: [],
+      script: 'C:\\r\\remy.js',
+    };
+    return f;
+  };
+
+  it('creates the logon task and starts it', () => {
+    const f = win();
+    expect(installerFor('win32', f.ctx)?.install()).toBe(
+      'The daemon is on and starts when you log in.',
+    );
+    expect(f.commands).toEqual([
+      [
+        'schtasks',
+        '/Create',
+        '/SC',
+        'ONLOGON',
+        '/TN',
+        'RemyDaemon',
+        '/TR',
+        '"C:\\Program Files\\nodejs\\node.exe" C:\\r\\remy.js daemon run',
+        '/RL',
+        'LIMITED',
+        '/F',
+      ],
+      ['schtasks', '/Run', '/TN', 'RemyDaemon'],
+    ]);
+    expect(f.written).toEqual({});
+  });
+
+  it('says so when the task cannot be created', () => {
+    const f = fake({ fail: () => ({ status: 1 }) });
+    expect(() => installerFor('win32', f.ctx)?.install()).toThrow('not as administrator');
+  });
+
+  it('ends and deletes the task', () => {
+    const f = win();
+    installerFor('win32', f.ctx)?.uninstall();
+    expect(f.commands).toEqual([
+      ['schtasks', '/End', '/TN', 'RemyDaemon'],
+      ['schtasks', '/Delete', '/TN', 'RemyDaemon', '/F'],
+    ]);
+  });
+
+  it('reads status from a query', () => {
+    const on = win();
+    expect(installerFor('win32', on.ctx)?.status().on).toBe(true);
+    expect(on.commands[0]).toEqual(['schtasks', '/Query', '/TN', 'RemyDaemon']);
+    expect(installerFor('win32', fake({ fail: () => ({ status: 1 }) }).ctx)?.isOn()).toBe(false);
   });
 });

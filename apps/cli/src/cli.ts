@@ -1972,7 +1972,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         if (sub === 'install' || sub === 'uninstall' || sub === 'status') {
           if (!installer)
             throw new Error(
-              'remy daemon install is for macOS. Run remy daemon in your own service.',
+              'remy daemon install has no service for this system. Run remy daemon run in your own service.',
             );
           out(
             sub === 'install'

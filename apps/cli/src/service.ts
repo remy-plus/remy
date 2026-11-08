@@ -230,9 +230,41 @@ export function systemdInstaller(ctx: ServiceContext): ServiceInstaller {
   };
 }
 
+/** Windows: a Scheduled Task at logon, in your own session and never elevated. */
+export function schtasksInstaller(ctx: ServiceContext): ServiceInstaller {
+  const isOn = () => ctx.run('schtasks', ['/Query', '/TN', TASK_NAME]).status === 0;
+  return {
+    kind: 'schtasks',
+    label: 'Windows Scheduled Task',
+    enableStep: 'Run remy daemon install.',
+    unavailable: () => undefined,
+    install() {
+      if (ctx.run('schtasks', schtasksCreateArgs(ctx.entry)).status !== 0)
+        throw new Error(
+          'Windows did not create the task. Run remy daemon install from your own account, not as administrator.',
+        );
+      ctx.run('schtasks', ['/Run', '/TN', TASK_NAME]);
+      return 'The daemon is on and starts when you log in.';
+    },
+    uninstall() {
+      ctx.run('schtasks', ['/End', '/TN', TASK_NAME]);
+      ctx.run('schtasks', ['/Delete', '/TN', TASK_NAME, '/F']);
+      return 'The daemon is off.';
+    },
+    status: () => ({
+      on: isOn(),
+      message: isOn()
+        ? 'The daemon is on.'
+        : 'The daemon is off. Turn it on with remy daemon install.',
+    }),
+    isOn,
+  };
+}
+
 /** The installer for this platform, or undefined where there is none. */
 export function installerFor(platform: string, ctx: ServiceContext): ServiceInstaller | undefined {
   if (platform === 'darwin') return launchdInstaller(ctx);
   if (platform === 'linux') return systemdInstaller(ctx);
+  if (platform === 'win32') return schtasksInstaller(ctx);
   return undefined;
 }
