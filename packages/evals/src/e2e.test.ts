@@ -28,7 +28,7 @@ describe('the starting cases', () => {
   it('follow the PLAN.md distribution', () => {
     const count = (s: string) => CASES.filter((c) => c.suite === s).length;
     expect(SUITES.filter((s) => s !== 'hard' && s !== 'choice' && s !== 'live').map(count)).toEqual(
-      [13, 8, 8, 8, 8, 17, 28, 7, 10, 10, 4, 37],
+      [13, 8, 8, 8, 8, 17, 30, 7, 10, 10, 4, 37],
     );
     expect(count('hard')).toBeGreaterThanOrEqual(41);
   });
