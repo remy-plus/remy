@@ -166,6 +166,10 @@ import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
+import { BODY_MAX_BYTES, webhookConfig, webhookPrompt } from './webhook-payload.ts';
+import { processStarter, startWebhooks } from './webhook-service.ts';
+import { openHooks } from './webhook-store.ts';
+import { newToken, rotateToken, sha256Hex, sharedToken } from './webhook-token.ts';
 
 export interface CliDeps {
   env: Record<string, string | undefined>;
@@ -272,6 +276,9 @@ Usage
                                   show opens it so you can sign in to sites, reset signs
                                   out of everything, install gets Chromium for machines
                                   without Chrome or Edge
+  remy webhook [list|add <name> "<prompt>"|rm <name>|token [<name>] [--rotate]|enable|disable|start|test <name> [--data <file>]]
+                                  Start a saved task from an outside call. Off until enable;
+                                  listens on 127.0.0.1 only; the payload is data, not orders
   remy doctor                     See what is set up and the next step for each
   remy review [--since 24h|7d|<date>]
                                   What ran without you (schedules, watches, background), what it
@@ -351,6 +358,11 @@ const OPTIONS = {
   long: { type: 'boolean' },
   for: { type: 'string' },
   background: { type: 'boolean' },
+  bind: { type: 'string' },
+  port: { type: 'string' },
+  data: { type: 'string' },
+  rotate: { type: 'boolean' },
+  shared: { type: 'boolean' },
   since: { type: 'string' },
   'net-allow': { type: 'string' },
   list: { type: 'boolean' },
@@ -462,6 +474,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'browser',
       'schedule',
       'daemon',
+      'webhook',
       'doctor',
       'review',
       'improve',
@@ -1968,6 +1981,138 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           return 0;
         }
         throw new Error('Use remy schedule list, add, run, rm, pause or resume.');
+      }
+
+      case 'webhook': {
+        const hooks = openHooks(home);
+        const sub = rest[0] ?? 'list';
+        const known = (name: string | undefined) => {
+          const hook = name ? hooks.get(name) : undefined;
+          if (!hook)
+            throw new Error(
+              `There is no hook ${name ?? ''}. See remy webhook list.`.replace('  ', ' '),
+            );
+          return hook;
+        };
+        /** Saves a task for the hook. The payload is data: the run starts tainted, read-only, at ask. */
+        const hookTask = async (name: string | undefined, payload: string) => {
+          const hook = known(name);
+          const file = cfg();
+          const id = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+          const { runtime } = makeRuntime(file, { model: true, taskId: id });
+          const model = deps.model ?? modelFor(file);
+          const { prompt, data } = webhookPrompt(hook, payload.slice(0, BODY_MAX_BYTES));
+          const config = webhookConfig(
+            taskConfig(file, model.id, join(home, 'workspaces', id)),
+            data,
+          );
+          mkdirSync(config.workspaceDir, { recursive: true });
+          await mcp?.ready;
+          await runtime.start(prompt, config);
+          return { id, runtime, config };
+        };
+        if (sub === 'list') {
+          const all = hooks.list();
+          out(
+            all.length
+              ? all
+                  .map(
+                    (h) =>
+                      `${h.name}  ${h.tokenHash ? 'own token' : 'shared token'}  ${truncate(h.prompt, 60)}`,
+                  )
+                  .join('\n')
+              : 'No webhooks yet. Add one with remy webhook add <name> "<prompt>".',
+          );
+          out(
+            st.dim(
+              hooks.enabled()
+                ? 'Listening is on while remy daemon runs.'
+                : 'Listening is off. Turn it on with remy webhook enable.',
+            ),
+          );
+          return 0;
+        }
+        if (sub === 'add') {
+          need(3, 'remy webhook add <name> "<prompt>"');
+          const h = hooks.add(rest[1] as string, rest.slice(2).join(' '), new Date());
+          out(
+            `Saved ${h.name}. Call it with POST /hook/${h.name} and your token (remy webhook token).`,
+          );
+          if (!hooks.enabled())
+            out(st.dim('Nothing listens yet. Turn it on with remy webhook enable.'));
+          return 0;
+        }
+        if (sub === 'rm' || sub === 'remove') {
+          need(2, 'remy webhook rm <name>');
+          if (!hooks.remove(rest[1] as string)) throw new Error(`There is no hook ${rest[1]}.`);
+          out(`Removed ${rest[1]}.`);
+          return 0;
+        }
+        if (sub === 'enable' || sub === 'disable') {
+          hooks.setEnabled(sub === 'enable');
+          out(
+            sub === 'enable'
+              ? 'Webhooks are on. They listen on 127.0.0.1 while remy daemon runs, or run remy webhook start. Restart the daemon to pick this up.'
+              : 'Webhooks are off. Restart the daemon to stop listening.',
+          );
+          return 0;
+        }
+        if (sub === 'token') {
+          const name = rest[1];
+          if (name) {
+            known(name);
+            if (flags.shared) {
+              hooks.setTokenHash(name, undefined);
+              out(`${name} uses the shared token again.`);
+              return 0;
+            }
+            const token = newToken();
+            hooks.setTokenHash(name, sha256Hex(token));
+            out(token);
+            out(st.dim(`This token opens only ${name}. It is shown once and is not saved.`));
+            return 0;
+          }
+          out(flags.rotate ? rotateToken(home) : sharedToken(home));
+          if (flags.rotate) out(st.dim('The old shared token no longer works.'));
+          return 0;
+        }
+        if (sub === 'run') {
+          // Started by the listener, with the payload on stdin. Never typed by hand.
+          const { id } = await hookTask(rest[1], (await deps.readStdin?.()) ?? '');
+          startBackground(id);
+          return 0;
+        }
+        if (sub === 'test') {
+          need(2, 'remy webhook test <name> [--data <file>]');
+          const payload = flags.data ? readFileSync(resolve(cwd, flags.data), 'utf8') : '';
+          const { id, runtime, config } = await hookTask(rest[1], payload);
+          out(st.dim(`Task ${id}, run here without a socket. Workspace ${config.workspaceDir}`));
+          return await drive(runtime, id);
+        }
+        if (sub === 'start') {
+          if (!hooks.enabled() || !hooks.list().length)
+            throw new Error(
+              'Turn webhooks on and add a hook first: remy webhook add, then remy webhook enable.',
+            );
+          const entry = deps.entry ?? currentEntry();
+          const listening = await startWebhooks({
+            home,
+            env,
+            ...(flags.bind && { bind: flags.bind }),
+            ...(flags.port && { port: flags.port }),
+            start: processStarter({ entry, env, cwd: home }),
+            isActive: async (id) =>
+              ['running', 'waiting_approval', 'waiting_user', 'paused'].includes(
+                fold(await store.read(id)).status,
+              ),
+            log: (line) => out(line),
+          });
+          out(
+            `Webhooks listen on http://${listening.host}:${listening.port}/hook/<name>. Press Ctrl+C to stop.`,
+          );
+          await new Promise(() => {});
+        }
+        throw new Error('Use remy webhook list, add, rm, token, enable, disable, start or test.');
       }
 
       case 'daemon': {
