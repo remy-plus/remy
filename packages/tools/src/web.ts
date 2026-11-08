@@ -7,7 +7,12 @@ export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  /** Which route answered, when more than one could. */
+  via?: string;
 }
+
+/** A search route that will not work again until something changes: a bad key, no Docker, a bot check. */
+export class SearchUnavailable extends Error {}
 
 export interface SearchProvider {
   search(query: string, count: number): Promise<SearchResult[]>;
@@ -96,16 +101,23 @@ export function createWebSearch(provider: SearchProvider, opts: { timeoutMs?: nu
       try {
         const results = (await provider.search(query, count ?? 5)).slice(0, count ?? 5);
         if (results.length === 0) return untrusted(noResults(query));
+        const via = results.find((r) => r.via)?.via;
         return untrusted(
-          results
-            .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`.trimEnd())
-            .join('\n\n'),
+          [
+            ...(via ? [`Searched with ${via}.\n`] : []),
+            results
+              .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`.trimEnd())
+              .join('\n\n'),
+          ].join('\n'),
         );
       } catch (e) {
         return {
           ok: false,
-          error: `Search failed: ${e instanceof Error ? e.message : String(e)}`,
-          retryable: true,
+          error:
+            e instanceof SearchUnavailable
+              ? e.message
+              : `Search failed: ${e instanceof Error ? e.message : String(e)}`,
+          retryable: !(e instanceof SearchUnavailable),
           phase: 'before_effect',
         };
       }

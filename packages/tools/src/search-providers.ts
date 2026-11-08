@@ -1,6 +1,9 @@
-import type { SearchProvider, SearchResult } from './web.ts';
+import { type SearchProvider, type SearchResult, SearchUnavailable } from './web.ts';
 
 async function json(res: Response, name: string): Promise<Record<string, unknown>> {
+  if (res.status === 401 || res.status === 403)
+    throw new SearchUnavailable(`${name} refused the key (HTTP ${res.status}).`);
+  if (res.status === 402) throw new SearchUnavailable(`${name} is out of credit (HTTP 402).`);
   if (!res.ok) throw new Error(`${name} returned HTTP ${res.status}`);
   return (await res.json()) as Record<string, unknown>;
 }

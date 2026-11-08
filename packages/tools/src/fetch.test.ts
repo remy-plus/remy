@@ -12,6 +12,7 @@ import {
   htmlToText,
   isPrivateAddress,
   NetError,
+  SearchUnavailable,
 } from './index.ts';
 
 let server: Server;
@@ -229,6 +230,29 @@ describe('web_search', () => {
       ok: false,
       retryable: true,
       phase: 'before_effect',
+    });
+  });
+});
+
+describe('web_search routes', () => {
+  it('says which route answered', async () => {
+    const tool = createWebSearch({
+      search: async () => [{ title: 'T', url: 'https://a.test', snippet: 's', via: 'tinyfish' }],
+    });
+    const r = await tool.execute({ query: 'cats' }, ctx());
+    expect(r.ok && r.content).toContain('Searched with tinyfish.');
+  });
+
+  it('returns an unavailable route as a plain error that is not retried', async () => {
+    const tool = createWebSearch({
+      search: async () => {
+        throw new SearchUnavailable('Search is off here. Set TINYFISH_API_KEY.');
+      },
+    });
+    expect(await tool.execute({ query: 'x' }, ctx())).toMatchObject({
+      ok: false,
+      error: 'Search is off here. Set TINYFISH_API_KEY.',
+      retryable: false,
     });
   });
 });
