@@ -1,0 +1,28 @@
+/* Remy design tokens. Dark is the default theme (owner, 2026-11-08). Source: the remy-brand guide on the
+   Doop canvas https://doop.design/c/ZuevZVY-Yl and branding/stage5-directions.md. */
+:root {
+  --bg: #0f0f10;
+  --surface: #17171a;
+  --raise: #1d1d21;
+  --text: #edebe6;
+  --muted: #8c8a85; /* secondary text: 5.5:1 on --bg */
+  --stone: #8c8a85; /* control borders and the trace line */
+  --line: #26262a;
+  --signal: #a8c49a; /* accent only: the one primary action per view, finished steps, live dots */
+  --signal-ink: #1e2a18;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+/* Light is parked on purpose; these are the values if it returns. Stone is never text on paper. */
+[data-theme='light'] {
+  --bg: #edebe6;
+  --surface: #f5f3ef;
+  --raise: #ffffff;
+  --text: #0f0f10;
+  --muted: #67655f;
+  --line: #d6d3cc;
+  --done: #5e7f4f;
+}
