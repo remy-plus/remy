@@ -61,6 +61,11 @@ const LABELS: Record<string, { label: string; model?: string; keyUrl?: string }>
     model: 'mercury-3',
     keyUrl: 'platform.inceptionlabs.ai',
   },
+  zerog: {
+    label: '0G Private Computer',
+    model: 'claude-haiku-5.5',
+    keyUrl: 'pc.0g.ai/dashboard/api-keys',
+  },
   zro: {
     label: 'Zro by MoonMath',
     model: 'deepseek-v4.1-flash',
@@ -95,6 +100,7 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   deepinfra: ['google/gemma-3-12b-it'],
   alibaba: ['qwen3.7-flash'],
   inception: ['mercury-3', 'mercury-2.5', 'mercury-2'],
+  zerog: ['claude-haiku-5.5', 'gpt-5-nano', 'glm-5.3-flash', 'claude-sonnet-5.5'],
   zro: ['deepseek-v4.1-flash', 'glm-5.3-flash'],
   ollama: ['llama3.1', 'llama3.2', 'qwen2.5'],
 };
