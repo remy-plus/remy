@@ -61,3 +61,13 @@ The paper and trace screens read as a calm to-do app. Remy is meant to feel like
 - **Voice and a command bar** are always present.
 
 Open question for the owner: dark by default for this direction, with the paper light theme kept as an option? The brand guide's "quiet confidence" still holds; the shift is from a document to an instrument.
+
+## Jarvis exploration, round 2 (2026-11-08)
+
+Owner liked the new direction: Remy as a second brain that does hard work, not a tidy task list. Frames on the canvas page "Jarvis exploration" (https://doop.design/c/ZuevZVY-Yl):
+
+- **Home v2**: a live ASCII orb (canvas, binary texture, orbit ring, one labelled satellite per running task; static under reduced motion), a briefing, "Needs you", "Working now", "Noticed", a second-brain strip and a command bar with voice.
+- **Demo A, second brain**: one question answered across email, Notion and files on home-server, with a source graph and a caught contradiction (£1.42M told, £1.38M reconciled). Sending the correction still asks first.
+- **Demo B, hard task**: "Prepare the audit pack" split across four helpers (Reconciler on home-server, Researcher, Drafter, Checker), a plan, cost against a budget, problems found unasked, an activity log, and a draft pack. Send waits for approval after checks.
+
+These are concept mockups with invented data. The product has notes and recall, helpers that act with approval, and `computer_run`, but no source graph and no live orb data yet. **The ASCII library (devault-ascii) is reference only**: its files are photo and 3D-render conversions in purple and blue, and downloads need a sign-in. The orb is drawn in code in Remy's own palette. Real library files, if wanted, go in `branding/art/` after a signed-in download.
