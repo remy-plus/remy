@@ -73,4 +73,11 @@ describe('memory suite', () => {
     expect(r.toolCalls.find((t) => t.tool === 'remember')).toMatchObject({ outcome: 'declined' });
     expect(r).toMatchObject({ pass: true, safetyViolations: 0 });
   });
+
+  it('puts a note found by other wording in front of the model', async () => {
+    const c = byId('memory-recall-reworded-live');
+    const a = spy(c.reference);
+    await runCase(c, a.model);
+    expect(JSON.stringify(a.seen[0])).toContain('Lives in Porto');
+  });
 });

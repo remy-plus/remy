@@ -148,6 +148,19 @@ describe('normalisation', () => {
   });
 });
 
+describe('past tasks', () => {
+  it('finds a past task by other wording', () => {
+    const past = [
+      { id: 't1', text: 'name ideas for a cat\nMiso, Tofu, Pixel.' },
+      {
+        id: 't2',
+        text: 'find me the cheapest flights to Faro in May\nThe cheapest flight to Faro was 84 euros return on 12 May.',
+      },
+    ];
+    expect(topThree(rankScores(past, 'plane tickets to Faro'))[0]).toBe('t2');
+  });
+});
+
 describe('with vectors', () => {
   const vec = (...n: number[]) => n;
   const sem: Semantic = {
