@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Budget } from '@remy/core';
 import { type McpServerConfig, mcpServersSchema } from '@remy/mcp';
+import type { SshConfig } from '@remy/tools';
 
 export interface FileConfig {
   profile?: string;
@@ -14,6 +15,8 @@ export interface FileConfig {
   search?: string;
   /** Same shape as Claude Desktop's `mcpServers`. Wins over servers saved by `remy connect`. */
   mcpServers?: Record<string, McpServerConfig>;
+  /** Machines Remy may run commands on over ssh: [{ name, host, user, port?, keyPath? }]. */
+  computers?: SshConfig[];
 }
 
 const strings = (v: unknown, name: string): string[] | undefined => {
@@ -65,6 +68,21 @@ export function loadConfig(cwd: string, home: string): FileConfig {
       );
     }
     out.mcpServers = servers.data;
+  }
+  if (raw.computers !== undefined) {
+    const list = raw.computers;
+    const bad = (m: string) => new Error(`${path}: "computers" ${m}`);
+    if (!Array.isArray(list)) throw bad('must be a list');
+    out.computers = list.map((c, i) => {
+      const o = (c ?? {}) as Record<string, unknown>;
+      for (const k of ['name', 'host', 'user'])
+        if (typeof o[k] !== 'string') throw bad(`entry ${i + 1} needs "${k}" as text`);
+      if (o.port !== undefined && typeof o.port !== 'number')
+        throw bad(`entry ${i + 1}: "port" must be a number`);
+      if (o.keyPath !== undefined && typeof o.keyPath !== 'string')
+        throw bad(`entry ${i + 1}: "keyPath" must be text`);
+      return o as unknown as SshConfig;
+    });
   }
   return out;
 }

@@ -202,3 +202,18 @@ describe('commandLine', () => {
     expect(commandLine({ url: 'https://a.example/mcp' })).toBe('https://a.example/mcp');
   });
 });
+
+describe('computers in remy.config.json', () => {
+  it('reads machines and rejects a malformed entry with the reason', () => {
+    const home = mkdtempSync(join(tmpdir(), 'remy-comp-'));
+    writeFileSync(
+      join(home, 'remy.config.json'),
+      JSON.stringify({ computers: [{ name: 'home', host: '10.0.0.5', user: 'remy', port: 22 }] }),
+    );
+    expect(loadConfig(join(home, '..'), home).computers).toEqual([
+      { name: 'home', host: '10.0.0.5', user: 'remy', port: 22 },
+    ]);
+    writeFileSync(join(home, 'remy.config.json'), JSON.stringify({ computers: [{ name: 'x' }] }));
+    expect(() => loadConfig(join(home, '..'), home)).toThrow(/entry 1 needs "host"/);
+  });
+});

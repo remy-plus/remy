@@ -48,6 +48,7 @@ import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
   calculate,
+  createComputerTools,
   createDelegate,
   createHowtoTool,
   createMemoryTools,
@@ -72,6 +73,7 @@ import {
   SAVE_SKILL_HINT,
   SKILLS_HINT,
   skillsBlock,
+  sshComputer,
   updatePlan,
   writeFile,
 } from '@remy/tools';
@@ -943,6 +945,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       connected: (name) => Boolean(mcp?.list().some((c) => c.name === name)),
     }))
       tools.add(t);
+    // Machines the user set up in remy.config.json. A bad entry stops here with the reason.
+    if (file.computers?.length)
+      for (const t of createComputerTools(file.computers.map((c) => sshComputer(c)))) tools.add(t);
     const helpersOn = env.REMY_HELPERS === 'on' || env.REMY_HELPERS === 'act';
     const helpersAct = env.REMY_HELPERS === 'act';
     const helperRoles = loadHelperRoles(home, process.cwd()).roles;
