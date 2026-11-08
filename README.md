@@ -90,7 +90,16 @@ When you correct Remy ("no, use the other folder", "next time check the date fir
 
 ### Schedules
 
-Ask for something to happen regularly, or run `remy schedule add "every day at 9" "Summarize the news"`. `remy daemon install` keeps schedules running on macOS. Each run asks before it acts, so nothing changes while you are away without your approval. `remy doctor` shows what is set up.
+Ask for something to happen regularly, or run `remy schedule add "every day at 9" "Summarize the news"`. `remy daemon install` keeps schedules running: a LaunchAgent on macOS, a systemd user unit on Linux, a Scheduled Task on Windows. Each run asks before it acts, so nothing changes while you are away without your approval. `remy doctor` shows what is set up.
+
+#### The daemon on Linux and Windows
+
+These two were generated and unit-tested, but not yet installed on a real Linux or Windows machine. Treat them as untried until you have run them once.
+
+- **Linux.** `remy daemon install` writes `~/.config/systemd/user/remy.service` (`Restart=on-failure`, the full path to the node that ran it, `WantedBy=default.target`), then runs `systemctl --user daemon-reload` and `systemctl --user enable --now remy.service`. `uninstall` disables and removes it, and `status` reads `systemctl --user is-active`. Where systemd user services are not available (no `systemctl`, a container, WSL without systemd), Remy says so in one line and prints the plain command to run in your own service: `remy daemon run`. A user service stops when you log out. To keep it running, you can run `loginctl enable-linger` yourself; Remy never runs it.
+- **Windows.** `remy daemon install` creates a Scheduled Task named `RemyDaemon` that runs at logon in your own session, with limited rights and never as administrator: `schtasks /Create /SC ONLOGON /TN RemyDaemon /TR "<node> <script> daemon run" /RL LIMITED /F`. `uninstall` runs `schtasks /Delete` and `status` runs `schtasks /Query`. Windows allows 261 characters for the task command, so a very long install path is refused with a message.
+
+`remy doctor` shows which of the three applies and the one step to turn it on.
 
 ### Search
 
