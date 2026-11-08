@@ -142,7 +142,7 @@ pnpm eval:replay   # deterministic eval run (the CI gate)
 pnpm eval --profile openrouter --model <id> --k 3   # live eval
 ```
 
-The architecture, the reasoning behind it and the roadmap are in [PLAN.md](PLAN.md). [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send a change, and [docs/evals.md](docs/evals.md) has the numbers. Packages:
+The architecture, the reasoning behind it and the roadmap are in [PLAN.md](PLAN.md). [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send a change, and [docs/evals.md](docs/evals.md) has the numbers, and [docs/webhooks.md](docs/webhooks.md) covers starting a task from another program. Packages:
 
 | Package            | What it does                                                                     |
 | ------------------ | -------------------------------------------------------------------------------- |
