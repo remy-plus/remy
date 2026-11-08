@@ -10,6 +10,9 @@ export function appleScriptString(text: string): string {
   return `"${clean.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
+/** Where the user sees everything that ran without them. */
+const REVIEW = 'remy review';
+
 export interface Note {
   title: string;
   body: string;
@@ -25,13 +28,19 @@ export function notificationFor(p: {
   const next = nextCommand(p.status, p.id);
   switch (p.status) {
     case 'succeeded':
-      return { title: 'Remy finished a task', body: `${title} is done. See it: ${next}` };
+      return {
+        title: 'Remy finished a task',
+        body: `${title} is done. See it: ${next}. All of it: ${REVIEW}`,
+      };
     case 'failed':
-      return { title: 'Remy could not finish', body: `${title} did not finish. Details: ${next}` };
+      return {
+        title: 'Remy could not finish',
+        body: `${title} did not finish. Details: ${next}. All of it: ${REVIEW}`,
+      };
     case 'waiting_approval':
       return {
         title: 'Remy needs your OK',
-        body: `${title} is waiting for approval. Run: ${next}`,
+        body: `${title} is waiting for approval. Run: ${next}. All of it: ${REVIEW}`,
       };
     case 'waiting_user':
       return { title: 'Remy has a question', body: `${title} is waiting for you. Run: ${next}` };
@@ -46,7 +55,7 @@ export function notificationFor(p: {
 export function cardNotification(p: { id: string; prompt: string }): Note {
   return {
     title: 'Remy needs your OK',
-    body: `"${notifyTitle(p.prompt)}" has an action waiting. It carries on meanwhile. Run: ${nextCommand('waiting_approval', p.id)}`,
+    body: `"${notifyTitle(p.prompt)}" has an action waiting. It carries on meanwhile. Run: ${nextCommand('waiting_approval', p.id)}. All of it: ${REVIEW}`,
   };
 }
 

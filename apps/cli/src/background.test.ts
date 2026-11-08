@@ -167,6 +167,7 @@ describe('notifications', () => {
     });
     expect(n?.body.length).toBeLessThan(120);
     expect(n?.body).toContain('remy show task_1');
+    expect(n?.body).toContain('remy review');
     expect(notificationFor({ status: 'paused', id: 't', prompt: 'p' })?.body).toContain(
       'remy continue t',
     );
@@ -182,6 +183,15 @@ describe('notifications', () => {
     expect(n.title).toBe('Remy needs your OK');
     expect(n.body).toContain('carries on');
     expect(n.body).toContain('remy attach t');
+    expect(n.body).toContain('remy review');
+  });
+
+  it('points to remy review on failure and on a waiting approval, not on a pause', () => {
+    for (const status of ['failed', 'waiting_approval'] as const)
+      expect(notificationFor({ status, id: 't', prompt: 'p' })?.body).toContain('remy review');
+    expect(notificationFor({ status: 'paused', id: 't', prompt: 'p' })?.body).not.toContain(
+      'remy review',
+    );
   });
 
   it('runs osascript text on macOS and nowhere else', () => {
