@@ -713,6 +713,8 @@ Started while Stage 2 waits on live marks. Same pattern: one Sonnet package at a
 
 **Stage 3 package 1 (2026-11-07).** Notes live in the `notes` table of `REMY_HOME/remy.sqlite` with no cap; the first open imports `memory.json` and renames it to `memory.json.imported`. Same-fact notes merge; a note that contradicts one of the same kind is saved and both are flagged, never replaced. Review on a copy of a real Remy folder caught that notes imported together were not checked against each other, now fixed. The model still sees a bounded set: about 250 tokens a message, 600 for `recall`.
 
+**Stage 3 package 2.** Recall ranks locally with BM25, stemming and a small explicit synonym list, so it needs no key. `REMY_EMBEDDINGS=on` adds embeddings through the provider the user already uses, stored per note and recomputed on edit, with a quiet fall back to local ranking. 20 of 20 on a fixed set of 40 notes and 20 queries (16 before), a flattering score because the queries and the synonyms were written together.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
