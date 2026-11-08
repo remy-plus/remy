@@ -719,6 +719,8 @@ Started while Stage 2 waits on live marks. Same pattern: one Sonnet package at a
 
 **Stage 3 package 4.** `remy improve propose|check|apply`: Remy reads failed runs from a journal and proposes at most 3 small edits, only to texts marked editable (18: nine system-rule lines, six tool descriptions, three skill descriptions). Safety text, approval and policy are locked by default, a fingerprint test fails if any locked text changes, and every edit is re-validated at check and apply. An edit is kept only if the replay gate holds, the target cases pass more often, no other case passes less, `eval compare` finds no regression and the run was not cut short. `apply` needs a passing verdict and a typed yes, and never commits. Scripted-model tests only; the first live proposal is still to run. 320 replay cases, 2,361 tests.
 
+**Stage 3 package 5.** Cost holds: in a 12-turn chat the prompt prefix repeats 99.98% with 0, 50, 500 and 5,000 notes, and the notes block never passes 221 tokens (table in `docs/memory.md`). Notes were already chosen once per user message, so no fix was needed; tests and two replay cases now pin it. Stage 3 gate: the recall suite has 30 cases at 100% in replay. What is missing is the live proof that a repeated task improves.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
