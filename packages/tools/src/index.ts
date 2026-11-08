@@ -3,6 +3,7 @@ export * from './calc-tools.ts';
 export * from './delegate.ts';
 export * from './edit-tools.ts';
 export * from './file-tools.ts';
+export * from './howto.ts';
 export * from './html.ts';
 export * from './memory-match.ts';
 export * from './memory-tools.ts';

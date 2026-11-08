@@ -24,6 +24,8 @@ export interface Skill {
   connections?: string[];
   /** How many times use_skill read it; skills used often rank a little higher. */
   uses?: number;
+  /** Saved from a correction (`learned: true` in the front matter). Only yours can be. */
+  learned?: boolean;
 }
 
 /** A skill Remy wrote from a run, as `save_skill` hands it to the store. */
@@ -31,6 +33,8 @@ export interface SkillDraft {
   name: string;
   description: string;
   body: string;
+  /** A how-to saved from a correction. */
+  learned?: boolean;
 }
 
 /** What the tools need from the skill store. Every call reads afresh, so new skills show up at once. */
@@ -42,6 +46,8 @@ export interface SkillsPort {
   used?(name: string): void;
   /** Whether a connection is set up. Absent where connections are not known. */
   connected?(name: string): boolean;
+  /** Replaces known secrets in text; `save_howto` refuses a how-to it would change. */
+  redact?(text: string): string;
 }
 
 /**
@@ -155,9 +161,17 @@ export function parseSkill(text: string, folderName?: string): SkillParse {
     .filter(Boolean);
   const body = (m[2] ?? '').trim();
   if (!body) return { ok: false, error: `${name} has no steps after the front matter.` };
+  const learned = str('learned').trim().toLowerCase() === 'true';
   return {
     ok: true,
-    skill: { name, description, tools, body, ...(connections.length && { connections }) },
+    skill: {
+      name,
+      description,
+      tools,
+      body,
+      ...(connections.length && { connections }),
+      ...(learned && { learned }),
+    },
   };
 }
 
@@ -197,7 +211,8 @@ export function skillsBlock(
 ): string {
   const picked = matchSkills(skills, query);
   if (!picked.length) return '';
-  const best = opts.steps ? picked.find(canSendSteps) : undefined;
+  // A how-to learned from a correction is short and the user approved its text: its steps go with the message.
+  const best = picked.find((s) => canSendSteps(s) && (opts.steps || s.learned));
   if (best) opts.onSteps?.(best);
   const others = picked.filter((s) => s !== best);
   return [
@@ -339,7 +354,7 @@ export function createSkillTools(port: SkillsPort): Tool[] {
 
 /** The SKILL.md text for a draft. The description is a quoted YAML string, so no character in it can end the front matter. */
 export function skillText(d: SkillDraft): string {
-  return `---\nname: ${d.name}\ndescription: ${JSON.stringify(oneLine(d.description))}\n---\n\n${d.body.trim()}\n`;
+  return `---\nname: ${d.name}\ndescription: ${JSON.stringify(oneLine(d.description))}\n${d.learned ? 'learned: true\n' : ''}---\n\n${d.body.trim()}\n`;
 }
 
 /** When to offer saving a skill. Fixed text, for the system prompt. */
