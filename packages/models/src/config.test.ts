@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { modelFromEnv, PROFILE_KEY_ENVS, PROFILES } from './config.ts';
 
 describe('modelFromEnv', () => {
+  it("a router profile bills at its own rates, not the model maker's", () => {
+    const zerog = modelFromEnv({
+      REMY_PROFILE: 'zerog',
+      REMY_MODEL: 'glm-5.3-flash',
+      ZEROG_API_KEY: 'k',
+    });
+    expect(zerog.caps.pricing).toEqual({ inPerMTok: 0.09, outPerMTok: 0.315 });
+    const zai = modelFromEnv({
+      REMY_PROFILE: 'zai',
+      REMY_MODEL: 'glm-5.3-flash',
+      ZHIPU_API_KEY: 'k',
+    });
+    expect(zai.caps.pricing.inPerMTok).not.toBe(0.09);
+  });
+
   it('builds from a profile with catalog caps', () => {
     const c = modelFromEnv({ REMY_PROFILE: 'ollama', REMY_MODEL: 'gemma2' });
     expect(c.id).toBe('gemma2');
