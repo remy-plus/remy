@@ -715,6 +715,8 @@ Started while Stage 2 waits on live marks. Same pattern: one Sonnet package at a
 
 **Stage 3 package 2.** Recall ranks locally with BM25, stemming and a small explicit synonym list, so it needs no key. `REMY_EMBEDDINGS=on` adds embeddings through the provider the user already uses, stored per note and recomputed on edit, with a quiet fall back to local ranking. 20 of 20 on a fixed set of 40 notes and 20 queries (16 before), a flattering score because the queries and the synonyms were written together.
 
+**Stage 3 package 3.** After a correction Remy offers once to save a short how-to (`save_howto`: title, when it applies, 1 to 5 steps, no secrets). A learned how-to is matched like a skill and its steps travel with the message when it is the top match, so a repeated task follows it in replay. Not shown on a live model yet.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
