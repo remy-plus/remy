@@ -10,6 +10,8 @@ import type { Proposal, Verdict } from './proposal.ts';
 import { type PromptOverrides, promptRegistry } from './registry.ts';
 import { editsHash, validateEdits } from './validate.ts';
 
+const MAX_LOST_IN_A_ROW = 3;
+
 export const overridesOf = (p: Pick<Proposal, 'edits'>): PromptOverrides =>
   Object.fromEntries(p.edits.map((e) => [e.id, e.to]));
 
@@ -105,10 +107,24 @@ export async function checkProposal(i: CheckInput): Promise<Verdict> {
     caseIds,
     live: true,
     maxUsd: i.maxUsd,
+    maxLostInARow: MAX_LOST_IN_A_ROW,
     prompts,
     ...(i.onRun && { onRun: i.onRun }),
   });
   const spentUsd = next.runs.reduce((n, r) => n + r.costUsd, 0);
+  if (next.stopped)
+    return verdict(false, [`The live runs stopped early: ${next.stopped}. Nothing was decided.`], {
+      spentUsd,
+    });
+  const lost = next.runs.filter((r) => r.failure === 'model_error').length;
+  if (lost)
+    return verdict(
+      false,
+      [`${lost} live run(s) were lost to the provider, so the result is unclear.`],
+      {
+        spentUsd,
+      },
+    );
 
   const baseResult: EvalResult = {
     version: 1,

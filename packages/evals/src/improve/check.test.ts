@@ -1,5 +1,5 @@
 import type { ModelResponse } from '@remy/core';
-import { ScriptedModelClient } from '@remy/models';
+import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
 import { answerContains, status } from '../graders.ts';
 import { runCase } from '../runner.ts';
@@ -115,6 +115,19 @@ describe('checkProposal', () => {
     ).rejects.toThrow(/over the cap of \$0\.5\. Nothing was spent/);
     expect(seen).toEqual([4]);
     expect(live.requests).toHaveLength(0);
+  });
+
+  it('does not decide when the spend cap cuts the live runs short', async () => {
+    const pricey = { ...DEFAULT_CAPS, pricing: { inPerMTok: 1e6, outPerMTok: 1e6 } };
+    const live = new ScriptedModelClient([...good, ...good], { caps: pricey });
+    const i = await input(live, { maxUsd: 0.5 });
+    const v = await checkProposal({
+      ...i,
+      baselineRuns: i.baselineRuns.map((r) => ({ ...r, costUsd: 0.1 })),
+    });
+    expect(v.passed).toBe(false);
+    expect(v.reasons.join(' ')).toMatch(/stopped early.*spend cap of \$0\.5/);
+    expect(v.spentUsd).toBeGreaterThan(0.5);
   });
 
   it('does not run when the edits are stale or were changed', async () => {
