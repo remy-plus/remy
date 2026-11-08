@@ -12,6 +12,19 @@ Older versions kept notes in `memory.json`. The first time a newer Remy opens yo
 
 Only a few notes reach the model, so a long memory costs the same as a short one. Each message carries the notes that best match what you wrote, then your newest preferences, up to about 250 tokens and 12 notes. The `recall` tool searches all of your notes and past tasks when the model needs something older, up to about 600 tokens of notes.
 
+### Cost as memory grows
+
+The notes for a message are picked once, when you send it, and that block is reused word for word for every step of the task and every later request in the chat. It goes in front of your message, after the part of the prompt a provider caches, so a long memory does not break the cache and a new note saved mid-task changes nothing already sent. Measured offline with a 12-turn chat, two model steps a turn (24 requests):
+
+| Notes | Requests repeating the one before | Notes block per message | Situation block | Largest request |
+| ----- | --------------------------------- | ----------------------- | --------------- | --------------- |
+| 0     | 99.95%                            | 0                       | 97 chars        | 5.8 KiB         |
+| 50    | 99.98%                            | up to 214 tokens        | 97 chars        | 14.5 KiB        |
+| 500   | 99.98%                            | up to 221 tokens        | 97 chars        | 16.4 KiB        |
+| 5,000 | 99.98%                            | up to 221 tokens        | 97 chars        | 16.4 KiB        |
+
+The cap is 250 tokens and 12 notes, so 500 notes cost the same as 5,000. The replay memory suite checks the same at 500 and 5,000 notes: at least 99% of each request repeats the one before, and no request grows past a fixed size.
+
 ## How notes are found
 
 Matching runs on your machine, with no key and no network. Remy ranks notes by the words they share with your message (BM25), after folding common endings together, so "living" finds "Lives in Porto". Numbers and dates stay whole, and "mar" counts as March. A short, fixed list of related words helps with the common cases: where you live, work or home, your pet or dog or cat, your job or employer, family words, phone, email and a few more. "Where do I live?" finds "Lives in Porto" and "my pet" finds "Has a dog named Kiwi" for that reason. A word that is neither shared nor on the list matches nothing. This is word matching, not understanding. The `recall` tool ranks past tasks the same way.
