@@ -42,6 +42,10 @@ C for the task view, on top of B for everything else (settings, connections, mem
 
 Design tokens from `branding/`, then browser prototypes of: first run, chat, a task at work, approval card, connections, skills, schedules, memory, settings, light and dark, phone size.
 
+## Decision and canvas (2026-11-08)
+
+Owner agreed with the recommendation: **C for the task view on top of B**. Design work is on the Doop canvas https://doop.design/c/ZuevZVY-Yl (tokens for light and dark, a `remy-brand` style guide, and the first screen, "Task at work, light"). Still to design: dark, first run, chat, approval card on its own, connections, skills, schedules, memory, settings, phone size.
+
 ## ASCII imagery tool
 
 Owner's pick for ASCII pictures: https://devault-ascii.pages.dev/ascii-generator/ . It turns an image or video into ASCII, braille, halftone, dither or brick art, runs in the browser (WebGL2, nothing uploaded), and exports JPEG, transparent WebP or MP4 with no watermark after a free sign-in. It needs a person at a browser, so Remy cannot run it: the owner exports into `branding/art/` and the web app uses the files. It makes pictures, not the logo. The `REMY` wordmark stays figlet Cosmike (see `README.md`). Use the Dither or Braille styles in ink and paper first; they fit the palette best.
