@@ -226,7 +226,10 @@ const FILE_NAME = '(?:\\S+\\.[a-z]{2,4}\\b|(?:the |a |your )?file\\b)';
 const ACTION_CLAIMS = [
   new RegExp(`${I_DID}(?:${ACTED})\\b`, 'i'),
   new RegExp(`${I_DID}(?:wrote|written|created|updated)\\s+(?:to\\s+)?${FILE_NAME}`, 'i'),
-  new RegExp(`\\b(?:has|have) been (?:successfully )?(?:${ACTED})\\b`, 'i'),
+  new RegExp(
+    `(?<!\\b(?:nothing|never|not) )\\b(?:has|have) been (?:successfully )?(?:${ACTED})\\b`,
+    'i',
+  ),
   new RegExp(`^\\s*(?:[-*\u2022]|\\d+[.)])\\s+(?:${ACTED}|wrote|created|updated)\\b`, 'im'),
 ];
 const DONE_CLAIMS = [

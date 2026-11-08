@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { argsHash } from './hash.ts';
 import {
+  isClaimedAction,
   isClaimedWork,
   isEmptyOffer,
   isPromisedWork,
@@ -513,6 +514,12 @@ describe('work claimed with no tool run', () => {
       const honest = 'I sent the issue, but the connection closed. It may or may not exist.';
       expect(next(...lost, said(honest, 2))).toMatchObject({ kind: 'finish', status: 'succeeded' });
       expect(next(...lost, said(emailed, 2))).not.toMatchObject({ status: 'succeeded' });
+    });
+
+    it('does not read "nothing has been sent" as a claim', () => {
+      const text = 'I did not send the email. Nothing has been sent.';
+      expect(isClaimedAction(text)).toBe(false);
+      expect(isClaimedAction('The email has been sent.')).toBe(true);
     });
 
     it('believes a claim once something was written', () => {
