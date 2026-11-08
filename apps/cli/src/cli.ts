@@ -144,6 +144,7 @@ import { createProfileStore, profileContext } from './profile.ts';
 import { reachLines, recommendReach } from './reach.ts';
 import { readReachFacts } from './reach-facts.ts';
 import { withRecall } from './recall.ts';
+import { collectReview, formatReview, parseSince } from './review.ts';
 import { plainSchedules } from './schedule.ts';
 import { openSchedules } from './schedule-store.ts';
 import {
@@ -271,6 +272,9 @@ Usage
                                   out of everything, install gets Chromium for machines
                                   without Chrome or Edge
   remy doctor                     See what is set up and the next step for each
+  remy review [--since 24h|7d|<date>]
+                                  What ran without you (schedules, watches, background), what it
+                                  changed, and what waits for your OK. Reads the log only
   remy --version | help
 
 Options for run
@@ -346,6 +350,7 @@ const OPTIONS = {
   long: { type: 'boolean' },
   for: { type: 'string' },
   background: { type: 'boolean' },
+  since: { type: 'string' },
   'net-allow': { type: 'string' },
   list: { type: 'boolean' },
   'key-stdin': { type: 'boolean' },
@@ -457,6 +462,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'schedule',
       'daemon',
       'doctor',
+      'review',
       'improve',
     ].includes(command)
   )
@@ -1877,6 +1883,24 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         });
         out(`\n${reachLines(recommendReach(reach)).join('\n')}`);
         return checks.some((c) => c.status === 'problem') ? 1 : 0;
+      }
+
+      case 'review': {
+        const now = new Date();
+        const since = parseSince(flags.since ?? '24h', now);
+        if (!since) throw new Error('Use --since 24h, 7d or a date such as 2026-11-01.');
+        out(
+          formatReview(
+            await collectReview({
+              store,
+              home,
+              since,
+              schedules: openSchedules(home).list(),
+            }),
+            since,
+          ),
+        );
+        return 0;
       }
 
       case 'schedule': {

@@ -5,6 +5,7 @@ import { fold, type ModelResponse } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { writeMarker } from './background.ts';
 import { type CliDeps, cli } from './cli.ts';
 
 const usage = { inTokens: 100, outTokens: 20 };
@@ -387,6 +388,24 @@ describe('inspecting tasks', () => {
     expect((await h.run('list', '--status', 'succeeded')).out).toContain(id);
     expect((await h.run('list', '--status', 'failed')).out).toContain('No failed tasks.');
     expect((await h.run('list', '--status', 'bogus')).code).toBe(1);
+  });
+
+  it('review says so when nothing ran without the user', async () => {
+    const { h } = await finished();
+    const r = await h.run('review');
+    expect(r.code).toBe(0);
+    expect(r.out.trim()).toBe('Nothing ran without you in that time.');
+  });
+
+  it('review lists a background task and refuses a bad window', async () => {
+    const { h, id } = await finished();
+    writeMarker(home, id, { pid: 1, startedAt: new Date().toISOString() });
+    const r = await h.run('review', '--since', '7d');
+    expect(r.out).toContain(`${id}  succeeded`);
+    expect(r.out).toContain('background');
+    const bad = await h.run('review', '--since', 'lately');
+    expect(bad.code).toBe(1);
+    expect(bad.err).toContain('--since');
   });
 
   it('list on an empty store points to remy run', async () => {
