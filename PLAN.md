@@ -731,6 +731,8 @@ Built in this order, safest first. Anything that downloads a binary, listens on 
 4. **Remy's own computer** through a container, and **Boat** as an optional cloud computer on the user's own key (needs the owner to pick the route).
 5. **Local voice** and **Lightpanda** wait for the owner: both download software and need a hardware or speed test on the owner's machine.
 
+**Stage 4 packages 1 and 2 (2026-11-08).** `remy doctor` now recommends a reach profile from memory, chip, disk, Docker, browser and search key (this Mac: light, because Docker is not running), and `remy review` and `/review` list what ran without the user in a window, needs-attention first, from the event store with no model call. The daemon installs through a `ServiceInstaller` port: macOS unchanged, a systemd user unit on Linux and a logon scheduled task on Windows (never admin). The Linux and Windows installers are generated and unit-tested only; the owner or a tester must install them on a real machine before the Stage 4 gate can pass. 322 replay cases, 2,437 tests.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
