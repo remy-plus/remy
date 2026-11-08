@@ -128,6 +128,8 @@ export interface RunOptions {
   resume?: RunRecord[];
   /** Stop after this many runs in a row lost to the provider: that is an outage, not a score. */
   maxLostInARow?: number;
+  /** Stop before a new run once runs (resumed ones too) have cost this many dollars. */
+  maxUsd?: number;
 }
 
 function approves(h: Human, tool: string): boolean {
@@ -408,6 +410,8 @@ export async function runEval(
   let modelId = 'none';
   let lost = 0;
   let stopped = false;
+  let why = '';
+  let spentUsd = opts.resume?.reduce((sum, r) => sum + r.costUsd, 0) ?? 0;
   for (const c of picked) {
     if (stopped) break;
     const model = modelFor(c);
@@ -418,12 +422,19 @@ export async function runEval(
         runs.push(kept);
         continue;
       }
+      if (opts.maxUsd !== undefined && spentUsd >= opts.maxUsd) {
+        stopped = true;
+        why = `the spend cap of $${opts.maxUsd} was reached ($${spentUsd.toFixed(4)} spent)`;
+        break;
+      }
       const r = await runCase(c, model, i, opts.live);
       runs.push(r);
       opts.onRun?.(r);
+      spentUsd += r.costUsd;
       lost = r.failure === 'model_error' ? lost + 1 : 0;
       if (opts.maxLostInARow && lost >= opts.maxLostInARow) {
         stopped = true;
+        why = `${lost} runs in a row lost to the provider`;
         break;
       }
     }
@@ -433,7 +444,7 @@ export async function runEval(
     model: modelId,
     date: new Date().toISOString().slice(0, 10),
     k,
-    ...(stopped ? { stopped: `${lost} runs in a row lost to the provider` } : {}),
+    ...(stopped ? { stopped: why } : {}),
     runs,
     metrics: computeMetrics(runs),
   };

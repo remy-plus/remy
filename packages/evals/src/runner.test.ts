@@ -369,6 +369,28 @@ describe('an outage', () => {
   });
 });
 
+describe('a spend cap', () => {
+  it('starts no run once the runs so far, the journal included, cost the cap', async () => {
+    const cases = ['a', 'b'].map((id) => ({ ...base, id }));
+    const spent = { ...(await runEval([cases[0]!], (c) => referenceModel(c.reference))).runs[0]! };
+    spent.costUsd = 2.5;
+    const played: string[] = [];
+    const r = await runEval(cases, (c) => referenceModel(c.reference), {
+      resume: [spent],
+      maxUsd: 2,
+      onRun: (x) => played.push(x.caseId),
+    });
+    expect(played).toEqual([]);
+    expect(r.stopped).toContain('spend cap of $2');
+  });
+
+  it('runs on while under the cap', async () => {
+    const r = await runEval([base], (c) => referenceModel(c.reference), { maxUsd: 2 });
+    expect(r.stopped).toBeUndefined();
+    expect(r.runs).toHaveLength(1);
+  });
+});
+
 describe('journal', () => {
   it('keeps finished runs and drops the ones the provider lost', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'remy-journal-')), 'nested', 'runs.jsonl');

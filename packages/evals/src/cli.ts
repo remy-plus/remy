@@ -30,13 +30,15 @@ import { type ModelFor, SUITES, type Suite } from './types.ts';
 const USAGE = `Usage:
   eval [run] [--model <id|reference>] [--profile <name>] [--suite <a,b|live-hard>] [--case <id,...>]
              [--k <n>] [--record] [--replay <cassette>] [--out <dir>] [--strict] [--no-write]
-             [--journal <file>]
+             [--journal <file>] [--max-usd <dollars>]
   eval compare <base.json> <next.json>
 
 Models: "reference" plays each case's ideal plan (deterministic, free). Anything else is a live
 model id sent through REMY_PROFILE / REMY_BASE_URL / REMY_API_KEY, or --profile.
 --journal saves each run as it ends. The same command again carries on from there, and stops
-after 3 runs in a row lost to the provider.`;
+after 3 runs in a row lost to the provider.
+--max-usd stops before the next run once the runs so far (journal included) cost that much, as
+priced by the model catalog. One run in flight can go a little past it.`;
 
 const MAX_LOST_IN_A_ROW = 3;
 
@@ -122,12 +124,18 @@ export async function evalMain(argv: string[]): Promise<number> {
     : (c) => referenceModel(c.reference, c.helperReference);
 
   const journal = values.journal;
+  const maxUsd = values['max-usd'] === undefined ? undefined : Number(values['max-usd']);
+  if (maxUsd !== undefined && !(maxUsd >= 0)) {
+    console.error('--max-usd must be a number of dollars, like 2');
+    return 2;
+  }
   const result = await runEval(
     suites.includes('live') ? [...CASES, ...liveCases] : CASES,
     modelFor,
     {
       k,
       ...(journal ? { resume: readJournal(journal), maxLostInARow: MAX_LOST_IN_A_ROW } : {}),
+      ...(maxUsd !== undefined ? { maxUsd } : {}),
       suites,
       caseIds: picked.caseIds,
       live: !!client && !values.replay,
@@ -185,6 +193,7 @@ function parse(argv: string[]) {
       replay: { type: 'string' },
       out: { type: 'string' },
       journal: { type: 'string' },
+      'max-usd': { type: 'string' },
       cassettes: { type: 'string' },
       strict: { type: 'boolean' },
       'no-write': { type: 'boolean' },
