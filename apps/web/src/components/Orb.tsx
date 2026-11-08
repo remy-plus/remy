@@ -35,7 +35,12 @@ const hidden = (p: { x: number; y: number; front: boolean }) =>
 const color = (name: string, fallback: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
-export function drawOrb(ctx: CanvasRenderingContext2D, t: number, labels: string[]) {
+export function drawOrb(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  labels: string[],
+  withRing = true,
+) {
   const ink = color('--text', '#edebe6');
   const signal = color('--signal', '#a8c49a');
   const dim = color('--muted', '#8c8a85');
@@ -56,7 +61,7 @@ export function drawOrb(ctx: CanvasRenderingContext2D, t: number, labels: string
       put(front ? 'o' : '.', p.x, p.y, front ? 0.7 : 0.35, ink);
     }
   };
-  ring(false);
+  if (withRing) ring(false);
 
   const slow = Math.floor(t * 0.8);
   for (let iy = 0; iy < Math.floor(H / CH); iy++) {
@@ -75,7 +80,7 @@ export function drawOrb(ctx: CanvasRenderingContext2D, t: number, labels: string
       put(glyph, x, y, Math.min(1, 0.2 + 0.8 * b), ink);
     }
   }
-  ring(true);
+  if (withRing) ring(true);
 
   labels.forEach((label, i) => {
     const a = t * 0.25 + (i * Math.PI * 2) / labels.length + 1;
@@ -96,22 +101,32 @@ export function drawOrb(ctx: CanvasRenderingContext2D, t: number, labels: string
   ctx.globalAlpha = 1;
 }
 
-export function Orb({ satellites = [] }: { satellites?: Satellite[] }) {
+/** `ring={false}` draws the sphere alone; `still` draws one frame and never animates (quiet screens). */
+export function Orb({
+  satellites = [],
+  ring = true,
+  still: holdStill = false,
+}: {
+  satellites?: Satellite[];
+  ring?: boolean;
+  still?: boolean;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const key = satellites.map((s) => s.label).join('\n');
   useEffect(() => {
     const canvas = ref.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-    const labels = key ? key.split('\n') : [];
+    const labels = ring && key ? key.split('\n') : [];
     const ratio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
     canvas.width = W * ratio;
     canvas.height = H * ratio;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const still =
+      holdStill || (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     if (still) {
-      drawOrb(ctx, 0, labels);
+      drawOrb(ctx, 0, labels, ring);
       return;
     }
     const start = performance.now();
@@ -120,7 +135,7 @@ export function Orb({ satellites = [] }: { satellites?: Satellite[] }) {
     const tick = (now: number) => {
       if (now - last >= FRAME_MS) {
         last = now;
-        drawOrb(ctx, (now - start) / 1000, labels);
+        drawOrb(ctx, (now - start) / 1000, labels, ring);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -134,7 +149,7 @@ export function Orb({ satellites = [] }: { satellites?: Satellite[] }) {
       document.removeEventListener('visibilitychange', onVisibility);
       cancelAnimationFrame(raf);
     };
-  }, [key]);
+  }, [key, ring, holdStill]);
 
   return (
     // biome-ignore lint/a11y/noAriaHiddenOnFocusable: a canvas is not focusable; it is decoration

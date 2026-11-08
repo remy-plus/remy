@@ -102,6 +102,13 @@ export function QuietRow() {
         checked={quiet}
         onChange={setQuiet}
       />
+      {quiet && (
+        <p className="mt-3 mb-0 text-[13px]">
+          <a href="#/quiet" className="text-text underline">
+            Open the quiet screen
+          </a>
+        </p>
+      )}
     </Row>
   );
 }
