@@ -6,7 +6,13 @@ import { join } from 'node:path';
 import { isPrivateAddress } from '@remy/tools';
 import type { BrowserContext, Page } from 'playwright-core';
 import type { Browser, PageSnapshot, SearchHit } from './port.ts';
-import { firstUseful, rephrased, rereadAfterNavigation } from './results.ts';
+import {
+  BotCheckError,
+  firstUseful,
+  looksLikeBotCheck,
+  rephrased,
+  rereadAfterNavigation,
+} from './results.ts';
 import { BING_RESULTS_SCRIPT, DDG_RESULTS_SCRIPT, SNAPSHOT_SCRIPT } from './walker.ts';
 
 export interface LocalBrowserOptions {
@@ -244,7 +250,12 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
         const engine = (url: string, script: string) => async () => {
           await navigate(tab, url);
           await settle(tab);
-          return read(script);
+          const hits = await read(script);
+          if (!hits?.length) {
+            const text = (await tab.evaluate("document.body?.innerText ?? ''")) as string;
+            if (looksLikeBotCheck(await tab.title(), text)) throw new BotCheckError();
+          }
+          return hits;
         };
         const bing = (text: string) =>
           engine(`https://www.bing.com/search?q=${encodeURIComponent(text)}`, BING_RESULTS_SCRIPT);

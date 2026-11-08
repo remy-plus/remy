@@ -1,3 +1,4 @@
+import { BotCheckError } from '@remy/browser';
 import { describe, expect, it } from 'vitest';
 import {
   dockerRunArgs,
@@ -33,6 +34,11 @@ describe('vmSearch', () => {
       reply({ hits: String(url).includes('ddg') ? null : [hit('rye bread')] }),
     );
     expect(await provider.search('rye bread', 3)).toEqual([hit('rye bread')]);
+  });
+
+  it('marks the route off when every engine shows a bot check, and never tries to pass it', async () => {
+    const provider = vmSearch(conn, async () => reply({ hits: null, blocked: true }));
+    await expect(provider.search('rye bread', 3)).rejects.toBeInstanceOf(BotCheckError);
   });
 
   it('says how to start it when it is not running', async () => {

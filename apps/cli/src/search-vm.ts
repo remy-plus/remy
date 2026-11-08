@@ -4,11 +4,13 @@
 // is open to this machine only and needs a token.
 import {
   BING_RESULTS_SCRIPT,
+  BOT_CHECK_PATTERN,
+  BotCheckError,
   DDG_RESULTS_SCRIPT,
   firstUseful,
   type SearchHit,
 } from '@remy/browser';
-import type { SearchProvider } from '@remy/tools';
+import { type SearchProvider, SearchUnavailable } from '@remy/tools';
 
 const NAME = 'remy-search';
 const IMAGE = 'mcr.microsoft.com/playwright:v1.50.0-noble';
@@ -45,13 +47,15 @@ export function vmSearch(
     try {
       r = await ask(name, query);
     } catch {
-      if (!(await ensure?.())) throw new Error(NOT_RUNNING);
+      if (!(await ensure?.())) throw new SearchUnavailable(NOT_RUNNING);
       r = await ask(name, query).catch(() => {
-        throw new Error(NOT_RUNNING);
+        throw new SearchUnavailable(NOT_RUNNING);
       });
     }
     if (!r.ok) throw new Error(`Search in the container failed (${r.status}).`);
-    return ((await r.json()) as { hits: SearchHit[] | null }).hits;
+    const body = (await r.json()) as { hits: SearchHit[] | null; blocked?: boolean };
+    if (body.blocked) throw new BotCheckError();
+    return body.hits;
   };
   return {
     async search(query, count) {
@@ -70,6 +74,7 @@ const ENGINES = {
   ddg: [(q) => 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), ${JSON.stringify(DDG_RESULTS_SCRIPT)}],
   bing: [(q) => 'https://www.bing.com/search?q=' + encodeURIComponent(q), ${JSON.stringify(BING_RESULTS_SCRIPT)}],
 };
+const BOT_CHECK = new RegExp(${JSON.stringify(BOT_CHECK_PATTERN.source)}, 'i');
 const TOKEN = process.env.REMY_SEARCH_TOKEN;
 let queue = Promise.resolve();
 (async () => {
@@ -81,7 +86,11 @@ let queue = Promise.resolve();
     try {
       await page.goto(url(q), { waitUntil: 'domcontentloaded', timeout: 20000 });
       await page.waitForLoadState('networkidle', { timeout: 2500 }).catch(() => {});
-      return await page.evaluate(script);
+      const hits = await page.evaluate(script);
+      if (hits && hits.length) return { hits };
+      const text = await page.evaluate(() => document.body ? document.body.innerText : '');
+      const title = await page.title();
+      return { hits, blocked: BOT_CHECK.test(title + '\\n' + text.slice(0, 1500)) };
     } finally {
       await page.close().catch(() => {});
       await new Promise((r) => setTimeout(r, 1500));
@@ -100,7 +109,7 @@ let queue = Promise.resolve();
     if (u.pathname !== '/search' || !ENGINES[name] || !q) return send(400, {});
     const job = queue.then(() => search(name, q));
     queue = job.catch(() => {});
-    job.then((hits) => send(200, { hits }), (e) => send(502, { error: String(e.message) }));
+    job.then((r) => send(200, r), (e) => send(502, { error: String(e.message) }));
   }).listen(${INNER_PORT}, '0.0.0.0');
 })();
 `;

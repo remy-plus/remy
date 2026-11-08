@@ -1,7 +1,25 @@
 // What a search page gave back, before the model sees it. A search engine can answer an automated
 // browser with popular pages that match one word of the query; those cost tokens and send the
 // model into repeat searches, so they count as no result.
+import { SearchUnavailable } from '@remy/tools';
 import type { SearchHit } from './port.ts';
+
+/** A search engine asked the browser to prove it is a person. Remy never answers that; the route is just off. */
+export class BotCheckError extends SearchUnavailable {
+  constructor(message = 'The search engine showed a bot check, so this route is off.') {
+    super(message);
+  }
+}
+
+export const BOT_CHECK_PATTERN =
+  /captcha|unusual traffic|verify you are (a )?human|are you a (robot|human)|prove you('| a)re (not a robot|human)|automated queries|robot check/i;
+
+/**
+ * True for a page that shows a bot check. Call it only when the page gave no results, so a normal
+ * results page that merely mentions a captcha is not mistaken for one.
+ */
+export const looksLikeBotCheck = (title: string, text: string): boolean =>
+  BOT_CHECK_PATTERN.test(`${title}\n${text.slice(0, 1500)}`);
 
 /** Words that say little about what is being looked for. */
 const COMMON = new Set(
@@ -69,6 +87,7 @@ export async function firstUseful(
   engines: (() => Promise<SearchHit[] | null>)[],
 ): Promise<SearchHit[]> {
   let failure: unknown;
+  let blocked: BotCheckError | undefined;
   let answered = false;
   for (const engine of engines) {
     try {
@@ -77,9 +96,10 @@ export async function firstUseful(
       if (hits.length) return hits;
     } catch (e) {
       failure = e;
+      if (e instanceof BotCheckError) blocked = e;
     }
   }
-  if (!answered) throw failure;
+  if (!answered) throw blocked ?? failure;
   return [];
 }
 

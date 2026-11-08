@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { firstUseful, rephrased, rereadAfterNavigation, usefulHits } from './results.ts';
+import {
+  BotCheckError,
+  firstUseful,
+  looksLikeBotCheck,
+  rephrased,
+  rereadAfterNavigation,
+  usefulHits,
+} from './results.ts';
 
 const hit = (title: string, url = 'https://example.com/a', snippet = '') => ({
   title,
@@ -156,5 +163,27 @@ describe('rereadAfterNavigation', () => {
     );
     await expect(read).rejects.toThrow('Timeout');
     expect(reads).toBe(1);
+  });
+});
+
+describe('bot checks', () => {
+  it('spots a check page and leaves an ordinary page alone', () => {
+    expect(
+      looksLikeBotCheck('', 'Our systems have detected unusual traffic from your network'),
+    ).toBe(true);
+    expect(looksLikeBotCheck('Please solve the CAPTCHA', '')).toBe(true);
+    expect(looksLikeBotCheck('rye bread - Search', 'Rye bread recipe. King Arthur.')).toBe(false);
+  });
+
+  it('fails with the bot check when every engine was blocked, and moves past one that was', async () => {
+    const blocked = async () => {
+      throw new BotCheckError();
+    };
+    await expect(firstUseful('rye bread', [blocked, blocked])).rejects.toBeInstanceOf(
+      BotCheckError,
+    );
+    expect(
+      await firstUseful('rye bread', [blocked, async () => [hit('Rye bread recipe')]]),
+    ).toHaveLength(1);
   });
 });
