@@ -65,6 +65,8 @@ const setup = (
   return { store, f, emb };
 };
 
+const text = (r: { ok: boolean; content?: string }) => (r.ok ? (r.content ?? '') : '');
+
 describe('embeddings', () => {
   it('sends nothing unless turned on', async () => {
     const { f, emb } = setup({ on: false });
@@ -145,8 +147,8 @@ describe('embeddings', () => {
     const withVec = createRecallTool(store, async () => [], emb.source);
     const local = createRecallTool(store, async () => []);
     const q = { query: 'my animal' };
-    expect((await withVec.execute(q as never, ctx)).content).toContain('Kiwi');
-    expect((await local.execute(q as never, ctx)).content).not.toContain('Kiwi');
+    expect(text(await withVec.execute(q as never, ctx))).toContain('Kiwi');
+    expect(text(await local.execute(q as never, ctx))).not.toContain('Kiwi');
   });
 });
 
