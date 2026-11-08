@@ -4,10 +4,11 @@ import { join } from 'node:path';
 import type { ModelResponse } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
-import { SKILLS_HINT } from '@remy/tools';
+import { HOWTO_HINT, SKILLS_HINT } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type CliDeps, cli } from './cli.ts';
 import { findCommand } from './commands.ts';
+import { saveProfile } from './profile.ts';
 import { openSkills, plainSkills } from './skills.ts';
 
 let root: string;
@@ -219,5 +220,45 @@ describe('saved skills', () => {
         .list()
         .find((k) => k.name === 'research')?.uses,
     ).toBe(1);
+  });
+});
+
+describe('learned how-tos', () => {
+  const profile = (personalise: boolean) =>
+    saveProfile(home, { name: '', goals: [], createdAt: new Date().toISOString(), personalise });
+  const how = {
+    name: 'invoices-in-drive',
+    description: 'Finding an invoice for the user',
+    body: '1. Look in Drive.',
+    learned: true,
+  };
+
+  it('are marked in the list and removable', () => {
+    const s = openSkills(home, cwd);
+    s.save(how);
+    const k = s.list().find((x) => x.name === 'invoices-in-drive');
+    expect(k).toMatchObject({ learned: true, source: 'yours' });
+    expect(plainSkills(s.list())).toContain('[learned] Finding an invoice');
+    expect(s.remove('invoices-in-drive')).toBe(true);
+  });
+
+  it('are offered as a tool with a hint only while personalising is on', async () => {
+    profile(true);
+    const on = new ScriptedModelClient([finish]);
+    await harness(on)('run', 'find the invoice');
+    expect(on.requests[0]?.tools.map((t) => t.name)).toContain('save_howto');
+    expect(on.requests[0]?.system).toContain(HOWTO_HINT);
+    profile(false);
+    const off = new ScriptedModelClient([finish]);
+    await harness(off)('run', 'find the invoice');
+    expect(off.requests[0]?.tools.map((t) => t.name)).not.toContain('save_howto');
+    expect(off.requests[0]?.system).not.toContain(HOWTO_HINT);
+  });
+
+  it('send their steps with a similar message', async () => {
+    openSkills(home, cwd).save(how);
+    const model = new ScriptedModelClient([finish]);
+    await harness(model)('run', 'please find the invoice from March');
+    expect(model.requests[0]?.messages[0]?.content).toContain('Look in Drive.');
   });
 });

@@ -120,3 +120,59 @@ describe('withRecall: situation', () => {
     expect(asked).toBe(1);
   });
 });
+
+describe('withRecall: corrections', () => {
+  const mk = (howto: boolean) => {
+    const inner = new ScriptedModelClient(
+      Array.from({ length: 4 }, () => ({
+        text: 'ok',
+        calls: [],
+        usage: { inTokens: 1, outTokens: 1 },
+      })),
+    );
+    return {
+      inner,
+      model: withRecall(inner, {
+        enabled: () => true,
+        notes: () => [],
+        hasTools: true,
+        howto: () => howto,
+      }),
+    };
+  };
+  const sentText = (inner: ScriptedModelClient, i = 0) =>
+    JSON.stringify(inner.requests[i]?.messages);
+
+  it('adds the note to a correction of an earlier answer', async () => {
+    const { inner, model } = mk(true);
+    await model.complete(req('find the invoice', 'No, use the other folder'), signal);
+    expect(sentText(inner)).toContain('is correcting your last answer');
+  });
+
+  it('not to a plain follow-up, a new request, or a first message', async () => {
+    const { inner, model } = mk(true);
+    await model.complete(req('find the invoice', 'and the one from May?'), signal);
+    await model.complete(req('find the invoice', 'now email it to Sam'), signal);
+    await model.complete(req('No, use the other folder'), signal);
+    for (const i of [0, 1, 2]) expect(sentText(inner, i)).not.toContain('correcting');
+  });
+
+  it('not when personalising is off', async () => {
+    const { inner, model } = mk(false);
+    await model.complete(req('find the invoice', 'No, use the other folder'), signal);
+    expect(sentText(inner)).not.toContain('correcting');
+  });
+
+  it('once per task: a second correction in the same task gets no note', async () => {
+    const { inner, model } = mk(true);
+    const messages = [
+      ...req('find the invoice', 'No, use the other folder').messages,
+      { role: 'assistant' as const, content: 'done' },
+      { role: 'user' as const, content: 'That is wrong, it was in Drive' },
+    ];
+    await model.complete(req('find the invoice', 'No, use the other folder'), signal);
+    await model.complete({ ...req('x'), messages }, signal);
+    const last = inner.requests[1]?.messages.at(-1)?.content as string;
+    expect(last).not.toContain('correcting');
+  });
+});

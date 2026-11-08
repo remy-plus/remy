@@ -232,12 +232,20 @@ export function plainSkills(skills: Skill[], problems: SkillProblem[] = []): str
     if (!group.length) continue;
     if (lines.length) lines.push('');
     lines.push(`Skills (${SOURCE_LABEL[source]})`);
-    for (const s of group) lines.push(`  ${s.name.padEnd(20)} ${firstSentence(s.description)}`);
+    for (const s of group)
+      lines.push(
+        `  ${s.name.padEnd(20)} ${s.learned ? '[learned] ' : ''}${firstSentence(s.description)}`,
+      );
   }
   for (const p of problems) lines.push('', `Skipped ${p.path}: ${p.error}`);
   lines.push(
     '',
     'Add your own with remy skills add <folder>; see one with remy skills show <name>.',
+    ...(skills.some((s) => s.learned)
+      ? [
+          '[learned] ones were saved from your corrections. Edit the file shown by show, or remove one with remy skills rm <name>.',
+        ]
+      : []),
   );
   return lines.join('\n');
 }
@@ -245,7 +253,7 @@ export function plainSkills(skills: Skill[], problems: SkillProblem[] = []): str
 /** The full text for `remy skills show` and the add preview. */
 export function plainSkill(s: Skill): string {
   return [
-    `${s.name} (${SOURCE_LABEL[s.source]})`,
+    `${s.name} (${SOURCE_LABEL[s.source]}${s.learned ? ', learned from a correction' : ''})`,
     s.description,
     ...(s.tools.length ? [`Tools it expects: ${s.tools.join(', ')}`] : []),
     ...(s.path ? [s.path] : []),

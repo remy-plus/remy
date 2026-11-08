@@ -4,6 +4,9 @@
 // what comes after it. The system prompt never changes.
 import type { ModelClient } from '@remy/core';
 import {
+  HOWTO_NOTE,
+  HOWTO_NOTE_MARK,
+  looksLikeCorrection,
   type MemoryEntry,
   memoryQuery,
   notesBlock,
@@ -23,6 +26,8 @@ export interface RecallOptions {
   situation?: () => Promise<string>;
   /** The skills that fit the user's recent messages; sent whether or not personalising is on. */
   skills?: (query: string) => string;
+  /** Whether a correction may carry the how-to note: personalising on and save_howto registered. */
+  howto?: () => boolean;
 }
 
 export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
@@ -37,14 +42,25 @@ export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
     },
     async complete(req, ...a) {
       const on = o.enabled();
-      if (!on && !o.situation && !o.skills) return inner.complete(req, ...a);
+      if (!on && !o.situation && !o.skills && !o.howto) return inner.complete(req, ...a);
       const last = req.messages.findLastIndex((m) => m.role === 'user');
       const lastText = req.messages[last]?.content;
       if (last >= 0 && typeof lastText === 'string' && !frozen.has(lastText)) {
         const query = memoryQuery(req.messages.slice(0, last + 1));
         const notes = on ? o.notes() : [];
         const sem = on && o.semantic ? await o.semantic(notes, query) : undefined;
+        const earlier = req.messages.slice(0, last);
+        // A correction needs an answer to correct, and a task gets the note once.
+        const correcting =
+          o.howto?.() === true &&
+          looksLikeCorrection(lastText, {
+            hasPriorAnswer: earlier.some((m) => m.role === 'assistant' && m.content !== 'Noted.'),
+          }) &&
+          !earlier.some(
+            (m) => m.role === 'user' && (frozen.get(m.content) ?? '').includes(HOWTO_NOTE_MARK),
+          );
         const parts = [
+          correcting ? HOWTO_NOTE : '',
           o.situation ? await o.situation() : '',
           o.skills ? o.skills(query) : '',
           on ? notesBlock(notes, query, sem) : '',

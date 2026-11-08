@@ -49,6 +49,7 @@ import {
   askUser,
   calculate,
   createDelegate,
+  createHowtoTool,
   createMemoryTools,
   createRecallTool,
   createRedactor,
@@ -62,6 +63,7 @@ import {
   editFile,
   fetchUrl,
   finish,
+  HOWTO_HINT,
   listFiles,
   makeDir,
   moveFile,
@@ -881,6 +883,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     if (personaliseOn(home)) {
       for (const t of createMemoryTools(memory())) tools.add(t);
       tools.add(createRecallTool(memory(), pastTasks, noteEmbedder().source));
+      // Corrections become how-tos: with personalising on only.
+      const howto = createHowtoTool({ ...skills(), redact });
+      if (howto) tools.add(howto);
     }
     for (const t of createSkillTools({
       ...skills(),
@@ -911,6 +916,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       notes: () => memory().list(),
       semantic: noteEmbedder().source,
       hasTools: Boolean(tools.get('remember')),
+      howto: () => personaliseOn(home) && Boolean(tools.get('save_howto')),
       skills: (query) =>
         skillsBlock(skills().list(), query, {
           steps: env.REMY_SKILL_STEPS === 'on',
@@ -956,7 +962,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       store,
       model,
       // Browser tools share one page, so helpers working side by side cannot use them.
-      helperTools: (t) => !t.name.startsWith('browser_'),
+      // A how-to is the user's lesson from their own correction: helpers never save one.
+      helperTools: (t) => !t.name.startsWith('browser_') && t.name !== 'save_howto',
       helperRoles,
       helpersAct,
       systemPrompt: [
@@ -965,6 +972,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         ...(tools.get('web_search') ? [] : [NO_SEARCH_HINT]),
         SKILLS_HINT,
         SAVE_SKILL_HINT,
+        ...(personaliseOn(home) ? [HOWTO_HINT] : []),
       ].join('\n\n'),
       tools,
       owner,
