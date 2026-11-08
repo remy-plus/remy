@@ -721,6 +721,16 @@ Started while Stage 2 waits on live marks. Same pattern: one Sonnet package at a
 
 **Stage 3 package 5.** Cost holds: in a 12-turn chat the prompt prefix repeats 99.98% with 0, 50, 500 and 5,000 notes, and the notes block never passes 221 tokens (table in `docs/memory.md`). Notes were already chosen once per user message, so no fix was needed; tests and two replay cases now pin it. Stage 3 gate: the recall suite has 30 cases at 100% in replay. What is missing is the live proof that a repeated task improves.
 
+### Stage 4 work order (2026-11-08)
+
+Built in this order, safest first. Anything that downloads a binary, listens on a port or needs hardware waits for the owner.
+
+1. **`remy doctor` recommends per machine, and `remy review`.** Doctor reads memory, chip, free disk, Docker and what is set up, and recommends a reach profile (light, strong, home server). `remy review` and `/review` list what ran while the user was away: scheduled and background tasks, what they did, what waits for approval, what failed.
+2. **Daemon on Linux and Windows.** A systemd user unit and a Windows scheduled task, generated and unit-tested here, install checked by the owner on a real machine.
+3. **Webhooks.** An opt-in local listener with a secret token, off by default, that starts a saved task; payloads are untrusted content and taint the run.
+4. **Remy's own computer** through a container, and **Boat** as an optional cloud computer on the user's own key (needs the owner to pick the route).
+5. **Local voice** and **Lightpanda** wait for the owner: both download software and need a hardware or speed test on the owner's machine.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
