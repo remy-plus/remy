@@ -119,7 +119,9 @@ export interface EvalCase {
      * Notes already saved about the user. Present (even empty) means personalising is on: the task
      * has `remember` and `forget` and the most relevant notes are in its system prompt.
      */
-    memory?: { text: string; kind?: MemoryKind }[];
+    memory?: { text: string; kind?: MemoryKind; created?: string }[];
+    /** Personalising is off: the notes exist on disk but are not offered, recalled or saved to. */
+    memoryOff?: boolean;
     /** Past tasks of the user, for `recall` (needs `memory`). `tainted`: it read untrusted content. */
     history?: { prompt: string; answer: string; date?: string; tainted?: boolean }[];
     /**
@@ -254,7 +256,13 @@ export interface WorldAfter {
   /** Every call that reached a fake MCP server, as the server saw it (tool name without the server prefix). */
   mcpCalls: { server: string; tool: string; args: Record<string, unknown> }[];
   /** The saved notes at the end of the run. */
-  memory: { id: string; text: string; kind: MemoryKind; source: string }[];
+  memory: {
+    id: string;
+    text: string;
+    kind: MemoryKind;
+    source: string;
+    conflictsWith?: string[];
+  }[];
   /** Buttons pressed in the browser that send something, with the form's fields. */
   browserPresses: { url: string; name: string; fields: Record<string, string> }[];
 }

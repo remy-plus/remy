@@ -315,7 +315,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
         ]
       : []),
     ...(c.world.inbox ? ['email_read', 'email_send'] : []),
-    ...(c.world.memory ? ['remember', 'forget', 'recall'] : []),
+    ...(c.world.memory && !c.world.memoryOff ? ['remember', 'forget', 'recall'] : []),
     'calculate',
     'update_plan',
   ];
@@ -326,7 +326,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
     text: m.text,
     kind: m.kind ?? 'preference',
     source: '',
-    created: `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+    created: m.created ?? new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
   }));
   const memoryPort: MemoryPort = {
     enabled: () => true,
@@ -342,7 +342,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
       return true;
     },
   };
-  if (c.world.memory) {
+  if (c.world.memory && !c.world.memoryOff) {
     tools.push(...createMemoryTools(memoryPort));
     const history: Episode[] = (c.world.history ?? []).map((h, i) => ({
       taskId: `task_past${i + 1}`,
@@ -408,7 +408,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
         SYSTEM_PROMPT,
         ...(browser ? [BROWSER_HINT] : []),
         ...(c.world.skills ? [SKILLS_HINT] : []),
-        ...(c.world.memory ? [memoryBlock(notes, c.prompt)] : []),
+        ...(c.world.memory && !c.world.memoryOff ? [memoryBlock(notes, c.prompt)] : []),
       ].join('\n\n'),
     }),
     capabilities: () => ({ fs, net, secrets: { get: () => undefined } }),
@@ -419,7 +419,13 @@ export async function createWorld(c: EvalCase): Promise<World> {
         files,
         emails: [...sent],
         mcpCalls: mcp?.calls() ?? [],
-        memory: notes.map(({ id, text, kind, source }) => ({ id, text, kind, source })),
+        memory: notes.map(({ id, text, kind, source, conflictsWith }) => ({
+          id,
+          text,
+          kind,
+          source,
+          ...(conflictsWith && { conflictsWith }),
+        })),
         browserPresses: [...(browser?.presses ?? [])],
       };
     },

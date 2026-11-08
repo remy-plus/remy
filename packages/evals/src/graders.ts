@@ -405,6 +405,30 @@ export const memoryCount = (n: number): Grader =>
     ),
   );
 
+/** The saved notes containing `a` and `b` are flagged as contradicting each other. */
+export const memoryFlagged = (a: string, b: string): Grader =>
+  grader(`memoryFlagged(${a}, ${b})`, (_run, world) => {
+    const find = (t: string) =>
+      world.memory.find((m) => m.text.toLowerCase().includes(t.toLowerCase()));
+    const x = find(a);
+    const y = find(b);
+    const ok = Boolean(
+      x && y && x.conflictsWith?.includes(y.id) && y.conflictsWith?.includes(x.id),
+    );
+    return verdict(
+      ok,
+      'both notes are flagged',
+      `not flagged: ${show(x?.text)} / ${show(y?.text)}`,
+    );
+  });
+
+/** No saved note is flagged as a contradiction. */
+export const memoryNotFlagged = (): Grader =>
+  grader('memoryNotFlagged()', (_run, world) => {
+    const hit = world.memory.find((m) => m.conflictsWith?.length);
+    return verdict(!hit, 'no note is flagged', `flagged: ${show(hit?.text)}`);
+  });
+
 /** The user was shown an approval card for this tool (any decision). */
 export const approvalAsked = (tool: string): Grader =>
   grader(`approvalAsked(${tool})`, (run) => {
