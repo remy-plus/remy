@@ -163,6 +163,8 @@ function counting(inner: ModelClient) {
     offered: [] as string[][],
     /** Characters of each request's predecessor that it starts with again, out of the predecessor's length. */
     prefix: { shared: 0, total: 0 },
+    /** Length of each request as sent, in characters. */
+    sizes: [] as number[],
     async complete(
       req: Parameters<ModelClient['complete']>[0],
       signal: AbortSignal,
@@ -170,6 +172,7 @@ function counting(inner: ModelClient) {
       m.calls += 1;
       m.offered.push(req.tools.map((t) => t.name).filter((n) => n.includes('__')));
       const cur = serialise(req);
+      m.sizes.push(cur.length);
       if (prev !== undefined) {
         m.prefix.shared += sharedPrefix(prev, cur);
         m.prefix.total += prev.length;
@@ -373,6 +376,7 @@ export async function runCase(
       };
     if (c.world.mcp) record.offered = counted.offered;
     if (counted.prefix.total > 0) record.prefix = counted.prefix;
+    if (counted.sizes.length > 0) record.requestChars = counted.sizes;
     const asked = taskIds.length - 1 + pauses;
     if (asked > 0) record.followUps = asked;
 

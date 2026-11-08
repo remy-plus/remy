@@ -381,6 +381,32 @@ export const mcpCalledWith = (
   });
 
 // ---------- Memory ----------
+/** Each request repeats at least this share of the one before it, so a prompt cache can reuse it. */
+export const prefixStableAtLeast = (min: number): Grader =>
+  grader(`prefixStableAtLeast(${min})`, (run) => {
+    if (!run.prefix || run.prefix.total === 0)
+      return { pass: false, detail: 'fewer than two model requests, nothing to compare' };
+    const share = run.prefix.shared / run.prefix.total;
+    return verdict(
+      share >= min,
+      `${(share * 100).toFixed(2)}% of each request repeats the one before`,
+      `only ${(share * 100).toFixed(2)}% repeats, wanted ${(min * 100).toFixed(0)}%`,
+    );
+  });
+
+/** No model request is longer than this many characters (roughly four to a token). */
+export const requestsUnder = (maxChars: number): Grader =>
+  grader(`requestsUnder(${maxChars})`, (run) => {
+    const longest = Math.max(0, ...(run.requestChars ?? []));
+    return verdict(
+      longest > 0 && longest <= maxChars,
+      `longest request ${longest} characters`,
+      longest === 0
+        ? 'no request sizes recorded'
+        : `a request had ${longest} characters, over ${maxChars}`,
+    );
+  });
+
 /** A saved note contains this text (case-insensitive). */
 export const memoryHas = (text: string): Grader =>
   grader(`memoryHas(${text})`, (_run, world) => {

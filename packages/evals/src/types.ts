@@ -239,6 +239,8 @@ export interface RunRecord {
    * appends scores ~100%; anything lower is a change a provider's prompt cache cannot reuse.
    */
   prefix?: { shared: number; total: number };
+  /** Length in characters of each model request as sent, in order. */
+  requestChars?: number[];
   /** Times the agent stopped for the user: mid-task pauses, plus chat turns after a closing question. */
   followUps?: number;
   /** For `firstReplyOnly` cases: what the model's first reply held. */
