@@ -162,6 +162,9 @@ import {
   vmStatus,
   waitForVm,
 } from './search-vm.ts';
+import { listenServe } from './serve.ts';
+import { resolveServeBind } from './serve-bind.ts';
+import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
 import { fetchSkill } from './skills-web.ts';
@@ -213,6 +216,8 @@ export interface CliDeps {
   notifyRun?: RunScript;
   /** Overrides process.platform for notifications (tests). */
   platform?: string;
+  /** Resolves to stop `remy serve` (tests); without it, serve runs until the process ends. */
+  serveStop?: Promise<void>;
   /** Waits between polls in `remy attach` (tests). Default 700 ms. */
   sleep?: (ms: number) => Promise<void>;
 }
@@ -281,6 +286,10 @@ Usage
   remy webhook [list|add <name> "<prompt>"|rm <name>|token [<name>] [--rotate]|enable|disable|start|test <name> [--data <file>]]
                                   Start a saved task from an outside call. Off until enable;
                                   listens on 127.0.0.1 only; the payload is data, not orders
+  remy serve [--port 7788] [--host 127.0.0.1]
+                                  Serve Remy over HTTP for the web app: tasks, approvals and a
+                                  live event stream. 127.0.0.1 only unless REMY_SERVE_ALLOW_REMOTE=on
+  remy serve token [--rotate]     Make the access token (shown once; only its hash is kept)
   remy doctor                     See what is set up and the next step for each
   remy review [--since 24h|7d|<date>]
                                   What ran without you (schedules, watches, background), what it
@@ -361,6 +370,7 @@ const OPTIONS = {
   for: { type: 'string' },
   background: { type: 'boolean' },
   bind: { type: 'string' },
+  host: { type: 'string' },
   port: { type: 'string' },
   data: { type: 'string' },
   rotate: { type: 'boolean' },
@@ -477,6 +487,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'schedule',
       'daemon',
       'webhook',
+      'serve',
       'doctor',
       'review',
       'improve',
@@ -2118,6 +2129,64 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           await new Promise(() => {});
         }
         throw new Error('Use remy webhook list, add, rm, token, enable, disable, start or test.');
+      }
+
+      case 'serve': {
+        if (rest[0] === 'token') {
+          if (serveTokenHash(home) && !flags.rotate) {
+            out(
+              'A token already exists. It is shown once, when it is made. For a new one (the old one stops working): remy serve token --rotate',
+            );
+            return 0;
+          }
+          out(makeServeToken(home));
+          out(st.dim('Shown once. Send it as: Authorization: Bearer <token>'));
+          return 0;
+        }
+        if (rest[0]) throw new Error('Use remy serve, or remy serve token [--rotate].');
+        // The address is checked first, so a refused one never opens the store or a connection.
+        const bind = resolveServeBind({ host: flags.host, port: flags.port }, env);
+        const file = cfg();
+        const model = deps.model ?? modelFor(file);
+        const { runtime } = makeRuntime(file, { model: true, hooks: {} });
+        await mcp?.ready;
+        if (!serveTokenHash(home)) {
+          out(makeServeToken(home));
+          out(
+            st.dim(
+              'That is your token. It is shown once. Send it as: Authorization: Bearer <token>',
+            ),
+          );
+        }
+        const listening = await listenServe(
+          {
+            store,
+            runtime,
+            home,
+            version: version(),
+            config: (id, trust) => {
+              const config = taskConfig(file, model.id, join(home, 'workspaces', id));
+              mkdirSync(config.workspaceDir, { recursive: true });
+              if (!trust) return config;
+              const { trust: _saved, ...permissions } = config.permissions;
+              return {
+                ...config,
+                permissions: trust === 'ask' ? permissions : { ...permissions, trust },
+              };
+            },
+            tokenHash: () => serveTokenHash(home),
+            redact,
+            alwaysAllow: (tool, risk) => standing().add(tool, risk),
+            log: (line) => out(st.dim(line)),
+          },
+          bind,
+        );
+        out(
+          `remy serve listens on http://${listening.host}:${listening.port}. Press Ctrl+C to stop.`,
+        );
+        await (deps.serveStop ?? new Promise<void>(() => {}));
+        await listening.close();
+        return 0;
       }
 
       case 'daemon': {
