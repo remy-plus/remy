@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useApi } from './api/index.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Header } from './components/Header.tsx';
+import { PushToTalk } from './components/PushToTalk.tsx';
 import { StatusBar } from './components/StatusBar.tsx';
 import { useHome } from './hooks.ts';
 import { AddConnection } from './pages/connect/AddConnection.tsx';
@@ -103,6 +104,7 @@ export function App() {
         <Page path={path} home={home} />
       </main>
       <CommandPalette />
+      <PushToTalk />
     </>
   );
 }
