@@ -86,6 +86,8 @@ For a job that should run for hours, `remy run --background --for 3h "<task>"` s
 
 Skills are short how-tos Remy follows for kinds of tasks. Five are built in, and `remy skills add <link>` takes your own or one from GitHub. It shows you the whole text first. Skills from a link stay limited: reading one means any action needs your approval.
 
+When you correct Remy ("no, use the other folder", "next time check the date first"), it may offer once, before it finishes, to save the fix as a short how-to: a title, when it applies and one to five steps, in your words. You see the whole text on an approval card and nothing is saved until you approve. The next similar task gets those steps with your message. How-tos you saved this way show as `[learned]` in `/skills` and `remy skills list`; edit the file that `remy skills show <name>` prints, or remove one with `remy skills rm <name>`. Remy never saves a secret in one, offers nothing when personalising is off, and helpers and scheduled runs never offer.
+
 ### Schedules
 
 Ask for something to happen regularly, or run `remy schedule add "every day at 9" "Summarize the news"`. `remy daemon install` keeps schedules running on macOS. Each run asks before it acts, so nothing changes while you are away without your approval. `remy doctor` shows what is set up.
