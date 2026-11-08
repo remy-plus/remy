@@ -103,13 +103,14 @@ import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
 import { gatherSearchPlan, makeService, routedSearch } from './search.ts';
+import { installerFor } from './service.ts';
 
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
 
 import { capabilitiesBlock, onceCapabilities } from './capabilities.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
-import { LAUNCH_LABEL, launchAgentPlist, TICK_MS, tick } from './daemon.ts';
+import { LAUNCH_LABEL, TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
 import { type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
@@ -1950,32 +1951,35 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
       case 'daemon': {
         const sub = rest[0];
-        const plist = join(homedir(), 'Library', 'LaunchAgents', `${LAUNCH_LABEL}.plist`);
         const entry = deps.entry ?? currentEntry();
-        if (sub === 'install') {
-          if (process.platform !== 'darwin')
+        const installer = installerFor(process.platform, {
+          entry,
+          homeDir: homedir(),
+          logFile: join(home, 'logs', 'daemon.log'),
+          path: env.PATH,
+          run: (cmd, args) => {
+            const r = spawnSync(cmd, args, { encoding: 'utf8' });
+            return { status: r.status, stdout: r.stdout ?? '' };
+          },
+          files: {
+            write: (path, text) => {
+              mkdirSync(dirname(path), { recursive: true });
+              writeFileSync(path, text);
+            },
+            remove: (path) => rmSync(path, { force: true }),
+          },
+        });
+        if (sub === 'install' || sub === 'uninstall' || sub === 'status') {
+          if (!installer)
             throw new Error(
               'remy daemon install is for macOS. Run remy daemon in your own service.',
             );
-          mkdirSync(dirname(plist), { recursive: true });
-          writeFileSync(plist, launchAgentPlist(entry, join(home, 'logs', 'daemon.log'), env.PATH));
-          spawnSync('launchctl', ['unload', plist]);
-          if (spawnSync('launchctl', ['load', '-w', plist]).status !== 0)
-            throw new Error('macOS did not start the daemon.');
-          out('The daemon is on and starts when you log in.');
-          return 0;
-        }
-        if (sub === 'uninstall') {
-          spawnSync('launchctl', ['unload', '-w', plist]);
-          rmSync(plist, { force: true });
-          out('The daemon is off.');
-          return 0;
-        }
-        if (sub === 'status') {
           out(
-            spawnSync('launchctl', ['list', LAUNCH_LABEL]).status === 0
-              ? 'The daemon is on.'
-              : 'The daemon is off. Turn it on with remy daemon install.',
+            sub === 'install'
+              ? installer.install()
+              : sub === 'uninstall'
+                ? installer.uninstall()
+                : installer.status().message,
           );
           return 0;
         }
