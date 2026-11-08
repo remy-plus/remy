@@ -51,7 +51,12 @@ describe('App routing', () => {
   const cases: [hash: string, heading: string | RegExp, current: string | null][] = [
     ['#/', /Three things need you/, 'Home'],
     ['#/tasks', 'Tasks', 'Tasks'],
-    ['#/tasks/task_9', 'Task', 'Tasks'],
+    ['#/tasks/task_flights', "Book Dana's flights", 'Tasks'],
+    [
+      '#/review',
+      'Three tasks ran. One is waiting for you. Nothing was sent or paid without your OK.',
+      null,
+    ],
     ['#/brain', 'Brain', 'Brain'],
     ['#/skills', 'Skills', null],
     ['#/schedules', 'Schedules', null],
