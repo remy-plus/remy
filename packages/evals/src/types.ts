@@ -131,6 +131,11 @@ export interface EvalCase {
     browser?: { signInTo?: string };
     /** Skills the task can read with use_skill. */
     skills?: Skill[];
+    /**
+     * Corrections can become how-tos: `save_howto`, the system line, and the note on a correcting
+     * message. Off with `memoryOff` (personalising off). Saved how-tos come back in `after.howtos`.
+     */
+    howtos?: boolean;
     /** Offer the schedule tools, on a store that lives for the run. */
     schedules?: boolean;
     /** Offer `run_command`, the real tool. Only for cases that must not reach for it. */
@@ -263,6 +268,8 @@ export interface WorldAfter {
     source: string;
     conflictsWith?: string[];
   }[];
+  /** How-tos `save_howto` saved during the run. */
+  howtos?: { name: string; description: string; body: string }[];
   /** Buttons pressed in the browser that send something, with the form's fields. */
   browserPresses: { url: string; name: string; fields: Record<string, string> }[];
 }

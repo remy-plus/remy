@@ -26,6 +26,7 @@ import {
   askUser,
   calculate,
   createDelegate,
+  createHowtoTool,
   createMemoryTools,
   createRecallTool,
   createScheduleTools,
@@ -38,8 +39,11 @@ import {
   editFile,
   fetchUrl,
   finish,
+  HOWTO_HINT,
+  HOWTO_NOTE,
   htmlToText,
   listFiles,
+  looksLikeCorrection,
   type MemoryEntry,
   type MemoryPort,
   makeDir,
@@ -267,6 +271,35 @@ export function withSkills(inner: ModelClient, skills: Skill[]): ModelClient {
   };
 }
 
+/** Marks a correcting message the way the app does, so the model knows it may offer a how-to. */
+export function withCorrectionNote(inner: ModelClient): ModelClient {
+  return {
+    get id() {
+      return inner.id;
+    },
+    get caps() {
+      return inner.caps;
+    },
+    complete(req, ...rest) {
+      const last = req.messages.findLastIndex((m) => m.role === 'user');
+      const m = req.messages[last];
+      const earlier = req.messages.slice(0, Math.max(last, 0));
+      const correcting =
+        m !== undefined &&
+        typeof m.content === 'string' &&
+        looksLikeCorrection(m.content, {
+          hasPriorAnswer: earlier.some((e) => e.role === 'assistant' && e.content !== 'Noted.'),
+        }) &&
+        !earlier.some((e) => typeof e.content === 'string' && e.content.includes(HOWTO_NOTE));
+      if (!correcting) return inner.complete(req, ...rest);
+      const messages = req.messages.map((x, i) =>
+        i === last ? { ...x, content: `${HOWTO_NOTE}\n\n${x.content}` } : x,
+      );
+      return inner.complete({ ...req, messages }, ...rest);
+    },
+  };
+}
+
 export async function createWorld(c: EvalCase): Promise<World> {
   const dir = await mkdtemp(join(tmpdir(), 'remy-eval-'));
   const fs = createScopedFs(dir);
@@ -359,6 +392,21 @@ export async function createWorld(c: EvalCase): Promise<World> {
     tools.push(...createSkillTools({ list: () => skills }));
     allowTools.push('use_skill');
   }
+  const howtos: { name: string; description: string; body: string }[] = [];
+  const howtosOn = c.world.howtos === true && !c.world.memoryOff;
+  if (howtosOn) {
+    const tool = createHowtoTool({
+      list: () => c.world.skills ?? [],
+      save(d) {
+        howtos.push({ name: d.name, description: d.description, body: d.body });
+        return { path: `skills/${d.name}/SKILL.md` };
+      },
+    });
+    if (tool) {
+      tools.push(tool);
+      allowTools.push('save_howto');
+    }
+  }
   if (c.world.schedules) {
     const added: { id: string; when: string; prompt: string; nextRun: string }[] = [];
     const nextRun = '2026-11-05T14:00:00.000Z';
@@ -403,11 +451,12 @@ export async function createWorld(c: EvalCase): Promise<World> {
     tools,
     allowTools,
     ...(helperRoles && { helperRoles, helpersAct: c.world.helpersAct === true }),
-    ...((c.world.memory || browser || c.world.skills) && {
+    ...((c.world.memory || browser || c.world.skills || howtosOn) && {
       system: [
         SYSTEM_PROMPT,
         ...(browser ? [BROWSER_HINT] : []),
         ...(c.world.skills ? [SKILLS_HINT] : []),
+        ...(howtosOn ? [HOWTO_HINT] : []),
         ...(c.world.memory && !c.world.memoryOff ? [memoryBlock(notes, c.prompt)] : []),
       ].join('\n\n'),
     }),
@@ -427,6 +476,7 @@ export async function createWorld(c: EvalCase): Promise<World> {
           ...(conflictsWith && { conflictsWith }),
         })),
         browserPresses: [...(browser?.presses ?? [])],
+        ...(howtosOn && { howtos: [...howtos] }),
       };
     },
     async cleanup() {

@@ -18,7 +18,7 @@ import { noPolicyViolations, safety } from './graders.ts';
 import { computeMetrics, type Metrics } from './metrics.ts';
 import { buildRecord, categorize } from './record.ts';
 import type { EvalCase, Grade, Human, ModelFor, RunRecord, Suite } from './types.ts';
-import { createWorld, withSkills } from './world.ts';
+import { createWorld, withCorrectionNote, withSkills } from './world.ts';
 
 /** Budget pauses a case's human extends before giving up. */
 const MAX_EXTENDS = 3;
@@ -192,10 +192,14 @@ export async function runCase(
     const inner = new MemoryEventStore({ now });
     const faulty = crashingStore(inner, c.faults ?? []);
     const stopper = c.firstReplyOnly ? firstReplyOnly(model) : undefined;
+    const withNote = (m: ModelClient) =>
+      c.world.howtos && !c.world.memoryOff ? withCorrectionNote(m) : m;
     const counted = counting(
-      withSituation(
-        c.world.skills ? withSkills(stopper ?? model, c.world.skills) : (stopper ?? model),
-        c,
+      withNote(
+        withSituation(
+          c.world.skills ? withSkills(stopper ?? model, c.world.skills) : (stopper ?? model),
+          c,
+        ),
       ),
     );
     const tools = new ToolRegistry(
