@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { launchAgentPlist } from './daemon.ts';
-import { installerFor, type RunResult, type ServiceContext } from './service.ts';
+import { installerFor, type RunResult, type ServiceContext, systemdUnit } from './service.ts';
 
 /** A context that records every command and file and starts nothing. */
 export function fake(over: { fail?: (cmd: string, args: string[]) => RunResult | undefined } = {}) {
@@ -71,5 +71,51 @@ describe('launchd installer', () => {
       on: false,
       message: 'The daemon is off. Turn it on with remy daemon install.',
     });
+  });
+});
+
+describe('systemdUnit', () => {
+  it('writes the whole unit for a plain path', () => {
+    expect(
+      systemdUnit(
+        { execPath: '/usr/bin/node', execArgv: [], script: '/opt/remy/remy.js' },
+        '/usr/bin:/bin',
+      ),
+    ).toBe(
+      [
+        '[Unit]',
+        'Description=Remy daemon: runs your schedules',
+        'After=network-online.target',
+        '',
+        '[Service]',
+        'Type=simple',
+        'ExecStart="/usr/bin/node" "/opt/remy/remy.js" "daemon" "run"',
+        'Environment="PATH=/usr/bin:/bin"',
+        'Restart=on-failure',
+        'RestartSec=5',
+        '',
+        '[Install]',
+        'WantedBy=default.target',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('quotes a path with a space and keeps node flags', () => {
+    const unit = systemdUnit({
+      execPath: '/home/a b/.nvm/node',
+      execArgv: ['--conditions=@remy/source'],
+      script: '/home/a b/remy/main.ts',
+    });
+    expect(unit).toContain(
+      'ExecStart="/home/a b/.nvm/node" "--conditions=@remy/source" "/home/a b/remy/main.ts" "daemon" "run"',
+    );
+    expect(unit).not.toContain('Environment=');
+  });
+
+  it('needs an absolute node path', () => {
+    expect(() => systemdUnit({ execPath: 'node', execArgv: [], script: '/x' })).toThrow(
+      'full path',
+    );
   });
 });

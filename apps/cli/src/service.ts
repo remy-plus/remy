@@ -52,6 +52,47 @@ export interface ServiceInstaller {
   isOn(): boolean;
 }
 
+/** Refuses text a service file could read as more than one line. */
+function singleLine(what: string, text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: that is the point
+  if (/[\u0000-\u001f\u007f]/.test(text)) throw new Error(`${what} has a control character.`);
+  return text;
+}
+
+/**
+ * One systemd word in double quotes. Inside them `\` and `"` are escaped, `%` is doubled so it is
+ * not a specifier, and `$` is doubled where the setting expands variables (ExecStart does).
+ */
+export function systemdQuote(text: string, what: string, expandsVariables = true): string {
+  const safe = singleLine(what, text)
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replaceAll('%', '%%');
+  return `"${expandsVariables ? safe.replaceAll('$', '$$$$') : safe}"`;
+}
+
+/** A systemd user unit: starts at login and comes back after a failure. */
+export function systemdUnit(entry: EntryPoint, path = ''): string {
+  if (!entry.execPath.startsWith('/'))
+    throw new Error('systemd needs the full path to node, and this one is not.');
+  const words = [entry.execPath, ...entry.execArgv, entry.script, 'daemon', 'run']
+    .map((w) => systemdQuote(w, 'A path'))
+    .join(' ');
+  return `[Unit]
+Description=Remy daemon: runs your schedules
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${words}
+${path ? `Environment=${systemdQuote(`PATH=${path}`, 'PATH', false)}\n` : ''}Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+`;
+}
+
 /** macOS: a LaunchAgent that starts at login. */
 export function launchdInstaller(ctx: ServiceContext): ServiceInstaller {
   const plist = join(ctx.homeDir, 'Library', 'LaunchAgents', `${LAUNCH_LABEL}.plist`);
