@@ -4,11 +4,11 @@
 
 `remy doctor` ends with a recommendation for how Remy should reach real apps and search on this machine. It reads memory, chip, cores, free disk where Remy keeps its data, whether Docker is running, whether Chrome or Edge is installed, and whether a search service key is set. Nothing is downloaded or started to find out. Docker is asked once, with a three second limit.
 
-| Machine | Recommendation |
-|---|---|
-| Under 16 GB, or less than 10 GB free | `light`: the hidden browser |
-| 16 GB or more, Docker running | `strong`: a container (`remy browser vm start`) |
-| 16 GB or more, no Docker | `light`, with one step: install or start Docker or Colima |
+| Machine                                | Recommendation                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------ |
+| Under 16 GB, or less than 10 GB free   | `light`: the hidden browser                                                          |
+| 16 GB or more, Docker running          | `strong`: a container (`remy browser vm start`)                                      |
+| 16 GB or more, no Docker               | `light`, with one step: install or start Docker or Colima                            |
 | Linux with room and no desktop browser | `home-server`: a container. The ready-made Docker image for servers comes in Stage 6 |
 
 It always gives a one-line reason and the single next step. If no browser and no search key are found, the step is to install Chrome or set `TINYFISH_API_KEY`.
