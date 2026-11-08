@@ -141,6 +141,8 @@ import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
+import { reachLines, recommendReach } from './reach.ts';
+import { readReachFacts } from './reach-facts.ts';
 import { withRecall } from './recall.ts';
 import { plainSchedules } from './schedule.ts';
 import { openSchedules } from './schedule-store.ts';
@@ -1868,6 +1870,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const facts = machineFacts();
         const checks = runChecks(facts);
         out(plainChecks(checks));
+        const reach = readReachFacts({
+          home,
+          browser: facts.browser,
+          keySearch: facts.search.order.some((r) => r !== 'vm' && r !== 'browser'),
+        });
+        out(`\n${reachLines(recommendReach(reach)).join('\n')}`);
         return checks.some((c) => c.status === 'problem') ? 1 : 0;
       }
 
