@@ -153,4 +153,153 @@ export interface RemyApi {
   cancel(id: string): Promise<void>;
   extend(id: string, body?: ExtendBody): Promise<void>;
   home(): Promise<HomeData>;
+  // Connections, skills, schedules and the brain (package 6.3 group B). The server has no routes
+  // for these yet: the mock serves them and the http adapter says "not connected" for each.
+  connections(): Promise<ConnectionsData>;
+  setPermission(appId: string, permissionId: string, on: boolean): Promise<void>;
+  disconnectApp(appId: string): Promise<void>;
+  signInApp(appId: string): Promise<void>;
+  appCatalog(): Promise<CatalogApp[]>;
+  connectApp(appId: string, level: PermissionLevel): Promise<void>;
+  testMachine(input: MachineInput): Promise<MachineTest>;
+  addMachine(input: MachineInput): Promise<void>;
+  skills(): Promise<SkillsData>;
+  setSkillEnabled(name: string, enabled: boolean): Promise<void>;
+  runSkill(name: string): Promise<{ taskId: string }>;
+  resolveSuggestion(accept: boolean): Promise<void>;
+  schedules(): Promise<SchedulesData>;
+  setScheduleEnabled(id: string, enabled: boolean): Promise<void>;
+  runScheduleNow(id: string): Promise<{ taskId: string }>;
+  setWebhookEnabled(id: string, enabled: boolean): Promise<void>;
+  createSchedule(input: NewScheduleInput): Promise<{ id: string }>;
+  brain(): Promise<BrainData>;
+  updateNote(id: string, body: string): Promise<void>;
+  deleteNote(id: string): Promise<void>;
+}
+
+// ---- Connections ----
+export type AppStatus = 'connected' | 'needs_signin' | 'not_connected';
+export type PermissionLevel = 'read' | 'draft' | 'act';
+export interface AppPermission {
+  id: string;
+  label: string;
+  detail: string;
+  on: boolean;
+}
+export interface ConnectedApp {
+  id: string;
+  name: string;
+  blurb: string;
+  status: AppStatus;
+  /** Extra words after the status, for example "read only". */
+  statusNote?: string;
+  permissions: AppPermission[];
+  /** What Remy does with text that comes in through this app. */
+  untrusted: string;
+}
+export interface Machine {
+  name: string;
+  detail: string;
+  status: 'reachable' | 'unreachable';
+}
+export interface ConnectionsData {
+  apps: ConnectedApp[];
+  machines: Machine[];
+}
+export interface CatalogApp {
+  id: string;
+  name: string;
+  blurb: string;
+  spendsMoney?: boolean;
+  levels: { id: PermissionLevel; label: string; detail: string }[];
+}
+export interface MachineInput {
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  /** A key file path, or empty for the key Remy makes for this machine. */
+  keyPath: string;
+}
+export interface MachineTest {
+  ok: boolean;
+  lines: string[];
+}
+
+// ---- Skills ----
+export interface SkillItem {
+  name: string;
+  blurb: string;
+  source: 'yours' | 'learned' | 'builtin';
+  enabled: boolean;
+  used: number;
+  lastRun: string | null;
+  /** For a learned skill: where it came from, in words. */
+  origin: string | null;
+  steps: { title: string; detail: string }[];
+  why: string | null;
+}
+export interface SkillsData {
+  skills: SkillItem[];
+  suggestion: { text: string } | null;
+}
+
+// ---- Schedules ----
+export interface ScheduleItem {
+  id: string;
+  title: string;
+  detail: string;
+  when: string;
+  /** "next in 4 days · last ok", or why it is paused. */
+  next: string;
+  enabled: boolean;
+  /** Set when the schedule is stopped by something to fix. */
+  fix?: { label: string; href: string };
+}
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  detail: string;
+  enabled: boolean;
+}
+export interface SchedulesData {
+  schedules: ScheduleItem[];
+  timeline: { at: string; title: string; note?: string; soon?: boolean }[];
+  webhooks: Webhook[];
+  webhooksNote: string;
+  away: string;
+  /** For the new-schedule form. */
+  runsOn: string[];
+  policy: { trust: TrustLevel; stopAbove: string };
+}
+export interface NewScheduleInput {
+  prompt: string;
+  /** A phrase the scheduler reads, like "every Monday at 08:30". */
+  when: string;
+  timezone: string;
+  runsOn: string;
+}
+
+// ---- Brain ----
+export type NoteKind = 'person' | 'project' | 'how-to' | 'fact';
+export interface BrainNote {
+  id: string;
+  title: string;
+  kind: NoteKind;
+  body: string;
+  /** Ids of the notes it links to (both ways are drawn). */
+  links: string[];
+  linkCount: number;
+  origin: string;
+  /** Place in the graph, 0 to 100 each way. */
+  x: number;
+  y: number;
+}
+export interface BrainData {
+  total: number;
+  newToday: number;
+  counts: Record<NoteKind, number>;
+  notes: BrainNote[];
+  selected: string;
 }
