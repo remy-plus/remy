@@ -498,6 +498,23 @@ describe('work claimed with no tool run', () => {
       ).toMatchObject({ kind: 'finish', status: 'failed' });
     });
 
+    it('lets an honest report of an unconfirmed send stand', () => {
+      const lost: Event[] = [
+        resp(1, call('b', 'email_send')),
+        { type: 'policy.decided', callId: 'b', decision: { kind: 'allow' }, risk: 'send_as_user' },
+        started('b'),
+        {
+          type: 'tool.completed',
+          callId: 'b',
+          result: { ok: false, error: 'closed', retryable: false, phase: 'after_effect' },
+          latencyMs: 1,
+        },
+      ];
+      const honest = 'I sent the issue, but the connection closed. It may or may not exist.';
+      expect(next(...lost, said(honest, 2))).toMatchObject({ kind: 'finish', status: 'succeeded' });
+      expect(next(...lost, said(emailed, 2))).not.toMatchObject({ status: 'succeeded' });
+    });
+
     it('believes a claim once something was written', () => {
       expect(next(...ran('write'), said(emailed, 2))).toMatchObject({ status: 'succeeded' });
     });

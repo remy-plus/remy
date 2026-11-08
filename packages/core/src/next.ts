@@ -138,9 +138,19 @@ const ranNoTools = (s: TaskState) =>
 const changedNothing = (s: TaskState) =>
   !Object.values(s.calls).some((c) => !NOT_WORK.has(c.tool) && c.result?.ok && c.risk !== 'read');
 
+/** An action was tried and stopped: the call failed, so whether it took effect is not known. */
+const triedAndFailed = (s: TaskState) =>
+  Object.values(s.calls).some((c) => c.risk && c.risk !== 'read' && c.result && !c.result.ok);
+
+/** The reply says it cannot tell whether the action happened. That is a report, not a claim. */
+const UNCERTAIN =
+  /\b(may or may not|might not have|could ?n[o']t (confirm|verify|tell)|can ?not (confirm|verify|tell)|can't (confirm|verify|tell)|unable to (confirm|verify)|not (sure|certain)|do ?n[o']t know whether|status unknown)\b/i;
+
 /** The reply says something happened, and the tools that ran could not have done it. */
-const unbackedClaim = (s: TaskState, text: string) =>
-  (ranNoTools(s) && isClaimedWork(text)) || (changedNothing(s) && isClaimedAction(text));
+const unbackedClaim = (s: TaskState, text: string) => {
+  if (triedAndFailed(s) && UNCERTAIN.test(text.replace(/\u2019/g, "'"))) return false;
+  return (ranNoTools(s) && isClaimedWork(text)) || (changedNothing(s) && isClaimedAction(text));
+};
 
 /** Nothing ran at all, or an action was tried and stopped: the claim cannot be true. */
 const provablyFalse = (s: TaskState) =>
