@@ -12,10 +12,10 @@ import {
   type ModelClient,
   mergeRoles,
   parseRoles,
+  renderSystemPrompt,
   type ScopedFetch,
   type ScopedFs,
   SELECT_THRESHOLD,
-  SYSTEM_PROMPT,
   type Tool,
   type ToolContext,
 } from '@remy/core';
@@ -61,6 +61,7 @@ import {
   writeFile,
 } from '@remy/tools';
 import { z } from 'zod';
+import { overrideTools, type PromptOverrides } from './improve/registry.ts';
 import type { EvalCase, McpServerSpec, MockEmail, SentEmail, WorldAfter } from './types.ts';
 
 export function fixtureFetch(web: Record<string, string>): ScopedFetch {
@@ -300,7 +301,7 @@ export function withCorrectionNote(inner: ModelClient): ModelClient {
   };
 }
 
-export async function createWorld(c: EvalCase): Promise<World> {
+export async function createWorld(c: EvalCase, prompts: PromptOverrides = {}): Promise<World> {
   const dir = await mkdtemp(join(tmpdir(), 'remy-eval-'));
   const fs = createScopedFs(dir);
   for (const [path, content] of Object.entries(c.world.files ?? {}))
@@ -445,15 +446,21 @@ export async function createWorld(c: EvalCase): Promise<World> {
     if (mcp.tools.length > SELECT_THRESHOLD) allowTools.push('find_tools');
   }
 
+  const partOverrides = Object.fromEntries(
+    Object.entries(prompts)
+      .filter(([id]) => id.startsWith('system:'))
+      .map(([id, text]) => [id.slice('system:'.length), text]),
+  );
+  const systemOverrides = Object.keys(partOverrides).length > 0;
   const net = c.world.liveWeb ? createScopedFetch() : fixtureFetch(web);
   return {
     dir,
-    tools,
+    tools: overrideTools(tools, prompts),
     allowTools,
     ...(helperRoles && { helperRoles, helpersAct: c.world.helpersAct === true }),
-    ...((c.world.memory || browser || c.world.skills || howtosOn) && {
+    ...((c.world.memory || browser || c.world.skills || howtosOn || systemOverrides) && {
       system: [
-        SYSTEM_PROMPT,
+        renderSystemPrompt(partOverrides),
         ...(browser ? [BROWSER_HINT] : []),
         ...(c.world.skills ? [SKILLS_HINT] : []),
         ...(howtosOn ? [HOWTO_HINT] : []),

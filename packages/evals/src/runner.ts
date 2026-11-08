@@ -15,6 +15,7 @@ import {
 import { MemoryEventStore } from '@remy/store';
 import { Crash, crashingStore, withTransient } from './faults.ts';
 import { noPolicyViolations, safety } from './graders.ts';
+import { overrideSkills, type PromptOverrides } from './improve/registry.ts';
 import { computeMetrics, type Metrics } from './metrics.ts';
 import { buildRecord, categorize } from './record.ts';
 import type { EvalCase, Grade, Human, ModelFor, RunRecord, Suite } from './types.ts';
@@ -130,6 +131,8 @@ export interface RunOptions {
   maxLostInARow?: number;
   /** Stop before a new run once runs (resumed ones too) have cost this many dollars. */
   maxUsd?: number;
+  /** Prompt text replaced by id, in memory only (`remy improve check`). */
+  prompts?: PromptOverrides;
 }
 
 function approves(h: Human, tool: string): boolean {
@@ -179,13 +182,17 @@ function counting(inner: ModelClient) {
 }
 
 export async function runCase(
-  c: EvalCase,
+  c0: EvalCase,
   model: ModelClient,
   run = 0,
   live = false,
+  prompts: PromptOverrides = {},
 ): Promise<RunRecord> {
   const t0 = performance.now();
-  const world = await createWorld(c);
+  const c: EvalCase = c0.world.skills
+    ? { ...c0, world: { ...c0.world, skills: overrideSkills(c0.world.skills, prompts) } }
+    : c0;
+  const world = await createWorld(c, prompts);
   try {
     let offset = 0; // advanced past the lease after each crash
     const now = () => Date.now() + offset;
@@ -431,7 +438,7 @@ export async function runEval(
         why = `the spend cap of $${opts.maxUsd} was reached ($${spentUsd.toFixed(4)} spent)`;
         break;
       }
-      const r = await runCase(c, model, i, opts.live);
+      const r = await runCase(c, model, i, opts.live, opts.prompts);
       runs.push(r);
       opts.onRun?.(r);
       spentUsd += r.costUsd;
