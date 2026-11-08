@@ -37,7 +37,7 @@ The shared token is 32 random bytes, made on first use and kept in `webhook-toke
 
 ## Payloads are untrusted
 
-Whatever a webhook sends is data, not instructions. Remy removes control and hidden characters, cuts it short, and puts it after your saved prompt marked as untrusted. The run starts tainted and at trust level `ask`, whatever you set for chat, with no always-allow approvals. It may read. Writing a file, sending a message, running a command or anything else that changes something waits for a card, and a webhook run has nobody to answer it until you open `remy review`. The task is not marked done while a card is waiting.
+Whatever a webhook sends is data, not instructions. Remy removes control and hidden characters, cuts it short, and puts it after your saved prompt marked as untrusted. The run starts tainted and at trust level `ask`, whatever you set for chat, with no always-allow approvals. It may read. Writing a file, sending a message, running a command or anything else that changes something waits for a card, and a webhook run has nobody to answer it until you open `remy review`.
 
 ## Use a private network, not an open port
 
