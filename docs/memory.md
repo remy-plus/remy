@@ -12,6 +12,18 @@ Older versions kept notes in `memory.json`. The first time a newer Remy opens yo
 
 Only a few notes reach the model, so a long memory costs the same as a short one. Each message carries the notes that best match what you wrote, then your newest preferences, up to about 250 tokens and 12 notes. The `recall` tool searches all of your notes and past tasks when the model needs something older, up to about 600 tokens of notes.
 
+## How notes are found
+
+Matching runs on your machine, with no key and no network. Remy ranks notes by the words they share with your message (BM25), after folding common endings together, so "living" finds "Lives in Porto". Numbers and dates stay whole, and "mar" counts as March. A short, fixed list of related words helps with the common cases: where you live, work or home, your pet or dog or cat, your job or employer, family words, phone, email and a few more. "Where do I live?" finds "Lives in Porto" and "my pet" finds "Has a dog named Kiwi" for that reason. A word that is neither shared nor on the list matches nothing. This is word matching, not understanding. The `recall` tool ranks past tasks the same way.
+
+### Embeddings (optional, off by default)
+
+If your provider offers an OpenAI-compatible `/embeddings` endpoint, set `REMY_EMBEDDINGS=on` and recall also compares meaning, so "something to keep me warm" can find "Owns a wool coat". Ranking then mixes the word score and the vector score.
+
+What is sent: the text of each note and the text of the recall query, to the provider you already chose for chat, and to no other. There is no separate address to set. Nothing else goes: not task content, files, keys or the notes' ids. A note is sent once, in batches, and again only when you edit it; its vector is stored in `remy.sqlite` next to the note and deleted with it. A new message sends only its own text.
+
+The model is `REMY_EMBEDDING_MODEL`. When the provider is OpenAI it defaults to `text-embedding-3-small`; for any other provider set it yourself. If the endpoint fails (not offered, refused, offline), Remy ranks locally for the rest of the session without interrupting you, and `remy doctor` shows the failure. With "Personalise replies" off, no embedding request is made.
+
 ## Duplicates and conflicts
 
 The same fact in other words updates the note you have instead of adding a second one: "Likes tea" and "Likes tea with milk" become one note, and the longer wording stays. Notes of different kinds are never merged.
