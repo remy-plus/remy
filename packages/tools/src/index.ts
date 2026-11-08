@@ -4,6 +4,7 @@ export * from './delegate.ts';
 export * from './edit-tools.ts';
 export * from './file-tools.ts';
 export * from './html.ts';
+export * from './memory-match.ts';
 export * from './memory-tools.ts';
 export * from './plan-tool.ts';
 export * from './redact.ts';
