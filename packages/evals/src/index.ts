@@ -8,6 +8,8 @@ export * from './improve/proposal.ts';
 export * from './improve/proposal.ts';
 export * from './improve/proposal.ts';
 export * from './improve/proposal.ts';
+export * from './improve/proposal.ts';
+export * from './improve/propose.ts';
 export * from './improve/propose.ts';
 export * from './improve/registry.ts';
 export * from './improve/validate.ts';

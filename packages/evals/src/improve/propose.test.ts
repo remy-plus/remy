@@ -112,6 +112,17 @@ describe('propose', () => {
     expect(model.requests[0]?.tools).toEqual([]);
   });
 
+  it('states the estimate first and stops over the cap without calling the model', async () => {
+    const model = new ScriptedModelClient([reply([])], { caps: priced(5000) });
+    const seen: number[] = [];
+    await expect(
+      propose({ ...input(model, 0.001), onEstimate: (u) => seen.push(u) }),
+    ).rejects.toThrow(/over the cap of \$0\.001\. Nothing was spent/);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBeGreaterThan(0.001);
+    expect(model.requests).toHaveLength(0);
+  });
+
   it('returns nothing when no run failed', async () => {
     const model = new ScriptedModelClient([]);
     expect(await propose({ ...input(model), runs: [ok('d')] })).toBeUndefined();

@@ -126,6 +126,10 @@ export async function propose(i: ProposeInput): Promise<Proposal | undefined> {
   const user = proposePrompt(groups, editableEntries());
   const estimate = estimateUsd(i.model, PROPOSE_SYSTEM, user);
   i.onEstimate?.(estimate);
+  if (estimate > i.maxUsd)
+    throw new Error(
+      `Stopped: this would cost about $${estimate.toFixed(4)}, over the cap of $${i.maxUsd}. Nothing was spent.`,
+    );
   const res = await i.model.complete(
     {
       system: PROPOSE_SYSTEM,
