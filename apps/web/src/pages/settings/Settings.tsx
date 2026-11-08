@@ -5,12 +5,15 @@ import { Memory } from './memory.tsx';
 import { Model } from './model.tsx';
 import { Notifications } from './notifications.tsx';
 import { SECTIONS, type SectionId, type SectionProps } from './sections.ts';
+import { About, Server } from './server.tsx';
 
 const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
   trust: Trust,
   budget: Budget,
   appearance: Appearance,
   memory: Memory,
+  server: Server,
+  about: About,
   model: Model,
   notifications: Notifications,
 };
