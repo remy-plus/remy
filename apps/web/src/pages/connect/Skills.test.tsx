@@ -62,6 +62,7 @@ describe('Skills', () => {
     await screen.findByRole('article');
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('heading', { level: 1, name: 'Skills' })).toBeTruthy();
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
   });

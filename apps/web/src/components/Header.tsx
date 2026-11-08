@@ -6,13 +6,17 @@ export const NAV = [
   {
     label: 'Tasks',
     href: '#/tasks',
-    match: (p: string) => p === '/tasks' || p.startsWith('/tasks/'),
+    match: (p: string) => p === '/tasks' || p.startsWith('/tasks/') || p.startsWith('/schedules'),
   },
-  { label: 'Brain', href: '#/brain', match: (p: string) => p === '/brain' },
+  {
+    label: 'Brain',
+    href: '#/brain',
+    match: (p: string) => p === '/brain' || p === '/skills',
+  },
   {
     label: 'Connections',
     href: '#/connections',
-    match: (p: string) => p === '/connections',
+    match: (p: string) => p === '/connections' || p.startsWith('/connections/'),
   },
   {
     label: 'Settings',

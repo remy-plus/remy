@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../App.tsx';
 import { ApiProvider } from '../../api/index.tsx';
@@ -59,6 +59,10 @@ describe('Add a connection', () => {
     open('#/connections/add');
     await screen.findByRole('radiogroup', { name: 'App' });
     expect(screen.getByRole('main')).toBeTruthy();
+    const nav = within(screen.getByRole('navigation', { name: 'Main' }));
+    expect(nav.getByRole('link', { name: 'Connections' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
     expect(screen.getByRole('complementary')).toBeTruthy();
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
   });
