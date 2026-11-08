@@ -48,27 +48,22 @@ export function readBody(
   });
 }
 
-export type Reservation = 'ok' | 'too_soon' | 'too_many';
+export type Reservation = 'ok' | 'too_soon';
 
 export interface RunGate {
-  /** Checks and takes the slot in one step, so two requests at once cannot both pass. */
-  reserve(hook: string, running: number): Reservation;
+  /** Checks and takes the hook's slot in one step, so two requests at once cannot both pass. */
+  reserve(hook: string): Reservation;
   /** Gives the slot back when the run did not start. */
   release(hook: string): void;
 }
 
-export function createRunGate(
-  now: () => number = Date.now,
-  gapMs = HOOK_GAP_MS,
-  maxRunning = MAX_RUNNING,
-): RunGate {
+export function createRunGate(now: () => number = Date.now, gapMs = HOOK_GAP_MS): RunGate {
   const last = new Map<string, number>();
   return {
-    reserve(hook, running) {
+    reserve(hook) {
       const t = now();
       const before = last.get(hook);
       if (before !== undefined && t - before < gapMs) return 'too_soon';
-      if (running >= maxRunning) return 'too_many';
       last.set(hook, t);
       return 'ok';
     },

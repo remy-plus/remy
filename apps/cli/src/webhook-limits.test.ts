@@ -61,22 +61,17 @@ describe('run gate', () => {
   it('allows one start per hook per 10 seconds', () => {
     let t = 0;
     const g = createRunGate(() => t);
-    expect(g.reserve('a', 0)).toBe('ok');
+    expect(g.reserve('a')).toBe('ok');
     t = 9_999;
-    expect(g.reserve('a', 0)).toBe('too_soon');
-    expect(g.reserve('b', 0)).toBe('ok');
+    expect(g.reserve('a')).toBe('too_soon');
+    expect(g.reserve('b')).toBe('ok');
     t = 10_000;
-    expect(g.reserve('a', 0)).toBe('ok');
-  });
-  it('allows at most 3 running at once', () => {
-    const g = createRunGate(() => 0);
-    expect(g.reserve('a', 2)).toBe('ok');
-    expect(g.reserve('b', 3)).toBe('too_many');
+    expect(g.reserve('a')).toBe('ok');
   });
   it('a released slot can be taken again', () => {
     const g = createRunGate(() => 0);
-    g.reserve('a', 0);
+    g.reserve('a');
     g.release('a');
-    expect(g.reserve('a', 0)).toBe('ok');
+    expect(g.reserve('a')).toBe('ok');
   });
 });
