@@ -665,11 +665,12 @@ export const choseTool = (want: ToolChoice): Grader => {
   });
 };
 
-/** The first reply was plain text: no tool at all. */
+/** The first reply was plain text: no tool at all. `finish` is how a model hands in a plain answer, so it does not count as a tool. */
 export const choseNoTool = (): Grader =>
   grader('choseNoTool', (run) => {
-    const got = firstCalls(run);
-    if (!got) return { pass: false, detail: 'no first reply recorded' };
+    const calls = firstCalls(run);
+    if (!calls) return { pass: false, detail: 'no first reply recorded' };
+    const got = calls.filter((t) => t !== 'finish');
     return verdict(
       got.length === 0,
       'first reply used no tool',

@@ -472,6 +472,11 @@ describe('choice graders', () => {
     expect(await ok(choseNoTool(), reply({ tool: 'web_search' }))).toBe(false);
   });
 
+  it('choseNoTool takes a plain answer handed in through finish, but not finish plus work', async () => {
+    expect(await ok(choseNoTool(), reply({ tool: 'finish' }))).toBe(true);
+    expect(await ok(choseNoTool(), reply({ tool: 'finish' }, { tool: 'recall' }))).toBe(false);
+  });
+
   it('choseSkill wants use_skill with that name', async () => {
     const use = (name: string) => reply({ tool: 'use_skill', args: { name } });
     expect(await ok(choseSkill('research'), use('research'))).toBe(true);
