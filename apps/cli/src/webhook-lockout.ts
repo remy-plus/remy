@@ -10,7 +10,11 @@ export interface Lockout {
   fail(address: string): void;
 }
 
-export function createLockout(now: () => number = Date.now): Lockout {
+export function createLockout(
+  now: () => number = Date.now,
+  /** How long a blocked address stays blocked. Webhooks use 5 minutes, `remy serve` 1 minute. */
+  blockMs: number = BLOCK_MS,
+): Lockout {
   const failures = new Map<string, number[]>();
   const until = new Map<string, number>();
   const prune = () => {
@@ -36,7 +40,7 @@ export function createLockout(now: () => number = Date.now): Lockout {
       const live = (failures.get(address) ?? []).filter((f) => t - f < FAILURE_WINDOW_MS);
       live.push(t);
       if (live.length >= MAX_FAILURES) {
-        until.set(address, t + BLOCK_MS);
+        until.set(address, t + blockMs);
         failures.delete(address);
       } else failures.set(address, live);
     },
