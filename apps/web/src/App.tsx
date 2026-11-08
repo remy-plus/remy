@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useApi } from './api/index.tsx';
+import { CommandPalette } from './components/CommandPalette.tsx';
 import { Header } from './components/Header.tsx';
+import { PushToTalk } from './components/PushToTalk.tsx';
 import { StatusBar } from './components/StatusBar.tsx';
 import { useHome } from './hooks.ts';
 import { AddConnection } from './pages/connect/AddConnection.tsx';
@@ -18,6 +20,7 @@ import { Task } from './pages/tasks/Task.tsx';
 import { Tasks } from './pages/tasks/Tasks.tsx';
 import { Quiet } from './pages/welcome/Quiet.tsx';
 import { SignIn } from './pages/welcome/SignIn.tsx';
+import { useFirstRun } from './pages/welcome/useFirstRun.ts';
 import { Welcome } from './pages/welcome/Welcome.tsx';
 import { matchRoute, useHashPath } from './router.ts';
 
@@ -61,8 +64,12 @@ function Page({ path, home }: { path: string; home: ReturnType<typeof useHome> }
   }
 }
 
+/** These screens are full-page, as in the frames: no bar across the top. */
+const BARE = new Set(['welcome', 'sign-in', 'quiet']);
+
 export function App() {
   const path = useHashPath();
+  useFirstRun(path);
   const api = useApi();
   const home = useHome();
   const main = useRef<HTMLElement>(null);
@@ -87,13 +94,17 @@ export function App() {
       >
         Skip to main content
       </a>
-      <Header
-        path={path}
-        status={home.data && <StatusBar status={home.data.status} sample={api.kind === 'mock'} />}
-      />
+      {!BARE.has(matchRoute(path).name) && (
+        <Header
+          path={path}
+          status={home.data && <StatusBar status={home.data.status} sample={api.kind === 'mock'} />}
+        />
+      )}
       <main id="main" ref={main} tabIndex={-1} className="outline-none">
         <Page path={path} home={home} />
       </main>
+      <CommandPalette />
+      <PushToTalk />
     </>
   );
 }
