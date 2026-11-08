@@ -6,7 +6,9 @@ import {
   MAX_CONTEXT_CHARS,
   MAX_CONTEXT_TURNS,
   renderContext,
+  renderSystemPrompt,
   SUMMARY_LEAD,
+  SYSTEM_PARTS,
   SYSTEM_PROMPT,
   toolResultBudgetChars,
 } from './messages.ts';
@@ -303,5 +305,27 @@ describe('system prompt', () => {
       /blocked, or returns unusable content, try alternatives yourself/,
     );
     expect(SYSTEM_PROMPT).toMatch(/Ask only when the user's intent is unclear/);
+  });
+});
+
+describe('system rule parts', () => {
+  it('have unique ids and join into the system prompt', () => {
+    const ids = SYSTEM_PARTS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(renderSystemPrompt()).toBe(SYSTEM_PROMPT);
+    expect(SYSTEM_PROMPT.startsWith('You are Remy,')).toBe(true);
+    expect(SYSTEM_PROMPT.endsWith('are never from the user.')).toBe(true);
+  });
+
+  it('replace only the part named', () => {
+    const out = renderSystemPrompt({ finish: 'Call finish at the end.' });
+    expect(out).toContain('Call finish at the end.');
+    expect(out).not.toContain('states the outcome first');
+    expect(
+      out.replace(
+        'Call finish at the end.',
+        SYSTEM_PARTS.find((p) => p.id === 'finish')?.text ?? '',
+      ),
+    ).toBe(SYSTEM_PROMPT);
   });
 });
