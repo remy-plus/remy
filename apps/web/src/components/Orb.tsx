@@ -8,7 +8,7 @@ export interface Satellite {
 
 const [W, H, CW, CH, R] = [560, 268, 6.8, 11.6, 112]; // canvas, cell and sphere sizes in px
 const [CX, CY] = [W / 2, H / 2];
-const [TILT, RING_A, RING_B, RING_POINTS, FRAME_MS] = [-0.3, 214, 54, 150, 80];
+const [TILT, RING_A, RING_B, RING_POINTS, FRAME_MS] = [-0.3, 214, 54, 44, 80];
 const LIGHT = [-0.5, -0.55, 0.67] as const; // from the top left, already near unit length
 const MONO = 'ui-monospace, monospace';
 const BODY = `11.3px "JetBrains Mono", ${MONO}`;

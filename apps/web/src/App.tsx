@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react';
+import { useApi } from './api/index.tsx';
 import { Header } from './components/Header.tsx';
+import { StatusBar } from './components/StatusBar.tsx';
+import { useHome } from './hooks.ts';
+import { Home } from './pages/Home.tsx';
 import { Placeholder } from './pages/Placeholder.tsx';
 import { matchRoute, useHashPath } from './router.ts';
 
-function Page({ path }: { path: string }) {
+function Page({ path, home }: { path: string; home: ReturnType<typeof useHome> }) {
   const { name, params } = matchRoute(path);
   switch (name) {
     case 'home':
-      return <Placeholder title="Home" />;
+      return <Home home={home} />;
     case 'tasks':
       return <Placeholder title="Tasks" />;
     case 'task':
@@ -31,13 +35,16 @@ function Page({ path }: { path: string }) {
 
 export function App() {
   const path = useHashPath();
+  const api = useApi();
+  const home = useHome();
   const main = useRef<HTMLElement>(null);
-  const first = useRef(true);
+  const shown = useRef(path);
   // After a navigation, move focus to the page so keyboard and screen reader users start at the top.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: it must run when the path changes
+  // Comparing paths (not a first-run flag) keeps StrictMode's double effect from focusing on load.
   useEffect(() => {
-    if (first.current) first.current = false;
-    else main.current?.focus();
+    if (shown.current === path) return;
+    shown.current = path;
+    main.current?.focus();
   }, [path]);
   return (
     <>
@@ -52,9 +59,12 @@ export function App() {
       >
         Skip to main content
       </a>
-      <Header path={path} />
+      <Header
+        path={path}
+        status={home.data && <StatusBar status={home.data.status} sample={api.kind === 'mock'} />}
+      />
       <main id="main" ref={main} tabIndex={-1} className="outline-none">
-        <Page path={path} />
+        <Page path={path} home={home} />
       </main>
     </>
   );

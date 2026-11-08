@@ -1,7 +1,15 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from './App.tsx';
+import { ApiProvider } from './api/index.tsx';
+import { createMockApi } from './api/mock.ts';
 import { matchRoute, pathOf } from './router.ts';
+
+const app = () => (
+  <ApiProvider api={createMockApi()}>
+    <App />
+  </ApiProvider>
+);
 
 const go = (hash: string) =>
   act(() => {
@@ -40,8 +48,8 @@ describe('matchRoute', () => {
 });
 
 describe('App routing', () => {
-  const cases: [hash: string, heading: string, current: string | null][] = [
-    ['#/', 'Home', 'Home'],
+  const cases: [hash: string, heading: string | RegExp, current: string | null][] = [
+    ['#/', /Three things need you/, 'Home'],
     ['#/tasks', 'Tasks', 'Tasks'],
     ['#/tasks/task_9', 'Task', 'Tasks'],
     ['#/brain', 'Brain', 'Brain'],
@@ -52,10 +60,10 @@ describe('App routing', () => {
     ['#/settings/trust', 'Settings', 'Settings'],
   ];
   for (const [hash, heading, current] of cases) {
-    it(`renders ${hash}`, () => {
+    it(`renders ${hash}`, async () => {
       window.location.hash = hash;
-      render(<App />);
-      expect(screen.getByRole('heading', { level: 1, name: heading })).toBeTruthy();
+      render(app());
+      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeTruthy();
       const marked = screen
         .getAllByRole('link')
         .filter((a) => a.getAttribute('aria-current') === 'page');
@@ -63,8 +71,9 @@ describe('App routing', () => {
     });
   }
 
-  it('follows the address bar and moves focus to the page', () => {
-    render(<App />);
+  it('follows the address bar and moves focus to the page', async () => {
+    render(app());
+    await screen.findByRole('heading', { level: 1 });
     go('#/brain');
     expect(screen.getByRole('heading', { level: 1, name: 'Brain' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBe('page');
@@ -73,13 +82,13 @@ describe('App routing', () => {
 
   it('shows a plain not-found page', () => {
     window.location.hash = '#/nope';
-    render(<App />);
+    render(app());
     expect(screen.getByRole('heading', { level: 1, name: 'Not found' })).toBeTruthy();
   });
 
   it('skip link focuses main without changing the route', () => {
     window.location.hash = '#/tasks';
-    render(<App />);
+    render(app());
     screen.getByRole('link', { name: 'Skip to main content' }).click();
     expect(document.activeElement).toBe(screen.getByRole('main'));
     expect(window.location.hash).toBe('#/tasks');
