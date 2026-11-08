@@ -27,6 +27,10 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS notes (
   id TEXT PRIMARY KEY, text TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL DEFAULT '',
   created TEXT NOT NULL DEFAULT '', conflicts TEXT NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS note_vectors (
+  id TEXT NOT NULL, space TEXT NOT NULL, hash TEXT NOT NULL, vec BLOB NOT NULL,
+  PRIMARY KEY (id, space)
 );`;
 
 const entrySchema = z.object({
@@ -53,6 +57,9 @@ export interface MemoryStore extends MemoryPort {
   /** Deletes every note. */
   clear(): number;
   subscribe(fn: () => void): () => void;
+  /** Stored embedding vectors for one provider and model, by note id (see embeddings.ts). */
+  vectors(space: string): Map<string, { hash: string; vec: number[] }>;
+  saveVectors(space: string, rows: { id: string; hash: string; vec: number[] }[]): void;
 }
 
 export const KIND_LABEL: Record<MemoryKind, string> = {
@@ -234,6 +241,7 @@ export function openMemory(
       return write((entries) => {
         if (!entries.some((e) => e.id === id)) return false;
         db.prepare('DELETE FROM notes WHERE id = ?').run(id);
+        db.prepare('DELETE FROM note_vectors WHERE id = ?').run(id);
         for (const e of removeNote(entries, id).changed) put(e);
         return true;
       });
@@ -250,7 +258,29 @@ export function openMemory(
     clear() {
       return write((entries) => {
         db.exec('DELETE FROM notes');
+        db.exec('DELETE FROM note_vectors');
         return entries.length;
+      });
+    },
+    vectors(space) {
+      const out = new Map<string, { hash: string; vec: number[] }>();
+      const rows = db
+        .prepare('SELECT id, hash, vec FROM note_vectors WHERE space = ?')
+        .all(space) as { id: string; hash: string; vec: Uint8Array }[];
+      for (const r of rows) {
+        const b = new Uint8Array(r.vec);
+        out.set(r.id, { hash: r.hash, vec: [...new Float32Array(b.buffer)] });
+      }
+      return out;
+    },
+    saveVectors(space, rows) {
+      tx(() => {
+        const put = db.prepare(
+          `INSERT INTO note_vectors (id, space, hash, vec) VALUES (?, ?, ?, ?)
+           ON CONFLICT(id, space) DO UPDATE SET hash = excluded.hash, vec = excluded.vec`,
+        );
+        for (const r of rows)
+          put.run(r.id, space, r.hash, new Uint8Array(new Float32Array(r.vec).buffer));
       });
     },
     subscribe(fn) {

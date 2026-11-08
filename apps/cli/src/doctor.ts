@@ -13,6 +13,8 @@ export interface Facts {
   search: SearchPlan;
   /** Problems found in the helper roles files, one line each. */
   helperProblems?: string[];
+  /** Embeddings for recall; absent where the check does not apply. */
+  embeddings?: { state: 'off' | 'on' | 'failed' | 'unavailable'; detail?: string };
 }
 
 export interface Check {
@@ -33,6 +35,7 @@ export interface Probes {
   /** The search route plan, already worked out from the keys and, only when needed, Docker. */
   search: SearchPlan;
   helperProblems?: () => string[];
+  embeddings?: () => NonNullable<Facts['embeddings']>;
 }
 
 /** Facts for the checks. */
@@ -46,6 +49,7 @@ export function gatherFacts(p: Probes): Facts {
     schedules: p.schedules(),
     search: p.search,
     ...(p.helperProblems && { helperProblems: p.helperProblems() }),
+    ...(p.embeddings && { embeddings: p.embeddings() }),
   };
 }
 
@@ -56,6 +60,21 @@ function nodeOk(version: string): boolean {
   return (
     major > (MIN_NODE[0] as number) || (major === MIN_NODE[0] && minor >= (MIN_NODE[1] as number))
   );
+}
+
+function embeddingsCheck(e: NonNullable<Facts['embeddings']>): Check {
+  if (e.state === 'failed')
+    return {
+      name: 'Embeddings',
+      status: 'warning',
+      detail: `${e.detail ?? 'the endpoint failed'}; recall uses local ranking`,
+      fix: 'Check that your provider offers /embeddings and set REMY_EMBEDDING_MODEL, or unset REMY_EMBEDDINGS.',
+    };
+  if (e.state === 'on')
+    return { name: 'Embeddings', status: 'ok', detail: 'on; note text goes to your chat provider' };
+  if (e.state === 'unavailable')
+    return { name: 'Embeddings', status: 'ok', detail: `on, but idle: ${e.detail ?? ''}`.trim() };
+  return { name: 'Embeddings', status: 'ok', detail: 'off; recall ranks on this machine' };
 }
 
 export function runChecks(f: Facts): Check[] {
@@ -111,6 +130,7 @@ export function runChecks(f: Facts): Check[] {
           fix: 'Run remy daemon install.',
         }
       : { name: 'Schedules', status: 'ok', detail: `${f.schedules} set` },
+    ...(f.embeddings ? [embeddingsCheck(f.embeddings)] : []),
     ...(f.helperProblems?.length
       ? [
           {
