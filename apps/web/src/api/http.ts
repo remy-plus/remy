@@ -44,6 +44,31 @@ export function createSseParser(onEvent: (e: StreamEvent) => void) {
   };
 }
 
+const NOT_YET = 'Not connected to a server yet';
+const no = () => Promise.reject(new ApiError(501, NOT_YET));
+const notAvailable = {
+  connections: no,
+  setPermission: no,
+  disconnectApp: no,
+  signInApp: no,
+  appCatalog: no,
+  connectApp: no,
+  testMachine: no,
+  addMachine: no,
+  skills: no,
+  setSkillEnabled: no,
+  runSkill: no,
+  resolveSuggestion: no,
+  schedules: no,
+  setScheduleEnabled: no,
+  runScheduleNow: no,
+  setWebhookEnabled: no,
+  createSchedule: no,
+  brain: no,
+  updateNote: no,
+  deleteNote: no,
+} satisfies Partial<RemyApi>;
+
 export function createHttpApi(opts: {
   token: () => string | null;
   base?: string;
@@ -113,6 +138,8 @@ export function createHttpApi(opts: {
     async markDone(): Promise<void> {
       throw new ApiError(404, 'Marking a task done is not available from the server yet.');
     },
+    // Mock-only for now: the server has no routes for connections, skills, schedules or the brain.
+    ...notAvailable,
   };
   return api;
 }

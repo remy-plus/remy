@@ -1,5 +1,6 @@
 // A believable in-memory server, so screens can be built before `remy serve` is live (and for demos
 // with ?mock=1). It keeps the same shapes as the real routes and applies approve, cancel and so on.
+import { createConnectMock } from './mock-connect.ts';
 import type {
   ApprovalCard,
   ApprovalDetail,
@@ -587,6 +588,7 @@ export function createMockApi(): RemyApi {
   };
 
   const api: RemyApi = {
+    ...createConnectMock(),
     kind: 'mock',
     async listTasks(q) {
       const items: TaskListItem[] = [...tasks.values()]

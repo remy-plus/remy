@@ -58,8 +58,8 @@ describe('App routing', () => {
       null,
     ],
     ['#/brain', 'Brain', 'Brain'],
-    ['#/skills', 'Skills', null],
-    ['#/schedules', 'Schedules', null],
+    ['#/skills', 'Skills', 'Brain'],
+    ['#/schedules', 'Schedules', 'Tasks'],
     ['#/connections', 'Connections', 'Connections'],
     ['#/settings', 'Settings', 'Settings'],
     ['#/settings/trust', 'Settings', 'Settings'],
@@ -80,7 +80,7 @@ describe('App routing', () => {
     render(app());
     await screen.findByRole('heading', { level: 1 });
     go('#/brain');
-    expect(screen.getByRole('heading', { level: 1, name: 'Brain' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Brain' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBe('page');
     expect(document.activeElement).toBe(screen.getByRole('main'));
   });
