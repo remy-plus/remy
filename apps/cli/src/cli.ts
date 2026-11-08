@@ -286,7 +286,7 @@ Usage
   remy webhook [list|add <name> "<prompt>"|rm <name>|token [<name>] [--rotate]|enable|disable|start|test <name> [--data <file>]]
                                   Start a saved task from an outside call. Off until enable;
                                   listens on 127.0.0.1 only; the payload is data, not orders
-  remy serve [--port 7788] [--host 127.0.0.1]
+  remy serve [--port 7790] [--host 127.0.0.1]
                                   Serve Remy over HTTP for the web app: tasks, approvals and a
                                   live event stream. 127.0.0.1 only unless REMY_SERVE_ALLOW_REMOTE=on
   remy serve token [--rotate]     Make the access token (shown once; only its hash is kept)

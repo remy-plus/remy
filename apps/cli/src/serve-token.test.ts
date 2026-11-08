@@ -36,8 +36,8 @@ describe('serve token', () => {
 });
 
 describe('serve bind', () => {
-  it('defaults to 127.0.0.1:7788', () => {
-    expect(resolveServeBind({}, {})).toEqual({ host: '127.0.0.1', port: 7788 });
+  it('defaults to 127.0.0.1:7790', () => {
+    expect(resolveServeBind({}, {})).toEqual({ host: '127.0.0.1', port: 7790 });
   });
 
   it('refuses a non-loopback host without its own env flag', () => {

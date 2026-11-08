@@ -1,6 +1,9 @@
 // Where `remy serve` may listen. Loopback only, unless REMY_SERVE_ALLOW_REMOTE=on is also set.
 // There is no TLS here: for another machine, use a private network such as Tailscale.
-import { DEFAULT_PORT, isLoopback, LOOPBACK } from './webhook-bind.ts';
+import { isLoopback, LOOPBACK } from './webhook-bind.ts';
+
+/** Not the webhook port (7788), so both can run at once. */
+export const SERVE_DEFAULT_PORT = 7790;
 
 export interface ServeBind {
   host: string;
@@ -13,7 +16,7 @@ export function resolveServeBind(
   env: Record<string, string | undefined>,
 ): ServeBind {
   const host = opts.host ?? LOOPBACK;
-  const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
+  const port = opts.port === undefined ? SERVE_DEFAULT_PORT : Number(opts.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535)
     throw new Error('The port must be a number from 0 to 65535.');
   if (!isLoopback(host) && env.REMY_SERVE_ALLOW_REMOTE !== 'on')
