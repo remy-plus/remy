@@ -18,7 +18,7 @@ Remy is a terminal agent. You describe a task, and it works in small steps with 
 - follow links, use a site's search box, fill in fields
 - press buttons that send, post, save or delete, **after you approve**; pay, **after you approve, every time**
 - never types passwords or card numbers: it shows the window and you do that part (`remy browser show` or `/browser` to sign in to sites ahead of time)
-- pick another search with `REMY_SEARCH`: `context` (Context.dev), `brave`, `tavily`, `searxng` or `off`; `REMY_BROWSER=off` keeps Remy off your machine's browser
+- search picks its own route (key service, then the container, then the hidden browser), skips one that stops working and says which answered; force one with `REMY_SEARCH`: `tinyfish`, `brave`, `tavily`, `context` (Context.dev), `searxng`, `vm`, `browser` or `off`; `REMY_BROWSER=off` keeps Remy off your machine's browser
 - fetch a page without the browser
 - restrict browsing to the domains you pass with `--net-allow`; local addresses only with `REMY_BROWSER_LOCAL=on`
 

@@ -92,7 +92,7 @@ Ask for something to happen regularly, or run `remy schedule add "every day at 9
 
 ### Search
 
-Remy searches in a hidden browser on your machine with no extra key. Search engines often turn that away, so results vary. `remy browser vm start` moves search into a container (Docker or Colima, about 2 GB) with nothing on your screen, and `REMY_SEARCH` picks a search service instead.
+Remy picks its search route on its own, in this order: a search service whose key is set (`TINYFISH_API_KEY`, `BRAVE_API_KEY`, `TAVILY_API_KEY`, `CONTEXT_DEV_API_KEY`, `SEARXNG_URL`), then a container (`remy browser vm start`, needs Docker or Colima and about 2 GB), then a hidden browser on your machine with no key. Nothing opens on your screen. Search engines often turn the hidden browser away, so a free TinyFish key is the steadiest start. If a route stops working (a refused key, Docker gone, a bot check), Remy skips it for the rest of the session, uses the next one and says which answered. It never solves a bot check. With no route, Remy tells you the one step to take. `remy doctor` shows the route, the order and the step. `REMY_SEARCH` forces one route.
 
 ### Helpers
 
@@ -110,7 +110,7 @@ A role adds instructions and narrows the helper's tools; it never widens them. `
 
 `REMY_HELPERS=act` also lets a helper whose role has an `Act: yes` line ask to change things. Each change shows up as an approval card marked with the helper's name, and nothing runs until you approve those exact arguments. Only one acting helper runs per call.
 
-Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Remy searches and browses in its own hidden browser on your computer, no key needed; `remy browser show` opens it so you can sign in to sites. `REMY_SEARCH` picks another search (`context`, `brave`, `tavily`, `searxng` or `off`).
+Useful commands: `remy list`, `remy show <id>` (the full timeline), `remy resume <id>`, `remy approve <id> [--deny]`, `remy cancel <id>`. Add `--debug` to any command to log model requests, responses and events as JSON lines (to stderr, or to `~/.remy/debug-<time>.jsonl` in the chat). Remy searches and browses in its own hidden browser on your computer, no key needed; `remy browser show` opens it so you can sign in to sites. `REMY_SEARCH` forces one search route (`tinyfish`, `brave`, `tavily`, `context`, `searxng`, `vm`, `browser` or `off`).
 
 ## From source
 
