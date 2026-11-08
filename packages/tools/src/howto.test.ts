@@ -89,6 +89,14 @@ describe('save_howto', () => {
     expect(parsed.ok && parsed.skill.learned).toBe(true);
   });
 
+  it('saves one per task', async () => {
+    const { tool, saved } = setup();
+    await tool.execute(tool.args.parse(args), ctx);
+    const again = await tool.execute(tool.args.parse({ ...args, title: 'Another one' }), ctx);
+    expect(again.ok).toBe(false);
+    expect(saved).toHaveLength(1);
+  });
+
   it('shows the whole how-to on the card', () => {
     const { tool } = setup();
     expect(tool.preview?.(tool.args.parse(args))).toContain('2. Check the date');

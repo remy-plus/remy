@@ -91,6 +91,7 @@ export const HOWTO_STEPS_MAX = 5;
 export function createHowtoTool(port: SkillsPort): Tool | undefined {
   if (!port.save) return undefined;
   const save = port.save.bind(port);
+  const savedIn = new Set<string>();
   const draftOf = (a: { title: string; when: string; steps: string[] }): SkillDraft => ({
     name: slug(a.title),
     description: oneLine(a.when),
@@ -130,7 +131,9 @@ export function createHowtoTool(port: SkillsPort): Tool | undefined {
       const existing = port.list().find((s) => s.name === d.name);
       return `${existing ? 'Replace' : 'Save'} the how-to ${d.name}: ${d.description}\n${d.body}`;
     },
-    async execute(a) {
+    async execute(a, ctx) {
+      if (savedIn.has(ctx.taskId))
+        return fail('One how-to is saved per task. Carry on and finish.');
       const d = draftOf(a);
       if (!d.name) return fail('The title needs some letters or digits.');
       if (secretIn(a))
@@ -143,6 +146,7 @@ export function createHowtoTool(port: SkillsPort): Tool | undefined {
       const check = parseSkill(skillText(d));
       if (!check.ok) return fail(check.error);
       const { path } = save(d);
+      savedIn.add(ctx.taskId);
       return {
         ok: true,
         content: `Saved the how-to ${d.name} (${path}).`,
