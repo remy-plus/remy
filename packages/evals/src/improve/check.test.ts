@@ -105,6 +105,18 @@ describe('checkProposal', () => {
     expect(v.reasons.join(' ')).toContain('case-b fell from 1 to 0');
   });
 
+  it('stops before spending when the live runs would cost more than the cap', async () => {
+    const live = new ScriptedModelClient(good);
+    const i = await input(live, { maxUsd: 0.5 });
+    const costly = i.baselineRuns.map((r) => ({ ...r, costUsd: 2 }));
+    const seen: number[] = [];
+    await expect(
+      checkProposal({ ...i, baselineRuns: costly, onEstimate: (u) => seen.push(u) }),
+    ).rejects.toThrow(/over the cap of \$0\.5\. Nothing was spent/);
+    expect(seen).toEqual([4]);
+    expect(live.requests).toHaveLength(0);
+  });
+
   it('does not run when the edits are stale or were changed', async () => {
     const live = new ScriptedModelClient(good);
     const changed = { ...proposal(), editsHash: 'other' };

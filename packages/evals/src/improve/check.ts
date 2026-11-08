@@ -48,6 +48,7 @@ export interface CheckInput {
   cases?: EvalCase[];
   /** Cases the replay half runs. Default: every case. */
   replayCases?: EvalCase[];
+  onEstimate?: (usd: number) => void;
   onRun?: (r: RunRecord) => void;
   now?: () => Date;
 }
@@ -92,11 +93,18 @@ export async function checkProposal(i: CheckInput): Promise<Verdict> {
     return verdict(false, ['The baseline journal has no runs in these suites.']);
   const caseIds = [...new Set(base.map((r) => r.caseId))];
   const k = Math.max(...base.map((r) => r.run)) + 1;
+  const estimate = base.reduce((n, r) => n + r.costUsd, 0);
+  i.onEstimate?.(estimate);
+  if (estimate > i.maxUsd)
+    throw new Error(
+      `Stopped: the live runs would cost about $${estimate.toFixed(4)}, over the cap of $${i.maxUsd}. Nothing was spent.`,
+    );
   const next = await runEval(i.cases ?? [...CASES, ...liveCases], () => i.live, {
     k,
     suites,
     caseIds,
     live: true,
+    maxUsd: i.maxUsd,
     prompts,
     ...(i.onRun && { onRun: i.onRun }),
   });
