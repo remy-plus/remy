@@ -22,6 +22,7 @@ import {
 import { McpManager } from '@remy/mcp';
 import { type FakeServer, fakeServer } from '@remy/mcp/testing';
 import {
+  addNote,
   askUser,
   calculate,
   createDelegate,
@@ -45,6 +46,7 @@ import {
   memoryBlock,
   moveFile,
   readFile,
+  removeNote,
   runCommand,
   type SearchProvider,
   SKILLS_HINT,
@@ -329,17 +331,15 @@ export async function createWorld(c: EvalCase): Promise<World> {
   const memoryPort: MemoryPort = {
     enabled: () => true,
     list: () => notes,
-    add({ text, kind, source }) {
-      const same = notes.find((n) => n.text.toLowerCase() === text.toLowerCase());
-      if (same) return { status: 'exists', entry: same };
-      const entry = { id: `mem_n${notes.length + 1}`, text, kind, source, created: '2026-02-01' };
-      notes.push(entry);
-      return { status: 'added', entry };
+    add(input) {
+      const out = addNote(notes, input, { id: `mem_n${notes.length + 1}`, now: '2026-02-01' });
+      notes.splice(0, notes.length, ...out.entries);
+      return out.result;
     },
     remove(id) {
-      const at = notes.findIndex((n) => n.id === id);
-      if (at >= 0) notes.splice(at, 1);
-      return at >= 0;
+      if (!notes.some((n) => n.id === id)) return false;
+      notes.splice(0, notes.length, ...removeNote(notes, id).entries);
+      return true;
     },
   };
   if (c.world.memory) {

@@ -1,5 +1,6 @@
 import { decide, type PlannedCall, type TaskConfig, type Tool, type ToolContext } from '@remy/core';
 import { describe, expect, it } from 'vitest';
+import { addNote } from './memory-match.ts';
 import {
   cleanMemoryText,
   createMemoryTools,
@@ -11,23 +12,23 @@ import {
   type MemoryPort,
   memoryBlock,
   memoryQuery,
+  NOTES_BUDGET_TOKENS,
+  NOTES_MAX,
+  noteTokens,
   selectMemories,
 } from './memory-tools.ts';
 
-function port(initial: MemoryEntry[] = [], opts: { on?: boolean; cap?: number } = {}) {
+function port(initial: MemoryEntry[] = [], opts: { on?: boolean } = {}) {
   const entries = [...initial];
   const p: MemoryPort & { entries: MemoryEntry[]; on: boolean } = {
     entries,
     on: opts.on ?? true,
     enabled: () => p.on,
     list: () => entries,
-    add({ text, kind, source }): MemoryAdd {
-      const same = entries.find((e) => e.text.toLowerCase() === text.toLowerCase());
-      if (same) return { status: 'exists', entry: same };
-      if (entries.length >= (opts.cap ?? 200)) return { status: 'full' };
-      const entry = { id: `mem_${entries.length + 1}`, text, kind, source, created: 'now' };
-      entries.push(entry);
-      return { status: 'added', entry };
+    add(input): MemoryAdd {
+      const out = addNote(entries, input, { id: `mem_${entries.length + 1}`, now: 'now' });
+      entries.splice(0, entries.length, ...out.entries);
+      return out.result;
     },
     remove(id) {
       const i = entries.findIndex((e) => e.id === id);
@@ -82,16 +83,12 @@ describe('remember and forget', () => {
     expect(p.entries).toHaveLength(1);
   });
 
-  it('reject long text in the schema and say so when memory is full or off', async () => {
+  it('reject long text in the schema and say so when memory is off', async () => {
     expect(
       remember.args.safeParse({ text: 'x'.repeat(MEMORY_MAX_CHARS + 1), kind: 'preference' })
         .success,
     ).toBe(false);
     expect(remember.args.safeParse({ text: 'fine note', kind: 'secret' }).success).toBe(false);
-    const full = toolsFor(port([note('a', 'one', 'about_you', '1')], { cap: 1 }));
-    expect(
-      await (full[0] as Tool).execute({ text: 'another note', kind: 'about_you' }, ctx),
-    ).toMatchObject({ ok: false, error: expect.stringContaining('full') });
     const off = toolsFor(port([], { on: false }));
     expect(
       await (off[0] as Tool).execute({ text: 'another note', kind: 'about_you' }, ctx),
@@ -116,6 +113,35 @@ describe('remember and forget', () => {
     expect(p.entries.map((e) => e.id)).toEqual(['mem_b']);
     expect(await f.execute({ id: 'nope' }, ctx)).toMatchObject({ ok: false });
     expect(await f.execute({}, ctx)).toMatchObject({ ok: false });
+  });
+});
+
+describe('remember keeps notes without a cap, merges and flags', () => {
+  it('saves note after note with no limit', async () => {
+    const p = port();
+    const [r] = toolsFor(p);
+    for (let i = 0; i < 250; i++)
+      await (r as Tool).execute({ text: `Owns gadget number ${i * 7}x`, kind: 'about_you' }, ctx);
+    expect(p.entries).toHaveLength(250);
+  });
+
+  it('updates the old note when the same fact comes in other words', async () => {
+    const p = port([note('mem_a', 'Likes tea', 'preference', '1')]);
+    const [r] = toolsFor(p);
+    const res = await (r as Tool).execute({ text: 'Likes tea with milk', kind: 'preference' }, ctx);
+    expect(res).toMatchObject({ ok: true, content: expect.stringContaining('Updated') });
+    expect(p.entries.map((e) => e.text)).toEqual(['Likes tea with milk']);
+  });
+
+  it('saves a contradiction, flags both notes and tells the model', async () => {
+    const p = port([note('mem_a', 'Lives in Lisbon', 'about_you', '1')]);
+    const [r] = toolsFor(p);
+    const res = (await (r as Tool).execute({ text: 'Lives in Porto', kind: 'about_you' }, ctx)) as {
+      content: string;
+    };
+    expect(res.content).toContain('may contradict "Lives in Lisbon" (mem_a)');
+    expect(p.entries).toHaveLength(2);
+    expect(p.entries.map((e) => e.conflictsWith)).toEqual([['mem_2'], ['mem_a']]);
   });
 });
 
@@ -191,7 +217,7 @@ describe('recall', () => {
     note('m7', 'Writes emails in a warm tone', 'preference', '2026-01-07'),
   ];
 
-  it('puts lexical matches first, then the newest preferences, at most five', () => {
+  it('puts lexical matches first, then the newest preferences', () => {
     const got = selectMemories(all, 'convert this recipe from cups to metric units');
     expect(got[0]?.id).toBe('m1');
     expect(got.map((e) => e.id)).toEqual(['m1', 'm7', 'm5', 'm3']);
@@ -202,12 +228,29 @@ describe('recall', () => {
     expect(selectMemories([], 'anything')).toEqual([]);
   });
 
-  it('never returns more than five', () => {
-    const many = Array.from({ length: 12 }, (_, i) =>
-      note(`p${i}`, `Likes thing ${i}`, 'preference', `2026-02-${String(i + 10)}`),
+  it('stays inside the token budget and the count limit however many notes there are', () => {
+    const many = Array.from({ length: 500 }, (_, i) =>
+      note(`p${i}`, `Likes thing ${i} and a few more words`, 'preference', `2026-02-${i + 100}`),
     );
-    expect(selectMemories(many, 'likes thing')).toHaveLength(5);
-    expect(selectMemories(many, 'unrelated words')).toHaveLength(5);
+    const got = selectMemories(many, 'likes thing');
+    expect(got.length).toBeLessThanOrEqual(NOTES_MAX);
+    expect(got.reduce((n, e) => n + noteTokens(e), 0)).toBeLessThanOrEqual(NOTES_BUDGET_TOKENS);
+    const tiny = selectMemories(many, 'likes', { budget: 40 });
+    expect(tiny.reduce((n, e) => n + noteTokens(e), 0)).toBeLessThanOrEqual(40);
+    expect(tiny.length).toBeGreaterThan(0);
+  });
+
+  it('prefers the newest of equally relevant notes', () => {
+    const same = [
+      note('old', 'Likes thing alpha', 'about_you', '2026-01-01'),
+      note('new', 'Likes thing alpha', 'about_you', '2026-03-01'),
+    ];
+    expect(selectMemories(same, 'thing alpha')[0]?.id).toBe('new');
+  });
+
+  it('shows which notes may contradict each other', () => {
+    const a = { ...note('m1', 'Lives in Lisbon', 'about_you', '1'), conflictsWith: ['m2'] };
+    expect(memoryBlock([a], 'lisbon')).toContain('"Lives in Lisbon" (may contradict m2)');
   });
 
   it('is deterministic', () => {

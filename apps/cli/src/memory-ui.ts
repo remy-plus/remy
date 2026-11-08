@@ -164,10 +164,25 @@ export function MemoryPanel(p: {
             i === at ? { bold: true, ...(accent ? { color: accent } : {}) } : {},
             `${i === at ? theme.symbols.prompt : ' '} ${text}`,
           ),
-          h(Text, muted, ` ${KIND_LABEL[e.kind]}`),
+          h(
+            Text,
+            muted,
+            ` ${e.conflictsWith?.length ? 'may contradict another · ' : ''}${KIND_LABEL[e.kind]}`,
+          ),
         );
       }),
       h(Box, { height: 1 }),
+      ...(cur?.conflictsWith?.length
+        ? [
+            h(
+              Text,
+              muted,
+              `May contradict: ${cur.conflictsWith
+                .map((id) => entries.find((x) => x.id === id)?.text ?? id)
+                .join('; ')}. Forget the one that is out of date.`,
+            ),
+          ]
+        : []),
       h(Hints, { hint: '↑↓ move · Enter edit · D forget · Shift+C forget all · Esc close', theme }),
     );
   }

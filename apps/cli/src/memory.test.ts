@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { BROWSER_HINT, type ModelResponse, NO_SEARCH_HINT } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
-import { MEMORY_MAX_ENTRIES } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type CliDeps, cli } from './cli.ts';
 import { openMemory, personaliseOn, plainMemory } from './memory.ts';
@@ -41,19 +40,32 @@ describe('memory store', () => {
     expect(m.list()).toHaveLength(1);
   });
 
-  it('stops at the cap', () => {
+  it('keeps every note, with no cap', () => {
     const m = openMemory(home);
-    const entries = Array.from({ length: MEMORY_MAX_ENTRIES }, (_, i) => ({
-      id: `mem_${i}`,
-      text: `note ${i}`,
-      kind: 'preference',
-      source: '',
-      created: '2026-01-01T00:00:00.000Z',
-    }));
-    writeFileSync(file(), JSON.stringify({ entries }));
-    expect(m.add(input('one more'))).toEqual({ status: 'full' });
-    expect(m.remove('mem_0')).toBe(true);
-    expect(m.add(input('one more'))).toMatchObject({ status: 'added' });
+    for (let i = 0; i < 300; i++) m.add(input(`Owns gadget number ${i * 11}x`));
+    expect(m.list()).toHaveLength(300);
+  });
+
+  it('updates the old note for the same fact in other words', () => {
+    const m = openMemory(home);
+    m.add(input('Likes tea'));
+    expect(m.add(input('Likes tea with milk'))).toMatchObject({ status: 'merged' });
+    expect(m.list().map((e) => e.text)).toEqual(['Likes tea with milk']);
+  });
+
+  it('saves a contradiction beside the old note and flags both, until one goes', () => {
+    const m = openMemory(home);
+    const a = m.add({ text: 'Lives in Lisbon', kind: 'about_you', source: '' });
+    const b = m.add({ text: 'Lives in Porto', kind: 'about_you', source: '' });
+    const [ida, idb] = [a, b].map((r) => (r.status === 'exists' ? '' : r.entry.id)) as [
+      string,
+      string,
+    ];
+    expect(m.list().find((e) => e.id === ida)?.conflictsWith).toEqual([idb]);
+    expect(m.list().find((e) => e.id === idb)?.conflictsWith).toEqual([ida]);
+    expect(plainMemory(m.load(), true)).toContain('may contradict');
+    m.remove(idb);
+    expect(m.list()[0]?.conflictsWith).toBeUndefined();
   });
 
   it('removes, edits and clears, and tells subscribers', () => {

@@ -5,13 +5,15 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  addNote,
   cleanMemoryText,
+  editNote,
   MEMORY_KINDS,
-  MEMORY_MAX_ENTRIES,
   type MemoryAdd,
   type MemoryEntry,
   type MemoryKind,
   type MemoryPort,
+  removeNote,
 } from '@remy/tools';
 import { z } from 'zod';
 import { loadProfile } from './profile.ts';
@@ -22,6 +24,7 @@ const entrySchema = z.object({
   kind: z.enum(MEMORY_KINDS),
   source: z.string().default(''),
   created: z.string().default(''),
+  conflictsWith: z.array(z.string()).optional(),
 });
 const fileSchema = z.object({ entries: z.array(z.unknown()) });
 
@@ -98,7 +101,7 @@ export function openMemory(
       else entries.push({ ...e.data, text });
     }
     return {
-      entries: entries.slice(0, MEMORY_MAX_ENTRIES),
+      entries,
       ...(skipped && {
         note: `${skipped} note${skipped === 1 ? '' : 's'} in ${path} could not be read and ${skipped === 1 ? 'was' : 'were'} skipped.`,
       }),
@@ -115,45 +118,31 @@ export function openMemory(
     notify();
   }
 
-  const key = (t: string) => t.toLowerCase();
-
   return {
     load,
     enabled: opts.enabled ?? (() => true),
     list: () => load().entries.sort(newestFirst),
     add({ text, kind, source }): MemoryAdd {
-      const clean = cleanMemoryText(text);
       const cur = load();
-      const same = cur.entries.find((e) => key(e.text) === key(clean));
-      if (same) return { status: 'exists', entry: same };
-      if (cur.entries.length >= MEMORY_MAX_ENTRIES) return { status: 'full' };
-      const entry: MemoryEntry = {
-        id: `mem_${randomBytes(3).toString('hex')}`,
-        text: clean,
-        kind,
-        source,
-        created: now().toISOString(),
-      };
-      save([...cur.entries, entry], cur.damaged === true);
-      return { status: 'added', entry };
+      const out = addNote(
+        cur.entries,
+        { text: cleanMemoryText(text), kind, source },
+        { id: `mem_${randomBytes(3).toString('hex')}`, now: now().toISOString() },
+      );
+      if (out.changed.length) save(out.entries, cur.damaged === true);
+      return out.result;
     },
     remove(id) {
       const cur = load();
       if (!cur.entries.some((e) => e.id === id)) return false;
-      save(
-        cur.entries.filter((e) => e.id !== id),
-        cur.damaged === true,
-      );
+      save(removeNote(cur.entries, id).entries, cur.damaged === true);
       return true;
     },
     edit(id, text) {
       const clean = cleanMemoryText(text);
       const cur = load();
       if (!clean || !cur.entries.some((e) => e.id === id)) return false;
-      save(
-        cur.entries.map((e) => (e.id === id ? { ...e, text: clean } : e)),
-        cur.damaged === true,
-      );
+      save(editNote(cur.entries, id, clean).entries, cur.damaged === true);
       return true;
     },
     clear() {
@@ -175,12 +164,17 @@ export const personaliseOn = (home: string): boolean => loadProfile(home)?.perso
 /** The plain-text list used by `remy memory list`, `/memory list` and the minimal screen. */
 export function plainMemory(file: MemoryFile, personalise: boolean): string {
   const lines = file.entries.sort(newestFirst).map((e) => {
-    return `${e.id}  ${e.text}  (${KIND_LABEL[e.kind]}, ${e.created.slice(0, 10)})`;
+    const clash = e.conflictsWith?.length ? `  [may contradict ${e.conflictsWith.join(', ')}]` : '';
+    return `${e.id}  ${e.text}  (${KIND_LABEL[e.kind]}, ${e.created.slice(0, 10)})${clash}`;
   });
+  const flagged = file.entries.filter((e) => e.conflictsWith?.length).length;
   const head = file.entries.length
     ? `Remy remembers ${file.entries.length} thing${file.entries.length === 1 ? '' : 's'} about you.`
     : 'Remy has not saved anything about you yet. When you tell it a lasting preference, it asks before saving it.';
   const tail = [
+    flagged
+      ? `${flagged} notes may contradict each other. Remy keeps both until you forget the one that is out of date.`
+      : undefined,
     file.note,
     personalise
       ? undefined

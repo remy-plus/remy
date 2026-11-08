@@ -3,7 +3,7 @@
 // something new. Pure and deterministic, so the CLI store and the eval world behave the same.
 // The contradiction rule is deliberately narrow: a miss only leaves two notes the user can sort
 // out; a false alarm trains the user to ignore the flag.
-import type { MemoryEntry, MemoryKind } from './memory-tools.ts';
+import type { MemoryAdd, MemoryEntry, MemoryKind } from './memory-tools.ts';
 
 /** Filler that never makes two notes different. Negations are kept apart, see NEGATIONS. */
 const FILLER = new Set(
@@ -149,4 +149,96 @@ export function planAdd(
   return same && text !== undefined
     ? { action: 'merge', target: same, text, conflicts }
     : { action: 'add', conflicts };
+}
+
+const withFlags = (e: MemoryEntry, ids: string[]): MemoryEntry => {
+  const { conflictsWith: _drop, ...rest } = e;
+  return ids.length ? { ...rest, conflictsWith: ids } : rest;
+};
+const union = (a: string[] | undefined, b: string[]) => [...new Set([...(a ?? []), ...b])];
+
+export interface NoteChange {
+  /** The whole list after the change. */
+  entries: MemoryEntry[];
+  /** Only the notes that were added or modified, for a store that writes rows. */
+  changed: MemoryEntry[];
+}
+
+/**
+ * Applies an add to `entries` (see planAdd): saves, merges or leaves alone, and flags both sides
+ * of a contradiction. Never drops or replaces a contradicting note.
+ */
+export function addNote(
+  entries: readonly MemoryEntry[],
+  input: { text: string; kind: MemoryKind; source: string },
+  fresh: { id: string; now: string },
+): NoteChange & { result: MemoryAdd } {
+  const plan = planAdd(entries, input);
+  if (plan.action === 'exists')
+    return { entries: [...entries], changed: [], result: { status: 'exists', entry: plan.target } };
+  const mine = plan.action === 'merge' ? plan.target.id : fresh.id;
+  const flagged = plan.conflicts.map((c) => withFlags(c, union(c.conflictsWith, [mine])));
+  const ids = plan.conflicts.map((c) => c.id);
+  const entry: MemoryEntry =
+    plan.action === 'merge'
+      ? withFlags(
+          { ...plan.target, text: plan.text, created: fresh.now },
+          union(plan.target.conflictsWith, ids),
+        )
+      : withFlags(
+          {
+            id: fresh.id,
+            text: input.text,
+            kind: input.kind,
+            source: input.source,
+            created: fresh.now,
+          },
+          ids,
+        );
+  const byId = new Map([...flagged, entry].map((e) => [e.id, e]));
+  const next = entries.map((e) => byId.get(e.id) ?? e);
+  if (plan.action === 'add') next.push(entry);
+  return {
+    entries: next,
+    changed: [...byId.values()],
+    result: { status: plan.action === 'merge' ? 'merged' : 'added', entry, conflicts: flagged },
+  };
+}
+
+/** Removes a note and the flags other notes carry for it. */
+export function removeNote(entries: readonly MemoryEntry[], id: string): NoteChange {
+  const changed: MemoryEntry[] = [];
+  const next: MemoryEntry[] = [];
+  for (const e of entries) {
+    if (e.id === id) continue;
+    if (e.conflictsWith?.includes(id)) {
+      const e2 = withFlags(
+        e,
+        e.conflictsWith.filter((x) => x !== id),
+      );
+      changed.push(e2);
+      next.push(e2);
+    } else next.push(e);
+  }
+  return { entries: next, changed };
+}
+
+/** Rewords a note (the user edited it): its old flags go, and the new wording is checked again. */
+export function editNote(entries: readonly MemoryEntry[], id: string, text: string): NoteChange {
+  const cur = entries.find((e) => e.id === id);
+  if (!cur) return { entries: [...entries], changed: [] };
+  const cleared = removeNote(entries, id);
+  const edited = { ...cur, text };
+  const clash = cleared.entries.filter((e) => contradicts(e, edited));
+  const flagged = clash.map((c) => withFlags(c, union(c.conflictsWith, [id])));
+  const entry = withFlags(
+    edited,
+    clash.map((c) => c.id),
+  );
+  const byId = new Map([...flagged, entry].map((e) => [e.id, e]));
+  const changed = new Map([...cleared.changed, ...byId.values()].map((e) => [e.id, e]));
+  return {
+    entries: entries.map((e) => (e.id === id ? entry : (changed.get(e.id) ?? e))),
+    changed: [...changed.values()],
+  };
 }
