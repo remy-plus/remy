@@ -25,7 +25,7 @@ describe('memory store', () => {
     expect(m.add(input('Likes tea'))).toMatchObject({ status: 'added' });
     m.add(input('Prefers metric units'));
     expect(m.list().map((e) => e.text)).toEqual(['Prefers metric units', 'Likes tea']);
-    expect(statSync(file()).mode & 0o777).toBe(0o600);
+    expect(statSync(join(home, 'remy.sqlite')).mode & 0o777).toBe(0o600);
     expect(openMemory(home).list()).toHaveLength(2);
     expect(m.list()[0]).toMatchObject({ kind: 'preference', source: 'task_1' });
     expect(m.list()[0]?.id).toMatch(/^mem_[0-9a-f]{6}$/);
@@ -96,6 +96,47 @@ describe('memory store', () => {
     expect(m.list()).toHaveLength(1);
     writeFileSync(file(), JSON.stringify({ wrong: true }));
     expect(m.load().note).toContain('expected shape');
+  });
+
+  it('imports the old memory.json once, keeps it renamed, and never deletes it', () => {
+    const old = JSON.stringify({
+      entries: [
+        { id: 'mem_a', text: 'Likes tea', kind: 'preference', source: '', created: '2026-01-01' },
+        {
+          id: 'mem_b',
+          text: 'Lives in Lisbon',
+          kind: 'about_you',
+          source: 't',
+          created: '2026-01-02',
+        },
+      ],
+    });
+    writeFileSync(file(), old);
+    const m = openMemory(home);
+    expect(m.list().map((e) => e.id)).toEqual(['mem_b', 'mem_a']);
+    expect(readdirSync(home)).not.toContain('memory.json');
+    expect(readFileSync(join(home, 'memory.json.imported'), 'utf8')).toBe(old);
+    m.remove('mem_a');
+    // A second open does not bring the removed note back.
+    expect(
+      openMemory(home)
+        .list()
+        .map((e) => e.id),
+    ).toEqual(['mem_b']);
+    // A file restored later is imported again, and the earlier copy is kept.
+    writeFileSync(file(), old);
+    expect(openMemory(home).list()).toHaveLength(2);
+    expect(readdirSync(home).filter((n) => n.startsWith('memory.json.imported'))).toHaveLength(2);
+  });
+
+  it('shows the same notes to two connections, with every write kept', () => {
+    const a = openMemory(home);
+    const b = openMemory(home);
+    for (let i = 0; i < 40; i++) {
+      (i % 2 ? a : b).add(input(`Owns gadget number ${i * 13}x`));
+      expect(a.list()).toHaveLength(i + 1);
+      expect(b.list()).toHaveLength(i + 1);
+    }
   });
 
   it('skips unreadable notes and keeps the rest', () => {

@@ -1,9 +1,13 @@
-// The user's saved notes, kept in REMY_HOME/memory.json (owner-only). Every call reads the file,
-// so a second Remy process (a background task) and the chat see the same notes. A damaged file
-// means no notes plus a note to the user; it is moved aside on the next save, never overwritten.
+// The user's saved notes, kept in the notes table of REMY_HOME/remy.sqlite (owner-only), the same
+// database file the tasks use. There is no cap on how many. Two Remy processes (the chat and a
+// background task) share the file: every change is one write transaction, so both always see the
+// same notes. Notes used to live in REMY_HOME/memory.json; the first open imports that file once
+// and renames it to memory.json.imported (never deletes it). A damaged old file is reported, left
+// alone, and moved aside to memory.json.damaged on the next save.
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   addNote,
   cleanMemoryText,
@@ -17,6 +21,12 @@ import {
 } from '@remy/tools';
 import { z } from 'zod';
 import { loadProfile } from './profile.ts';
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS notes (
+  id TEXT PRIMARY KEY, text TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL DEFAULT '',
+  created TEXT NOT NULL DEFAULT '', conflicts TEXT NOT NULL DEFAULT '[]'
+);`;
 
 const entrySchema = z.object({
   id: z.string().min(1),
@@ -50,72 +60,139 @@ export const KIND_LABEL: Record<MemoryKind, string> = {
   how_to: 'how to',
 };
 
-const pathOf = (home: string) => join(home, 'memory.json');
-
 /** Newest first, ties by id. */
 export const newestFirst = (a: MemoryEntry, b: MemoryEntry) =>
   a.created < b.created ? 1 : a.created > b.created ? -1 : a.id < b.id ? -1 : 1;
+
+type Row = Record<string, string | number | null>;
+
+const toEntry = (r: Row): MemoryEntry => {
+  let flags: unknown = [];
+  try {
+    flags = JSON.parse(String(r.conflicts ?? '[]'));
+  } catch {}
+  const ids = Array.isArray(flags) ? flags.filter((x): x is string => typeof x === 'string') : [];
+  return {
+    id: String(r.id),
+    text: String(r.text),
+    kind: r.kind as MemoryKind,
+    source: String(r.source ?? ''),
+    created: String(r.created ?? ''),
+    ...(ids.length && { conflictsWith: ids }),
+  };
+};
 
 export function openMemory(
   home: string,
   opts: { now?: () => Date; enabled?: () => boolean } = {},
 ): MemoryStore {
-  const path = pathOf(home);
+  const oldPath = join(home, 'memory.json');
   const now = opts.now ?? (() => new Date());
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const fn of listeners) fn();
   };
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  const dbPath = join(home, 'remy.sqlite');
+  const db = new DatabaseSync(dbPath);
+  // The chat and a background task share this file: wait for a lock, do not fail.
+  db.exec('PRAGMA busy_timeout = 5000');
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec(SCHEMA);
+  try {
+    chmodSync(dbPath, 0o600);
+  } catch {}
 
-  function load(): MemoryFile {
-    if (!existsSync(path)) return { entries: [] };
+  const tx = <T>(fn: () => T): T => {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const out = fn();
+      db.exec('COMMIT');
+      return out;
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  };
+  const readAll = (): MemoryEntry[] =>
+    (db.prepare('SELECT id, text, kind, source, created, conflicts FROM notes').all() as Row[]).map(
+      toEntry,
+    );
+  const put = (e: MemoryEntry) =>
+    db
+      .prepare(
+        `INSERT INTO notes (id, text, kind, source, created, conflicts) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET text = excluded.text, source = excluded.source,
+           created = excluded.created, conflicts = excluded.conflicts`,
+      )
+      .run(e.id, e.text, e.kind, e.source, e.created, JSON.stringify(e.conflictsWith ?? []));
+
+  /** What the last import skipped; reported for as long as this process runs. */
+  let skippedNote: string | undefined;
+
+  /** Reads the old memory.json, if there is one. Returns a note when it is damaged (and left alone). */
+  function importOld(): { damaged: true; note: string } | undefined {
+    if (!existsSync(oldPath)) return undefined;
     let raw: unknown;
     try {
-      raw = JSON.parse(readFileSync(path, 'utf8'));
+      raw = JSON.parse(readFileSync(oldPath, 'utf8'));
     } catch {
       return {
-        entries: [],
         damaged: true,
-        note: `${path} could not be read, so Remy remembers nothing right now. Fix or delete the file.`,
+        note: `${oldPath} could not be read, so its notes were not imported. Fix or delete the file.`,
       };
     }
     const file = fileSchema.safeParse(raw);
     if (!file.success)
       return {
-        entries: [],
         damaged: true,
-        note: `${path} is not in the expected shape, so Remy remembers nothing right now. Fix or delete the file.`,
+        note: `${oldPath} is not in the expected shape, so its notes were not imported. Fix or delete the file.`,
       };
-    const entries: MemoryEntry[] = [];
-    let skipped = 0;
-    const seen = new Set<string>();
-    for (const item of file.data.entries) {
-      const e = entrySchema.safeParse(item);
-      if (!e.success || seen.has(e.data.id)) {
-        skipped += 1;
-        continue;
+    tx(() => {
+      // Another process may have imported it while this one waited for the lock.
+      if (!existsSync(oldPath)) return;
+      let skipped = 0;
+      const seen = new Set<string>();
+      for (const item of file.data.entries) {
+        const e = entrySchema.safeParse(item);
+        const text = e.success ? cleanMemoryText(e.data.text) : '';
+        if (!e.success || !text || seen.has(e.data.id)) {
+          skipped += 1;
+          continue;
+        }
+        seen.add(e.data.id);
+        db.prepare(
+          'INSERT OR IGNORE INTO notes (id, text, kind, source, created, conflicts) VALUES (?, ?, ?, ?, ?, ?)',
+        ).run(
+          e.data.id,
+          text,
+          e.data.kind,
+          e.data.source,
+          e.data.created,
+          JSON.stringify(e.data.conflictsWith ?? []),
+        );
       }
-      seen.add(e.data.id);
-      const text = cleanMemoryText(e.data.text);
-      if (!text) skipped += 1;
-      else entries.push({ ...e.data, text });
-    }
-    return {
-      entries,
-      ...(skipped && {
-        note: `${skipped} note${skipped === 1 ? '' : 's'} in ${path} could not be read and ${skipped === 1 ? 'was' : 'were'} skipped.`,
-      }),
-    };
+      if (skipped)
+        skippedNote = `${skipped} note${skipped === 1 ? '' : 's'} in ${oldPath} could not be read and ${skipped === 1 ? 'was' : 'were'} skipped.`;
+      const kept = `${oldPath}.imported`;
+      renameSync(oldPath, existsSync(kept) ? `${kept}-${Date.now()}` : kept);
+    });
+    return undefined;
   }
 
-  function save(entries: MemoryEntry[], damaged: boolean): void {
-    mkdirSync(home, { recursive: true, mode: 0o700 });
-    if (damaged && existsSync(path)) renameSync(path, `${path}.damaged`);
-    const tmp = `${path}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify({ entries }, null, 2)}\n`, { mode: 0o600 });
-    chmodSync(tmp, 0o600);
-    renameSync(tmp, path);
+  function load(): MemoryFile {
+    const bad = importOld();
+    const note = bad?.note ?? skippedNote;
+    return { entries: readAll(), ...(note && { note }), ...(bad && { damaged: true as const }) };
+  }
+
+  /** A write: first moves a still-damaged old file aside, then runs `fn` in one transaction. */
+  function write<T>(fn: (entries: MemoryEntry[]) => T): T {
+    const bad = importOld();
+    if (bad && existsSync(oldPath)) renameSync(oldPath, `${oldPath}.damaged`);
+    const out = tx(() => fn(readAll()));
     notify();
+    return out;
   }
 
   return {
@@ -123,33 +200,38 @@ export function openMemory(
     enabled: opts.enabled ?? (() => true),
     list: () => load().entries.sort(newestFirst),
     add({ text, kind, source }): MemoryAdd {
-      const cur = load();
-      const out = addNote(
-        cur.entries,
-        { text: cleanMemoryText(text), kind, source },
-        { id: `mem_${randomBytes(3).toString('hex')}`, now: now().toISOString() },
-      );
-      if (out.changed.length) save(out.entries, cur.damaged === true);
-      return out.result;
+      return write((entries) => {
+        const out = addNote(
+          entries,
+          { text: cleanMemoryText(text), kind, source },
+          { id: `mem_${randomBytes(3).toString('hex')}`, now: now().toISOString() },
+        );
+        for (const e of out.changed) put(e);
+        return out.result;
+      });
     },
     remove(id) {
-      const cur = load();
-      if (!cur.entries.some((e) => e.id === id)) return false;
-      save(removeNote(cur.entries, id).entries, cur.damaged === true);
-      return true;
+      return write((entries) => {
+        if (!entries.some((e) => e.id === id)) return false;
+        db.prepare('DELETE FROM notes WHERE id = ?').run(id);
+        for (const e of removeNote(entries, id).changed) put(e);
+        return true;
+      });
     },
     edit(id, text) {
       const clean = cleanMemoryText(text);
-      const cur = load();
-      if (!clean || !cur.entries.some((e) => e.id === id)) return false;
-      save(editNote(cur.entries, id, clean).entries, cur.damaged === true);
-      return true;
+      if (!clean) return false;
+      return write((entries) => {
+        if (!entries.some((e) => e.id === id)) return false;
+        for (const e of editNote(entries, id, clean).changed) put(e);
+        return true;
+      });
     },
     clear() {
-      const cur = load();
-      if (!cur.entries.length && !cur.damaged) return 0;
-      save([], cur.damaged === true);
-      return cur.entries.length;
+      return write((entries) => {
+        db.exec('DELETE FROM notes');
+        return entries.length;
+      });
     },
     subscribe(fn) {
       listeners.add(fn);
