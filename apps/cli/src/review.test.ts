@@ -168,6 +168,12 @@ describe('collectReview', () => {
     });
   });
 
+  it('labels a webhook run', async () => {
+    await seed('task_w', '[webhook orders] Log the order.', []);
+    const items = await collectReview({ store, home, since });
+    expect(items.map((i) => i.source)).toEqual(['webhook']);
+  });
+
   it('sorts needs-attention first, then newest first', async () => {
     await seed('task_ok_old', 'old success', [
       { type: 'task.finished', status: 'succeeded', answer: 'x' },

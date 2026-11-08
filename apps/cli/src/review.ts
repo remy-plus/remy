@@ -14,7 +14,7 @@ import { fmtCost } from './format.ts';
 import type { Schedule } from './schedule.ts';
 import { parseWhen } from './schedule.ts';
 
-export type ReviewSource = 'schedule' | 'file watch' | 'background';
+export type ReviewSource = 'schedule' | 'file watch' | 'webhook' | 'background';
 
 export interface ReviewItem {
   taskId: string;
@@ -102,6 +102,7 @@ export async function collectReview(d: ReviewDeps): Promise<ReviewItem[]> {
         source = 'schedule';
       }
     }
+    if (!sched && /^\[webhook [a-z0-9_-]+\] /.test(state.prompt)) source = 'webhook';
     const did = Object.values(state.calls)
       .sort((a, b) => a.step - b.step)
       .filter((c) => c.result?.ok && c.risk && c.risk !== 'read')
