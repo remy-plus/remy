@@ -94,3 +94,7 @@ Page "V1 screens" on the canvas (https://doop.design/c/ZuevZVY-Yl), dark first, 
 16. Home in light
 
 Earlier pages hold the first paper-and-trace screens, Home v2 and the two demos. Not yet drawn: the Tasks list, the add-connection and add-machine flows, empty states, notification settings, About, and light twins of every screen but Home. These are mockups with invented data. The Stage 5 gate is the owner's sign-off on these.
+
+## Full dark set, linked (2026-11-08)
+
+Owner decision: dark only for now. The light theme is parked (frame "16 Home, light" stays on the canvas, unlinked). All V1 screens are on the "V1 screens" page and wired into a clickable prototype: https://doop.design/c/ZuevZVY-Yl/proto (starts at "01 First run"). New since the first set: 17 Ask the brain, 18 A hard task, 19 Tasks, 20 Add a connection, 21 Add a machine, 22 and 24 first run (connect, first task), 23 Settings: model and keys, 25 Settings: notifications, 26 New schedule. Every nav bar, the approval flows, the add flows, the settings sections and the first-run steps link to real frames, and the wiring report shows no broken targets. Not linked: the flights approval on Home, Budget, Memory and privacy, Appearance, Home server and About in Settings. Mockup data only.
