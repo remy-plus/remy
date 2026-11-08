@@ -259,11 +259,10 @@ describe('web search', () => {
     );
   });
 
-  it('tells the model search is off, so it does not guess page addresses', async () => {
+  it('keeps web_search with no route, so the model gets the one step instead of guessing', async () => {
     const model = new ScriptedModelClient([finish]);
     await harness(model, { REMY_BROWSER: 'off' }).run('run', 'find the best budget laptops');
-    expect(model.requests[0]?.system).toContain(NO_SEARCH_HINT);
-    expect(model.requests[0]?.tools.map((t) => t.name)).not.toContain('web_search');
+    expect(model.requests[0]?.tools.map((t) => t.name)).toContain('web_search');
   });
 
   it('leaves the hint out when a search key is set', async () => {
@@ -285,13 +284,5 @@ describe('picking the search', () => {
     await harness(off, { REMY_SEARCH: 'off' }).run('run', 'find rye');
     expect(off.requests[0]?.tools.map((t) => t.name)).not.toContain('web_search');
     expect(off.requests[0]?.system).toContain(NO_SEARCH_HINT);
-  });
-
-  it('says which key a picked service needs', async () => {
-    const r = await harness(new ScriptedModelClient([finish]), { REMY_SEARCH: 'brave' }).run(
-      'run',
-      'find rye',
-    );
-    expect(r.err).toContain('needs BRAVE_API_KEY');
   });
 });

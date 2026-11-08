@@ -1,9 +1,12 @@
-// Which service answers web_search. The user picks; without a pick, a service whose key is set
-// wins, then Remy's own browser.
+// Which route answers web_search. The order is fixed and explained: a search service whose key is
+// set, then the container, then Remy's own hidden browser, else none. REMY_SEARCH overrides it.
+// A route that cannot recover (bad key, Docker gone, a bot check) is dropped for the rest of the
+// process and the next one answers. Nothing here ever opens a window.
 import {
   braveSearch,
   contextDevSearch,
   type SearchProvider,
+  SearchUnavailable,
   searxngSearch,
   tavilySearch,
   tinyfishSearch,
@@ -21,46 +24,176 @@ export const SEARCH_CHOICES = [
 ] as const;
 export type SearchChoice = (typeof SEARCH_CHOICES)[number];
 
-const SERVICES: Record<
-  Exclude<SearchChoice, 'browser' | 'vm' | 'off'>,
-  { env: string; make: (value: string) => SearchProvider }
-> = {
-  context: { env: 'CONTEXT_DEV_API_KEY', make: contextDevSearch },
-  brave: { env: 'BRAVE_API_KEY', make: braveSearch },
-  tavily: { env: 'TAVILY_API_KEY', make: tavilySearch },
-  tinyfish: { env: 'TINYFISH_API_KEY', make: tinyfishSearch },
-  searxng: { env: 'SEARXNG_URL', make: searxngSearch },
-};
-
 export const isSearchChoice = (v: string): v is SearchChoice =>
   (SEARCH_CHOICES as readonly string[]).includes(v);
 
-/**
- * `choice` from REMY_SEARCH or remy.config.json. `browser` means Remy's browser does the
- * searching (when the browser is off, there is no search); `off` means no web_search at all.
- */
-export function pickSearch(
-  env: Record<string, string | undefined>,
-  picked: string | undefined,
-  vm?: () => SearchProvider,
-): { choice: SearchChoice; provider?: SearchProvider } {
-  const want = picked?.trim().toLowerCase();
+/** Services with a key, in the order they are tried. */
+export const SERVICES = {
+  tinyfish: { env: 'TINYFISH_API_KEY', label: 'TinyFish', make: tinyfishSearch },
+  brave: { env: 'BRAVE_API_KEY', label: 'Brave', make: braveSearch },
+  tavily: { env: 'TAVILY_API_KEY', label: 'Tavily', make: tavilySearch },
+  context: { env: 'CONTEXT_DEV_API_KEY', label: 'Context.dev', make: contextDevSearch },
+  searxng: { env: 'SEARXNG_URL', label: 'SearXNG', make: searxngSearch },
+} as const;
+export type KeyRoute = keyof typeof SERVICES;
+export type Route = KeyRoute | 'vm' | 'browser';
+
+export const routeLabel = (r: Route): string =>
+  r === 'vm' ? 'the container' : r === 'browser' ? 'the hidden browser' : SERVICES[r].label;
+
+/** What the machine has, read from the doctor checks and the environment; no slow probes here. */
+export interface SearchFacts {
+  /** REMY_SEARCH or `search` in remy.config.json. */
+  override?: string | undefined;
+  keys: Partial<Record<KeyRoute, boolean>>;
+  /** Docker answers. */
+  docker: boolean;
+  /** `remy browser vm start` has been run on this machine. */
+  vmSetUp: boolean;
+  /** A browser is installed and not switched off. */
+  browser: boolean;
+}
+
+export interface SearchPlan {
+  /** Routes in the order they are tried. Empty when search is off or nothing works. */
+  order: Route[];
+  chosen?: Route;
+  /** REMY_SEARCH set it. */
+  override: boolean;
+  /** Search was switched off on purpose. */
+  off: boolean;
+  /** The one step that would make search better or work at all. Absent when nothing is needed. */
+  step?: string;
+  /** Why there is no route, when there is none. */
+  why?: string;
+}
+
+const TINYFISH_STEP = 'Get a free TinyFish key and set TINYFISH_API_KEY.';
+
+/** The route order for a machine. Pure. */
+export function pickSearchRoute(f: SearchFacts): SearchPlan {
+  const want = f.override?.trim().toLowerCase();
   if (want) {
     if (!isSearchChoice(want))
-      throw new Error(`REMY_SEARCH must be one of ${SEARCH_CHOICES.join(', ')}, not "${picked}".`);
-    if (want === 'browser' || want === 'off') return { choice: want };
-    if (want === 'vm') return vm ? { choice: want, provider: vm() } : { choice: 'browser' };
-    const s = SERVICES[want];
-    const value = env[s.env];
-    if (!value)
-      throw new Error(
-        `Search through ${want} needs ${s.env}. Set it, or pick another with REMY_SEARCH.`,
-      );
-    return { choice: want, provider: s.make(value) };
+      return {
+        order: [],
+        override: true,
+        off: false,
+        why: `REMY_SEARCH is "${f.override}", which is not a route`,
+        step: `Set REMY_SEARCH to one of ${SEARCH_CHOICES.join(', ')}, or unset it.`,
+      };
+    if (want === 'off') return { order: [], override: true, off: true };
+    if (want === 'browser' || want === 'vm')
+      return { order: [want], chosen: want, override: true, off: false };
+    if (!f.keys[want])
+      return {
+        order: [],
+        override: true,
+        off: false,
+        why: `REMY_SEARCH picks ${SERVICES[want].label} but ${SERVICES[want].env} is not set`,
+        step: `Set ${SERVICES[want].env}, or unset REMY_SEARCH.`,
+      };
+    return { order: [want], chosen: want, override: true, off: false };
   }
-  for (const [name, s] of Object.entries(SERVICES)) {
-    const value = env[s.env];
-    if (value) return { choice: name as SearchChoice, provider: s.make(value) };
-  }
-  return { choice: 'browser' };
+  const order: Route[] = [
+    ...(Object.keys(SERVICES) as KeyRoute[]).filter((k) => f.keys[k]),
+    ...(f.docker && f.vmSetUp ? (['vm'] as const) : []),
+    ...(f.browser ? (['browser'] as const) : []),
+  ];
+  const [chosen] = order;
+  if (chosen && chosen in SERVICES) return { order, chosen, override: false, off: false };
+  const step =
+    f.docker && !f.vmSetUp
+      ? 'Run remy browser vm start, or get a free TinyFish key and set TINYFISH_API_KEY.'
+      : TINYFISH_STEP;
+  return {
+    order,
+    ...(chosen && { chosen }),
+    override: false,
+    off: false,
+    step,
+    ...(!chosen && {
+      why: `no search key is set, ${f.docker ? 'the container is not set up' : 'Docker is not running'} and no browser is available`,
+    }),
+  };
+}
+
+/** `Searched ...` order in one phrase for `remy doctor`. */
+export const describeOrder = (order: Route[]): string => order.map(routeLabel).join(', then ');
+
+/** What `web_search` says when no route answers: short, plain, and one step. */
+export function noRouteMessage(plan: SearchPlan, dead: ReadonlyMap<Route, string>): string {
+  const reasons = [...dead.values()];
+  const why = reasons.length ? reasons.join(' ') : `${plan.why ?? 'No search route works here'}.`;
+  const authFailed = [...dead.entries()].find(([r]) => r in SERVICES);
+  const step = authFailed
+    ? `Check ${SERVICES[authFailed[0] as KeyRoute].env}, or get a free TinyFish key and set TINYFISH_API_KEY.`
+    : (plan.step ?? TINYFISH_STEP);
+  return `Web search is off on this machine. ${why} Next step for the user: ${step} Do not answer from memory.`;
+}
+
+export interface Routed {
+  provider: SearchProvider;
+  /** Routes dropped for this process, with the reason. */
+  dead: ReadonlyMap<Route, string>;
+}
+
+/**
+ * A provider that walks the plan's routes. A route that fails in a way that will not fix itself is
+ * dropped for the rest of the process and the next is tried once; any other failure is returned as
+ * it is. Results carry the route that answered. A bot check only ever drops the route.
+ */
+export function routedSearch(plan: SearchPlan, make: (route: Route) => SearchProvider): Routed {
+  const dead = new Map<Route, string>();
+  const made = new Map<Route, SearchProvider>();
+  const provider: SearchProvider = {
+    async search(query, count) {
+      for (const route of plan.order) {
+        if (dead.has(route)) continue;
+        try {
+          const p = made.get(route) ?? make(route);
+          made.set(route, p);
+          const results = await p.search(query, count);
+          return results.map((r) => ({ ...r, via: routeLabel(route) }));
+        } catch (e) {
+          if (!(e instanceof SearchUnavailable)) throw e;
+          dead.set(route, e.message);
+        }
+      }
+      throw new SearchUnavailable(noRouteMessage(plan, dead));
+    },
+  };
+  return { provider, dead };
+}
+
+/** The service behind a key route, from the environment. */
+export function makeService(
+  route: KeyRoute,
+  env: Record<string, string | undefined>,
+): SearchProvider {
+  const s = SERVICES[route];
+  const value = env[s.env];
+  if (!value) throw new SearchUnavailable(`${s.label} needs ${s.env}, which is not set.`);
+  return s.make(value);
+}
+
+/** Facts from the environment, probing Docker only when no pick or key already settles the route. */
+export function gatherSearchPlan(p: {
+  env: Record<string, string | undefined>;
+  override: string | undefined;
+  vmSetUp: boolean;
+  browser: boolean;
+  hasDocker: () => boolean;
+}): SearchPlan {
+  const keys = Object.fromEntries(
+    (Object.keys(SERVICES) as KeyRoute[]).map((k) => [k, Boolean(p.env[SERVICES[k].env])]),
+  ) as Record<KeyRoute, boolean>;
+  const settled = Boolean(p.override?.trim()) || Object.values(keys).some(Boolean);
+  return pickSearchRoute({
+    override: p.override,
+    keys,
+    docker: settled ? false : p.hasDocker(),
+    vmSetUp: p.vmSetUp,
+    browser: p.browser,
+  });
 }

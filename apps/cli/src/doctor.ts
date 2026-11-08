@@ -1,5 +1,7 @@
 // `remy doctor`: what is set up, what is not, and the next step for each. The checks are pure, so
 // the facts can be gathered once and every rule tested.
+import { describeOrder, routeLabel, type SearchPlan } from './search.ts';
+
 export interface Facts {
   node: string;
   /** The default model provider, when one is logged in. */
@@ -8,7 +10,7 @@ export interface Facts {
   docker: boolean;
   daemon: boolean;
   schedules: number;
-  search: string;
+  search: SearchPlan;
   /** Problems found in the helper roles files, one line each. */
   helperProblems?: string[];
 }
@@ -26,20 +28,20 @@ export interface Probes {
   platform: string;
   model?: string | undefined;
   hasChromeApp: () => boolean;
-  hasDocker: () => boolean;
   daemonOn: () => boolean;
   schedules: () => number;
-  search: string;
+  /** The search route plan, already worked out from the keys and, only when needed, Docker. */
+  search: SearchPlan;
   helperProblems?: () => string[];
 }
 
-/** Facts for the checks. Docker only matters when search falls back to the hidden browser. */
+/** Facts for the checks. */
 export function gatherFacts(p: Probes): Facts {
   return {
     node: p.node,
     ...(p.model !== undefined && { model: p.model }),
     browser: p.hasChromeApp() || p.platform !== 'darwin',
-    docker: p.search === 'browser' ? p.hasDocker() : false,
+    docker: p.search.order.includes('vm'),
     daemon: p.platform === 'darwin' && p.daemonOn(),
     schedules: p.schedules(),
     search: p.search,
@@ -58,16 +60,27 @@ function nodeOk(version: string): boolean {
 
 export function runChecks(f: Facts): Check[] {
   const search = (): Check => {
-    if (f.search !== 'browser')
-      return { name: 'Search', status: 'ok', detail: `using ${f.search}` };
-    return {
-      name: 'Search',
-      status: 'warning',
-      detail: 'hidden browser; search engines often turn it away',
-      fix: f.docker
-        ? 'Run remy browser vm start for better results.'
-        : 'Install Docker or Colima, then run remy browser vm start, or set REMY_SEARCH.',
-    };
+    const plan = f.search;
+    if (plan.off) return { name: 'Search', status: 'ok', detail: 'off (REMY_SEARCH=off)' };
+    if (!plan.chosen)
+      return {
+        name: 'Search',
+        status: 'warning',
+        detail: `off: ${plan.why ?? 'no route works here'}`,
+        ...(plan.step && { fix: plan.step }),
+      };
+    const order = plan.order.length > 1 ? ` (order: ${describeOrder(plan.order)})` : '';
+    if (plan.step)
+      return {
+        name: 'Search',
+        status: plan.chosen === 'browser' ? 'warning' : 'ok',
+        detail:
+          plan.chosen === 'browser'
+            ? 'hidden browser; search engines often turn it away'
+            : `using ${routeLabel(plan.chosen)}${order}`,
+        fix: plan.step,
+      };
+    return { name: 'Search', status: 'ok', detail: `using ${routeLabel(plan.chosen)}${order}` };
   };
   return [
     nodeOk(f.node)

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { capabilitiesBlock, MAX_CAPABILITY_LINES, onceCapabilities } from './capabilities.ts';
 import type { Facts } from './doctor.ts';
 import { gatherFacts } from './doctor.ts';
+import { pickSearchRoute } from './search.ts';
 import { situationBlock } from './situation.ts';
+
+const plan = (over: object = {}) =>
+  pickSearchRoute({ keys: {}, docker: false, vmSetUp: false, browser: true, ...over });
 
 const bare: Facts = {
   node: 'v26.1.0',
@@ -11,9 +15,15 @@ const bare: Facts = {
   docker: false,
   daemon: false,
   schedules: 2,
-  search: 'browser',
+  search: plan({ browser: false }),
 };
-const full: Facts = { ...bare, browser: true, docker: true, daemon: true, search: 'tinyfish' };
+const full: Facts = {
+  ...bare,
+  browser: true,
+  docker: true,
+  daemon: true,
+  search: plan({ keys: { tinyfish: true } }),
+};
 
 describe('capabilitiesBlock trust line', () => {
   it('is absent at ask and names what still asks above it', () => {
@@ -31,8 +41,8 @@ describe('capabilitiesBlock', () => {
   it('names each gap with the single step that fixes it when nothing is set up', () => {
     const out = capabilitiesBlock({ facts: bare, helpers: false, skills: 0 });
     expect(out).toContain('Browser: none found. Ask the user: Install Chrome');
-    expect(out).toContain('Web search: hidden browser');
-    expect(out).toContain('Ask the user: Install Docker or Colima');
+    expect(out).toContain('Web search: off: no search key is set');
+    expect(out).toContain('Ask the user: Get a free TinyFish key and set TINYFISH_API_KEY.');
     expect(out).toContain('ask the user to run `remy connect`');
     expect(out).toContain(
       'Schedules: 2 set, but the daemon is off. Ask the user: Run remy daemon install',
@@ -43,7 +53,7 @@ describe('capabilitiesBlock', () => {
 
   it('states what works, with no asks, when everything is set up', () => {
     const out = capabilitiesBlock({ facts: full, helpers: true, skills: 3 });
-    expect(out).toContain('Web search: using tinyfish.');
+    expect(out).toContain('Web search: using TinyFish');
     expect(out).toContain('Browser: available.');
     expect(out).toContain('Schedules: 2 set.');
     expect(out).toContain('Helpers: on.');
@@ -91,20 +101,17 @@ describe('gatherFacts', () => {
       node: 'v26.1.0',
       platform: 'darwin',
       hasChromeApp: () => (calls.push('chrome'), false),
-      hasDocker: () => (calls.push('docker'), true),
       daemonOn: () => (calls.push('daemon'), true),
       schedules: () => 1,
-      search: 'tinyfish',
+      search: plan({ keys: { tinyfish: true } }),
       ...over,
     };
     return { p, calls };
   };
 
-  it('skips the slow Docker probe unless search falls back to the browser', () => {
-    const a = probes();
-    expect(gatherFacts(a.p).docker).toBe(false);
-    expect(a.calls).not.toContain('docker');
-    const b = probes({ search: 'browser' });
+  it('reports a container route as Docker being up', () => {
+    expect(gatherFacts(probes().p).docker).toBe(false);
+    const b = probes({ search: plan({ docker: true, vmSetUp: true }) });
     expect(gatherFacts(b.p).docker).toBe(true);
   });
 

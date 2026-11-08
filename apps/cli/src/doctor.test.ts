@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { type Check, plainChecks, runChecks } from './doctor.ts';
+import { pickSearchRoute } from './search.ts';
+
+const plan = (over: object = {}) =>
+  pickSearchRoute({ keys: {}, docker: false, vmSetUp: false, browser: true, ...over });
 
 describe('runChecks', () => {
   const facts = {
@@ -9,7 +13,7 @@ describe('runChecks', () => {
     docker: false,
     daemon: false,
     schedules: 0,
-    search: 'browser',
+    search: plan(),
   };
 
   it('passes a healthy setup', () => {
@@ -49,15 +53,44 @@ describe('runChecks', () => {
     expect(c?.fix).toContain('remy daemon install');
   });
 
-  it('says hidden search can be weak and how to do better', () => {
-    const c = runChecks({ ...facts, docker: true }).find((x) => x.name === 'Search');
+  it('says hidden search can be weak and names one step to do better', () => {
+    const c = runChecks(facts).find((x) => x.name === 'Search');
     expect(c?.status).toBe('warning');
-    expect(c?.fix).toContain('remy browser vm start');
+    expect(c?.fix).toContain('TINYFISH_API_KEY');
+    const d = runChecks({ ...facts, search: plan({ docker: true }) }).find(
+      (x) => x.name === 'Search',
+    );
+    expect(d?.fix).toContain('remy browser vm start');
   });
 
-  it('is happy with container search', () => {
-    const c = runChecks({ ...facts, search: 'vm' }).find((x) => x.name === 'Search');
+  it('shows the chosen route and the order when more than one works', () => {
+    const c = runChecks({
+      ...facts,
+      search: plan({ keys: { tinyfish: true }, docker: true, vmSetUp: true }),
+    }).find((x) => x.name === 'Search');
+    expect(c).toMatchObject({ status: 'ok' });
+    expect(c?.detail).toBe(
+      'using TinyFish (order: TinyFish, then the container, then the hidden browser)',
+    );
+    expect(c?.fix).toBeUndefined();
+  });
+
+  it('is happy with container search, and offers a key for steadier results', () => {
+    const c = runChecks({
+      ...facts,
+      search: plan({ docker: true, vmSetUp: true, override: 'vm' }),
+    }).find((x) => x.name === 'Search');
     expect(c?.status).toBe('ok');
+    expect(c?.detail).toBe('using the container');
+  });
+
+  it('says search is off and why when no route works', () => {
+    const c = runChecks({ ...facts, search: plan({ browser: false }) }).find(
+      (x) => x.name === 'Search',
+    );
+    expect(c?.status).toBe('warning');
+    expect(c?.detail).toContain('off: no search key is set');
+    expect(c?.fix).toBe('Get a free TinyFish key and set TINYFISH_API_KEY.');
   });
 });
 

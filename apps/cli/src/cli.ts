@@ -5,7 +5,13 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { type Browser, createBrowserTools, createLocalBrowser, profileInUse } from '@remy/browser';
+import {
+  type Browser,
+  browserSearch,
+  createBrowserTools,
+  createLocalBrowser,
+  profileInUse,
+} from '@remy/browser';
 import {
   type ApprovalRequest,
   BROWSER_HINT,
@@ -94,7 +100,7 @@ import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from '.
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
-import { pickSearch } from './search.ts';
+import { gatherSearchPlan, makeService, routedSearch } from './search.ts';
 
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
@@ -301,9 +307,12 @@ Setup
   this machine (Chrome, Edge or Chromium) with its own profile in REMY_HOME/browser; it shows the
   window when you need to sign in. REMY_BROWSER=off turns it off; REMY_BROWSER_LOCAL=on lets it
   open local addresses.
-  Search: REMY_SEARCH (or "search" in remy.config.json) picks browser, context, brave, tavily, tinyfish,
-  searxng or off. Unset, a service whose key is set searches (CONTEXT_DEV_API_KEY, BRAVE_API_KEY,
-  TAVILY_API_KEY, TINYFISH_API_KEY, SEARXNG_URL), else the browser.
+  Search picks its own route: a service whose key is set (TINYFISH_API_KEY, BRAVE_API_KEY,
+  TAVILY_API_KEY, CONTEXT_DEV_API_KEY, SEARXNG_URL, in that order), then the container
+  (remy browser vm start, with Docker running), then the hidden browser. A route that stops working
+  is skipped and the next answers; remy doctor shows the order and the step to improve it.
+  REMY_SEARCH (or "search" in remy.config.json) forces one: browser, vm, context, brave, tavily,
+  tinyfish, searxng or off.
 `;
 
 const OPTIONS = {
@@ -729,6 +738,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const browserOn = () => env.REMY_BROWSER !== 'off';
   const browserDir = () => join(home, 'browser');
   const vmFile = () => join(home, 'search-vm.json');
+  const machineHasBrowser = () =>
+    browserOn() &&
+    (process.platform !== 'darwin' ||
+      ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
+        existsSync(p),
+      ));
+  let searchPlanMemo: ReturnType<typeof gatherSearchPlan> | undefined;
+  /** The search route order, worked out once per process; Docker is asked only when no pick or key settles it. */
+  const searchPlan = (file: FileConfig) =>
+    (searchPlanMemo ??= gatherSearchPlan({
+      env,
+      override: env.REMY_SEARCH ?? file.search,
+      vmSetUp: existsSync(vmFile()),
+      browser: machineHasBrowser(),
+      hasDocker: () => spawnSync('docker', ['info']).status === 0,
+    }));
   /** What this machine has set up; shared by `remy doctor` and the capabilities block. */
   const machineFacts = (): Facts => {
     const file = cfg();
@@ -741,10 +766,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
           existsSync(p),
         ),
-      hasDocker: () => has('docker', ['info']),
       daemonOn: () => has('launchctl', ['list', LAUNCH_LABEL]),
       schedules: () => openSchedules(home).list().length,
-      search: env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : 'browser'),
+      search: searchPlan(file),
       helperProblems: () => loadHelperRoles(home, process.cwd()).problems,
     });
   };
@@ -859,29 +883,30 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           capabilities: capabilities(),
         }),
     });
-    const search = pickSearch(
-      env,
-      env.REMY_SEARCH ?? file.search ?? (existsSync(vmFile()) ? 'vm' : undefined),
-      () =>
-        vmSearch(vmConnection, fetch, () =>
-          startVmSearch().then(
-            () => true,
-            () => false,
-          ),
-        ),
-    );
-    if (search.provider)
-      tools.add(
-        createWebSearch(
-          search.provider,
-          search.choice === 'vm' ? { timeoutMs: VM_TIMEOUT_MS } : {},
-        ),
+    const plan = searchPlan(file);
+    if (!plan.off) {
+      const { provider } = routedSearch(plan, (route) =>
+        route === 'browser'
+          ? browserSearch(browserFor(file))
+          : route === 'vm'
+            ? vmSearch(vmConnection, fetch, () =>
+                startVmSearch().then(
+                  () => true,
+                  () => false,
+                ),
+              )
+            : makeService(route, env),
       );
-    // The browser on this machine; it searches too when the pick is the browser.
+      tools.add(
+        createWebSearch(provider, {
+          timeoutMs: plan.order.some((r) => r === 'vm') ? VM_TIMEOUT_MS : 45_000,
+        }),
+      );
+    }
+    // The browser on this machine (it never answers web_search here: the route above does).
     if (browserOn())
       for (const t of createBrowserTools(browserFor(file)))
-        if ((t.name !== 'web_search' || search.choice === 'browser') && !tools.get(t.name))
-          tools.add(t);
+        if (t.name !== 'web_search' && !tools.get(t.name)) tools.add(t);
     // Commands that never call a model (cancel) do not start the servers.
     if (opts.model) mcpHost(file, Boolean(opts.hooks))?.attach(tools);
     const timeline = createTimeline(st, { live: true });
