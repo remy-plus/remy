@@ -98,6 +98,13 @@ describe('checkProposal', () => {
     expect(v.reasons.join(' ')).toContain('target cases did not rise');
   });
 
+  it('fails when another case falls, even if the target rises', async () => {
+    const live = new ScriptedModelClient([...good, ...bad]);
+    const v = await checkProposal(await input(live));
+    expect(v.passed).toBe(false);
+    expect(v.reasons.join(' ')).toContain('case-b fell from 1 to 0');
+  });
+
   it('does not run when the edits are stale or were changed', async () => {
     const live = new ScriptedModelClient(good);
     const changed = { ...proposal(), editsHash: 'other' };

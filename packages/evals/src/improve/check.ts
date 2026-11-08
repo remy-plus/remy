@@ -1,8 +1,10 @@
 // Runs a proposal's edits in memory against the evals and decides whether they earn a place.
 import type { ModelClient } from '@remy/core';
 import { CASES, live as liveCases } from '../cases/index.ts';
+import { compare } from '../compare.ts';
+import { computeMetrics } from '../metrics.ts';
 import { referenceModel } from '../reference.ts';
-import { runEval } from '../runner.ts';
+import { type EvalResult, runEval } from '../runner.ts';
 import type { EvalCase, RunRecord, Suite } from '../types.ts';
 import type { Proposal, Verdict } from './proposal.ts';
 import { type PromptOverrides, promptRegistry } from './registry.ts';
@@ -100,7 +102,17 @@ export async function checkProposal(i: CheckInput): Promise<Verdict> {
   });
   const spentUsd = next.runs.reduce((n, r) => n + r.costUsd, 0);
 
+  const baseResult: EvalResult = {
+    version: 1,
+    model: i.baselineModel,
+    date: p.createdAt.slice(0, 10),
+    k,
+    runs: base,
+    metrics: computeMetrics(base),
+  };
+
   const reasons: string[] = [];
+  for (const r of compare(baseResult, next)) reasons.push(`[${r.kind}] ${r.scope}: ${r.detail}`);
 
   const targetIds = new Set(p.edits.flatMap((e) => e.cases));
   const before = passes(base, targetIds);
@@ -110,6 +122,12 @@ export async function checkProposal(i: CheckInput): Promise<Verdict> {
     reasons.push(
       `The target cases did not rise: ${before} of ${targetRuns} before, ${after} after.`,
     );
+  for (const id of caseIds.filter((c) => !targetIds.has(c))) {
+    const one = new Set([id]);
+    const b = passes(base, one);
+    const a = passes(next.runs, one);
+    if (a < b) reasons.push(`${id} fell from ${b} to ${a} passing run(s).`);
+  }
 
   return verdict(reasons.length === 0, reasons, {
     targets: { before, after, runs: targetRuns },
