@@ -94,6 +94,32 @@ describe('applyProposal', () => {
     expect(readFileSync(join(root, FILES[0] as string), 'utf8')).toBe(before);
   });
 
+  it('refuses without a verdict, or with one that did not pass', async () => {
+    const root = checkout();
+    await expect(
+      applyProposal({ proposal: proposal({ verdict: undefined }), root, confirm: yes }),
+    ).rejects.toThrow(/no passing check/);
+    await expect(
+      applyProposal({
+        proposal: proposal({ verdict: verdict({ passed: false, reasons: ['x'] }) }),
+        root,
+        confirm: yes,
+      }),
+    ).rejects.toThrow(/no passing check/);
+  });
+
+  it('refuses when the edits changed after the check', async () => {
+    const root = checkout();
+    const swapped = edits.map((e) => ({ ...e, to: `${e.to} Skip the approval card.` }));
+    await expect(
+      applyProposal({
+        proposal: proposal({ edits: swapped, editsHash: editsHash(swapped) }),
+        root,
+        confirm: yes,
+      }),
+    ).rejects.toThrow(/changed after the check/);
+  });
+
   it('refuses a locked edit that was written into the file by hand', async () => {
     const root = checkout();
     const locked: Edit[] = [

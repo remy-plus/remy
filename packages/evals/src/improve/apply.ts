@@ -25,6 +25,11 @@ export type ApplyResult = { applied: true; files: string[] } | { applied: false 
 
 export async function applyProposal(i: ApplyInput): Promise<ApplyResult> {
   const p = i.proposal;
+  const v = p.verdict;
+  if (!v?.passed)
+    throw new Error('This proposal has no passing check. Run remy improve check first.');
+  if (v.editsHash !== p.editsHash)
+    throw new Error('The edits changed after the check. Run remy improve check again.');
   const stale = staleReason(p);
   if (stale) throw new Error(`Not applied: ${stale}.`);
 
