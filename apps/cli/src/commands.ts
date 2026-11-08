@@ -30,6 +30,7 @@ export const COMMANDS: CommandInfo[] = [
   { name: 'minimal', summary: 'Use the quiet minimal screen at start (saved)' },
   { name: 'profile', summary: 'See or change what Remy knows about you' },
   { name: 'skills', summary: 'See the how-tos Remy follows for kinds of tasks' },
+  { name: 'review', summary: 'See what ran without you, and what waits for your OK' },
   { name: 'schedules', summary: 'See the tasks set to run by themselves' },
   { name: 'memory', summary: 'See what Remy remembers about you; edit or forget a note' },
   { name: 'tour', summary: 'Replay the welcome tour' },

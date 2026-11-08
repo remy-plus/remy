@@ -734,6 +734,36 @@ describe('/bg', () => {
   });
 });
 
+describe('/review', () => {
+  const noteTexts = (chat: Chat) =>
+    chat.getState().items.flatMap((i) => (i.kind === 'note' || i.kind === 'error' ? [i.text] : []));
+
+  it('shows the review, passing the window along', async () => {
+    const asked: Array<string | undefined> = [];
+    const { chat } = harness(new ScriptedModelClient([]), ['read'], {
+      review: async (since) => {
+        asked.push(since);
+        return 'Nothing ran without you in that time.';
+      },
+    });
+    await chat.submit('/review');
+    await chat.submit('/review 7d');
+    expect(asked).toEqual([undefined, '7d']);
+    expect(noteTexts(chat)[0]).toBe('Nothing ran without you in that time.');
+    expect(chat.getState().phase).toBe('idle');
+  });
+
+  it('reports a bad window as an error', async () => {
+    const { chat } = harness(new ScriptedModelClient([]), ['read'], {
+      review: async () => {
+        throw new Error('Use --since 24h, 7d or a date.');
+      },
+    });
+    await chat.submit('/review lately');
+    expect(noteTexts(chat)[0]).toContain('Use --since');
+  });
+});
+
 describe('keepTurns', () => {
   it('drops the oldest half at once past the cap', () => {
     const n = (k: number) => Array.from({ length: k }, (_, i) => i);

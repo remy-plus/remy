@@ -228,6 +228,8 @@ export interface ChatDeps {
   skills?: () => string;
   /** The schedule list for /schedules, as plain text. */
   schedules?: () => string;
+  /** /review [window]: what ran without the user, as plain text. Throws on a window it cannot read. */
+  review?: (since?: string) => Promise<string>;
   /** A tool's risk, for listing standing approvals. */
   riskOf?: (tool: string) => Risk | undefined;
   /** Adds an app or service, for /connect. */
@@ -1111,6 +1113,16 @@ export function createChat(deps: ChatDeps): Chat {
         kind: 'note',
         text: deps.schedules?.() ?? 'Schedules are not available here. Run remy schedule list.',
       });
+    } else if (name === 'review') {
+      if (!deps.review)
+        return void commit({
+          kind: 'note',
+          text: 'Review is not available here. Run remy review.',
+        });
+      return deps.review(args[0]).then(
+        (text) => commit({ kind: 'note', text }),
+        (e) => commit({ kind: 'error', text: friendlyError(e) }),
+      );
     } else if (name === 'skills') {
       commit({
         kind: 'note',

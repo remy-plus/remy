@@ -1531,6 +1531,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       approvals: standing(),
       skills: () => plainSkills(skills().list(), skills().problems()),
       schedules: () => plainSchedules(openSchedules(home).list()),
+      review: async (window) => {
+        const now = new Date();
+        const since = parseSince(window ?? '24h', now);
+        if (!since) throw new Error('Use /review 24h, 7d or a date such as 2026-11-01.');
+        return formatReview(
+          await collectReview({ store, home, since, schedules: openSchedules(home).list() }),
+          since,
+        );
+      },
       config: (context) => taskConfig(file, model.id, workspace, context),
       listTasks: async () => (await store.listTasks()).filter((t) => !isHelperTask(t.taskId)),
       background: {
