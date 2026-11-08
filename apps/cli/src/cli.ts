@@ -110,7 +110,7 @@ const MAX_EPISODES = 300;
 
 import { capabilitiesBlock, onceCapabilities } from './capabilities.ts';
 import { type Credentials, openCredentials } from './credentials.ts';
-import { LAUNCH_LABEL, TICK_MS, tick } from './daemon.ts';
+import { TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
 import { type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
@@ -811,10 +811,27 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       browser: machineHasBrowser(),
       hasDocker: () => spawnSync('docker', ['info']).status === 0,
     }));
+  const daemonInstaller = () =>
+    installerFor(process.platform, {
+      entry: deps.entry ?? currentEntry(),
+      homeDir: homedir(),
+      logFile: join(home, 'logs', 'daemon.log'),
+      path: env.PATH,
+      run: (cmd, args) => {
+        const r = spawnSync(cmd, args, { encoding: 'utf8' });
+        return { status: r.status, stdout: r.stdout ?? '' };
+      },
+      files: {
+        write: (path, text) => {
+          mkdirSync(dirname(path), { recursive: true });
+          writeFileSync(path, text);
+        },
+        remove: (path) => rmSync(path, { force: true }),
+      },
+    });
   /** What this machine has set up; shared by `remy doctor` and the capabilities block. */
   const machineFacts = (): Facts => {
     const file = cfg();
-    const has = (cmd: string, args: string[]) => spawnSync(cmd, args).status === 0;
     return gatherFacts({
       node: process.version,
       platform: process.platform,
@@ -823,7 +840,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
           existsSync(p),
         ),
-      daemonOn: () => has('launchctl', ['list', LAUNCH_LABEL]),
+      daemonOn: () => daemonInstaller()?.isOn() ?? false,
+      service: () => {
+        const s = daemonInstaller();
+        return s && { label: s.label, enableStep: s.enableStep, unavailable: s.unavailable() };
+      },
       schedules: () => openSchedules(home).list().length,
       search: searchPlan(file),
       helperProblems: () => loadHelperRoles(home, process.cwd()).problems,
@@ -1952,23 +1973,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       case 'daemon': {
         const sub = rest[0];
         const entry = deps.entry ?? currentEntry();
-        const installer = installerFor(process.platform, {
-          entry,
-          homeDir: homedir(),
-          logFile: join(home, 'logs', 'daemon.log'),
-          path: env.PATH,
-          run: (cmd, args) => {
-            const r = spawnSync(cmd, args, { encoding: 'utf8' });
-            return { status: r.status, stdout: r.stdout ?? '' };
-          },
-          files: {
-            write: (path, text) => {
-              mkdirSync(dirname(path), { recursive: true });
-              writeFileSync(path, text);
-            },
-            remove: (path) => rmSync(path, { force: true }),
-          },
-        });
+        const installer = daemonInstaller();
         if (sub === 'install' || sub === 'uninstall' || sub === 'status') {
           if (!installer)
             throw new Error(

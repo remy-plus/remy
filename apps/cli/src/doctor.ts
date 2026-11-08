@@ -15,6 +15,15 @@ export interface Facts {
   helperProblems?: string[];
   /** Embeddings for recall; absent where the check does not apply. */
   embeddings?: { state: 'off' | 'on' | 'failed' | 'unavailable'; detail?: string };
+  /** The service manager the daemon would use on this machine. */
+  service?: ServiceInfo;
+}
+
+export interface ServiceInfo {
+  label: string;
+  enableStep: string;
+  /** One line saying why the service manager cannot be used, when it cannot. */
+  unavailable?: string | undefined;
 }
 
 export interface Check {
@@ -36,20 +45,23 @@ export interface Probes {
   search: SearchPlan;
   helperProblems?: () => string[];
   embeddings?: () => NonNullable<Facts['embeddings']>;
+  service?: () => ServiceInfo | undefined;
 }
 
 /** Facts for the checks. */
 export function gatherFacts(p: Probes): Facts {
+  const svc = p.service?.();
   return {
     node: p.node,
     ...(p.model !== undefined && { model: p.model }),
     browser: p.hasChromeApp() || p.platform !== 'darwin',
     docker: p.search.order.includes('vm'),
-    daemon: p.platform === 'darwin' && p.daemonOn(),
+    daemon: (p.platform === 'darwin' || p.service !== undefined) && p.daemonOn(),
     schedules: p.schedules(),
     search: p.search,
     ...(p.helperProblems && { helperProblems: p.helperProblems() }),
     ...(p.embeddings && { embeddings: p.embeddings() }),
+    ...(svc && { service: svc }),
   };
 }
 
@@ -75,6 +87,18 @@ function embeddingsCheck(e: NonNullable<Facts['embeddings']>): Check {
   if (e.state === 'unavailable')
     return { name: 'Embeddings', status: 'ok', detail: `on, but idle: ${e.detail ?? ''}`.trim() };
   return { name: 'Embeddings', status: 'ok', detail: 'off; recall ranks on this machine' };
+}
+
+function daemonCheck(s: ServiceInfo, on: boolean): Check {
+  if (s.unavailable)
+    return {
+      name: 'Daemon',
+      status: 'warning',
+      detail: `${s.label}: ${s.unavailable}`,
+      fix: 'Run remy daemon run in your own service, or leave a terminal open.',
+    };
+  if (on) return { name: 'Daemon', status: 'ok', detail: `on (${s.label})` };
+  return { name: 'Daemon', status: 'ok', detail: `off; would use a ${s.label}`, fix: s.enableStep };
 }
 
 export function runChecks(f: Facts): Check[] {
@@ -130,6 +154,7 @@ export function runChecks(f: Facts): Check[] {
           fix: 'Run remy daemon install.',
         }
       : { name: 'Schedules', status: 'ok', detail: `${f.schedules} set` },
+    ...(f.service ? [daemonCheck(f.service, f.daemon)] : []),
     ...(f.embeddings ? [embeddingsCheck(f.embeddings)] : []),
     ...(f.helperProblems?.length
       ? [

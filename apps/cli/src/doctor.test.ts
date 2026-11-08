@@ -109,3 +109,46 @@ describe('plainChecks', () => {
     expect(plainChecks(checks)).toContain('Run remy login.');
   });
 });
+
+describe('daemon check', () => {
+  const base = {
+    node: 'v26.1.0',
+    model: 'openai',
+    browser: true,
+    docker: false,
+    daemon: false,
+    schedules: 0,
+    search: plan(),
+  };
+  const find = (f: object) => runChecks({ ...base, ...f }).find((c) => c.name === 'Daemon');
+
+  it('shows nothing where no installer applies', () => {
+    expect(find({})).toBeUndefined();
+  });
+
+  it('names the installer and the one step to turn it on', () => {
+    expect(
+      find({ service: { label: 'systemd user unit', enableStep: 'Run remy daemon install.' } }),
+    ).toEqual({
+      name: 'Daemon',
+      status: 'ok',
+      detail: 'off; would use a systemd user unit',
+      fix: 'Run remy daemon install.',
+    });
+  });
+
+  it('says on when it is on', () => {
+    const c = find({ daemon: true, service: { label: 'Windows Scheduled Task', enableStep: 'x' } });
+    expect(c?.detail).toBe('on (Windows Scheduled Task)');
+    expect(c?.fix).toBeUndefined();
+  });
+
+  it('says when the service manager is not there and what to run instead', () => {
+    const c = find({
+      service: { label: 'systemd user unit', enableStep: 'x', unavailable: 'no systemctl.' },
+    });
+    expect(c?.status).toBe('warning');
+    expect(c?.detail).toBe('systemd user unit: no systemctl.');
+    expect(c?.fix).toContain('remy daemon run');
+  });
+});
