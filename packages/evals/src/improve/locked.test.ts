@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderSystemPrompt, SYSTEM_PROMPT } from '@remy/core';
 import { describe, expect, it } from 'vitest';
+import { proposePrompt } from './propose.ts';
 import { editableEntries, promptRegistry } from './registry.ts';
 import { weakens } from './validate.ts';
 
@@ -82,6 +83,14 @@ describe('locked prompt text', () => {
   it('builds the same system prompt as before the parts existed', () => {
     expect(SYSTEM_PROMPT).toBe(renderSystemPrompt({}));
     expect(digest(SYSTEM_PROMPT)).toBe(digest(renderSystemPrompt()));
+  });
+
+  it('never shows the proposer a locked id or its text', () => {
+    const prompt = proposePrompt([], editableEntries());
+    for (const e of locked) {
+      expect(prompt, e.id).not.toContain(`[${e.id}]`);
+      expect(prompt, e.id).not.toContain(e.text);
+    }
   });
 
   it('finds each editable text exactly once in the file it is written to', () => {
