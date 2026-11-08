@@ -50,6 +50,7 @@ remy
 | Alibaba Qwen  | `alibaba`          | `DASHSCOPE_API_KEY`  | OpenAI-compatible API                                        |
 | Inception     | `inception`        | `INCEPTION_API_KEY`  | Mercury models, free tokens on a new key                     |
 | Zro           | `zro`              | `ZRO_API_KEY`        | DeepSeek and GLM Flash models, free daily use                |
+| 0G            | `zerog`            | `ZEROG_API_KEY`      | One key for Claude, GPT, GLM and more, at the router's rates |
 | Ollama        | `ollama`           | none                 | Local models                                                 |
 | Anything else | `--base-url <url>` | `REMY_API_KEY`       | Any OpenAI-compatible endpoint (or `custom` in `remy login`) |
 
