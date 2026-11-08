@@ -3,8 +3,10 @@
 import type {
   ApproveBody,
   ExtendBody,
+  Health,
   HomeData,
   RemyApi,
+  SettingsData,
   StreamEvent,
   TaskListItem,
   TaskView,
@@ -42,6 +44,9 @@ export function createSseParser(onEvent: (e: StreamEvent) => void) {
     }
   };
 }
+
+/** The server has no routes for settings yet. */
+const notYet = <T>(): Promise<T> => Promise.reject(new Error('This is not available yet.'));
 
 export function createHttpApi(opts: {
   token: () => string | null;
@@ -105,6 +110,29 @@ export function createHttpApi(opts: {
       const tasks = await api.listTasks({ limit: 50 });
       return homeFromTasks(tasks, await waitingCards(api, tasks));
     },
+    settings: () => notYet<SettingsData>(),
+    health: () => json<Health>('/api/health'),
+    async testToken(token) {
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/tasks?limit=50`, {
+          headers: { authorization: `Bearer ${token.trim()}` },
+        });
+      } catch {
+        throw new Error('Remy could not be reached at this address.');
+      }
+      if (res.status === 401 || res.status === 403) throw new Error('That token was not accepted.');
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? 'The server did not accept that.');
+      }
+      const body = (await res.json().catch(() => ({}))) as { tasks?: TaskListItem[] };
+      return { running: (body.tasks ?? []).filter((t) => t.status === 'running').length };
+    },
+    deleteNotes: () => notYet(),
+    rotateToken: () => notYet(),
+    testModels: () => notYet(),
+    sendTestNotification: () => notYet(),
   };
   return api;
 }

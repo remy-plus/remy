@@ -2,9 +2,11 @@
 // with ?mock=1). It keeps the same shapes as the real routes and applies approve, cancel and so on.
 import type {
   ApprovalCard,
+  Health,
   HomeData,
   NeedCard,
   RemyApi,
+  SettingsData,
   StreamEvent,
   TaskListItem,
   TaskStatus,
@@ -215,10 +217,52 @@ const headline = (n: number) =>
     ? 'Nothing needs you.'
     : `${['', 'One thing needs', 'Two things need', 'Three things need'][n] ?? `${n} things need`} you.`;
 
+const SETTINGS: SettingsData = {
+  currency: '£',
+  providers: [
+    {
+      id: 'openrouter',
+      name: 'OpenRouter',
+      note: 'Many models, one key. Pay as you go.',
+      state: 'key_in_use',
+    },
+    {
+      id: 'ollama',
+      name: 'Ollama on this machine',
+      note: 'Free and private. llama3.3 ready.',
+      state: 'running',
+    },
+    { id: 'groq', name: 'Groq', note: 'Fast open models.', state: 'no_key' },
+    { id: 'openai', name: 'OpenAI', note: 'GPT models.', state: 'no_key' },
+  ],
+  models: {
+    everyday: 'mercury-3',
+    hard: 'claude-haiku-5.5',
+    everydayCost: '£0.002 per task',
+    hardCost: '£0.01 per task',
+  },
+  budget: { usedMonth: 6.8, daysLeft: 11 },
+  notes: 1204,
+  server: {
+    address: 'remy.home.example.test',
+    lastSignIns: [
+      { at: 'Today 08:12', where: 'This browser' },
+      { at: 'Yesterday 21:40', where: 'Phone' },
+      { at: 'Thu 07:05', where: 'Laptop' },
+    ],
+  },
+  about: {
+    version: '1.0 preview',
+    licences: 'Apache-2.0, with the open-source licences of what it bundles',
+    dataDir: '~/.remy',
+  },
+};
+
 export function createMockApi(): RemyApi {
   const tasks = new Map<string, TaskView>(SEEDS.map((s) => [s.id, taskView(s)]));
   const updated = new Map<string, string>(SEEDS.map((s) => [s.id, iso(s.at)]));
   let counter = 0;
+  let notes = SETTINGS.notes;
   const get = (id: string) => {
     const v = tasks.get(id);
     if (!v) throw new Error('There is no such task.');
@@ -340,6 +384,28 @@ export function createMockApi(): RemyApi {
         },
       };
     },
+    async settings() {
+      return { ...SETTINGS, notes };
+    },
+    async health(): Promise<Health> {
+      return { ok: true, version: SETTINGS.about.version };
+    },
+    async testToken(token) {
+      if (token.trim().length < 8) throw new Error('That token was not accepted.');
+      return { running: 4 };
+    },
+    async deleteNotes() {
+      const deleted = notes;
+      notes = 0;
+      return { deleted };
+    },
+    async rotateToken() {
+      return { token: 'mock-token-for-a-demo-only' };
+    },
+    async testModels() {
+      return { ok: true, detail: 'Both models answered.' };
+    },
+    async sendTestNotification() {},
   };
   return api;
 }

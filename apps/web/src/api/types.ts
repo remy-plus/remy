@@ -136,6 +136,34 @@ export interface Notice {
   text: string;
 }
 
+// --- Settings, sign-in and first run (6.3 group C). `remy serve` has no routes for these yet. ---
+
+/** GET /api/health: the one route that needs no token. */
+export interface Health {
+  ok: boolean;
+  version: string;
+}
+export interface Provider {
+  id: string;
+  name: string;
+  note: string;
+  /** What the status column says, in plain words. */
+  state: 'key_in_use' | 'key_saved' | 'running' | 'no_key';
+}
+/** What Settings shows and the person cannot change here. Values they can change live in the settings store. */
+export interface SettingsData {
+  currency: string;
+  providers: Provider[];
+  models: { everyday: string; hard: string; everydayCost: string; hardCost: string };
+  budget: { usedMonth: number; daysLeft: number };
+  notes: number;
+  server: {
+    address: string;
+    lastSignIns: { at: string; where: string }[];
+  };
+  about: { version: string; licences: string; dataDir: string };
+}
+
 /** Everything the screens may ask of the server. Components use this and nothing else. */
 export interface RemyApi {
   readonly kind: 'mock' | 'http';
@@ -153,4 +181,13 @@ export interface RemyApi {
   cancel(id: string): Promise<void>;
   extend(id: string, body?: ExtendBody): Promise<void>;
   home(): Promise<HomeData>;
+  /** Settings, sign-in and first run. The http adapter says 'not available yet' for the settings routes. */
+  settings(): Promise<SettingsData>;
+  health(): Promise<Health>;
+  /** Resolves when `token` is accepted; rejects with a message safe to show. Does not store the token. */
+  testToken(token: string): Promise<{ running: number }>;
+  deleteNotes(): Promise<{ deleted: number }>;
+  rotateToken(): Promise<{ token: string }>;
+  testModels(): Promise<{ ok: boolean; detail: string }>;
+  sendTestNotification(): Promise<void>;
 }
