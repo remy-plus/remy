@@ -11,6 +11,13 @@ export type RouteName =
   | 'connections'
   | 'settings'
   | 'settings-section'
+  | 'review'
+  | 'connection-add'
+  | 'machine-add'
+  | 'schedule-new'
+  | 'welcome'
+  | 'sign-in'
+  | 'quiet'
   | 'not-found';
 
 export interface Route {
@@ -26,6 +33,13 @@ const TABLE: [pattern: string, name: RouteName][] = [
   ['/skills', 'skills'],
   ['/schedules', 'schedules'],
   ['/connections', 'connections'],
+  ['/connections/add', 'connection-add'],
+  ['/connections/machine', 'machine-add'],
+  ['/schedules/new', 'schedule-new'],
+  ['/review', 'review'],
+  ['/welcome/:step', 'welcome'],
+  ['/sign-in', 'sign-in'],
+  ['/quiet', 'quiet'],
   ['/settings', 'settings'],
   ['/settings/:section', 'settings-section'],
 ];

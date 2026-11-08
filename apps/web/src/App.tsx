@@ -3,8 +3,22 @@ import { useApi } from './api/index.tsx';
 import { Header } from './components/Header.tsx';
 import { StatusBar } from './components/StatusBar.tsx';
 import { useHome } from './hooks.ts';
+import { AddConnection } from './pages/connect/AddConnection.tsx';
+import { AddMachine } from './pages/connect/AddMachine.tsx';
+import { Brain } from './pages/connect/Brain.tsx';
+import { Connections } from './pages/connect/Connections.tsx';
+import { NewSchedule } from './pages/connect/NewSchedule.tsx';
+import { Schedules } from './pages/connect/Schedules.tsx';
+import { Skills } from './pages/connect/Skills.tsx';
 import { Home } from './pages/Home.tsx';
 import { Placeholder } from './pages/Placeholder.tsx';
+import { Settings } from './pages/settings/Settings.tsx';
+import { Review } from './pages/tasks/Review.tsx';
+import { Task } from './pages/tasks/Task.tsx';
+import { Tasks } from './pages/tasks/Tasks.tsx';
+import { Quiet } from './pages/welcome/Quiet.tsx';
+import { SignIn } from './pages/welcome/SignIn.tsx';
+import { Welcome } from './pages/welcome/Welcome.tsx';
 import { matchRoute, useHashPath } from './router.ts';
 
 function Page({ path, home }: { path: string; home: ReturnType<typeof useHome> }) {
@@ -13,21 +27,35 @@ function Page({ path, home }: { path: string; home: ReturnType<typeof useHome> }
     case 'home':
       return <Home home={home} />;
     case 'tasks':
-      return <Placeholder title="Tasks" />;
+      return <Tasks />;
     case 'task':
-      return <Placeholder title="Task" detail={`Task ${params.id}`} />;
+      return <Task id={params.id} />;
+    case 'review':
+      return <Review />;
     case 'brain':
-      return <Placeholder title="Brain" />;
+      return <Brain />;
     case 'skills':
-      return <Placeholder title="Skills" />;
+      return <Skills />;
     case 'schedules':
-      return <Placeholder title="Schedules" />;
+      return <Schedules />;
+    case 'schedule-new':
+      return <NewSchedule />;
     case 'connections':
-      return <Placeholder title="Connections" />;
+      return <Connections />;
+    case 'connection-add':
+      return <AddConnection />;
+    case 'machine-add':
+      return <AddMachine />;
     case 'settings':
-      return <Placeholder title="Settings" />;
+      return <Settings />;
     case 'settings-section':
-      return <Placeholder title="Settings" detail={`Section: ${params.section}`} />;
+      return <Settings section={params.section} />;
+    case 'welcome':
+      return <Welcome step={params.step} />;
+    case 'sign-in':
+      return <SignIn />;
+    case 'quiet':
+      return <Quiet />;
     default:
       return <Placeholder title="Not found" detail="There is no such page." />;
   }
