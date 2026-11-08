@@ -89,4 +89,34 @@ describe('withRecall: situation', () => {
     await model.complete(req('metric please'), signal);
     expect(inner.requests[0]?.messages[0]?.content).toMatch(/^S\n\nThe user's own saved notes/);
   });
+
+  it('ranks with vectors when given, and not at all when personalising is off', async () => {
+    const notes = [note('mem_a', 'Has a dog named Kiwi'), note('mem_b', 'Prefers metric units')];
+    let asked = 0;
+    const semantic = async () => {
+      asked += 1;
+      return { vectors: new Map([['mem_a', [1, 0]]]), query: [1, 0] };
+    };
+    const mk = (enabled: boolean) => {
+      const inner = new ScriptedModelClient([
+        { text: 'ok', calls: [], usage: { inTokens: 1, outTokens: 1 } },
+      ]);
+      const model = withRecall(inner, {
+        enabled: () => enabled,
+        notes: () => notes,
+        semantic,
+        hasTools: true,
+        situation: async () => 'NOW',
+      });
+      return { inner, model };
+    };
+    const on = mk(true);
+    await on.model.complete(req('tell me about the animal'), signal);
+    expect(JSON.stringify(on.inner.requests[0]?.messages)).toContain('Kiwi');
+    expect(asked).toBe(1);
+    const off = mk(false);
+    await off.model.complete(req('tell me about the animal'), signal);
+    expect(JSON.stringify(off.inner.requests[0]?.messages)).not.toContain('Kiwi');
+    expect(asked).toBe(1);
+  });
 });

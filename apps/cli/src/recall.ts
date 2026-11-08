@@ -3,12 +3,20 @@
 // computed once and then reused word for word, so a later `remember` or a new turn only changes
 // what comes after it. The system prompt never changes.
 import type { ModelClient } from '@remy/core';
-import { type MemoryEntry, memoryQuery, notesBlock, REMEMBER_HINT } from '@remy/tools';
+import {
+  type MemoryEntry,
+  memoryQuery,
+  notesBlock,
+  REMEMBER_HINT,
+  type SemanticSource,
+} from '@remy/tools';
 
 export interface RecallOptions {
   /** Read on every call: personalising can be switched off mid-session. */
   enabled: () => boolean;
   notes: () => MemoryEntry[];
+  /** Vectors for ranking, when the user turned embeddings on; undefined results mean local ranking. */
+  semantic?: SemanticSource;
   /** Whether the remember and forget tools are registered. */
   hasTools: boolean;
   /** The situation block for a new user message; sent whether or not personalising is on. */
@@ -34,10 +42,12 @@ export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
       const lastText = req.messages[last]?.content;
       if (last >= 0 && typeof lastText === 'string' && !frozen.has(lastText)) {
         const query = memoryQuery(req.messages.slice(0, last + 1));
+        const notes = on ? o.notes() : [];
+        const sem = on && o.semantic ? await o.semantic(notes, query) : undefined;
         const parts = [
           o.situation ? await o.situation() : '',
           o.skills ? o.skills(query) : '',
-          on ? notesBlock(o.notes(), query) : '',
+          on ? notesBlock(notes, query, sem) : '',
         ];
         frozen.set(lastText, parts.filter(Boolean).join('\n\n'));
       }

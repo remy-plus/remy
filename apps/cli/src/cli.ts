@@ -111,6 +111,13 @@ import { LAUNCH_LABEL, launchAgentPlist, TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
 import { type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
+import {
+  createNoteEmbedder,
+  type EmbedEndpoint,
+  embeddingModel,
+  embeddingStatusFile,
+  readEmbeddingStatus,
+} from './embeddings.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
 import { loadHelperRoles } from './helper-roles.ts';
 import {
@@ -467,6 +474,17 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     memoryStore ??= openMemory(home, { enabled: () => personaliseOn(home) });
     return memoryStore;
   };
+  let embedder: ReturnType<typeof createNoteEmbedder> | undefined;
+  /** Embeddings for recall: off unless REMY_EMBEDDINGS=on, and then only to the chat provider. */
+  const noteEmbedder = () =>
+    (embedder ??= createNoteEmbedder({
+      on: env.REMY_EMBEDDINGS === 'on',
+      personalising: () => personaliseOn(home),
+      store: memory(),
+      endpoint: () => embedEndpoint(cfg()),
+      statusFile: embeddingStatusFile(home),
+      ...(deps.fetch && { fetch: deps.fetch }),
+    }));
   let skillStore: SkillStore | undefined;
   const skills = () => {
     skillStore ??= openSkills(home, deps.cwd);
@@ -634,6 +652,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   function modelFor(file: FileConfig): ModelClient {
     if (deps.model) return deps.model;
     if (env.REMY_DEMO === 'on') return demoModel();
+    return modelFromEnv(providerEnv(file));
+  }
+
+  /** The chat provider as env settings: flags, then env, then a saved login, then remy.config.json. */
+  function providerEnv(file: FileConfig): Record<string, string | undefined> {
     // Per field: flags, then env, then a saved login, then remy.config.json.
     const explicitUrl = flags['base-url'] ?? env.REMY_BASE_URL;
     const named = flags.profile ?? env.REMY_PROFILE;
@@ -666,7 +689,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       throw new Error(
         `The ${e.REMY_PROFILE} profile needs an API key. Run remy login, or set ${keyEnv}.`,
       );
-    return modelFromEnv(e);
+    return e;
+  }
+
+  /** Where embeddings would go: the chat provider, never another. Undefined when it cannot be worked out. */
+  function embedEndpoint(file: FileConfig): EmbedEndpoint | undefined {
+    try {
+      const e = providerEnv(file);
+      const profile = e.REMY_PROFILE ? PROFILES[e.REMY_PROFILE] : undefined;
+      const baseUrl = e.REMY_BASE_URL ?? profile?.baseUrl;
+      const model = baseUrl ? embeddingModel(env, baseUrl) : undefined;
+      if (!baseUrl || !model) return undefined;
+      const key = e.REMY_API_KEY ?? (profile?.keyEnv ? e[profile.keyEnv] : undefined);
+      return { baseUrl, ...(key && { apiKey: key }), model };
+    } catch {
+      return undefined;
+    }
   }
 
   /** Starts the connected servers once per process. Trouble with the config never stops Remy. */
@@ -770,6 +808,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       schedules: () => openSchedules(home).list().length,
       search: searchPlan(file),
       helperProblems: () => loadHelperRoles(home, process.cwd()).problems,
+      embeddings: () =>
+        readEmbeddingStatus(home, env.REMY_EMBEDDINGS === 'on', personaliseOn(home)),
     });
   };
   const vmRun: Run = (cmd, args) => {
@@ -840,7 +880,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     // Notes about the user: tools and recall exist only while personalising is on.
     if (personaliseOn(home)) {
       for (const t of createMemoryTools(memory())) tools.add(t);
-      tools.add(createRecallTool(memory(), pastTasks));
+      tools.add(createRecallTool(memory(), pastTasks, noteEmbedder().source));
     }
     for (const t of createSkillTools({
       ...skills(),
@@ -869,6 +909,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     const model = withRecall(inner, {
       enabled: () => personaliseOn(home),
       notes: () => memory().list(),
+      semantic: noteEmbedder().source,
       hasTools: Boolean(tools.get('remember')),
       skills: (query) =>
         skillsBlock(skills().list(), query, {
