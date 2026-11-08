@@ -1,12 +1,16 @@
 import { type ComponentType, useCallback, useEffect, useState } from 'react';
 import { type SettingsData, useApi } from '../../api/index.tsx';
 import { Appearance, Budget, Trust } from './basics.tsx';
+import { Model } from './model.tsx';
+import { Notifications } from './notifications.tsx';
 import { SECTIONS, type SectionId, type SectionProps } from './sections.ts';
 
 const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
   trust: Trust,
   budget: Budget,
   appearance: Appearance,
+  model: Model,
+  notifications: Notifications,
 };
 
 const isSection = (s: string): s is SectionId => SECTIONS.some((x) => x.id === s);
@@ -40,7 +44,7 @@ export function Settings({ section = 'trust' }: { section?: string }) {
         aria-label="Settings sections"
         className="border-b border-line px-5 py-4 md:border-r md:border-b-0 md:py-8 md:pr-5 md:pl-10"
       >
-        <ul className="m-0 flex flex-wrap gap-1 p-0 md:block md:space-y-1">
+        <ul className="-mx-3 m-0 flex flex-wrap gap-1 p-0 md:mx-0 md:block md:space-y-1">
           {SECTIONS.map((s) => {
             const on = s.id === (current ?? '');
             return (
