@@ -167,7 +167,7 @@ import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
 import { BODY_MAX_BYTES, webhookConfig, webhookPrompt } from './webhook-payload.ts';
-import { processStarter, startWebhooks } from './webhook-service.ts';
+import { daemonWebhooks, processStarter, startWebhooks } from './webhook-service.ts';
 import { openHooks } from './webhook-store.ts';
 import { newToken, rotateToken, sha256Hex, sharedToken } from './webhook-token.ts';
 
@@ -2135,7 +2135,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         }
         if (sub && sub !== 'run')
           throw new Error('Use remy daemon, or remy daemon install, uninstall or status.');
-        const store = openSchedules(home);
+        const schedules = openSchedules(home);
         const start = (prompt: string) =>
           new Promise<string>((done, fail) => {
             execFile(
@@ -2148,9 +2148,19 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               },
             );
           });
+        await daemonWebhooks({
+          home,
+          env,
+          start: processStarter({ entry, env, cwd: home }),
+          isActive: async (id) =>
+            ['running', 'waiting_approval', 'waiting_user', 'paused'].includes(
+              fold(await store.read(id)).status,
+            ),
+          log: (line) => out(line),
+        });
         out('The daemon is running. Press Ctrl+C to stop it.');
         for (;;) {
-          await tick(store, new Date(), start, (line) => out(line));
+          await tick(schedules, new Date(), start, (line) => out(line));
           await new Promise((r) => setTimeout(r, TICK_MS));
         }
       }

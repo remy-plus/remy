@@ -62,3 +62,18 @@ export async function startWebhooks(p: {
     bind,
   );
 }
+
+/** The daemon's part: listens only when webhooks are on and a hook exists. A failure to bind is logged, never fatal. */
+export async function daemonWebhooks(
+  p: Parameters<typeof startWebhooks>[0],
+): Promise<Listening | undefined> {
+  if (!shouldListen(p.home)) return undefined;
+  try {
+    const listening = await startWebhooks(p);
+    p.log(`Webhooks listen on http://${listening.host}:${listening.port}/hook/<name>.`);
+    return listening;
+  } catch (e) {
+    p.log(`Webhooks did not start: ${e instanceof Error ? e.message : String(e)}`);
+    return undefined;
+  }
+}
