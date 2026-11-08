@@ -1,5 +1,6 @@
 export * from './builtin-skills.ts';
 export * from './calc-tools.ts';
+export * from './computer.ts';
 export * from './delegate.ts';
 export * from './edit-tools.ts';
 export * from './file-tools.ts';
