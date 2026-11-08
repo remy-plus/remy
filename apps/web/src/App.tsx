@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useApi } from './api/index.tsx';
+import { CommandPalette } from './components/CommandPalette.tsx';
 import { Header } from './components/Header.tsx';
 import { StatusBar } from './components/StatusBar.tsx';
 import { useHome } from './hooks.ts';
@@ -101,6 +102,7 @@ export function App() {
       <main id="main" ref={main} tabIndex={-1} className="outline-none">
         <Page path={path} home={home} />
       </main>
+      <CommandPalette />
     </>
   );
 }
