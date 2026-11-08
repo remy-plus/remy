@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { launchAgentPlist } from './daemon.ts';
-import { installerFor, type RunResult, type ServiceContext, systemdUnit } from './service.ts';
+import {
+  installerFor,
+  type RunResult,
+  type ServiceContext,
+  schtasksCreateArgs,
+  systemdUnit,
+  taskCommand,
+  windowsArg,
+} from './service.ts';
 
 /** A context that records every command and file and starts nothing. */
 export function fake(over: { fail?: (cmd: string, args: string[]) => RunResult | undefined } = {}) {
@@ -171,5 +179,57 @@ describe('systemd installer', () => {
     expect(on.commands[0]).toEqual(sys('is-active', 'remy.service'));
     const off = fake({ fail: () => ({ status: 3, stdout: 'inactive\n' }) });
     expect(installerFor('linux', off.ctx)?.status().on).toBe(false);
+  });
+});
+
+describe('scheduled task string', () => {
+  it('quotes only what needs it', () => {
+    expect(windowsArg('C:\\node\\node.exe')).toBe('C:\\node\\node.exe');
+    expect(windowsArg('C:\\Program Files\\nodejs\\node.exe')).toBe(
+      '"C:\\Program Files\\nodejs\\node.exe"',
+    );
+    expect(windowsArg('')).toBe('""');
+  });
+
+  it('escapes quotes and the backslashes before them and at the end', () => {
+    expect(windowsArg('a "b" c')).toBe('"a \\"b\\" c"');
+    expect(windowsArg('C:\\my dir\\')).toBe('"C:\\my dir\\\\"');
+    expect(windowsArg('x\\"y z')).toBe('"x\\\\\\"y z"');
+  });
+
+  it('builds the task command with a path that has a space', () => {
+    const entry = {
+      execPath: 'C:\\Program Files\\nodejs\\node.exe',
+      execArgv: [],
+      script: 'C:\\Users\\Ana Lopes\\remy\\remy.js',
+    };
+    expect(taskCommand(entry)).toBe(
+      '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\Ana Lopes\\remy\\remy.js" daemon run',
+    );
+    expect(schtasksCreateArgs(entry)).toEqual([
+      '/Create',
+      '/SC',
+      'ONLOGON',
+      '/TN',
+      'RemyDaemon',
+      '/TR',
+      '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\Ana Lopes\\remy\\remy.js" daemon run',
+      '/RL',
+      'LIMITED',
+      '/F',
+    ]);
+  });
+
+  it('never elevates or names another account', () => {
+    const args = schtasksCreateArgs({ execPath: 'node', execArgv: [], script: 'r.js' });
+    expect(args).toContain('LIMITED');
+    expect(args).not.toContain('/RU');
+    expect(args).not.toContain('HIGHEST');
+  });
+
+  it('refuses a command longer than schtasks takes', () => {
+    expect(() => taskCommand({ execPath: 'n', execArgv: [], script: 'x'.repeat(300) })).toThrow(
+      '261',
+    );
   });
 });

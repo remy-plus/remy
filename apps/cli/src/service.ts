@@ -124,6 +124,57 @@ export function launchdInstaller(ctx: ServiceContext): ServiceInstaller {
   };
 }
 
+/** One word as Windows programs read a command line: quoted when it needs it, quotes escaped. */
+export function windowsArg(text: string): string {
+  singleLine('A path', text);
+  if (text !== '' && !/[\s"]/.test(text)) return text;
+  let out = '"';
+  let slashes = 0;
+  for (const c of text) {
+    if (c === '\\') slashes++;
+    else if (c === '"') {
+      out += `${'\\'.repeat(slashes * 2 + 1)}"`;
+      slashes = 0;
+    } else {
+      out += '\\'.repeat(slashes) + c;
+      slashes = 0;
+    }
+  }
+  return `${out}${'\\'.repeat(slashes * 2)}"`;
+}
+
+export const TASK_NAME = 'RemyDaemon';
+/** The longest /TR text schtasks accepts. */
+const TR_LIMIT = 261;
+
+/** The command the scheduled task runs: this node, this install, `daemon run`. */
+export function taskCommand(entry: EntryPoint): string {
+  const text = [entry.execPath, ...entry.execArgv, entry.script, 'daemon', 'run']
+    .map(windowsArg)
+    .join(' ');
+  if (text.length > TR_LIMIT)
+    throw new Error(
+      `Windows allows ${TR_LIMIT} characters for a task command; this one is ${text.length}. Install Remy under a shorter path.`,
+    );
+  return text;
+}
+
+/** The schtasks arguments that create the logon task. No shell reads them, and no /RU: it runs as you. */
+export function schtasksCreateArgs(entry: EntryPoint): string[] {
+  return [
+    '/Create',
+    '/SC',
+    'ONLOGON',
+    '/TN',
+    TASK_NAME,
+    '/TR',
+    taskCommand(entry),
+    '/RL',
+    'LIMITED',
+    '/F',
+  ];
+}
+
 const UNIT = 'remy.service';
 
 /** One word for a POSIX shell, in single quotes, for the line we print and never run. */
