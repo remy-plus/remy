@@ -733,6 +733,8 @@ Built in this order, safest first. Anything that downloads a binary, listens on 
 
 **Stage 4 packages 1 and 2 (2026-11-08).** `remy doctor` now recommends a reach profile from memory, chip, disk, Docker, browser and search key (this Mac: light, because Docker is not running), and `remy review` and `/review` list what ran without the user in a window, needs-attention first, from the event store with no model call. The daemon installs through a `ServiceInstaller` port: macOS unchanged, a systemd user unit on Linux and a logon scheduled task on Windows (never admin). The Linux and Windows installers are generated and unit-tested only; the owner or a tester must install them on a real machine before the Stage 4 gate can pass. 322 replay cases, 2,437 tests.
 
+**Stage 4 package 3 (2026-11-08).** Webhooks: `remy webhook add|list|rm|token|enable|start|test`. Off until enabled; binds to 127.0.0.1 (another address needs `REMY_WEBHOOK_ALLOW_REMOTE=on`); bearer token compared in constant time with a lockout after 5 failures; 64 KB and 10 s limits; one run per hook per 10 s; the payload is fenced untrusted data and the run starts tainted at trust level `ask`; the reply is 202 with a run id only. Three proactive replay cases pin the injection and approval paths. 325 replay cases, 2,507 tests. Not exposed beyond loopback or tried against a real sender. Remaining in Stage 4: Remy's own computer and Boat (owner picks the route), local voice and Lightpanda (both download software; owner decides).
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
