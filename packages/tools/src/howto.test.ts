@@ -49,6 +49,8 @@ describe('looksSecret', () => {
     expect(looksSecret('use key sk-abcdefghijklmnop1234')).toBe(true);
     expect(looksSecret('the password is hunter2hunter')).toBe(true);
     expect(looksSecret('Bearer abcdefghijklmnopqrstuvwx')).toBe(true);
+    expect(looksSecret('log in with hunter2-Zebra-91')).toBe(true);
+    expect(looksSecret('open Drive/Invoices-2026/acme-march.txt, the 2nd one')).toBe(false);
     expect(looksSecret('check Drive/Invoices-2026/final-reports-for-the-year first')).toBe(false);
   });
 });

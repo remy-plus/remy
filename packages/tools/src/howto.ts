@@ -65,7 +65,16 @@ const SECRET_SHAPES = [
   /\b(?:password|passwd|passcode|api[ _-]?key|secret|token)\b\s*(?:is|=|:)\s*\S{4,}/i,
   /\b(?=[A-Za-z0-9]*\d)(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{32,}\b/,
 ];
-export const looksSecret = (text: string) => SECRET_SHAPES.some((r) => r.test(text));
+/** A word-like part of 6+ characters mixing letters and digits ("hunter2"): password-shaped. */
+const mixedPart = (text: string) =>
+  text
+    .split(/[\s/.,;:()\-_'"`]+/)
+    .some(
+      (p) => p.length >= 6 && /[A-Za-z]/.test(p) && /\d/.test(p) && !/^\d{1,2}[a-z]{2,3}$/i.test(p),
+    );
+
+export const looksSecret = (text: string) =>
+  SECRET_SHAPES.some((r) => r.test(text)) || mixedPart(text);
 
 const slug = (title: string) =>
   title
