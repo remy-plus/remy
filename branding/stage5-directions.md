@@ -49,3 +49,15 @@ Owner agreed with the recommendation: **C for the task view on top of B**. Desig
 ## ASCII imagery tool
 
 Owner's pick for ASCII pictures: https://devault-ascii.pages.dev/ascii-generator/ . It turns an image or video into ASCII, braille, halftone, dither or brick art, runs in the browser (WebGL2, nothing uploaded), and exports JPEG, transparent WebP or MP4 with no watermark after a free sign-in. It needs a person at a browser, so Remy cannot run it: the owner exports into `branding/art/` and the web app uses the files. It makes pictures, not the logo. The `REMY` wordmark stays figlet Cosmike (see `README.md`). Use the Dither or Braille styles in ink and paper first; they fit the palette best.
+
+## Owner feedback, 2026-11-08: "it does not feel like Jarvis"
+
+The paper and trace screens read as a calm to-do app. Remy is meant to feel like a living intelligence that works ahead of you. Exploration on the canvas page "Jarvis exploration", frame "Home: Remy is awake (dark)". What changed in the idea, not just the look:
+
+- **Home is a briefing, not an empty chat.** Remy speaks first: "Three things need you. Everything else is on track."
+- **Parallel work is visible.** Four tasks run at once, each with a step rail, including one on a machine and one that only watches.
+- **Remy notices things.** A feed of what it saw and did unasked, with nothing sent or spent without approval.
+- **A living presence.** An animated ASCII ring built from the logo's density ramp (`.` to `M`), static under reduced motion.
+- **Voice and a command bar** are always present.
+
+Open question for the owner: dark by default for this direction, with the paper light theme kept as an option? The brand guide's "quiet confidence" still holds; the shift is from a document to an instrument.
