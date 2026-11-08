@@ -122,6 +122,7 @@ import {
 } from './embeddings.ts';
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
 import { loadHelperRoles } from './helper-roles.ts';
+import { improve } from './improve.ts';
 import {
   defaultModelFor,
   listLogins,
@@ -240,6 +241,7 @@ Usage
                                   See what Remy remembers about you, forget one note
                                   or all of them (notes are used only while
                                   "Personalise replies" is on in /profile)
+  remy improve propose|list       Remy proposes edits to its own prompts from failed eval runs
   remy skills [list|show <name>|add <folder or link>|update <name>|rm <name>]
                                   How-tos Remy follows for kinds of tasks; add shows the
                                   SKILL.md and asks first (--yes skips the question)
@@ -332,6 +334,9 @@ const OPTIONS = {
   workspace: { type: 'string' },
   'max-steps': { type: 'string' },
   'max-cost': { type: 'string' },
+  from: { type: 'string' },
+  'max-usd': { type: 'string' },
+  suite: { type: 'string' },
   steps: { type: 'string' },
   cost: { type: 'string' },
   long: { type: 'boolean' },
@@ -448,6 +453,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'schedule',
       'daemon',
       'doctor',
+      'improve',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -1841,6 +1847,20 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           'Use remy skills list, show <name>, add <folder or link>, update <name> or rm <name>.',
         );
       }
+
+      case 'improve':
+        return improve(
+          rest[0],
+          rest[1],
+          {
+            ...(flags.from && { from: flags.from }),
+            ...(flags['max-usd'] !== undefined && { 'max-usd': flags['max-usd'] }),
+            ...(flags.suite && { suite: flags.suite }),
+            ...(flags.model && { model: flags.model }),
+            ...(flags.profile && { profile: flags.profile }),
+          },
+          { home, cwd, env, out, model: deps.model, ask: deps.ask, isTTY: deps.isTTY },
+        );
 
       case 'doctor': {
         const facts = machineFacts();
