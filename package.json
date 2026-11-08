@@ -9,8 +9,8 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -p tsconfig.check.json",
-    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.check.json && pnpm --filter @remy/web typecheck",
+    "test": "vitest run && pnpm --filter @remy/web test",
     "test:watch": "vitest",
     "remy": "node --conditions=@remy/source apps/cli/src/main.ts",
     "lint": "biome check .",
@@ -19,7 +19,7 @@
     "eval:replay": "node --conditions=@remy/source packages/evals/src/cli.ts --model reference --strict",
     "eval:compare": "node --conditions=@remy/source packages/evals/src/cli.ts compare",
     "bundle": "pnpm --filter @koryei/remy bundle",
-    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm test"
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm --filter @remy/web build && pnpm test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",

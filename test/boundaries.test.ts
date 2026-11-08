@@ -15,6 +15,8 @@ const ALLOWED: Record<string, string[]> = {
   'packages/mcp': ['core'],
   'packages/browser': ['core', 'tools'],
   'packages/evals': ['core', 'models', 'tools', 'store', 'mcp', 'browser'],
+  // The web app is a static page that talks to `remy serve` over HTTP only: no workspace package.
+  'apps/web': [],
   'apps/cli': ['core', 'models', 'tools', 'store', 'evals', 'mcp', 'browser'],
 };
 

@@ -18,6 +18,8 @@ export default defineConfig({
   },
   test: {
     include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts', 'test/**/*.test.ts'],
+    // apps/web has its own config (jsdom, React) and runs through `pnpm --filter @remy/web test`.
+    exclude: ['apps/web/**', '**/node_modules/**'],
     passWithNoTests: true,
   },
 });
