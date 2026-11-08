@@ -71,3 +71,26 @@ Owner liked the new direction: Remy as a second brain that does hard work, not a
 - **Demo B, hard task**: "Prepare the audit pack" split across four helpers (Reconciler on home-server, Researcher, Drafter, Checker), a plan, cost against a budget, problems found unasked, an activity log, and a draft pack. Send waits for approval after checks.
 
 These are concept mockups with invented data. The product has notes and recall, helpers that act with approval, and `computer_run`, but no source graph and no live orb data yet. **The ASCII library (devault-ascii) is reference only**: its files are photo and 3D-render conversions in purple and blue, and downloads need a sign-in. The orb is drawn in code in Remy's own palette. Real library files, if wanted, go in `branding/art/` after a signed-in download.
+
+## V1 screens, first full set (2026-11-08)
+
+Page "V1 screens" on the canvas (https://doop.design/c/ZuevZVY-Yl), dark first, in the Jarvis direction the owner approved. All use the `remy-brand` rules (stone text `#67655F` in light, real buttons and links, one primary action per view).
+
+1. First run: choose a model
+2. Approval: send as you (desktop)
+3. Connections and machines, with per-connection permissions
+4. Skills, with a suggested skill and why one exists
+5. Schedules and webhooks
+6. Brain: notes graph and a selected note
+7. Settings: trust, budget, memory, quiet mode, appearance
+8. Overnight review (`remy review`)
+9. A task that failed: one send, no blind retry, what the user can do
+10. Quiet mode
+11. Sign in to a home server
+12. Push to talk
+13. Command palette (⌘K)
+14. Phone: Home
+15. Phone: Approval sheet
+16. Home in light
+
+Earlier pages hold the first paper-and-trace screens, Home v2 and the two demos. Not yet drawn: the Tasks list, the add-connection and add-machine flows, empty states, notification settings, About, and light twins of every screen but Home. These are mockups with invented data. The Stage 5 gate is the owner's sign-off on these.
