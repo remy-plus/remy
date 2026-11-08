@@ -701,6 +701,16 @@ The mark to beat is Mercury 3 on the live suite, 35 of 39 runs (11 of 13 cases o
 **Paid runs (owner's 0G credit, from 2026-11-07).** Budget to 1.0 about $20, hard cap $25: Haiku 5.5 as the main test model, GLM-5.3 Flash second, Sonnet 5.5 only on small sets. Every run states model, suite and cost first and runs with `--max-usd`. 0G is provider 20, priced at its own rates.
 
 
+### Stage 3 work order (2026-11-07)
+
+Started while Stage 2 waits on live marks. Same pattern: one Sonnet package at a time, Opus reviews, each stays only if the evals hold.
+
+1. **Notes with no cap.** Notes move from `memory.json` to SQLite in `REMY_HOME`, with a one-time move that keeps the old file. Duplicates merge; a note that contradicts an older one is flagged for the user, never silently replaced. A recall suite of about 25 replay cases.
+2. **Search by meaning.** Recall finds a note by what it means, not only its words: local word matching always, plus embeddings through the user's own provider when it offers them. No new key needed, and nothing leaves the machine unless the user's provider already sees it.
+3. **Corrections become how-tos.** When the user corrects Remy, it offers to save the fix as a skill step, with approval.
+4. **Remy proposes changes to its own prompts** from failed runs. Kept only if the evals rise and the owner approves; it never touches its own safety rules.
+5. **Cost holds.** The cached share stays high as memory grows; measured in the recall suite.
+
 ### Needed from the owner
 
 - A logout and login, then `launchctl list | grep remy`, to close the daemon check.
