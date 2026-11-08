@@ -47,16 +47,28 @@ describe('Home', () => {
     expect(screen.getByText('Sample data')).toBeTruthy();
   });
 
-  it('approves a card and updates the page', async () => {
+  it('opens the approval dialog from a card, approves there and updates the page', async () => {
     open();
     const button = await screen.findByRole('button', { name: 'Approve and book' });
     fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: /Book this flight/ });
+    fireEvent.click(within(dialog).getByRole('button', { name: /Approve and pay/ }));
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Approve and book' })).toBeNull(),
     );
     expect(
       await screen.findByRole('heading', { level: 1, name: /Two things need you/ }),
     ).toBeTruthy();
+  });
+
+  it('has real buttons for the palette and for talking', async () => {
+    open();
+    const seen: string[] = [];
+    window.addEventListener('remy:palette', () => seen.push('palette'));
+    window.addEventListener('remy:voice', () => seen.push('voice'));
+    fireEvent.click(await screen.findByRole('button', { name: /command palette/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Talk to Remy/ }));
+    expect(seen).toEqual(['palette', 'voice']);
   });
 
   it('fills the command bar from a suggestion and starts a task on send', async () => {

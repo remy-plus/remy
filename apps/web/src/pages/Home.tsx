@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode, type RefObject, useId, useRef, useState } from 'react';
 import { type HomeData, type NeedCard, type Notice, useApi, type WorkItem } from '../api/index.tsx';
+import { ApprovalDialog } from '../components/ApprovalDialog.tsx';
 import { Orb } from '../components/Orb.tsx';
 import type { HomeState } from '../hooks.ts';
 
@@ -35,10 +36,12 @@ function Need({
   card,
   first,
   onApprove,
+  onOpen,
 }: {
   card: NeedCard;
   first: boolean;
   onApprove: (c: NeedCard, granted: boolean) => void;
+  onOpen: (c: NeedCard) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const act = async (granted: boolean) => {
@@ -62,7 +65,7 @@ function Need({
       <div className="mt-3 flex flex-wrap gap-2">
         {a && (
           <>
-            <button type="button" className={primary} disabled={busy} onClick={() => act(true)}>
+            <button type="button" className={primary} disabled={busy} onClick={() => onOpen(card)}>
               {a.approve}
             </button>
             <button type="button" className={quiet} disabled={busy} onClick={() => act(false)}>
@@ -71,12 +74,9 @@ function Need({
           </>
         )}
         {card.review && (
-          <a
-            className={`${quiet} no-underline`}
-            href={`#/tasks/${encodeURIComponent(card.taskId)}`}
-          >
+          <button type="button" className={quiet} onClick={() => onOpen(card)}>
             {card.review}
-          </a>
+          </button>
         )}
         {card.others ? (
           <a className={`${quiet} no-underline`} href="#/tasks">
@@ -173,15 +173,18 @@ function CommandBar({
           {error}
         </span>
       )}
-      <kbd
-        className={`${mono} hidden rounded border border-line px-2 py-1 text-[11px] text-muted sm:block`}
-      >
-        ⌘K
-      </kbd>
       <button
         type="button"
-        disabled
-        title="Voice comes later"
+        aria-label="Open the command palette (⌘K)"
+        onClick={() => window.dispatchEvent(new CustomEvent('remy:palette'))}
+        className={`${mono} hidden cursor-pointer rounded border border-line bg-transparent px-2 py-1 text-[11px] text-muted hover:text-text sm:block`}
+      >
+        <kbd className="font-[inherit]">⌘K</kbd>
+      </button>
+      <button
+        type="button"
+        aria-label="Talk to Remy"
+        onClick={() => window.dispatchEvent(new CustomEvent('remy:voice'))}
         className={`${quiet} hidden size-11 rounded-full! p-0 sm:block`}
       >
         talk
@@ -197,6 +200,7 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
   const api = useApi();
   const input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState('');
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const approve = async (c: NeedCard, granted: boolean) => {
     if (!c.approval) return;
     await api.approve(c.taskId, {
@@ -240,7 +244,13 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
         <Section title="Needs you" aside={String(needsYou.length + (alert ? 1 : 0))}>
           <ul className="m-0 p-0">
             {needsYou.map((c, i) => (
-              <Need key={c.taskId} card={c} first={i === 0} onApprove={approve} />
+              <Need
+                key={c.taskId}
+                card={c}
+                first={i === 0}
+                onApprove={approve}
+                onOpen={(n) => setReviewing(n.taskId)}
+              />
             ))}
           </ul>
           {alert && (
@@ -303,6 +313,16 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
         )}
         <CommandBar input={input} value={draft} setValue={setDraft} />
       </div>
+      {reviewing && (
+        <ApprovalDialog
+          taskId={reviewing}
+          onClose={() => setReviewing(null)}
+          onResolved={reload}
+          onEdit={() => {
+            window.location.hash = `#/tasks/${encodeURIComponent(reviewing)}`;
+          }}
+        />
+      )}
     </div>
   );
 }
