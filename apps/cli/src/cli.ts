@@ -241,7 +241,9 @@ Usage
                                   See what Remy remembers about you, forget one note
                                   or all of them (notes are used only while
                                   "Personalise replies" is on in /profile)
-  remy improve propose|list       Remy proposes edits to its own prompts from failed eval runs
+  remy improve propose|check|apply|list
+                                  Remy proposes edits to its own prompts from failed eval runs;
+                                  nothing changes until you apply a checked proposal
   remy skills [list|show <name>|add <folder or link>|update <name>|rm <name>]
                                   How-tos Remy follows for kinds of tasks; add shows the
                                   SKILL.md and asks first (--yes skips the question)

@@ -3,6 +3,7 @@
 
 import type { ModelClient } from '@remy/core';
 import {
+  applyProposal,
   checkProposal,
   listProposals,
   loadProposal,
@@ -37,6 +38,7 @@ export interface ImproveDeps {
 const USAGE = `Usage:
   remy improve propose --from <journal.jsonl> [--profile <p> --model <id>] --max-usd <dollars>
   remy improve check <proposal> [--suite <a,b>] [--max-usd <dollars>]
+  remy improve apply <proposal>
   remy improve list`;
 
 const usd = (n: number) => `$${n.toFixed(4)}`;
@@ -137,6 +139,30 @@ export async function improve(
         : `Verdict saved in ${path}.`,
     );
     return verdict.passed ? 0 : 1;
+  }
+
+  if (sub === 'apply') {
+    if (!arg) throw new Error(`Say which proposal to apply.\n\n${USAGE}`);
+    const { proposal } = loadProposal(d.home, arg);
+    const r = await applyProposal({
+      proposal,
+      root: d.cwd,
+      confirm: async (diff, files) => {
+        if (!(d.isTTY && d.ask))
+          throw new Error('Applying needs a terminal, so you can read the diff and say yes.');
+        out(`${diff}\n\nThis changes ${files.join(' and ')} in ${d.cwd}. It does not commit.`);
+        const answer = ((await d.ask('Write these changes? Type yes to continue: ')) ?? '').trim();
+        return /^y(es)?$/i.test(answer);
+      },
+    });
+    if (!r.applied) {
+      out('Nothing changed.');
+      return 1;
+    }
+    out(
+      `Written to ${r.files.join(' and ')}. Nothing was committed: read git diff, run pnpm check, then commit.`,
+    );
+    return 0;
   }
 
   throw new Error(USAGE);

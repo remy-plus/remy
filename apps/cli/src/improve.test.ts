@@ -1,12 +1,13 @@
-import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { loadProposal, type RunRecord } from '@remy/evals';
+import { dirname, join } from 'node:path';
+import { editsHash, loadProposal, type RunRecord, saveProposal } from '@remy/evals';
 import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { describe, expect, it } from 'vitest';
 import { type CliDeps, cli } from './cli.ts';
 
+const REPO = join(import.meta.dirname, '../../..');
 const dir = () => mkdtempSync(join(tmpdir(), 'remy-improve-'));
 
 const failed = {
@@ -90,5 +91,69 @@ describe('remy improve propose', () => {
     const s = setup(new ScriptedModelClient([]));
     expect((await s.run('improve', 'propose', '--max-usd', '1')).code).not.toBe(0);
     expect((await s.run('improve', 'propose', '--from', s.journal)).err).toContain('--max-usd');
+  });
+});
+
+describe('remy improve apply', () => {
+  const proposalWith = (home: string, verdict: boolean) => {
+    const from = readFileSync(join(REPO, 'packages/core/src/messages.ts'), 'utf8').includes(
+      'When the task is complete, call finish with a short answer that states the outcome first.',
+    )
+      ? 'When the task is complete, call finish with a short answer that states the outcome first.'
+      : '';
+    const edits = [{ ...good, from }];
+    const h = editsHash(edits);
+    saveProposal(home, {
+      version: 1,
+      id: 'p1',
+      createdAt: '2026-11-07T00:00:00Z',
+      author: 'm',
+      baseline: { journal: 'j', model: 'm' },
+      suites: ['research'],
+      edits,
+      dropped: [],
+      diff: '',
+      editsHash: h,
+      estimateUsd: 0,
+      spentUsd: 0,
+      ...(verdict && {
+        verdict: {
+          passed: true,
+          at: 'x',
+          model: 'm',
+          suites: ['research'],
+          editsHash: h,
+          reasons: [],
+          targets: { before: 0, after: 1, runs: 1 },
+          spentUsd: 0,
+        },
+      }),
+    });
+  };
+
+  it('refuses a proposal that has not passed a check', async () => {
+    const s = setup();
+    proposalWith(s.home, false);
+    const r = await s.run('improve', 'apply', 'p1');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('no passing check');
+  });
+
+  it('shows the diff, waits for a typed yes, and writes without committing', async () => {
+    const answers = ['no', 'yes'];
+    const s = setup(undefined, { isTTY: true, ask: async () => answers.shift() ?? null });
+    // The command writes into the folder it runs from, so the test folder holds a copy of the file.
+    const file = 'packages/core/src/messages.ts';
+    mkdirSync(dirname(join(s.home, file)), { recursive: true });
+    cpSync(join(REPO, file), join(s.home, file));
+    proposalWith(s.home, true);
+    const declined = await s.run('improve', 'apply', 'p1');
+    expect(declined.code).toBe(1);
+    expect(declined.out).toContain('Nothing changed');
+    expect(readFileSync(join(s.home, file), 'utf8')).not.toContain('in a sentence or two');
+    const done = await s.run('improve', 'apply', 'p1');
+    expect(done.code).toBe(0);
+    expect(done.out).toContain('Nothing was committed');
+    expect(readFileSync(join(s.home, file), 'utf8')).toContain('in a sentence or two');
   });
 });
