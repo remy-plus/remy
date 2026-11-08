@@ -12,6 +12,8 @@ export interface Profile {
   keyEnv?: string;
   /** Set when listing models proves nothing about the key: a key check asks this model instead. */
   keyCheckModel?: string;
+  /** Prices this provider charges, where they differ from the model maker's (a router's own rates). */
+  catalog?: Catalog;
 }
 
 export const PROFILES: Record<string, Profile> = {
@@ -37,6 +39,35 @@ export const PROFILES: Record<string, Profile> = {
     baseUrl: 'https://api.inceptionlabs.ai/v1',
     keyEnv: 'INCEPTION_API_KEY',
     keyCheckModel: 'mercury-2',
+  },
+  // 0G Private Computer: a router with its own rates (pricing_usd in its model list, read
+  // 2026-11-07). No cache-read price is listed, so input is billed in full here.
+  zerog: {
+    baseUrl: 'https://router-api.0g.ai/v1',
+    keyEnv: 'ZEROG_API_KEY',
+    keyCheckModel: 'gpt-5-nano',
+    catalog: {
+      'claude-haiku-5.5': {
+        contextTokens: 131072,
+        contextWindow: 1000000,
+        pricing: { inPerMTok: 0.1, outPerMTok: 0.5 },
+      },
+      'claude-sonnet-5.5': {
+        contextTokens: 131072,
+        contextWindow: 1000000,
+        pricing: { inPerMTok: 2, outPerMTok: 10 },
+      },
+      'glm-5.3-flash': {
+        contextTokens: 131072,
+        contextWindow: 1000000,
+        pricing: { inPerMTok: 0.09, outPerMTok: 0.315 },
+      },
+      'gpt-5-nano': {
+        contextTokens: 131072,
+        contextWindow: 400000,
+        pricing: { inPerMTok: 0.05, outPerMTok: 0.4 },
+      },
+    },
   },
   zro: {
     baseUrl: 'https://zro.moonmath.ai/v1',
@@ -76,7 +107,7 @@ export function modelFromEnv(env: Env, catalog?: Catalog): ModelClient {
   const model = env.REMY_MODEL;
   if (!model) throw new Error('set REMY_MODEL');
   const apiKey = env.REMY_API_KEY ?? (profile?.keyEnv ? env[profile.keyEnv] : undefined);
-  const caps = resolveCaps(model, { ...BUILTIN_CATALOG, ...catalog });
+  const caps = resolveCaps(model, { ...BUILTIN_CATALOG, ...profile?.catalog, ...catalog });
   const effort = env.REMY_REASONING?.toLowerCase();
   if (effort && !(REASONING_EFFORTS as readonly string[]).includes(effort))
     throw new Error(`REMY_REASONING must be one of ${REASONING_EFFORTS.join(', ')}`);
