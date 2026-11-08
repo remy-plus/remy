@@ -291,3 +291,60 @@ describe('schtasks installer', () => {
     expect(installerFor('win32', fake({ fail: () => ({ status: 1 }) }).ctx)?.isOn()).toBe(false);
   });
 });
+
+describe('escaping', () => {
+  const nasty = [
+    '/home/josé de ñandú/my "quoted" dir/it\'s',
+    '/tmp/$(touch pwned) `id` ; rm -rf ~ | & > x',
+    '/tmp/%h/%n/$HOME/${PATH}',
+    'C:\\Users\\Zoë Ångström\\a "b" c\\',
+  ];
+  const at = (script: string) => ({ execPath: '/usr/bin/node', execArgv: [], script });
+
+  it('keeps every systemd word inside quotes, on one line', () => {
+    for (const p of nasty) {
+      const line =
+        systemdUnit(at(p))
+          .split('\n')
+          .find((l) => l.startsWith('ExecStart=')) ?? '';
+      // Undo the quoting the way systemd does: `\x` is x, `%%` is %, `$$` is $.
+      const words = [...line.slice('ExecStart='.length).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) =>
+        (m[1] ?? '').replace(/\\(.)/g, '$1').replaceAll('%%', '%').replaceAll('$$', '$'),
+      );
+      expect(words).toEqual(['/usr/bin/node', p, 'daemon', 'run']);
+      expect(line.replace(/"(?:[^"\\]|\\.)*"/g, '').trim()).toBe('ExecStart=');
+    }
+  });
+
+  it('turns % and $ into literals in the unit', () => {
+    const unit = systemdUnit(at('/tmp/%h/$HOME'), '/a/%h');
+    expect(unit).toContain('"/tmp/%%h/$$HOME"');
+    expect(unit).toContain('Environment="PATH=/a/%%h"');
+  });
+
+  it('refuses a newline or other control character in any of the three', () => {
+    const bad = at('/x\n[Service]\nExecStart=/bin/evil');
+    expect(() => systemdUnit(bad)).toThrow('control character');
+    expect(() => systemdUnit(at('/x'), '/a\nB=c')).toThrow('control character');
+    expect(() => taskCommand(bad)).toThrow('control character');
+    expect(() => launchAgentPlist(bad, 'l')).not.toThrow();
+    expect(launchAgentPlist(at('</string><string>x'), 'l')).not.toContain('</string><string>x');
+  });
+
+  it('keeps the task command one argument and quotes every awkward word', () => {
+    for (const p of nasty) {
+      const args = schtasksCreateArgs({ execPath: 'C:\\n\\node.exe', execArgv: [], script: p });
+      expect(args).toHaveLength(10);
+      expect(args[6]).toBe(taskCommand({ execPath: 'C:\\n\\node.exe', execArgv: [], script: p }));
+      expect(args[6]?.endsWith(' daemon run')).toBe(true);
+    }
+  });
+
+  it('runs commands as argument lists, never as shell text', () => {
+    const f = fake();
+    f.ctx.entry = at(nasty[1] as string);
+    installerFor('linux', f.ctx)?.install();
+    installerFor('darwin', f.ctx)?.install();
+    for (const c of f.commands) expect(c.every((w) => !w.includes('pwned'))).toBe(true);
+  });
+});
