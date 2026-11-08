@@ -44,7 +44,7 @@ Design tokens from `branding/`, then browser prototypes of: first run, chat, a t
 
 ## Decision and canvas (2026-11-08)
 
-Owner agreed with the recommendation: **C for the task view on top of B**. Design work is on the Doop canvas https://doop.design/c/ZuevZVY-Yl (tokens for light and dark, a `remy-brand` style guide, and the first screen, "Task at work, light"). Still to design: dark, first run, chat, approval card on its own, connections, skills, schedules, memory, settings, phone size.
+Owner agreed with the recommendation: **C for the task view on top of B**. Design work is on the Doop canvas https://doop.design/c/ZuevZVY-Yl (tokens for light and dark, a `remy-brand` style guide, and the first screen, "Task at work, light"). Frames so far (all pass the first review; stone text is `#67655F` in light, see the `remy-brand` guide): task at work in light, task after approval in dark, first run, connections (with machines), memory in dark, task at work on a phone. Still to design: skills, schedules, settings, trust levels, an error state, and light or dark twins for each screen.
 
 ## ASCII imagery tool
 
