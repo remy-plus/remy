@@ -142,3 +142,43 @@ export async function collectReview(d: ReviewDeps): Promise<ReviewItem[]> {
     (a, b) => Number(b.attention) - Number(a.attention) || b.at.localeCompare(a.at),
   );
 }
+
+const STATUS_WORDS: Record<TaskStatus, string> = {
+  succeeded: 'succeeded',
+  failed: 'failed',
+  paused: 'paused (budget ran out)',
+  waiting_approval: 'waiting for approval',
+  waiting_user: 'waiting for your answer',
+  running: 'still running',
+  cancelled: 'cancelled',
+};
+
+/** The review as plain text. */
+export function formatReview(items: ReviewItem[], since: Date): string {
+  if (!items.length) return 'Nothing ran without you in that time.';
+  const need = items.filter((i) => i.attention).length;
+  const head = `${items.length} ${items.length === 1 ? 'task' : 'tasks'} ran without you since ${since.toISOString().slice(0, 16).replace('T', ' ')} UTC${need ? `; ${need} need${need === 1 ? 's' : ''} you` : ''}.`;
+  const rows = items.flatMap((i) => {
+    const shown = i.did.slice(0, DID_MAX);
+    const more = i.did.length - shown.length;
+    return [
+      '',
+      `${i.taskId}  ${STATUS_WORDS[i.status]}  ${i.at.slice(0, 16).replace('T', ' ')}  ${i.source}  ${fmtCost(i.costUsd)}`,
+      `  Task: "${i.prompt}"`,
+      ...(i.reason ? [`  Why: "${i.reason}"`] : []),
+      ...(shown.length
+        ? [
+            `  Changed: ${shown.map((s) => `"${s}"`).join('; ')}${more > 0 ? `; and ${more} more` : ''}`,
+          ]
+        : []),
+      ...i.waiting.map((w) => `  Waiting for approval: "${w}"`),
+      ...(i.attention ? [`  Next: ${nextCommand(i.status, i.taskId)}`] : []),
+    ];
+  });
+  return [
+    head,
+    ...rows,
+    '',
+    'Text in quotes comes from prompts and tool output. Remy shows it and does not act on it.',
+  ].join('\n');
+}

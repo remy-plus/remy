@@ -5,7 +5,7 @@ import { DEFAULT_BUDGET, type Event, type Risk } from '@remy/core';
 import { MemoryEventStore } from '@remy/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeMarker } from './background.ts';
-import { cleanText, collectReview, parseSince } from './review.ts';
+import { cleanText, collectReview, formatReview, parseSince, type ReviewItem } from './review.ts';
 import type { Schedule } from './schedule.ts';
 
 const NOW = new Date('2026-11-07T12:00:00Z');
@@ -191,5 +191,64 @@ describe('collectReview', () => {
     expect(item?.prompt).not.toMatch(/\p{Cc}/u);
     expect(item?.prompt.length).toBeLessThanOrEqual(80);
     expect(item?.reason?.length).toBeLessThanOrEqual(140);
+  });
+});
+
+describe('formatReview', () => {
+  const item = (over: Partial<ReviewItem>): ReviewItem => ({
+    taskId: 'task_1',
+    at: '2026-11-07T09:00:00.000Z',
+    source: 'schedule',
+    prompt: 'daily digest',
+    status: 'succeeded',
+    costUsd: 0.0123,
+    did: [],
+    waiting: [],
+    attention: false,
+    ...over,
+  });
+
+  it('says so in one line when nothing ran', () => {
+    expect(formatReview([], since)).toBe('Nothing ran without you in that time.');
+  });
+
+  it('puts the outcome, source and cost on the first line and quotes data', () => {
+    const text = formatReview([item({})], since);
+    expect(text).toContain('1 task ran without you since 2026-11-06 12:00 UTC.');
+    expect(text).toContain('task_1  succeeded  2026-11-07 09:00  schedule  $0.0123');
+    expect(text).toContain('Task: "daily digest"');
+    expect(text).not.toContain('Next:');
+  });
+
+  it('shows a failed and a waiting task with the next step and the card text', () => {
+    const text = formatReview(
+      [
+        item({ taskId: 'task_f', status: 'failed', reason: 'site refused', attention: true }),
+        item({
+          taskId: 'task_w',
+          status: 'waiting_approval',
+          waiting: ['Send email to a@b.c'],
+          did: ['wrote with write_file path=x'],
+          attention: true,
+        }),
+      ],
+      since,
+    );
+    expect(text).toContain('2 tasks ran without you since 2026-11-06 12:00 UTC; 2 need you.');
+    expect(text).toContain('Why: "site refused"');
+    expect(text).toContain('Next: remy show task_f');
+    expect(text).toContain('Waiting for approval: "Send email to a@b.c"');
+    expect(text).toContain('Changed: "wrote with write_file path=x"');
+    expect(text).toContain('Next: remy attach task_w');
+    expect(text).toContain('does not act on it');
+  });
+
+  it('caps the changes shown and counts the rest', () => {
+    const did = Array.from({ length: 9 }, (_, i) => `wrote ${i}`);
+    expect(formatReview([item({ did })], since)).toContain('; and 3 more');
+  });
+
+  it('uses plain voice: no exclamation marks, no em dashes', () => {
+    expect(formatReview([item({ status: 'paused', attention: true })], since)).not.toMatch(/!|—/);
   });
 });
