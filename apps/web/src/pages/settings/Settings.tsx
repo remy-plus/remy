@@ -1,6 +1,7 @@
 import { type ComponentType, useCallback, useEffect, useState } from 'react';
 import { type SettingsData, useApi } from '../../api/index.tsx';
 import { Appearance, Budget, Trust } from './basics.tsx';
+import { Memory } from './memory.tsx';
 import { Model } from './model.tsx';
 import { Notifications } from './notifications.tsx';
 import { SECTIONS, type SectionId, type SectionProps } from './sections.ts';
@@ -9,6 +10,7 @@ const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
   trust: Trust,
   budget: Budget,
   appearance: Appearance,
+  memory: Memory,
   model: Model,
   notifications: Notifications,
 };
