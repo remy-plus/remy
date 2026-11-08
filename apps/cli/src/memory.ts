@@ -11,6 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   addNote,
   cleanMemoryText,
+  contradicts,
   editNote,
   MEMORY_KINDS,
   type MemoryAdd,
@@ -131,6 +132,24 @@ export function openMemory(
   let skippedNote: string | undefined;
 
   /** Reads the old memory.json, if there is one. Returns a note when it is damaged (and left alone). */
+  /** Notes that came in together were never checked against each other: flag the pairs that clash. */
+  function flagImported() {
+    const rows = db.prepare('SELECT id, text, kind, conflicts FROM notes').all() as Row[];
+    const flags = new Map(
+      rows.map((r) => [String(r.id), new Set<string>(JSON.parse(String(r.conflicts ?? '[]')))]),
+    );
+    for (const [i, a] of rows.entries())
+      for (const b of rows.slice(i + 1)) {
+        const na = { text: String(a.text), kind: a.kind as MemoryKind };
+        const nb = { text: String(b.text), kind: b.kind as MemoryKind };
+        if (!contradicts(na, nb)) continue;
+        flags.get(String(a.id))?.add(String(b.id));
+        flags.get(String(b.id))?.add(String(a.id));
+      }
+    const set = db.prepare('UPDATE notes SET conflicts = ? WHERE id = ?');
+    for (const [id, ids] of flags) if (ids.size) set.run(JSON.stringify([...ids]), id);
+  }
+
   function importOld(): { damaged: true; note: string } | undefined {
     if (!existsSync(oldPath)) return undefined;
     let raw: unknown;
@@ -172,6 +191,7 @@ export function openMemory(
           JSON.stringify(e.data.conflictsWith ?? []),
         );
       }
+      flagImported();
       if (skipped)
         skippedNote = `${skipped} note${skipped === 1 ? '' : 's'} in ${oldPath} could not be read and ${skipped === 1 ? 'was' : 'were'} skipped.`;
       const kept = `${oldPath}.imported`;

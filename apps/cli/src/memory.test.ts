@@ -98,6 +98,34 @@ describe('memory store', () => {
     expect(m.load().note).toContain('expected shape');
   });
 
+  it('flags notes that clash when they are imported together', () => {
+    const note = (id: string, text: string) => ({
+      id,
+      text,
+      kind: 'about_you',
+      source: '',
+      created: '2026-01-01',
+    });
+    writeFileSync(
+      file(),
+      JSON.stringify({
+        entries: [
+          note('mem_a', 'Lives in Lisbon'),
+          note('mem_b', 'Lives in Porto'),
+          note('mem_c', 'Has a dog'),
+        ],
+      }),
+    );
+    const byId = new Map(
+      openMemory(home)
+        .list()
+        .map((e) => [e.id, e.conflictsWith ?? []]),
+    );
+    expect(byId.get('mem_a')).toEqual(['mem_b']);
+    expect(byId.get('mem_b')).toEqual(['mem_a']);
+    expect(byId.get('mem_c')).toEqual([]);
+  });
+
   it('imports the old memory.json once, keeps it renamed, and never deletes it', () => {
     const old = JSON.stringify({
       entries: [
