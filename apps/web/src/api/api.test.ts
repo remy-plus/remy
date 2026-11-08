@@ -9,7 +9,7 @@ describe('mock adapter', () => {
     const tasks = await createMockApi().listTasks();
     expect(tasks.length).toBeGreaterThan(4);
     for (const t of tasks) {
-      expect(t).toEqual({
+      expect(t).toMatchObject({
         id: expect.stringMatching(/^task_/),
         prompt: expect.any(String),
         status: expect.any(String),
@@ -53,7 +53,7 @@ describe('mock adapter', () => {
 
   it('builds the Home data', async () => {
     const home = await createMockApi().home();
-    expect(home.needsYou.map((c) => c.taskId)).toEqual(['task_flights', 'task_reply']);
+    expect(home.needsYou.map((c) => c.taskId)).toEqual(['task_flights', 'task_correction']);
     expect(home.briefing.headline).toBe('Three things need you.');
     expect(home.working).toHaveLength(4);
     expect(home.noticed).toHaveLength(3);

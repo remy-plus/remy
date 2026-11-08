@@ -21,6 +21,10 @@ export interface TaskListItem {
   createdAt: string;
   updatedAt: string;
   costUsd: number;
+  /** Mock only for now: a second line, a state word and a time that the server does not send yet. */
+  note?: string;
+  label?: string;
+  when?: string;
 }
 
 export interface ApprovalCard {
@@ -30,6 +34,9 @@ export interface ApprovalCard {
   risk: Risk;
   reason: string;
   parked?: number;
+  /** Mock only for now: the structured preview the approval dialog shows. Without it the dialog
+   * shows `preview` as plain text. */
+  detail?: ApprovalDetail;
 }
 
 export interface CallView {
@@ -42,6 +49,9 @@ export interface CallView {
   inFlight: boolean;
   lastError?: string;
   result?: { ok: true; content: string; truncated: boolean } | { ok: false; error: string };
+  /** Mock only for now: a plain-words name and a time for the trace. Otherwise made from `tool`. */
+  label?: string;
+  at?: string;
 }
 
 /** GET /api/tasks/:id. Strings are text, never markup: render them as text. */
@@ -66,6 +76,14 @@ export interface TaskView {
   final?: { status: 'succeeded' | 'failed' | 'cancelled'; answer?: string; reason?: string };
   calls: CallView[];
   running: boolean;
+  /** Mock only for now (no server route): the helper tasks, the failure explanation, the answer with
+   * its sources, and the draft being made. Screens show them only when present. */
+  plan?: TaskPlan;
+  helpers?: HelperView[];
+  found?: string;
+  making?: Making;
+  failure?: TaskFailure;
+  brain?: BrainAnswer;
 }
 
 /** One line of GET /api/tasks/:id/stream (server-sent events; `id:` is `seq`). */
@@ -136,6 +154,75 @@ export interface Notice {
   text: string;
 }
 
+// ---- Added in package 6.3 group A. Types the server does not send yet are marked "mock only".
+
+/** Mock only: what an approval dialog shows beyond the plain preview. */
+export interface ApprovalDetail {
+  title: string;
+  headers?: { k: string; v: string }[];
+  body?: string[];
+  /** A phrase inside `body` to mark, for example a corrected figure. */
+  highlight?: string;
+  attachment?: string;
+  effects?: { label: string; value: string }[];
+  /** True when Remy can change the draft before it goes. */
+  canEdit?: boolean;
+}
+
+export interface TaskPlan {
+  steps: string[];
+  /** Index of the step being done. */
+  current: number;
+}
+export interface HelperView {
+  name: string;
+  status: string;
+  note: string;
+  live?: string;
+  /** 0 to 1 */
+  progress: number;
+}
+export interface Making {
+  title: string;
+  sub: string;
+  paragraphs: string[];
+  rows?: string[][];
+  files: { name: string; meta: string }[];
+  actions: { label: string; kind: 'open' | 'send'; disabled?: boolean }[];
+}
+export interface TaskFailure {
+  title: string;
+  body: string;
+  notes: string[];
+  why: { lead: string; strong: string };
+  actions: { label: string; kind: 'retry' | 'done' | 'link'; href?: string }[];
+}
+export interface BrainAnswer {
+  read: string;
+  headline: string;
+  items: { title: string; text: string; chips: string[] }[];
+  contradiction?: {
+    text: string;
+    left: { label: string; value: string };
+    right: { label: string; value: string };
+    draft: string;
+  };
+  footnote?: string;
+  used: string;
+  sources: { title: string; meta: string }[];
+}
+
+/** Mock only: the overnight review. */
+export interface ReviewData {
+  span: string;
+  headline: string;
+  rest: string;
+  tiles: { value: string; label: string }[];
+  timeline: { at: string; title: string; tag?: string; text: string; waiting?: boolean }[];
+  needs: { taskId: string; kind: string; title: string; quote: string } | null;
+  awayNote: { trust: TrustLevel; text: string } | null;
+}
+
 /** Everything the screens may ask of the server. Components use this and nothing else. */
 export interface RemyApi {
   readonly kind: 'mock' | 'http';
@@ -153,4 +240,8 @@ export interface RemyApi {
   cancel(id: string): Promise<void>;
   extend(id: string, body?: ExtendBody): Promise<void>;
   home(): Promise<HomeData>;
+  /** No server route yet: the mock answers, the http adapter says so. */
+  review(): Promise<ReviewData>;
+  /** No server route yet: marks a stopped task as done after the person checked by hand. */
+  markDone(id: string): Promise<void>;
 }

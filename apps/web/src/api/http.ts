@@ -5,6 +5,7 @@ import type {
   ExtendBody,
   HomeData,
   RemyApi,
+  ReviewData,
   StreamEvent,
   TaskListItem,
   TaskView,
@@ -104,6 +105,13 @@ export function createHttpApi(opts: {
     async home(): Promise<HomeData> {
       const tasks = await api.listTasks({ limit: 50 });
       return homeFromTasks(tasks, await waitingCards(api, tasks));
+    },
+    // No server routes yet for the two below.
+    async review(): Promise<ReviewData> {
+      throw new ApiError(404, 'The overnight review is not available from the server yet.');
+    },
+    async markDone(): Promise<void> {
+      throw new ApiError(404, 'Marking a task done is not available from the server yet.');
     },
   };
   return api;
