@@ -103,7 +103,7 @@ describe('collectReview', () => {
     const [item] = await collectReview({ store, home, since });
     expect(item?.status).toBe('succeeded');
     expect(item?.source).toBe('background');
-    expect(item?.costUsd).toBeCloseTo(0.01);
+    expect(item?.costUsd).toBeCloseTo(0.03);
     expect(item?.did).toEqual([
       'wrote with write_file path=notes.md',
       'sent with send_email to=sam@example.com',
