@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -112,6 +112,7 @@ async function serve(
     hold?: Promise<void>;
     redact?: (t: string) => string;
     lockout?: ReturnType<typeof createLockout>;
+    webRoot?: string;
   } = {},
 ) {
   const store = p.store ?? new MemoryEventStore();
@@ -139,6 +140,7 @@ async function serve(
       tokenHash: () => serveTokenHash(home),
       ...(p.redact && { redact: p.redact }),
       ...(p.lockout && { lockout: p.lockout }),
+      ...(p.webRoot && { webRoot: p.webRoot }),
       log: (l) => logs.push(l),
       pollMs: 20,
       busyMs: 50,
@@ -529,4 +531,39 @@ describe('recovery', () => {
     await until(async () => (await two.api(`/api/tasks/${id}`)).json.status === 'succeeded');
     expect(effects.notes).toBe(1);
   }, 10_000);
+});
+
+describe('the web app on the same port', () => {
+  it('serves the app without a token, while the API still needs one', async () => {
+    const web = join(home, 'web');
+    mkdirSync(join(web, 'assets'), { recursive: true });
+    writeFileSync(join(web, 'index.html'), '<title>Remy</title>');
+    writeFileSync(join(web, 'assets', 'a-1.js'), 'x');
+    const { api } = await serve([done()], { webRoot: web });
+    const root = await api('/', { token: null });
+    expect(root.status).toBe(200);
+    expect(root.text).toContain('<title>Remy</title>');
+    expect(root.headers.get('content-security-policy')).toContain("default-src 'self'");
+    expect((await api('/assets/a-1.js', { token: null })).status).toBe(200);
+    expect((await api('/tasks/task_1', { token: null })).text).toContain('<title>Remy</title>');
+    // The API wins: health is open, everything else asks for the token, and a missing API route
+    // is JSON, never the app.
+    expect((await api('/api/health', { token: null })).json.ok).toBe(true);
+    expect((await api('/api/tasks', { token: null })).status).toBe(401);
+    expect((await api('/api/tasks')).status).toBe(200);
+    const missing = await api('/api/nope');
+    expect(missing.status).toBe(404);
+    expect(missing.text).not.toContain('<title>');
+    expect((await api('/api')).status).toBe(404);
+    expect((await api('/api', { token: null })).text).not.toContain('<title>');
+    // Static paths cannot write.
+    expect((await api('/', { method: 'POST', body: {}, token: null })).status).toBe(405);
+  });
+
+  it('says the app is not built when there is no folder', async () => {
+    const { api } = await serve([done()], { webRoot: join(home, 'nothing') });
+    const r = await api('/', { token: null });
+    expect(r.status).toBe(404);
+    expect(r.json.error).toContain('not built');
+  });
 });

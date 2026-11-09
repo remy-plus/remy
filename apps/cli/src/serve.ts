@@ -5,7 +5,8 @@
 //    a hash in constant time; 5 wrong tries lock the address out for a minute;
 //  - bodies are at most 64 KB and must arrive within 10 s (the event stream is exempt);
 //  - an approval carries the argsHash the user saw; this server passes it on and never makes one;
-//  - no CORS headers at all, and every answer is JSON or an event stream, never HTML;
+//  - no CORS headers at all, and every /api answer is JSON or an event stream, never HTML; the web
+//    app's static files are served for every other GET/HEAD path (serve-static.ts), without a token;
 //  - nothing secret is logged: not the token, and request bodies are not logged.
 // The event log is the source of truth: the stream just reads it, and after a restart the server
 // picks up the tasks it started and `advance` recovers each one from its events.
@@ -31,6 +32,7 @@ import {
 } from '@remy/core';
 import { z } from 'zod';
 import type { ServeBind } from './serve-bind.ts';
+import { createStaticHandler } from './serve-static.ts';
 import { listItem, type Redact, redactDeep, taskView } from './serve-view.ts';
 import { bearer, safeEqual } from './webhook-auth.ts';
 import { readBody } from './webhook-limits.ts';
@@ -56,6 +58,8 @@ export interface ServeDeps {
   /** The saved SHA-256 of the token, read on every request so a rotation takes effect at once. */
   tokenHash(): string | undefined;
   redact?: Redact;
+  /** The built web app to serve at every non-API path (default: found next to the bundle or in apps/web/dist). */
+  webRoot?: string;
   /** Saves "always allow" for a tool, as `remy approve --always` does. */
   alwaysAllow?(tool: string, risk: Risk): void;
   log(line: string): void;
@@ -141,6 +145,7 @@ export function createServe(deps: ServeDeps) {
   const busyMs = deps.busyMs ?? 1000;
   const busyTries = deps.busyTries ?? 40;
   const by = deps.by ?? 'api';
+  const staticFiles = createStaticHandler(deps.webRoot === undefined ? {} : { root: deps.webRoot });
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   let closed = false;
@@ -332,7 +337,8 @@ export function createServe(deps: ServeDeps) {
       send(res, status, body, headers);
     };
 
-    if (!path.startsWith('/api/')) return reply(404);
+    if (path === '/api') return reply(404);
+    if (!path.startsWith('/api/')) return staticFiles(req, res); // the web app: no token, no API
     if (path === '/api/health') {
       if (method !== 'GET') return reply(405, undefined, { allow: 'GET' });
       return reply(200, { ok: true, version: deps.version });
