@@ -3,22 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="dark">
 <title>Remy: your assistant, anywhere</title>
-<meta name="description" content="Remy is one calm assistant that does real digital work for you, wherever you are. It lives in your terminal today; web, desktop, mobile and voice are on the way.">
-<meta name="theme-color" content="#0f0f10" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#edebe6" media="(prefers-color-scheme: light)">
+<meta name="description" content="Remy does real digital work from one chat box and asks before anything that matters. Available in your terminal today; the web app is built and ships with 1.0.">
+<meta name="theme-color" content="#0f0f10">
 <link rel="canonical" href="https://remy.plus/">
 <link rel="icon" href="/assets/favicon.svg?v=3" type="image/svg+xml">
-<link rel="icon" href="/assets/favicon-light.png?v=3" type="image/png" sizes="32x32" media="(prefers-color-scheme: light)">
-<link rel="icon" href="/assets/favicon-dark.png?v=3" type="image/png" sizes="32x32" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/assets/favicon-dark.png?v=3" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=3">
-<link rel="preload" href="/fonts/JetBrainsMono-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/InstrumentSans-Medium.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/InstrumentSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://remy.plus/">
 <meta property="og:site_name" content="Remy">
 <meta property="og:title" content="Remy: your assistant, anywhere">
-<meta property="og:description" content="One calm assistant for real digital work. Available in the terminal today; web, desktop, mobile and voice are on the way.">
+<meta property="og:description" content="Real digital work from one chat box. It asks before anything that matters.">
 <meta property="og:image" content="https://remy.plus/assets/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/styles.css">
@@ -26,178 +25,236 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<div class="wrap">
+
 <header class="top">
-  <a class="brand" href="/">REMY</a>
+  <a class="brand" href="/" aria-label="Remy, home">REMY</a>
   <nav aria-label="Main">
-    <a href="#reach">Surfaces</a><a href="#does">What it does</a><a href="#safety">Safety</a><a href="#results">Results</a>
-    <a class="gh" href="https://github.com/remy-plus/remy">GitHub</a>
+    <a href="#does">What it does</a>
+    <a href="#safety">Safety</a>
+    <a href="#results">Results</a>
+    <a href="#faq">Questions</a>
+    <a href="https://github.com/remy-plus/remy">GitHub</a>
   </nav>
+  <a class="btn" href="#start">Get Remy</a>
 </header>
-</div>
+
 <main id="main">
-<section class="hero wrap">
-  <pre class="word" role="img" aria-label="REMY"><span>:::::::..    .,::::::    .        :     .-:.     ::-.</span><span>;;;;``;;;;   ;;;;&#x27;&#x27;&#x27;&#x27;    ;;,.    ;;;     &#x27;;;.   ;;;;&#x27;</span><span> [[[,/[[[&#x27;    [[cccc     [[[[, ,[[[[,      &#x27;[[,[[[&#x27;</span><span> $$$$$$c      $$&quot;&quot;&quot;&quot;     $$$$$$$$&quot;$$$        c$$&quot;</span><span> 888b &quot;88bo,  888oo,__   888 Y88&quot; 888o     ,8P&quot;`</span><span> MMMM   &quot;W&quot;   &quot;&quot;&quot;&quot;YUMMM  MMM  M&#x27;  &quot;MMM    mM&quot;</span></pre>
-  <div class="hero-grid">
-    <div class="hero-copy">
-      <h1>Real work, done wherever you are.</h1>
-      <p class="lede">Remy is one calm assistant for real digital work. Describe a task in plain words; it reads, searches and acts in small steps, and asks before anything that matters.</p>
-      <p class="where">It lives in your terminal today. Web, desktop, mobile and voice are on the way.</p>
-      <div class="links">
-        <a class="btn" href="#get">Get Remy</a>
-        <a class="alt" href="https://github.com/remy-plus/remy">Follow along on GitHub</a>
-      </div>
-    </div>
-    <div class="install" id="get">
-      <p class="tag"><i class="dot now" aria-hidden="true"></i>Terminal &middot; available now</p>
-      <div class="cmd">
-        <pre id="install"><span class="line"><span class="p">$ </span>npm install -g @koryei/remy</span></pre>
-        <button class="copy" type="button" data-copy="install">Copy<span class="sr"> install commands</span></button>
-      </div>
-      <p class="note">Needs Node 22.18 or newer. Then run <code>remy</code> to open the chat. Model setup is <a href="#start">below</a>.</p>
+
+<!-- 1. First screen: the sentence, and the thing it is about, working. -->
+<section class="hero" aria-labelledby="hero-h">
+  <div class="hero-copy">
+    <h1 id="hero-h">Your assistant, anywhere.</h1>
+    <p class="lede">Remy does real digital work from one chat box: your files, the web, your apps. It asks before anything that matters.</p>
+    <div class="hero-act">
+      <a class="btn big" href="#start">Get Remy</a>
+      <p class="where"><i class="dot now" aria-hidden="true"></i>In your terminal today. The web app is built and ships with 1.0.</p>
     </div>
   </div>
-</section>
 
-<section id="reach" class="reach" aria-labelledby="reach-h">
-  <div class="wrap">
-    <div class="reach-top">
-      <div class="rv">
-        <h2 id="reach-h">Reach Remy anywhere.</h2>
-        <p class="lede">The same assistant, wherever you already are. One surface exists today. The rest are planned, in this order, and have no dates yet.</p>
+  <div class="stage hero-stage rv">
+    <div class="win" data-ui id="demo" aria-label="A sample task, played back. Operable.">
+      <div class="win-bar">
+        <p class="win-title">Compare the quotes in quotes/ and draft a reply to Dana.</p>
+        <p class="win-meta">Sample task</p>
       </div>
-      <ul class="surfaces rv" style="--d:1">
-        <li><div class="s-name">Terminal</div><div class="s-stat"><i class="dot now" aria-hidden="true"></i>Available now</div><p>Open a chat, describe the task, approve what matters. Works with the model you choose.</p></li>
-        <li><div class="s-name">Web</div><div class="s-stat"><i class="dot next" aria-hidden="true"></i>Next</div><p>The same chat in a browser, with a live timeline and approval cards. Nothing to install.</p></li>
-        <li><div class="s-name">Desktop</div><div class="s-stat"><i class="dot later" aria-hidden="true"></i>Later</div><p>Remy on your own machine, working with your apps only where you allow it.</p></li>
-        <li><div class="s-name">Mobile</div><div class="s-stat"><i class="dot later" aria-hidden="true"></i>Later</div><p>Start a task, get a note when it needs a yes, and approve from your pocket.</p></li>
-        <li><div class="s-name">Voice</div><div class="s-stat"><i class="dot later" aria-hidden="true"></i>Later</div><p>Say what you need. Remy answers briefly and still asks before anything that matters.</p></li>
-      </ul>
-    </div>
-
-    <figure class="flow rv" aria-labelledby="flow-cap">
-      <figcaption id="flow-cap"><b>One task, continued across surfaces.</b> <span>A preview of the intent. Only the terminal step exists today, and it stops at the saved draft. Sending needs an email integration that is not built yet, so the phone and voice steps are mockups.</span></figcaption>
-      <ol>
-        <li class="live">
-          <p class="tag"><i class="dot now" aria-hidden="true"></i>Terminal &middot; works today</p>
-          <div class="mock mono">
-            <span class="you">you  Compare the quotes in quotes/ and draft a reply to Dana</span>
-            <span><span class="ok">&#10003;</span> read_file  quotes/*.md</span>
-            <span><span class="ok">&#10003;</span> write_file  reply.md</span>
-            <span>Draft saved to reply.md. Nothing is sent.</span>
-          </div>
-        </li>
-        <li>
-          <p class="tag"><i class="dot later" aria-hidden="true"></i>Mobile &middot; preview</p>
-          <div class="mock card">
-            <b>Remy needs a yes</b>
-            <span>Send reply.md to Dana. Approval covers this exact message.</span>
-            <span class="btns" aria-hidden="true"><span class="b">Send</span><span class="b">Not yet</span></span>
-          </div>
-        </li>
-        <li>
-          <p class="tag"><i class="dot later" aria-hidden="true"></i>Voice &middot; preview</p>
-          <div class="mock mono">
-            <span class="you">you  Send it.</span>
-            <span><span class="ok">&#10003;</span> Sent to Dana. 4 steps, $0.0009.</span>
+      <ol class="trace">
+        <li class="step done"><span class="mk" aria-hidden="true"></span><span class="tx"><b>Read your request</b> <time>09:14</time></span></li>
+        <li class="step done" data-seq><span class="mk" aria-hidden="true"></span><span class="tx"><b>Read file</b> quotes/acme.md</span></li>
+        <li class="step done" data-seq><span class="mk" aria-hidden="true"></span><span class="tx"><b>Read file</b> quotes/northwind.md</span></li>
+        <li class="step done" data-seq><span class="mk" aria-hidden="true"></span><span class="tx"><b>Calculate</b> 12 months of each, side by side</span></li>
+        <li class="step wait" id="ask" data-seq><span class="mk" aria-hidden="true"></span>
+          <span class="tx"><b>Write file</b> <span class="dim">waiting for your OK</span></span>
+          <div class="card">
+            <p class="k">Changes something</p>
+            <p class="what">Write 14 lines to reply.md, replacing it if it exists.</p>
+            <div class="btns">
+              <button class="yes" type="button" id="approve">Approve <kbd>Enter</kbd></button>
+              <button class="no" type="button" id="decline">Decline <kbd>Esc</kbd></button>
+            </div>
+            <p class="fine">This approval covers exactly this change and nothing else. It can be used once.</p>
           </div>
         </li>
       </ol>
-    </figure>
-  </div>
-</section>
-
-<section id="does" class="wrap" aria-labelledby="does-h">
-  <div class="does">
-    <div class="rv"><h2 id="does-h">What it does today.</h2>
-    <p class="lede">In the terminal, Remy works in small steps with these tools until the task is done, it needs you, or it hits a limit.</p>
-    <ul class="tools">
-      <li><b>Files</b><span>Read, list, write, edit, move and delete inside one workspace folder.</span></li>
-      <li><b>Web</b><span>Fetch pages. Search with a Brave, Tavily or SearXNG key. Limit browsing to domains you name.</span></li>
-      <li><b>Commands</b><span>Run one allowlisted program at a time, such as git, grep, node or pnpm. Every command asks first.</span></li>
-      <li><b>Math</b><span>Arithmetic and date math, such as the days between two dates.</span></li>
-      <li><b>Questions</b><span>When it needs something only you know, it asks. At most three times per task.</span></li>
-      <li><b>Models</b><span>Any OpenAI-compatible endpoint: OpenAI, OpenRouter, Ollama, vLLM or Groq.</span></li>
-    </ul></div>
-    <div class="demo-col rv" style="--d:1">
-      <div class="term" id="term" role="img" aria-label="Example terminal session: Remy fetches a page, asks approval to write notes.md, and reports the result.">
-<span class="l you" data-type="you  Summarize https://example.com/pricing into notes.md">you  Summarize https://example.com/pricing into notes.md</span>
-<span class="l dim" data-delay="500">Plan: fetch the page, write the summary.</span>
-<span class="l"><span class="ok">&#10003;</span> fetch_url  example.com/pricing  <span class="dim">1.2s</span></span>
-<span class="l dim">  Page content is untrusted. Writes now need approval.</span>
-<span class="l">Approve? write_file notes.md  <span class="dim">(18 lines)</span>  [y/n]</span>
-<span class="l you" data-type="y">y</span>
-<span class="l"><span class="ok">&#10003;</span> write_file  notes.md</span>
-<span class="l" data-delay="600">Saved notes.md. Three plans, priced per seat, with the limits of each. The page does not say whether annual billing is cheaper.</span>
-<span class="l dim">3 steps  &middot;  $0.0004</span>
-      </div>
-      <p class="note"><span>An example session in the terminal today. Remy fetches a page, then stops to ask before it writes a file.</span> <button class="replay" id="replay" type="button">Replay</button></p>
+      <p class="result" id="result" role="status" aria-live="polite"></p>
+      <p class="win-foot"><span>A sample task, played back.</span> <button class="link" type="button" id="replay">Replay</button></p>
     </div>
   </div>
 </section>
 
-<section id="safety" class="safe" aria-labelledby="safe-h">
-  <div class="wrap">
-    <h2 id="safe-h" class="rv">Nothing happens that you did not approve.</h2>
-    <div class="safe-grid">
-      <div class="rv"><h3>Approvals bind to the exact action</h3><p>Each yes covers one specific call and is used once. Deleting files, running commands and spending money always ask, whatever you allow.</p></div>
-      <div class="rv" style="--d:1"><h3>Untrusted content is marked</h3><p>Text from web pages and command output is untrusted. Once a task has seen it, every action that is not a read needs your approval, so a hidden instruction in a page cannot act for you.</p></div>
-      <div class="rv"><h3>Crash-safe resume</h3><p>Every task is an append-only log. After a crash or Ctrl+C, <code>remy resume</code> continues from where it stopped.</p></div>
-      <div class="rv" style="--d:1"><h3>No double actions</h3><p>An action that may already have happened is checked or reported, never blindly repeated. Tasks stop at 30 steps, $1 or 30 minutes.</p></div>
+<!-- 2. What it does: one capability per row, each with its real fragment. -->
+<section id="does" class="does" aria-labelledby="does-h">
+  <div class="sec-head rv">
+    <h2 id="does-h">One chat box. Real tools.</h2>
+    <p class="lede">Remy works in small steps with the tools below until the task is done, it needs you, or it reaches a limit.</p>
+  </div>
+
+  <div class="cap rv">
+    <div class="cap-text">
+      <h3>It works on your files.</h3>
+      <p>Read, write, edit, move and delete inside one workspace folder you choose. It runs one allowlisted program at a time, such as git, grep or pnpm, and every command asks first.</p>
+    </div>
+    <div class="frag" data-ui aria-label="Files and commands">
+      <p class="f-h">workspace <span class="dim">~/Documents/invoices</span></p>
+      <ul class="rows">
+        <li><span>Move</span> 40 files into <code>2026/</code> by invoice date <em class="ok">done</em></li>
+        <li><span>Rename</span> <code>scan_0031.pdf</code> to <code>2026-10-31-acme.pdf</code> <em class="ok">done</em></li>
+        <li><span>Run</span> <code>git status</code> <em class="ask">asks first</em></li>
+        <li><span>Delete</span> 3 duplicates <em class="ask">always asks</em></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cap flip rv">
+    <div class="cap-text">
+      <h3>It uses the web like you do.</h3>
+      <p>Remy has its own browser on your computer. It searches, follows links, uses a site's search box and fills in fields. It never types passwords or card numbers: it shows you the window and you do that part.</p>
+    </div>
+    <div class="frag" data-ui aria-label="Browsing">
+      <p class="f-h">browser <span class="dim">its own profile, on your machine</span></p>
+      <ul class="rows">
+        <li><span>Search</span> best budget noise-cancelling headphones <em class="ok">3 sources</em></li>
+        <li><span>Open</span> the maker's spec page <em class="ok">read</em></li>
+        <li><span>Fill</span> delivery postcode <em class="ok">done</em></li>
+        <li><span>Pay</span> $89.00 at checkout <em class="ask">asks, every time</em></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cap rv">
+    <div class="cap-text">
+      <h3>It connects to your apps.</h3>
+      <p>Remy uses apps through MCP: GitHub, Notion, Linear and Sentry are on the built-in list, and you can add any other server. A connection's tool asks before it acts, unless it is marked read-only.</p>
+    </div>
+    <div class="frag" data-ui aria-label="Connections">
+      <p class="f-h">connections <span class="dim">4 on, 1 asking</span></p>
+      <ul class="rows">
+        <li><span>GitHub</span> read issues and pull requests <em class="ok">read-only</em></li>
+        <li><span>Notion</span> create a page in Projects <em class="ask">asks first</em></li>
+        <li><span>Linear</span> find tickets assigned to you <em class="ok">read-only</em></li>
+        <li><span>Sentry</span> read the last 24 hours of errors <em class="ok">read-only</em></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cap flip rv">
+    <div class="cap-text">
+      <h3>It keeps going without you.</h3>
+      <p>Run a task in the background, schedule it, or let it continue after a crash. Every task is a log: <code>remy resume</code> picks up where it stopped. Remy remembers what you agree it should, and you can see and delete every note.</p>
+    </div>
+    <div class="frag" data-ui aria-label="Schedules and memory">
+      <p class="f-h">schedules <span class="dim">asks before acting while you are away</span></p>
+      <ul class="rows">
+        <li><span>Weekdays 08:30</span> summarise unread mail into a note <em class="ok">on</em></li>
+        <li><span>Mondays 09:00</span> list open pull requests <em class="ok">on</em></li>
+        <li><span>Memory</span> Dana prefers short replies <em class="ok">saved, you agreed</em></li>
+      </ul>
     </div>
   </div>
 </section>
 
-<section id="results" class="wrap" aria-labelledby="res-h">
-  <h2 id="res-h" class="rv">Measured, not claimed.</h2>
-  <div class="results rv">
-    <p class="big">99%</p>
-    <div class="facts">
-      <div><b>169 of 170 runs</b><span>passed: the 34-case suite, five runs each, on <span class="nw">GPT-5</span> nano</span></div>
-      <div><b>0</b><span>safety violations and duplicate actions</span></div>
-      <div><b>about $0.0008</b><span>per task</span></div>
-    </div>
-  </div>
-  <p class="fine">Run 9, 2026-10-26: 99% success, 97% of cases passing all five runs. The one miss asked too many questions and never sent. The earlier 30-case suite scored 100%. Weaker or free models are less reliable than this; open-weight baselines are still to be measured. Full history is in <a href="https://github.com/remy-plus/remy/tree/main/evals/results">evals/results</a>.</p>
-</section>
-
-<section id="start" class="start" aria-labelledby="start-h">
-  <div class="wrap">
-    <h2 id="start-h" class="rv">Pick a model and talk.</h2>
-    <ol class="steps rv">
-      <li><span>Pick a model</span><pre>export REMY_PROFILE=openrouter
-export OPENROUTER_API_KEY=sk-or-...
-export REMY_MODEL=google/gemma-4-26b-a4b-it:free
-
-# or local
-# REMY_PROFILE=ollama REMY_MODEL=qwen2.5:7b</pre></li>
-      <li><span>Open the chat</span><pre>remy
-
-# one task, for scripts
-remy run "summarize README.md"</pre></li>
+<!-- 3. How it works: a pinned stage that changes with the three statements. -->
+<section id="how" class="how" aria-labelledby="how-h">
+  <h2 id="how-h" class="how-h">From a sentence to done.</h2>
+  <div class="how-grid">
+    <ol class="how-steps">
+      <li data-step="1"><p class="big">Say what you need.</p><p>Plain words, one box. No setup per task. Remy makes a short plan before it touches anything.</p></li>
+      <li data-step="2"><p class="big">Watch it work.</p><p>Each step shows as it runs, with the cost so far. It reads freely. Anything that changes something waits.</p></li>
+      <li data-step="3"><p class="big">Say yes to what matters.</p><p>Writing, sending, deleting and paying stop at a card that names the exact action. Your yes covers that one thing, once.</p></li>
     </ol>
-    <p class="note">Not installed yet? The commands are under <a href="#get">Get Remy</a>, at the top of the page.</p>
+    <div class="how-stage" id="stage" data-state="1">
+      <div class="win small" data-ui aria-hidden="true">
+        <div class="s s1"><p class="win-title">You</p><p class="said">Compare the quotes in quotes/ and draft a reply to Dana.</p><p class="dim plan">Plan: read both quotes, compare, write the reply.</p></div>
+        <div class="s s2"><p class="win-title">Working <span class="dim">$0.0004 of $1.00</span></p>
+          <ol class="trace"><li class="step done"><span class="mk"></span><span class="tx"><b>Read file</b> quotes/acme.md</span></li><li class="step done"><span class="mk"></span><span class="tx"><b>Read file</b> quotes/northwind.md</span></li><li class="step run"><span class="mk"></span><span class="tx"><b>Calculate</b> <span class="dim">12 months of each</span></span></li></ol></div>
+        <div class="s s3"><p class="win-title">Needs your OK</p><p class="k">Changes something</p><p class="what">Write 14 lines to reply.md.</p><div class="btns"><span class="yes">Approve</span><span class="no">Decline</span></div><p class="fine">Covers exactly this change. Used once.</p></div>
+      </div>
+    </div>
   </div>
 </section>
 
-<section id="limits" class="wrap" aria-labelledby="not-h">
-  <h2 id="not-h" class="rv">Not yet.</h2>
-  <ul class="not rv">
-    <li>Only the terminal exists. Web, desktop, mobile and voice are planned and not built.</li>
-    <li>No browser automation: it reads pages but cannot click or fill forms.</li>
-    <li>No real email, calendar or account integrations.</li>
-    <li>Ctrl+C stops the task, but a tool already running finishes its current call.</li>
-    <li><code>run_command</code> is not a full sandbox. Read each command before you approve it.</li>
-    <li>No memory across chats beyond the current conversation, and no scheduled tasks.</li>
-    <li>Free and weaker models are less reliable than the numbers above.</li>
+<!-- 4. Safety: a full field, one heading, four plain commitments. -->
+<section id="safety" class="safe" aria-labelledby="safe-h">
+  <div class="safe-in">
+    <h2 id="safe-h" class="rv">Nothing happens without your yes.</h2>
+    <div class="safe-list">
+      <div class="rv"><h3>Each yes covers one exact action.</h3><p>An approval is tied to the specific call, used once, and gone. Deleting files, running commands, sending as you and spending money always ask, whatever you allow.</p></div>
+      <div class="rv"><h3>Pages cannot give orders.</h3><p>Text from web pages, email, connections and command output is marked untrusted. Once a task has seen any, every action that is not a read needs your approval, so an instruction hidden in a page cannot act for you.</p></div>
+      <div class="rv"><h3>You choose how much it asks.</h3><p>By default it asks. Steady clears a short list of low-risk, reversible work in the workspace; away clears a little more for long runs while you are gone. Neither ever clears spending, sending, deleting or anything after a page it could not trust.</p></div>
+      <div class="rv"><h3>A crash loses nothing.</h3><p>Every task is an append-only log. If Remy stops, it continues from the log. An action that may already have happened is checked or reported, never repeated blindly.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Results: real numbers, with their limits. -->
+<section id="results" class="results" aria-labelledby="res-h">
+  <h2 id="res-h" class="rv">Measured, not claimed.</h2>
+  <div class="res-grid">
+    <div class="big-fig rv">
+      <p class="num">46<span class="of"> of 48</span></p>
+      <p class="cap-line">live runs passed on Claude Haiku 5.5: 16 real tasks on live websites and files, three tries each.</p>
+    </div>
+    <ul class="facts rv">
+      <li><b>352 of 360</b><span>hard runs passed on Haiku 5.5: 120 traps, such as wrong files, hidden instructions in pages and mail to the wrong person.</span></li>
+      <li><b>325</b><span>replay cases run on every change, with no model in the loop. All pass.</span></li>
+      <li><b>100%</b><span>is the bar for the safety and recovery suites on every model. A model that misses it does not ship.</span></li>
+    </ul>
+  </div>
+  <p class="fine-print rv">The misses are in the results files, not hidden. Weaker and free models are less reliable than these numbers, and the live runs cover a small set of tasks. Run it yourself: <code>pnpm eval:replay</code>.</p>
+</section>
+
+<!-- 6. Where it runs: honest status. -->
+<section id="reach" class="reach" aria-labelledby="reach-h">
+  <div class="sec-head rv">
+    <h2 id="reach-h">Where Remy runs.</h2>
+    <p class="lede">One surface is released. The rest are in this order, and none has a date.</p>
+  </div>
+  <ul class="surfaces rv">
+    <li><span class="nm">Terminal</span><span class="st"><i class="dot now" aria-hidden="true"></i>Released</span><span class="ds">Open a chat, describe the task, approve what matters. Works with the model you choose.</span></li>
+    <li><span class="nm">Web app</span><span class="st"><i class="dot next" aria-hidden="true"></i>Built, ships with 1.0</span><span class="ds">The same chat in a browser, with a live timeline and approval cards. Runs on your machine or a home server.</span></li>
+    <li><span class="nm">Desktop</span><span class="st"><i class="dot later" aria-hidden="true"></i>Later</span><span class="ds">Remy working with your own apps, only where you allow it.</span></li>
+    <li><span class="nm">Mobile and voice</span><span class="st"><i class="dot later" aria-hidden="true"></i>Later</span><span class="ds">Start a task, get a note when it needs a yes, approve from your pocket.</span></li>
   </ul>
 </section>
+
+<!-- 7. Questions, answered plainly. -->
+<section id="faq" class="faq" aria-labelledby="faq-h">
+  <h2 id="faq-h" class="faq-h">Questions.</h2>
+  <div class="faq-list">
+    <details class="rv" open><summary>Which models does it use?</summary><p>Yours. OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Ollama, or any OpenAI-compatible endpoint such as vLLM or LM Studio. Run <code>remy login</code> once and your key goes in the macOS Keychain or a private file. A typical task costs a fraction of a cent on a small model.</p></details>
+    <details class="rv"><summary>Does my data leave my machine?</summary><p>Your files and notes stay where they are. What Remy reads to do a task is sent to the model provider you chose, and nothing else is sent anywhere. Secrets are kept out of what the model sees.</p></details>
+    <details class="rv"><summary>What if it gets something wrong?</summary><p>It stops at limits you set: 30 steps, $1 or 30 minutes by default, then asks to continue. Anything that changes something waits for your yes first. Stop it any time; the log shows exactly what it did.</p></details>
+    <details class="rv"><summary>What can it not do yet?</summary><p>No voice, desktop or mobile app. No Slack or Google Workspace on the built-in list; you can still add their servers yourself. The command tool is not a full sandbox, so read each command before you approve it. Free and weaker models are less reliable. The web app is built but not released.</p></details>
+    <details class="rv"><summary>Is it open source?</summary><p>The code is Apache-2.0 on GitHub. The Remy name and logo are not licensed with it.</p></details>
+  </div>
+</section>
+
+<!-- 8. Start: the first step, already open. -->
+<section id="start" class="start" aria-labelledby="start-h">
+  <div class="start-in">
+    <div class="start-copy">
+      <h2 id="start-h">Start in a minute.</h2>
+      <p class="lede">Node 22.18 or newer. Three commands, then talk.</p>
+    </div>
+    <div class="win dialog" data-ui>
+      <p class="win-title">Get Remy <span class="dim">terminal, available now</span></p>
+      <div class="cmd">
+        <pre id="install"><span class="line"><span class="p">$ </span>npm install -g @koryei/remy</span>
+<span class="line"><span class="p">$ </span>remy login</span>
+<span class="line"><span class="p">$ </span>remy</span></pre>
+        <button class="copy" type="button" data-copy="install">Copy<span class="sr"> install commands</span></button>
+      </div>
+      <p class="fine">Pick a provider and paste its key when asked. Or run a model on your own machine with Ollama and no key at all.</p>
+    </div>
+  </div>
+</section>
 </main>
-<footer class="wrap">
+
+<footer class="foot">
   <pre class="word" role="img" aria-label="REMY"><span>:::::::..    .,::::::    .        :     .-:.     ::-.</span><span>;;;;``;;;;   ;;;;&#x27;&#x27;&#x27;&#x27;    ;;,.    ;;;     &#x27;;;.   ;;;;&#x27;</span><span> [[[,/[[[&#x27;    [[cccc     [[[[, ,[[[[,      &#x27;[[,[[[&#x27;</span><span> $$$$$$c      $$&quot;&quot;&quot;&quot;     $$$$$$$$&quot;$$$        c$$&quot;</span><span> 888b &quot;88bo,  888oo,__   888 Y88&quot; 888o     ,8P&quot;`</span><span> MMMM   &quot;W&quot;   &quot;&quot;&quot;&quot;YUMMM  MMM  M&#x27;  &quot;MMM    mM&quot;</span></pre>
-  <div class="foot">
-    <span>Your assistant, anywhere. Apache-2.0 code; the Remy name and logo are not licensed with it.</span>
-    <nav aria-label="Footer"><a href="https://github.com/remy-plus/remy">GitHub</a><a href="https://github.com/remy-plus/remy/blob/main/CAPABILITIES.md">Capabilities</a></nav>
+  <div class="foot-line">
+    <span>Your assistant, anywhere.</span>
+    <nav aria-label="Footer"><a href="https://github.com/remy-plus/remy">GitHub</a><a href="https://github.com/remy-plus/remy/blob/main/CAPABILITIES.md">Capabilities</a><a href="https://github.com/remy-plus/remy/blob/main/SECURITY.md">Security</a></nav>
+    <span>Apache-2.0 code. The name and logo are not licensed with it.</span>
   </div>
 </footer>
 <span class="sr" id="status" role="status" aria-live="polite"></span>
