@@ -226,7 +226,7 @@
     <h2 id="reach-h">Where Remy runs.</h2>
     <p class="lede">One surface is released. The rest are in this order, and none has a date.</p>
   </div>
-  <ul class="surfaces rv">
+  <ul class="surfaces">
     <li><span class="nm">Terminal</span><span class="st"><i class="dot now" aria-hidden="true"></i>Released</span><span class="ds">Open a chat, describe the task, approve what matters. Works with the model you choose.</span></li>
     <li><span class="nm">Web app</span><span class="st"><i class="dot next" aria-hidden="true"></i>Built, ships with 1.0</span><span class="ds">The same chat in a browser, with a live timeline and approval cards. Runs on your machine or a home server.</span></li>
     <li><span class="nm">Desktop</span><span class="st"><i class="dot later" aria-hidden="true"></i>Later</span><span class="ds">Remy working with your own apps, only where you allow it.</span></li>
@@ -238,11 +238,11 @@
 <section id="faq" class="faq" aria-labelledby="faq-h">
   <h2 id="faq-h" class="faq-h">Questions.</h2>
   <div class="faq-list">
-    <details class="rv" open><summary>Which models does it use?</summary><p>Yours. OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Ollama, or any OpenAI-compatible endpoint such as vLLM or LM Studio. Run <code>remy login</code> once and your key goes in the macOS Keychain or a private file. A typical task costs a fraction of a cent on a small model.</p></details>
-    <details class="rv"><summary>Does my data leave my machine?</summary><p>Your files and notes stay where they are. What Remy reads to do a task is sent to the model provider you chose, and nothing else is sent anywhere. Secrets are kept out of what the model sees.</p></details>
-    <details class="rv"><summary>What if it gets something wrong?</summary><p>It stops at limits you set: 30 steps, $1 or 30 minutes by default, then asks to continue. Anything that changes something waits for your yes first. Stop it any time; the log shows exactly what it did.</p></details>
-    <details class="rv"><summary>What can it not do yet?</summary><p>No voice, desktop or mobile app. No Slack or Google Workspace on the built-in list; you can still add their servers yourself. The command tool is not a full sandbox, so read each command before you approve it. Free and weaker models are less reliable. The web app is built but not released.</p></details>
-    <details class="rv"><summary>Is it open source?</summary><p>The code is Apache-2.0 on GitHub. The Remy name and logo are not licensed with it.</p></details>
+    <details open><summary>Which models does it use?</summary><p>Yours. OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Ollama, or any OpenAI-compatible endpoint such as vLLM or LM Studio. Run <code>remy login</code> once and your key goes in the macOS Keychain or a private file. A typical task costs a fraction of a cent on a small model.</p></details>
+    <details><summary>Does my data leave my machine?</summary><p>Your files and notes stay where they are. What Remy reads to do a task is sent to the model provider you chose, and nothing else is sent anywhere. Secrets are kept out of what the model sees.</p></details>
+    <details><summary>What if it gets something wrong?</summary><p>It stops at limits you set: 30 steps, $1 or 30 minutes by default, then asks to continue. Anything that changes something waits for your yes first. Stop it any time; the log shows exactly what it did.</p></details>
+    <details><summary>What can it not do yet?</summary><p>No voice, desktop or mobile app. No Slack or Google Workspace on the built-in list; you can still add their servers yourself. The command tool is not a full sandbox, so read each command before you approve it. Free and weaker models are less reliable. The web app is built but not released.</p></details>
+    <details><summary>Is it open source?</summary><p>The code is Apache-2.0 on GitHub. The Remy name and logo are not licensed with it.</p></details>
   </div>
 </section>
 
