@@ -73,6 +73,14 @@ function Need({
             </button>
           </>
         )}
+        {!a && !card.review && (
+          <a
+            className={`${primary} no-underline`}
+            href={`#/tasks/${encodeURIComponent(card.taskId)}`}
+          >
+            Open
+          </a>
+        )}
         {card.review && (
           <button type="button" className={quiet} onClick={() => onOpen(card)}>
             {card.review}
@@ -297,18 +305,20 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
                 {brain.newToday} new today
               </span>
             </span>
-            <span>
-              Most connected:{' '}
-              {brain.connected.map((c, i) => (
-                <span key={c.name}>
-                  {i > 0 && ' · '}
-                  <a href="#/brain" className="text-text underline">
-                    {c.name}
-                  </a>{' '}
-                  ({c.links})
-                </span>
-              ))}
-            </span>
+            {brain.connected.length > 0 && (
+              <span>
+                Most connected:{' '}
+                {brain.connected.map((c, i) => (
+                  <span key={c.name}>
+                    {i > 0 && ' · '}
+                    <a href="#/brain" className="text-text underline">
+                      {c.name}
+                    </a>{' '}
+                    ({c.links})
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
         )}
         <CommandBar input={input} value={draft} setValue={setDraft} />

@@ -70,8 +70,6 @@ const notAvailable = {
   updateNote: no,
   deleteNote: no,
 } satisfies Partial<RemyApi>;
-/** The server has no routes for settings yet. */
-const notYet = <T>(): Promise<T> => Promise.reject(new Error('This is not available yet.'));
 
 export function createHttpApi(opts: {
   token: () => string | null;
@@ -131,20 +129,21 @@ export function createHttpApi(opts: {
     answer: (id, answer) => post(`${task(id)}/answer`, { answer }),
     cancel: (id) => post(`${task(id)}/cancel`),
     extend: (id, body: ExtendBody = {}) => post(`${task(id)}/extend`, body),
-    async home(): Promise<HomeData> {
-      const tasks = await api.listTasks({ limit: 50 });
-      return homeFromTasks(tasks, await waitingCards(api, tasks));
+    home: () => json<HomeData>('/api/home'),
+    review(since) {
+      const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+      return json<ReviewData>(`/api/review${qs}`);
     },
-    // No server routes yet for the two below.
-    async review(): Promise<ReviewData> {
-      throw new ApiError(404, 'The overnight review is not available from the server yet.');
-    },
+    // No server route yet.
     async markDone(): Promise<void> {
       throw new ApiError(404, 'Marking a task done is not available from the server yet.');
     },
     // Mock-only for now: the server has no routes for connections, skills, schedules or the brain.
     ...notAvailable,
-    settings: () => notYet<SettingsData>(),
+    settings: () => json<SettingsData>('/api/settings'),
+    updateSettings: async (patch) => {
+      await call('/api/settings', { method: 'PUT', body: JSON.stringify(patch) });
+    },
     health: () => json<Health>('/api/health'),
     async testToken(token) {
       let res: Response;
@@ -163,76 +162,15 @@ export function createHttpApi(opts: {
       const body = (await res.json().catch(() => ({}))) as { tasks?: TaskListItem[] };
       return { running: (body.tasks ?? []).filter((t) => t.status === 'running').length };
     },
-    deleteNotes: () => notYet(),
-    rotateToken: () => notYet(),
-    testModels: () => notYet(),
-    sendTestNotification: () => notYet(),
+    deleteNotes: (confirm) =>
+      json<{ deleted: number }>('/api/notes/delete-all', {
+        method: 'POST',
+        body: JSON.stringify({ confirm }),
+      }),
+    rotateToken: () => json<{ token: string }>('/api/token/rotate', { method: 'POST', body: '{}' }),
+    testModels: () =>
+      json<{ ok: boolean; detail: string }>('/api/models/test', { method: 'POST', body: '{}' }),
+    sendTestNotification: () => post('/api/notifications/test'),
   };
   return api;
-}
-
-async function waitingCards(api: RemyApi, tasks: TaskListItem[]) {
-  const waiting = tasks.filter((t) => t.status === 'waiting_approval').slice(0, 6);
-  return Promise.all(waiting.map((t) => api.getTask(t.id)));
-}
-
-const usd = (n: number) => `$${n.toFixed(2)}`;
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/** Home from what the task routes already tell us. Machines, notes and the brain are not served yet. */
-export function homeFromTasks(tasks: TaskListItem[], waiting: TaskView[]): HomeData {
-  const running = tasks.filter((t) => t.status === 'running');
-  const asks = waiting.length + tasks.filter((t) => t.status === 'waiting_user').length;
-  const now = new Date();
-  return {
-    status: {
-      running: running.length,
-      machinesUp: null,
-      notes: null,
-      trust: 'ask',
-      quiet: false,
-      time: now.toTimeString().slice(0, 5),
-    },
-    briefing: {
-      headline: asks
-        ? `${plural(asks, 'thing')} need${asks === 1 ? 's' : ''} you.`
-        : 'Nothing needs you.',
-      rest: 'Everything else is on track.',
-      stats: [
-        `${plural(running.length, 'task')} running`,
-        `${usd(tasks.reduce((s, t) => s + t.costUsd, 0))} spent`,
-      ],
-      asks: [],
-    },
-    satellites: [],
-    needsYou: waiting.flatMap((v) =>
-      v.pendingApproval
-        ? [
-            {
-              taskId: v.taskId,
-              kind: v.pendingApproval.risk.replaceAll('_', ' '),
-              title: v.prompt,
-              detail: v.pendingApproval.preview,
-              approval: {
-                callId: v.pendingApproval.callId,
-                argsHash: v.pendingApproval.argsHash,
-                approve: 'Approve',
-                decline: 'Decline',
-              },
-            },
-          ]
-        : [],
-    ),
-    working: running.map((t) => ({
-      taskId: t.id,
-      title: t.prompt,
-      state: 'working',
-      done: 0,
-      total: 0,
-      line: `${usd(t.costUsd)} so far`,
-    })),
-    noticed: [],
-    alert: null,
-    brain: null,
-  };
 }

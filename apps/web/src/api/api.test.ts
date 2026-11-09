@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import { applyServerPrefs, bindServerSettings, getSetting, setSetting } from '../settings.ts';
 import { ApiError, createHttpApi, createSseParser } from './http.ts';
 import { chooseApi } from './index.tsx';
 import { createMockApi } from './mock.ts';
-import type { StreamEvent } from './types.ts';
+import type { ServerPrefs, StreamEvent } from './types.ts';
 
 describe('mock adapter', () => {
   it('lists tasks in the shape of GET /api/tasks', async () => {
@@ -134,5 +135,102 @@ describe('http adapter', () => {
       'data: {oops\n\ndata: {"seq":1,"at":"t","event":{"type":"x"}}\n\n',
     );
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe('http adapter, home to settings', () => {
+  const stub = (body: unknown = {}, status = 200) => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+    const api = createHttpApi({ token: () => 'tok', fetch: fetcher as unknown as typeof fetch });
+    const last = () => {
+      const [url, init] = fetcher.mock.calls.at(-1) as unknown as [string, RequestInit];
+      return { url, init, body: init.body ? JSON.parse(init.body as string) : undefined };
+    };
+    return { api, fetcher, last };
+  };
+
+  it('reads home and the review from the server', async () => {
+    const { api, last } = stub({ status: { running: 2 } });
+    expect((await api.home()).status.running).toBe(2);
+    expect(last().url).toBe('/api/home');
+    await api.review();
+    expect(last().url).toBe('/api/review');
+    await api.review('7d');
+    expect(last().url).toBe('/api/review?since=7d');
+    expect(new Headers(last().init.headers).get('authorization')).toBe('Bearer tok');
+  });
+
+  it('reads and saves settings', async () => {
+    const { api, last } = stub({ currency: '$' });
+    expect((await api.settings()).currency).toBe('$');
+    expect(last().url).toBe('/api/settings');
+    await api.updateSettings({ trust: 'away', budget: { perTask: 3 } });
+    expect(last().init.method).toBe('PUT');
+    expect(last().body).toEqual({ trust: 'away', budget: { perTask: 3 } });
+  });
+
+  it('sends the note count the person was shown, and shows the server message when it differs', async () => {
+    const { api, last } = stub({ deleted: 3 });
+    expect(await api.deleteNotes(3)).toEqual({ deleted: 3 });
+    expect(last().url).toBe('/api/notes/delete-all');
+    expect(last().body).toEqual({ confirm: 3 });
+    const wrong = stub({ error: 'There are 4 notes, not 3. Nothing was deleted.' }, 409);
+    await expect(wrong.api.deleteNotes(3)).rejects.toMatchObject({
+      status: 409,
+      message: 'There are 4 notes, not 3. Nothing was deleted.',
+    });
+  });
+
+  it('rotates the token, tests the model and sends a test notification', async () => {
+    const rotate = stub({ token: 'new-token' });
+    expect(await rotate.api.rotateToken()).toEqual({ token: 'new-token' });
+    expect(rotate.last().url).toBe('/api/token/rotate');
+    expect(rotate.last().init.method).toBe('POST');
+    const model = stub({ ok: true, detail: 'llama3 answered.' });
+    expect(await model.api.testModels()).toEqual({ ok: true, detail: 'llama3 answered.' });
+    expect(model.last().url).toBe('/api/models/test');
+    const note = stub({ ok: true });
+    await expect(note.api.sendTestNotification()).resolves.toBeUndefined();
+    expect(note.last().url).toBe('/api/notifications/test');
+  });
+
+  it('still says the routes of the other groups are not connected', async () => {
+    const { api } = stub();
+    await expect(api.skills()).rejects.toMatchObject({ status: 501 });
+  });
+});
+
+describe('settings copied to and from the server', () => {
+  const prefs: ServerPrefs = {
+    trust: 'steady',
+    budget: { monthly: 30, perTask: 4 },
+    remember: false,
+    quiet: true,
+    quietHours: { from: '22:00', to: '06:30' },
+    notifications: { approvals: true, finished: false, noticed: true, reviewAt: '08:15' },
+    appearance: 'dark',
+  };
+
+  it('copies the server values in without sending them back, then sends each change', () => {
+    const sent: unknown[] = [];
+    bindServerSettings((p) => sent.push(p));
+    applyServerPrefs(prefs);
+    expect(sent).toEqual([]);
+    expect(getSetting('trust')).toBe('steady');
+    expect(getSetting('budget.month')).toBe(30);
+    expect(getSetting('notify.review')).toBe('08:15');
+    expect(getSetting('quiet.to')).toBe('06:30');
+    setSetting('trust', 'away');
+    setSetting('budget.task', 5);
+    setSetting('notify.noticed', false);
+    setSetting('escalate', false); // stays in this browser
+    expect(sent).toEqual([
+      { trust: 'away' },
+      { budget: { perTask: 5 } },
+      { notifications: { noticed: false } },
+    ]);
+    bindServerSettings(null);
+    setSetting('trust', 'ask');
+    expect(sent).toHaveLength(3);
   });
 });

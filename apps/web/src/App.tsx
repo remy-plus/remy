@@ -23,6 +23,7 @@ import { SignIn } from './pages/welcome/SignIn.tsx';
 import { useFirstRun } from './pages/welcome/useFirstRun.ts';
 import { Welcome } from './pages/welcome/Welcome.tsx';
 import { matchRoute, useHashPath } from './router.ts';
+import { applyServerPrefs, bindServerSettings } from './settings.ts';
 
 function Page({ path, home }: { path: string; home: ReturnType<typeof useHome> }) {
   const { name, params } = matchRoute(path);
@@ -74,6 +75,23 @@ export function App() {
   const home = useHome();
   const main = useRef<HTMLElement>(null);
   const shown = useRef(path);
+  // With a real server, copy its saved settings in once, then write each change back.
+  useEffect(() => {
+    if (api.kind !== 'http') return;
+    let live = true;
+    api
+      .settings()
+      .then((d) => {
+        if (!live) return;
+        if (d.prefs) applyServerPrefs(d.prefs);
+        bindServerSettings((patch) => void api.updateSettings(patch).catch(() => {}));
+      })
+      .catch(() => {}); // the Settings screen says what is missing
+    return () => {
+      live = false;
+      bindServerSettings(null);
+    };
+  }, [api]);
   // After a navigation, move focus to the page so keyboard and screen reader users start at the top.
   // Comparing paths (not a first-run flag) keeps StrictMode's double effect from focusing on load.
   useEffect(() => {

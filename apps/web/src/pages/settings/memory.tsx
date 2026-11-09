@@ -17,7 +17,7 @@ export function Memory({ data, reload }: SectionProps) {
   const remove = async () => {
     setBusy(true);
     try {
-      const { deleted } = await api.deleteNotes();
+      const { deleted } = await api.deleteNotes(count);
       setResult(`Deleted ${deleted.toLocaleString('en')} ${deleted === 1 ? 'note' : 'notes'}.`);
       reload();
     } catch (e) {
