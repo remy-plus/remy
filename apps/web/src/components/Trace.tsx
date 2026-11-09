@@ -24,6 +24,7 @@ export function buildSteps(view: TaskView, clock: (iso: string) => string): Step
   ];
   const calls = [...view.calls].sort((a, b) => a.step - b.step);
   for (const c of calls) {
+    if (c.tool === 'finish') continue; // the end of the task is the "Finished" step below
     const waiting = view.pendingApproval?.callId === c.callId;
     const failed = c.result ? !c.result.ok : false;
     const state: StepState = waiting
@@ -118,11 +119,13 @@ export function Trace({
         >
           <Marker state={s.state} />
           <p
-            className={`m-0 font-mono text-[14px] leading-[1.6] ${s.state === 'pending' ? 'text-muted' : 'text-text'}`}
+            className={`m-0 text-[15px] leading-[1.6] ${s.state === 'pending' ? 'text-muted' : 'text-text'}`}
           >
-            <span className="font-bold">{s.label}</span>
+            <span className="font-medium">{s.label}</span>
             <span className="sr-only"> ({WORD[s.state]})</span>
-            {s.time && <span className="ml-2 font-normal text-muted">{s.time}</span>}
+            {s.time && (
+              <span className="ml-2 font-mono text-[12px] font-normal text-muted">{s.time}</span>
+            )}
             {s.suffix && <span className="font-normal text-muted"> · {s.suffix}</span>}
           </p>
           {cards[s.id]}
