@@ -163,6 +163,7 @@ import {
   waitForVm,
 } from './search-vm.ts';
 import { listenServe } from './serve.ts';
+import { actionRoutes } from './serve-actions.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
@@ -2206,6 +2207,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 home,
                 prefs: webPrefs,
                 schedules: () => openSchedules(home).list(),
+              }),
+              actionRoutes({
+                store,
+                prefs: webPrefs,
+                redact,
+                notes: { count: () => memory().list().length, clear: () => memory().clear() },
+                rotateToken: () => makeServeToken(home),
+                model,
               }),
               settingsRoutes(
                 {

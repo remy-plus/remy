@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { writeMarker } from './background.ts';
 import { listenServe, type ServeListening } from './serve.ts';
+import { actionRoutes } from './serve-actions.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
@@ -90,6 +91,13 @@ async function serve(script: ModelResponse[], rig: Rig = {}) {
           notesToday: () => notes.length,
         }),
         reviewRoutes({ store, home, prefs, schedules: () => [] }),
+        actionRoutes({
+          store,
+          prefs,
+          notes: { count: () => notes.length, clear: () => notes.splice(0).length },
+          rotateToken: () => makeServeToken(home),
+          model,
+        }),
         settingsRoutes(
           {
             home,
@@ -168,6 +176,10 @@ const ROUTES: [string, string][] = [
   ['GET', '/api/home'],
   ['GET', '/api/review'],
   ['GET', '/api/settings'],
+  ['POST', '/api/notes/delete-all'],
+  ['POST', '/api/token/rotate'],
+  ['POST', '/api/models/test'],
+  ['POST', '/api/notifications/test'],
   ['PUT', '/api/settings'],
 ];
 
@@ -559,5 +571,118 @@ describe('review', () => {
     expect((await api('/api/review?since=2026-11-01')).status).toBe(200);
     expect((await api('/api/review?since=yesterday')).status).toBe(400);
     expect((await api('/api/review?since=1;drop')).status).toBe(400);
+  });
+});
+
+describe('actions', () => {
+  it('deletes all notes only when the count matches', async () => {
+    const { api, notes } = await serve([], { notes: ['a', 'b', 'c'] });
+    const wrong = await api('/api/notes/delete-all', { body: { confirm: 2 } });
+    expect(wrong.status).toBe(409);
+    expect(wrong.json.error).toContain('3 notes');
+    expect(notes).toHaveLength(3);
+    for (const body of [
+      {},
+      { confirm: '3' },
+      { confirm: 3, extra: 1 },
+      { confirm: -1 },
+      { confirm: 3.5 },
+    ])
+      expect((await api('/api/notes/delete-all', { body })).status, JSON.stringify(body)).toBe(400);
+    expect(notes).toHaveLength(3);
+    const ok = await api('/api/notes/delete-all', { body: { confirm: 3 } });
+    expect(ok.status).toBe(200);
+    expect(ok.json).toEqual({ deleted: 3 });
+    expect(notes).toHaveLength(0);
+    expect((await api('/api/notes/delete-all', { body: { confirm: 0 } })).json).toEqual({
+      deleted: 0,
+    });
+  });
+
+  it('makes a new token, shows it once, and stops the old one at once', async () => {
+    const { api } = await serve([]);
+    const old = token;
+    const r = await api('/api/token/rotate', { body: {} });
+    expect(r.status).toBe(200);
+    const fresh = r.json.token as string;
+    expect(fresh).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(fresh).not.toBe(old);
+    expect(Object.keys(r.json)).toEqual(['token']);
+    expect((await api('/api/tasks', { token: old })).status).toBe(401);
+    expect((await api('/api/tasks', { token: fresh })).status).toBe(200);
+    // Only the hash is kept.
+    const kept = readFileSync(join(home, 'serve-token.sha256'), 'utf8');
+    expect(kept).not.toContain(fresh);
+    expect(kept.trim()).toBe(serveTokenHash(home));
+    // No other route gives it back.
+    expect((await api('/api/settings', { token: fresh })).text).not.toContain(fresh);
+  });
+
+  it('tests the model with one tiny call and says what it costs', async () => {
+    const model = new ScriptedModelClient([{ calls: [], text: 'ok', usage }], { id: 'llama3' });
+    const { api } = await serve([], { routeModel: model });
+    const r = await api('/api/models/test', { body: {} });
+    expect(r.status).toBe(200);
+    expect(r.json.ok).toBe(true);
+    expect(r.json.detail).toContain('llama3 answered');
+    expect(r.json.detail).toContain('fraction of a cent');
+    expect(model.requests).toHaveLength(1);
+    expect(model.requests[0]).toMatchObject({ maxOutputTokens: 1, tools: [] });
+  });
+
+  it('says plainly when the model does not answer', async () => {
+    const model = new ScriptedModelClient([new Error('401 from provider')], { id: 'llama3' });
+    const { api } = await serve([], { routeModel: model });
+    const r = await api('/api/models/test', { body: {} });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual({ ok: false, detail: 'llama3 did not answer: 401 from provider' });
+  });
+
+  it('refuses the model test while a task has spent more than the per-task stop', async () => {
+    const model = new ScriptedModelClient([{ calls: [], text: 'ok', usage }]);
+    const { api, store } = await serve([], { routeModel: model });
+    await api('/api/settings', { method: 'PUT', body: { budget: { perTask: 0.01 } } });
+    await store.createTask('task_big', 'Big job', {
+      model: 'scripted',
+      permissions: { autoApprove: [] },
+      budget: DEFAULT_BUDGET,
+      workspaceDir: '/w',
+    });
+    const lease = await store.acquireLease('task_big', 'test', 60_000);
+    if (!lease) throw new Error('no lease');
+    await store.append(
+      'task_big',
+      1,
+      [
+        {
+          type: 'model.responded',
+          step: 1,
+          calls: [],
+          text: 'working',
+          usage: { inTokens: 1, outTokens: 1 },
+          costUsd: 0.05,
+          latencyMs: 1,
+        },
+      ],
+      lease,
+    );
+    await store.releaseLease(lease);
+    const r = await api('/api/models/test', { body: {} });
+    expect(r.status).toBe(409);
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it('answers the notification test without sending anything', async () => {
+    const { api } = await serve([]);
+    const r = await api('/api/notifications/test', { body: {} });
+    expect(r.status).toBe(200);
+    expect(r.json.ok).toBe(true);
+    expect(r.json.detail).toContain('nothing was sent');
+  });
+
+  it('refuses extra fields on the action routes', async () => {
+    const { api } = await serve([]);
+    expect((await api('/api/token/rotate', { body: { x: 1 } })).status).toBe(400);
+    expect((await api('/api/models/test', { body: { model: 'other' } })).status).toBe(400);
   });
 });
