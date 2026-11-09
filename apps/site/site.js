@@ -4,7 +4,7 @@
   const status = d.getElementById('status');
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // Copy buttons: label, colour and a polite announcement all change together.
+  // ---- Copy button: label, colour and a polite announcement change together.
   for (const b of d.querySelectorAll('[data-copy]')) {
     const target = d.getElementById(b.dataset.copy);
     let timer;
@@ -26,11 +26,8 @@
         if (status) status.textContent = '';
       }, 1800);
     };
-    const text = () => {
-      const lines = target.querySelectorAll('.line');
-      if (!lines.length) return target.textContent.trim();
-      return [...lines].map((l) => l.textContent.replace(/^\$ /, '')).join('\n');
-    };
+    const text = () =>
+      [...target.querySelectorAll('.line')].map((l) => l.textContent.replace(/^\$ /, '')).join('\n');
     const legacy = () => {
       const t = d.createElement('textarea');
       t.value = text();
@@ -56,7 +53,7 @@
     });
   }
 
-  // Reveal on scroll, only when the script flagged <html> and motion is welcome.
+  // ---- Entrances: once, as each part scrolls in.
   const rv = d.querySelectorAll('.rv');
   if (reduce || !('IntersectionObserver' in window)) {
     for (const e of rv) e.classList.add('in');
@@ -70,91 +67,106 @@
           }
         }
       },
-      { threshold: 0.1, rootMargin: '0px 0px -6% 0px' },
+      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
     );
     for (const e of rv) io.observe(e);
   }
 
-  // Terminal demo.
-  const term = d.getElementById('term');
-  if (!term) return;
-  const lines = [...term.querySelectorAll('.l')];
+  // ---- Pinned story: the stage follows whichever statement is in view.
+  const stage = d.getElementById('stage');
+  const steps = [...d.querySelectorAll('.how-steps li')];
+  if (stage && steps.length && 'IntersectionObserver' in window) {
+    const set = (n) => {
+      stage.dataset.state = n;
+      for (const s of steps) s.classList.toggle('on', s.dataset.step === n);
+    };
+    set('1');
+    const so = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) set(e.target.dataset.step);
+      },
+      { rootMargin: '-40% 0px -40% 0px' },
+    );
+    for (const s of steps) so.observe(s);
+  }
+
+  // ---- Hero: a sample task plays back, then waits for the visitor's yes or no.
+  const demo = d.getElementById('demo');
+  if (!demo) return;
+  const seq = [...demo.querySelectorAll('[data-seq]')];
+  const ask = d.getElementById('ask');
+  const result = d.getElementById('result');
+  const approve = d.getElementById('approve');
+  const decline = d.getElementById('decline');
   const replay = d.getElementById('replay');
-  const cur = d.createElement('span');
-  cur.className = 'cur';
-  cur.setAttribute('aria-hidden', 'true');
+  const card = ask.querySelector('.card');
+  const mark = ask.querySelector('.tx');
   let run = 0;
+  let decided = false;
 
-  const reset = () => {
-    for (const l of lines) {
-      l.classList.remove('on');
-      if (l.dataset.type) l.textContent = l.dataset.type;
+  const resetDemo = () => {
+    decided = false;
+    for (const s of seq) s.classList.remove('shown');
+    ask.className = 'step wait';
+    ask.dataset.seq = '';
+    mark.innerHTML = '<b>Write file</b> <span class="dim">waiting for your OK</span>';
+    card.hidden = false;
+    result.textContent = '';
+  };
+
+  const play = async () => {
+    const me = ++run;
+    resetDemo();
+    if (reduce) {
+      for (const s of seq) s.classList.add('shown');
+      return;
+    }
+    await wait(700);
+    for (const s of seq) {
+      if (me !== run) return;
+      s.classList.add('shown');
+      await wait(s === seq[seq.length - 2] ? 650 : 520);
     }
   };
-  // Typed line: written text, the cursor, then the unwritten rest as an
-  // invisible ghost. The line is always its final height.
-  const typed = (l) => {
-    const full = l.dataset.type;
-    const t = d.createTextNode('');
-    const ghost = d.createElement('span');
-    ghost.className = 'ghost';
-    ghost.textContent = full;
-    l.textContent = '';
-    l.append(t, cur, ghost);
-    l.classList.add('on');
-    return { full, t, ghost };
-  };
 
-  if (reduce) {
-    for (const l of lines) l.classList.add('on');
-    if (replay) replay.hidden = true;
-    return;
-  }
-
-  // Idle: a caret waits where the first command will appear.
-  const idle = () => {
-    reset();
-    typed(lines[0]).t.data = '';
-  };
-  idle();
-
-  async function play() {
-    const id = ++run;
-    started = true;
-    if (replay) replay.disabled = true;
-    reset();
-    for (const l of lines) {
-      if (id !== run) return;
-      if (l.dataset.type) {
-        const { full, t, ghost } = typed(l);
-        for (let i = 0; i < full.length; i++) {
-          if (id !== run) return;
-          t.data = full.slice(0, i + 1);
-          ghost.textContent = full.slice(i + 1);
-          await wait(26 + Math.random() * 30);
-        }
-        ghost.remove();
-        await wait(450);
-      } else {
-        l.classList.add('on');
-        l.append(cur);
-        await wait(Number(l.dataset.delay || 420));
-      }
+  const decide = (yes) => {
+    if (decided) return;
+    decided = true;
+    card.hidden = true;
+    ask.classList.remove('wait');
+    if (yes) {
+      ask.classList.add('done');
+      mark.innerHTML = '<b>Write file</b> reply.md <span class="dim">you approved</span>';
+      result.textContent =
+        'Draft saved to reply.md. Northwind is $1,240 cheaper over twelve months. Nothing has been sent.';
+    } else {
+      ask.classList.add('done');
+      mark.innerHTML = '<b>Write file</b> <span class="dim">you declined, nothing was written</span>';
+      result.textContent = 'Understood. reply.md was not written. What should change?';
     }
-    if (id === run && replay) replay.disabled = false;
-  }
+    if (status) status.textContent = result.textContent;
+  };
 
-  let started = false;
-  const io = new IntersectionObserver(
-    (es) => {
-      if (es[0].isIntersecting && !started) {
-        started = true;
-        io.disconnect();
+  approve.addEventListener('click', () => decide(true));
+  decline.addEventListener('click', () => decide(false));
+  replay.addEventListener('click', play);
+  d.addEventListener('keydown', (e) => {
+    if (decided || !demo.matches(':hover, :focus-within')) return;
+    if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      decide(true);
+    }
+    if (e.key === 'Escape') decide(false);
+  });
+
+  // Start when the hero is on screen, which is at load.
+  if ('IntersectionObserver' in window) {
+    const ho = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) {
+        ho.disconnect();
         play();
       }
-    },
-    { threshold: 0.4 },
-  );
-  io.observe(term);
-  replay?.addEventListener('click', play);
+    });
+    ho.observe(demo);
+  } else play();
 })();
