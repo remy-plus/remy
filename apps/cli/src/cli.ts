@@ -164,6 +164,7 @@ import {
 } from './search-vm.ts';
 import { listenServe } from './serve.ts';
 import { resolveServeBind } from './serve-bind.ts';
+import { createBrainMount } from './serve-brain.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
 import { createSkillsMount } from './serve-skills.ts';
@@ -2201,6 +2202,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   ),
               }),
               createSkillsMount({ skills: skills() }),
+              createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
               createSchedulesMount({
                 schedules: openSchedules(home),
                 hooks: openHooks(home),
