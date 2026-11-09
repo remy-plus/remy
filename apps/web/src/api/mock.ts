@@ -772,7 +772,10 @@ export function createMockApi(): RemyApi {
       if (token.trim().length < 8) throw new Error('That token was not accepted.');
       return { running: 4 };
     },
-    async deleteNotes() {
+    async updateSettings() {},
+    async deleteNotes(confirm) {
+      if (confirm !== notes)
+        throw new Error(`There are ${notes} notes, not ${confirm}. Nothing was deleted.`);
       const deleted = notes;
       notes = 0;
       return { deleted };

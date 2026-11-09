@@ -163,7 +163,11 @@ import {
   waitForVm,
 } from './search-vm.ts';
 import { listenServe } from './serve.ts';
+import { actionRoutes } from './serve-actions.ts';
 import { resolveServeBind } from './serve-bind.ts';
+import { homeRoutes } from './serve-home.ts';
+import { reviewRoutes } from './serve-review.ts';
+import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
@@ -2158,8 +2162,76 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             ),
           );
         }
+        const webPrefs = openWebPrefs(home, () => loadPrefs(home).trust);
+        // Only for the Settings screen's provider line; a model passed in by a test has no profile.
+        const provider = (() => {
+          try {
+            return providerEnv(file).REMY_PROFILE;
+          } catch {
+            return undefined;
+          }
+        })();
+        const spend = createSpend(store);
+        const notesCount = () => {
+          try {
+            return memory().list().length;
+          } catch {
+            return null;
+          }
+        };
+        const notesToday = () => {
+          try {
+            const midnight = new Date();
+            midnight.setHours(0, 0, 0, 0);
+            return memory()
+              .list()
+              .filter((n) => new Date(n.created) >= midnight).length;
+          } catch {
+            return null;
+          }
+        };
         const listening = await listenServe(
           {
+            routes: [
+              homeRoutes({
+                store,
+                prefs: webPrefs,
+                spend,
+                redact,
+                machines: () => file.computers?.length ?? 0,
+                notesCount,
+                notesToday,
+              }),
+              reviewRoutes({
+                store,
+                home,
+                prefs: webPrefs,
+                schedules: () => openSchedules(home).list(),
+              }),
+              actionRoutes({
+                store,
+                prefs: webPrefs,
+                redact,
+                notes: { count: () => memory().list().length, clear: () => memory().clear() },
+                rotateToken: () => makeServeToken(home),
+                model,
+              }),
+              settingsRoutes(
+                {
+                  home,
+                  store,
+                  prefs: webPrefs,
+                  version: version(),
+                  provider,
+                  modelId: model.id,
+                  pricing: model.caps.pricing,
+                  address: () => `${bind.host}:${bind.port}`,
+                  notesCount,
+                  needsKey: (p) => Boolean(PROFILES[p]?.keyEnv),
+                },
+                spend,
+              ),
+            ],
             store,
             runtime,
             home,
@@ -2167,12 +2239,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             config: (id, trust) => {
               const config = taskConfig(file, model.id, join(home, 'workspaces', id));
               mkdirSync(config.workspaceDir, { recursive: true });
-              if (!trust) return config;
-              const { trust: _saved, ...permissions } = config.permissions;
-              return {
-                ...config,
-                permissions: trust === 'ask' ? permissions : { ...permissions, trust },
-              };
+              return configWithPrefs(config, webPrefs.chosen(), trust);
             },
             tokenHash: () => serveTokenHash(home),
             redact,

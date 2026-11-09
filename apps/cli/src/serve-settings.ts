@@ -1,0 +1,245 @@
+// The settings the web app saves: trust, budget, memory, quiet hours and notifications. They live
+// in REMY_HOME/web-prefs.json (0600, written atomically), apart from preferences.json, which the
+// terminal changes. Only the keys below can be set; the file only holds what the person chose, so
+// an unset trust falls back to the terminal's. Trust and the per-task stop apply to new tasks.
+// Nothing here returns a key or a token.
+import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { EventStore, TaskConfig, TrustLevel } from '@remy/core';
+import { fold } from '@remy/core';
+import { z } from 'zod';
+import { type ApiCtx, type ApiResult, type ApiRoute, HttpError } from './serve.ts';
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const hhmm = z.string().regex(HHMM, 'Use HH:MM, for example 07:30.');
+const money = (max: number) => z.number().finite().min(0.01).max(max);
+
+export const MONTHLY_CAP_MAX = 100_000;
+export const PER_TASK_MAX = 10_000;
+
+/** What PUT /api/settings accepts: any of these, nothing else. */
+export const prefsPatch = z
+  .object({
+    trust: z.enum(['ask', 'steady', 'away']),
+    budget: z
+      .object({ monthly: money(MONTHLY_CAP_MAX), perTask: money(PER_TASK_MAX) })
+      .partial()
+      .strict(),
+    remember: z.boolean(),
+    quiet: z.boolean(),
+    quietHours: z.object({ from: hhmm, to: hhmm }).partial().strict(),
+    notifications: z
+      .object({
+        approvals: z.boolean(),
+        finished: z.boolean(),
+        noticed: z.boolean(),
+        reviewAt: hhmm,
+      })
+      .partial()
+      .strict(),
+    /** The app is dark only. */
+    appearance: z.literal('dark'),
+  })
+  .partial()
+  .strict();
+export type PrefsPatch = z.infer<typeof prefsPatch>;
+
+/** Every setting with a value. */
+export interface WebPrefs {
+  trust: TrustLevel;
+  budget: { monthly: number; perTask: number };
+  remember: boolean;
+  quiet: boolean;
+  quietHours: { from: string; to: string };
+  notifications: { approvals: boolean; finished: boolean; noticed: boolean; reviewAt: string };
+  appearance: 'dark';
+}
+
+export const WEB_PREFS_DEFAULTS: WebPrefs = {
+  trust: 'ask',
+  budget: { monthly: 20, perTask: 2 },
+  remember: true,
+  quiet: false,
+  quietHours: { from: '23:00', to: '07:00' },
+  notifications: { approvals: true, finished: true, noticed: false, reviewAt: '07:30' },
+  appearance: 'dark',
+};
+
+export interface WebPrefsStore {
+  /** Every setting, with defaults for what was never set. */
+  get(): WebPrefs;
+  /** Only what the person chose in the web app. */
+  chosen(): PrefsPatch;
+  /** Merges a checked patch and returns the result. Throws when the file cannot be written. */
+  update(patch: PrefsPatch): WebPrefs;
+}
+
+const merge = (a: PrefsPatch, b: PrefsPatch): PrefsPatch => ({
+  ...a,
+  ...b,
+  ...(a.budget || b.budget ? { budget: { ...a.budget, ...b.budget } } : {}),
+  ...(a.quietHours || b.quietHours ? { quietHours: { ...a.quietHours, ...b.quietHours } } : {}),
+  ...(a.notifications || b.notifications
+    ? { notifications: { ...a.notifications, ...b.notifications } }
+    : {}),
+});
+
+/** `fallbackTrust` is the terminal's saved level, used until the web app sets one. */
+export function openWebPrefs(
+  home: string,
+  fallbackTrust: () => TrustLevel | undefined = () => undefined,
+): WebPrefsStore {
+  const file = join(home, 'web-prefs.json');
+  const chosen = (): PrefsPatch => {
+    try {
+      const parsed = prefsPatch.safeParse(JSON.parse(readFileSync(file, 'utf8')));
+      return parsed.success ? parsed.data : {}; // a damaged or foreign file means defaults
+    } catch {
+      return {};
+    }
+  };
+  const resolve = (c: PrefsPatch): WebPrefs => {
+    const d = WEB_PREFS_DEFAULTS;
+    return {
+      trust: c.trust ?? fallbackTrust() ?? d.trust,
+      budget: { ...d.budget, ...c.budget },
+      remember: c.remember ?? d.remember,
+      quiet: c.quiet ?? d.quiet,
+      quietHours: { ...d.quietHours, ...c.quietHours },
+      notifications: { ...d.notifications, ...c.notifications },
+      appearance: 'dark',
+    };
+  };
+  return {
+    get: () => resolve(chosen()),
+    chosen,
+    update(patch) {
+      const next = merge(chosen(), patch);
+      mkdirSync(home, { recursive: true, mode: 0o700 });
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+      chmodSync(tmp, 0o600);
+      renameSync(tmp, file);
+      return resolve(next);
+    },
+  };
+}
+
+/**
+ * The config a new task starts with. A trust level in the request wins, then the one chosen in the
+ * web app, then the terminal's (already in `base`). The cost stop is the per-task one, never more
+ * than the monthly cap.
+ */
+export function configWithPrefs(
+  base: TaskConfig,
+  chosen: PrefsPatch,
+  requested?: TrustLevel,
+): TaskConfig {
+  const trust = requested ?? chosen.trust;
+  let permissions = base.permissions;
+  if (trust) {
+    const { trust: _old, ...rest } = base.permissions;
+    permissions = trust === 'ask' ? rest : { ...rest, trust };
+  }
+  let maxCostUsd = chosen.budget?.perTask ?? base.budget.maxCostUsd;
+  if (chosen.budget?.monthly !== undefined)
+    maxCostUsd = Math.min(maxCostUsd, chosen.budget.monthly);
+  return { ...base, permissions, budget: { ...base.budget, maxCostUsd } };
+}
+
+// ---- what the Settings screen shows besides the values
+
+export interface SettingsDeps {
+  home: string;
+  store: EventStore;
+  prefs: WebPrefsStore;
+  version: string;
+  /** Provider and model in use, and its prices in USD per million tokens. */
+  provider?: string | undefined;
+  modelId: string;
+  pricing?: { inPerMTok: number; outPerMTok: number } | undefined;
+  /** The address the server listens on. */
+  address: () => string;
+  /** How many notes there are; null when they cannot be read. */
+  notesCount: () => number | null;
+  /** Providers that need a key (for the status word). */
+  needsKey?: (provider: string) => boolean;
+  now?: () => Date;
+}
+
+const SPEND_TTL_MS = 30_000;
+
+/** Spend on models since the start of this month, from the task events. Cached for 30 s. */
+export function createSpend(store: EventStore, now: () => Date = () => new Date()) {
+  let cache: { at: number; usd: number; month: string } | undefined;
+  return async (): Promise<number> => {
+    const t = now();
+    const month = `${t.getFullYear()}-${t.getMonth()}`;
+    if (cache && cache.month === month && t.getTime() - cache.at < SPEND_TTL_MS) return cache.usd;
+    const start = new Date(t.getFullYear(), t.getMonth(), 1).getTime();
+    let usd = 0;
+    for (const s of await store.listTasks()) {
+      if (new Date(s.createdAt).getTime() < start) continue;
+      usd += fold(await store.read(s.taskId)).costUsd;
+    }
+    cache = { at: t.getTime(), usd, month };
+    return usd;
+  };
+}
+export type Spend = () => Promise<number>;
+
+const perM = (n: number) =>
+  n === 0 ? 'free' : `$${n < 1 ? n.toFixed(2) : n.toFixed(1)} per million tokens in`;
+const NAMES: Record<string, string> = {
+  ollama: 'Ollama on this machine',
+  openrouter: 'OpenRouter',
+  openai: 'OpenAI',
+  groq: 'Groq',
+};
+
+export function settingsView(d: SettingsDeps, spentMonth: number) {
+  const t = (d.now ?? (() => new Date()))();
+  const daysInMonth = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  const provider = d.provider ?? 'custom';
+  const keyed = d.needsKey?.(provider) ?? provider !== 'ollama';
+  const cost = d.pricing ? perM(d.pricing.inPerMTok) : 'price not known';
+  return {
+    currency: '$',
+    providers: [
+      {
+        id: provider,
+        name: NAMES[provider] ?? provider,
+        note: `Using ${d.modelId}.`,
+        state: keyed ? 'key_in_use' : 'running',
+      },
+    ],
+    models: { everyday: d.modelId, hard: d.modelId, everydayCost: cost, hardCost: cost },
+    budget: { usedMonth: Math.round(spentMonth * 100) / 100, daysLeft: daysInMonth - t.getDate() },
+    notes: d.notesCount() ?? 0,
+    server: { address: d.address(), lastSignIns: [] as { at: string; where: string }[] },
+    about: {
+      version: d.version,
+      licences: 'Apache-2.0, with the open-source licences of what it bundles',
+      dataDir: d.home,
+    },
+    prefs: d.prefs.get(),
+  };
+}
+
+/** GET and PUT /api/settings. */
+export function settingsRoutes(d: SettingsDeps, spend: Spend): ApiRoute {
+  return async (ctx: ApiCtx): Promise<ApiResult | undefined> => {
+    if (ctx.parts[0] !== 'settings' || ctx.parts.length !== 1) return undefined;
+    if (ctx.method === 'GET') return { status: 200, body: settingsView(d, await spend()) };
+    if (ctx.method === 'PUT') {
+      const patch = await ctx.body(prefsPatch);
+      try {
+        d.prefs.update(patch);
+      } catch {
+        throw new HttpError(500, 'The settings could not be saved.');
+      }
+      return { status: 200, body: settingsView(d, await spend()) };
+    }
+    return { status: 405, headers: { allow: 'GET, PUT' } };
+  };
+}

@@ -106,8 +106,8 @@ export interface ExtendBody {
   wallMs?: number;
 }
 
-/** What the Home screen shows. The server does not serve this yet: the http adapter builds what it
- * can from the task routes and leaves the rest empty. */
+/** GET /api/home. Lists the server has no source for (suggested questions, alerts, connected notes)
+ * come back empty and the screen shows its empty state. */
 export interface HomeData {
   status: {
     running: number;
@@ -212,7 +212,7 @@ export interface BrainAnswer {
   sources: { title: string; meta: string }[];
 }
 
-/** Mock only: the overnight review. */
+/** GET /api/review?since=24h: the overnight review. */
 export interface ReviewData {
   span: string;
   headline: string;
@@ -237,8 +237,26 @@ export interface Provider {
   /** What the status column says, in plain words. */
   state: 'key_in_use' | 'key_saved' | 'running' | 'no_key';
 }
-/** What Settings shows and the person cannot change here. Values they can change live in the settings store. */
+/** The values the server keeps (web-prefs.json). PUT /api/settings takes any part of this. */
+export interface ServerPrefs {
+  trust: TrustLevel;
+  budget: { monthly: number; perTask: number };
+  remember: boolean;
+  quiet: boolean;
+  quietHours: { from: string; to: string };
+  notifications: { approvals: boolean; finished: boolean; noticed: boolean; reviewAt: string };
+  appearance: 'dark';
+}
+export type SettingsPatch = {
+  [K in keyof ServerPrefs]?: ServerPrefs[K] extends object
+    ? Partial<ServerPrefs[K]>
+    : ServerPrefs[K];
+};
+
+/** GET /api/settings: what Settings shows and the person cannot change here, and the saved values
+ * in `prefs` (the browser keeps a copy in the settings store and writes changes back). */
 export interface SettingsData {
+  prefs?: ServerPrefs;
   currency: string;
   providers: Provider[];
   models: { everyday: string; hard: string; everydayCost: string; hardCost: string };
@@ -267,18 +285,19 @@ export interface RemyApi {
   answer(id: string, answer: string): Promise<void>;
   cancel(id: string): Promise<void>;
   extend(id: string, body?: ExtendBody): Promise<void>;
-  /** Settings, sign-in and first run. The http adapter says 'not available yet' for the settings routes. */
   settings(): Promise<SettingsData>;
+  /** Saves some of the values in `ServerPrefs`. Rejects with a message safe to show. */
+  updateSettings(patch: SettingsPatch): Promise<void>;
   health(): Promise<Health>;
   /** Resolves when `token` is accepted; rejects with a message safe to show. Does not store the token. */
   testToken(token: string): Promise<{ running: number }>;
-  deleteNotes(): Promise<{ deleted: number }>;
+  /** `confirm` is the note count the person was shown; the server refuses if it has changed. */
+  deleteNotes(confirm: number): Promise<{ deleted: number }>;
   rotateToken(): Promise<{ token: string }>;
   testModels(): Promise<{ ok: boolean; detail: string }>;
   sendTestNotification(): Promise<void>;
   home(): Promise<HomeData>;
-  /** No server route yet: the mock answers, the http adapter says so. */
-  review(): Promise<ReviewData>;
+  review(since?: string): Promise<ReviewData>;
   /** No server route yet: marks a stopped task as done after the person checked by hand. */
   markDone(id: string): Promise<void>;
   // Connections, skills, schedules and the brain (package 6.3 group B). The server has no routes

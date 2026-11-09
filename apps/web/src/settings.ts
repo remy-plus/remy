@@ -1,8 +1,9 @@
 // A tiny store for what the person sets in this browser. Keys are prefixed `remy.` and values are JSON.
 // Storage can be blocked (private windows), so every read and write is guarded and falls back to memory.
-// Mock-only for now: the server has no settings routes, so nothing here reaches `remy serve` yet.
+// With a real server, the settings that `remy serve` keeps (trust, budget, memory, quiet, notifications)
+// are copied in at start and written back on every change; the rest stay in this browser.
 import { useCallback, useSyncExternalStore } from 'react';
-import type { TrustLevel } from './api/types.ts';
+import type { ServerPrefs, SettingsPatch, TrustLevel } from './api/types.ts';
 
 export interface SettingValues {
   trust: TrustLevel;
@@ -72,8 +73,61 @@ const parse = <K extends SettingKey>(key: K, raw: string | null): SettingValues[
 export const getSetting = <K extends SettingKey>(key: K): SettingValues[K] =>
   parse(key, readRaw(key));
 
-export const setSetting = <K extends SettingKey>(key: K, value: SettingValues[K]) =>
+/** The part of a server-kept setting, as the patch PUT /api/settings takes. */
+const toPatch = (key: SettingKey, v: unknown): SettingsPatch | null => {
+  switch (key) {
+    case 'trust':
+      return { trust: v as TrustLevel };
+    case 'budget.month':
+      return { budget: { monthly: v as number } };
+    case 'budget.task':
+      return { budget: { perTask: v as number } };
+    case 'memory':
+      return { remember: v as boolean };
+    case 'quiet':
+      return { quiet: v as boolean };
+    case 'quiet.from':
+      return { quietHours: { from: v as string } };
+    case 'quiet.to':
+      return { quietHours: { to: v as string } };
+    case 'notify.finished':
+      return { notifications: { finished: v as boolean } };
+    case 'notify.noticed':
+      return { notifications: { noticed: v as boolean } };
+    case 'notify.review':
+      return { notifications: { reviewAt: v as string } };
+    default:
+      return null; // `escalate` and `onboarded` stay in this browser
+  }
+};
+
+let push: ((patch: SettingsPatch) => void) | null = null;
+
+/** Sends each change of a server-kept setting to `send`; null stops. Used when a real server is in use. */
+export const bindServerSettings = (send: ((patch: SettingsPatch) => void) | null) => {
+  push = send;
+};
+
+/** Copies the server's saved values into this browser without sending them back. */
+export function applyServerPrefs(p: ServerPrefs) {
+  const set = (key: SettingKey, v: unknown) => writeRaw(key, JSON.stringify(v));
+  set('trust', p.trust);
+  set('budget.month', p.budget.monthly);
+  set('budget.task', p.budget.perTask);
+  set('memory', p.remember);
+  set('quiet', p.quiet);
+  set('quiet.from', p.quietHours.from);
+  set('quiet.to', p.quietHours.to);
+  set('notify.finished', p.notifications.finished);
+  set('notify.noticed', p.notifications.noticed);
+  set('notify.review', p.notifications.reviewAt);
+}
+
+export const setSetting = <K extends SettingKey>(key: K, value: SettingValues[K]) => {
   writeRaw(key, JSON.stringify(value));
+  const patch = push && toPatch(key, value);
+  if (patch) push?.(patch);
+};
 
 /** Forgets one setting, so it falls back to its default. */
 export const resetSetting = (key: SettingKey) => writeRaw(key, null);
