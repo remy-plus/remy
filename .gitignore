@@ -14,3 +14,4 @@ apps/cli/release/
 # Skills installed by the owner for design work
 .agents/
 skills-lock.json
+.taste-skill/
