@@ -7,6 +7,7 @@ import {
   createRuntime,
   DEFAULT_BUDGET,
   defineTool,
+  type Event,
   type EventStore,
   type ModelResponse,
   ToolRegistry,
@@ -16,8 +17,10 @@ import { MemoryEventStore } from '@remy/store';
 import { askUser, finish } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { writeMarker } from './background.ts';
 import { listenServe, type ServeListening } from './serve.ts';
 import { homeRoutes } from './serve-home.ts';
+import { reviewRoutes } from './serve-review.ts';
 import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 
@@ -86,6 +89,7 @@ async function serve(script: ModelResponse[], rig: Rig = {}) {
           notesCount: () => notes.length,
           notesToday: () => notes.length,
         }),
+        reviewRoutes({ store, home, prefs, schedules: () => [] }),
         settingsRoutes(
           {
             home,
@@ -162,6 +166,7 @@ const until = async <T>(fn: () => Promise<T | undefined | false>, ms = 4000): Pr
 
 const ROUTES: [string, string][] = [
   ['GET', '/api/home'],
+  ['GET', '/api/review'],
   ['GET', '/api/settings'],
   ['PUT', '/api/settings'],
 ];
@@ -447,5 +452,112 @@ describe('home', () => {
     // biome-ignore lint/suspicious/noControlCharactersInRegex: that is what is checked
     expect(r.text).not.toMatch(/[\u0000-\u0008\u000b-\u001f]/);
     expect(r.json.needsYou[0].title).toBe('Line one line <script>x</script>');
+  });
+});
+
+describe('review', () => {
+  const cfg = {
+    model: 'scripted',
+    permissions: { autoApprove: ['read' as const] },
+    budget: DEFAULT_BUDGET,
+    workspaceDir: '/w',
+  };
+  const seed = async (store: EventStore, id: string, prompt: string, events: Event[]) => {
+    await store.createTask(id, prompt, cfg);
+    const lease = await store.acquireLease(id, 'test', 60_000);
+    if (!lease) throw new Error('no lease');
+    await store.append(id, 1, events, lease);
+    await store.releaseLease(lease);
+    writeMarker(home, id, { pid: 1, startedAt: new Date().toISOString() });
+  };
+  const sendCall = (callId: string): Event[] => [
+    {
+      type: 'model.responded',
+      step: 1,
+      calls: [{ callId, tool: 'send_email', args: { to: 'a@b.test' }, argsHash: `h-${callId}` }],
+      usage: { inTokens: 1, outTokens: 1 },
+      costUsd: 0.03,
+      latencyMs: 1,
+    },
+  ];
+
+  it('says so when nothing ran without the user', async () => {
+    const { api } = await serve([]);
+    const r = await api('/api/review');
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({
+      headline: 'Nothing ran without you.',
+      timeline: [],
+      needs: null,
+      awayNote: null,
+    });
+    expect(r.json.tiles.map((t: { label: string }) => t.label)).toEqual([
+      'tasks finished',
+      'needs your OK',
+      'spent on models',
+      'sent as you',
+    ]);
+  });
+
+  it('turns background tasks into tiles, a timeline and the card that waits', async () => {
+    const { api, store } = await serve([]);
+    await seed(store, 'task_ok', 'Rename invoices', [
+      ...sendCall('a'),
+      { type: 'policy.decided', callId: 'a', decision: { kind: 'allow' }, risk: 'send_as_user' },
+      { type: 'tool.started', callId: 'a', idempotencyKey: 'a', attempt: 1 },
+      {
+        type: 'tool.completed',
+        callId: 'a',
+        result: { ok: true, content: 'sent', trust: 'trusted' },
+        latencyMs: 1,
+      },
+      { type: 'task.finished', status: 'succeeded', answer: 'done' },
+    ]);
+    await seed(store, 'task_wait', 'Remind Acme', [
+      ...sendCall('b'),
+      {
+        type: 'policy.decided',
+        callId: 'b',
+        decision: { kind: 'require_approval', reason: 'sends as you' },
+        risk: 'send_as_user',
+      },
+      {
+        type: 'approval.requested',
+        callId: 'b',
+        argsHash: 'h-b',
+        preview: 'Email Acme: invoice 0412 is overdue',
+        risk: 'send_as_user',
+        reason: 'sends as you',
+      },
+    ]);
+    await api('/api/settings', { method: 'PUT', body: { trust: 'away' } });
+    const r = await api('/api/review?since=24h');
+    expect(r.status).toBe(200);
+    expect(r.json.headline).toBe('2 tasks ran. One needs you.');
+    expect(r.json.rest).toBe('1 message sent as you.');
+    expect(r.json.tiles).toEqual([
+      { value: '1', label: 'tasks finished' },
+      { value: '1', label: 'needs your OK' },
+      { value: '$0.06', label: 'spent on models' },
+      { value: '1', label: 'sent as you' },
+    ]);
+    expect(r.json.needs).toEqual({
+      taskId: 'task_wait',
+      kind: 'Sends as you',
+      title: 'Remind Acme',
+      quote: 'Email Acme: invoice 0412 is overdue',
+    });
+    expect(r.json.timeline).toHaveLength(2);
+    const waiting = r.json.timeline.find((e: { title: string }) => e.title === 'Remind Acme');
+    expect(waiting).toMatchObject({ tag: 'waiting for you', waiting: true });
+    expect(r.json.awayNote.trust).toBe('away');
+  });
+
+  it('takes since as a span or a date and refuses anything else', async () => {
+    const { api } = await serve([]);
+    expect((await api('/api/review?since=7d')).status).toBe(200);
+    expect((await api('/api/review?since=2026-11-01')).status).toBe(200);
+    expect((await api('/api/review?since=yesterday')).status).toBe(400);
+    expect((await api('/api/review?since=1;drop')).status).toBe(400);
   });
 });

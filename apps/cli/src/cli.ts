@@ -165,6 +165,7 @@ import {
 import { listenServe } from './serve.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { homeRoutes } from './serve-home.ts';
+import { reviewRoutes } from './serve-review.ts';
 import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
@@ -2199,6 +2200,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 machines: () => file.computers?.length ?? 0,
                 notesCount,
                 notesToday,
+              }),
+              reviewRoutes({
+                store,
+                home,
+                prefs: webPrefs,
+                schedules: () => openSchedules(home).list(),
               }),
               settingsRoutes(
                 {
