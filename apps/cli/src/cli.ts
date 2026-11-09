@@ -170,7 +170,13 @@ import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
-import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
+import {
+  assertUnderMonthlyCap,
+  configWithPrefs,
+  createSpend,
+  openWebPrefs,
+  settingsRoutes,
+} from './serve-settings.ts';
 import { createSkillsMount } from './serve-skills.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
@@ -2246,6 +2252,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               mkdirSync(config.workspaceDir, { recursive: true });
               return configWithPrefs(config, webPrefs.chosen(), trust);
             },
+            beforeStart: () => assertUnderMonthlyCap(webPrefs, spend),
             tokenHash: () => serveTokenHash(home),
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),

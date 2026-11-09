@@ -241,6 +241,8 @@ export interface Provider {
 export interface ServerPrefs {
   trust: TrustLevel;
   budget: { monthly: number; perTask: number };
+  /** Amounts are kept in US dollars; this is only how they are shown. */
+  currency: { code: string; perUsd: number };
   remember: boolean;
   quiet: boolean;
   quietHours: { from: string; to: string };

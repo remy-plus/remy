@@ -75,6 +75,8 @@ export interface ServeDeps {
   version: string;
   /** The config a new task starts with (the same one `remy run` builds); `trust` overrides the saved level. */
   config(taskId: string, trust?: TrustLevel): TaskConfig;
+  /** Runs before a task is created; throw an HttpError to refuse (the monthly cap). */
+  beforeStart?: () => Promise<void>;
   /** The saved SHA-256 of the token, read on every request so a rotation takes effect at once. */
   tokenHash(): string | undefined;
   redact?: Redact;
@@ -304,6 +306,7 @@ export function createServe(deps: ServeDeps) {
 
   /** Creates a task and starts it in the background; shared by POST /api/tasks and the mounts. */
   async function beginTask(prompt: string, trust?: TrustLevel) {
+    await deps.beforeStart?.();
     const taskId = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
     const config = deps.config(taskId, trust);
     await store.createTask(taskId, prompt, config);

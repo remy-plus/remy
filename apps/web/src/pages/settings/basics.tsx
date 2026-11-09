@@ -1,5 +1,6 @@
 // Trust, budget and appearance. Trust shows a row from each of the other small sections too, as the
 // frame does, so the same rows are exported and reused. All values live in the settings store.
+import { useState } from 'react';
 import type { TrustLevel } from '../../api/index.tsx';
 import { useSetting } from '../../settings.ts';
 import { Money, money, Row, Segmented, Toggle } from './controls.tsx';
@@ -43,16 +44,24 @@ export function TrustRow() {
 export function MonthlyBudgetRow({ data }: SectionProps) {
   const [cap, setCap] = useSetting('budget.month');
   const [perTask, setPerTask] = useSetting('budget.task');
-  const symbol = data?.currency ?? '$';
+  const [code] = useSetting('currency.code');
+  const [rate] = useSetting('currency.rate');
+  const symbol = symbolFor(code);
   const used = data?.budget.usedMonth;
   const share = used === undefined || cap <= 0 ? 0 : Math.min(1, used / cap);
   return (
-    <Row title="Monthly budget" help="Remy pauses and asks before going over.">
+    <Row title="Monthly budget" help="Remy will not start a new task once the month has used it.">
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <Money label="Monthly budget" symbol={symbol} value={cap} onChange={setCap} />
+        <Money
+          key={`${code}${rate}`}
+          label="Monthly budget"
+          symbol={symbol}
+          value={shown(cap, rate)}
+          onChange={(v) => setCap(v / rate)}
+        />
         {data && (
           <p className="m-0 font-mono text-[12px] text-muted">
-            {money(symbol, data.budget.usedMonth)} used · {data.budget.daysLeft} days left
+            {money(symbol, data.budget.usedMonth * rate)} used · {data.budget.daysLeft} days left
           </p>
         )}
       </div>
@@ -69,11 +78,94 @@ export function MonthlyBudgetRow({ data }: SectionProps) {
         </div>
       )}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Money label="Stop one task at" symbol={symbol} value={perTask} onChange={setPerTask} />
+        <Money
+          key={`${code}${rate}`}
+          label="Stop one task at"
+          symbol={symbol}
+          value={shown(perTask, rate)}
+          onChange={(v) => setPerTask(v / rate)}
+        />
         <p className="m-0 text-[14px] text-muted">
-          Per task, Remy stops and asks at {money(symbol, perTask)}.
+          Per task, Remy stops and asks at {money(symbol, perTask * rate)}.
         </p>
       </div>
+    </Row>
+  );
+}
+
+const shown = (usd: number, rate: number) => Math.round(usd * rate * 100) / 100;
+
+/** The sign for a three-letter code, or the code when the browser has none. */
+export function symbolFor(code: string): string {
+  try {
+    const parts = new Intl.NumberFormat('en', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    return parts.find((p) => p.type === 'currency')?.value ?? code;
+  } catch {
+    return code;
+  }
+}
+
+const validCode = (code: string) => {
+  if (!/^[A-Z]{3}$/.test(code)) return false;
+  try {
+    new Intl.NumberFormat('en', { style: 'currency', currency: code });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export function CurrencyRow() {
+  const [code, setCode] = useSetting('currency.code');
+  const [rate, setRate] = useSetting('currency.rate');
+  const [codeText, setCodeText] = useState(code);
+  const [rateText, setRateText] = useState(String(rate));
+  const bad = codeText !== code && !validCode(codeText.toUpperCase());
+  return (
+    <Row title="Currency" help="Only how amounts are shown. Remy is billed in US dollars.">
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="flex flex-col gap-1 text-[13px] text-muted">
+          Code
+          <input
+            aria-label="Currency code"
+            aria-invalid={bad}
+            maxLength={3}
+            value={codeText}
+            onChange={(e) => {
+              const v = e.target.value.toUpperCase();
+              setCodeText(v);
+              if (validCode(v)) setCode(v);
+            }}
+            className="h-[38px] w-[88px] rounded-md border border-stone bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[13px] text-muted">
+          {`${code} for 1 USD`}
+          <input
+            aria-label="Amount of this currency in one US dollar"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="any"
+            value={rateText}
+            onChange={(e) => {
+              setRateText(e.target.value);
+              const n = Number.parseFloat(e.target.value);
+              if (Number.isFinite(n) && n > 0) setRate(n);
+            }}
+            className="h-[38px] w-[120px] rounded-md border border-stone bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
+          />
+        </label>
+      </div>
+      <p className="mt-3 mb-0 text-[13px] text-muted">
+        {bad
+          ? 'Use a three-letter code such as USD, GBP or INR.'
+          : 'You set the rate; Remy does not look it up.'}
+      </p>
     </Row>
   );
 }
@@ -135,6 +227,7 @@ export function Trust(props: SectionProps) {
     <>
       <TrustRow />
       <MonthlyBudgetRow {...props} />
+      <CurrencyRow />
       <RememberRow />
       <QuietRow />
       <AppearanceRow />
@@ -150,6 +243,7 @@ export function Budget(props: SectionProps) {
         Remy tells you before it goes over either limit.
       </p>
       <MonthlyBudgetRow {...props} />
+      <CurrencyRow />
       <Row title="When the stronger model is used" help="Set under Model and keys.">
         <p className="m-0 text-[14px] text-muted">
           {escalate

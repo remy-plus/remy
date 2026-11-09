@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import type { EventStore, TaskConfig, TrustLevel } from '@remy/core';
 import { fold } from '@remy/core';
 import { z } from 'zod';
+import { type Currency, formatMoney, isCurrencyCode, symbolOf, USD } from './currency.ts';
 import { type ApiCtx, type ApiResult, type ApiRoute, HttpError } from './serve.ts';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -37,6 +38,14 @@ export const prefsPatch = z
       })
       .partial()
       .strict(),
+    /** What amounts are shown in. Stored amounts stay in US dollars. */
+    currency: z
+      .object({
+        code: z.string().refine(isCurrencyCode, 'Use a three-letter code such as USD or GBP.'),
+        perUsd: z.number().finite().min(0.000001).max(1_000_000),
+      })
+      .partial()
+      .strict(),
     /** The app is dark only. */
     appearance: z.literal('dark'),
   })
@@ -48,6 +57,7 @@ export type PrefsPatch = z.infer<typeof prefsPatch>;
 export interface WebPrefs {
   trust: TrustLevel;
   budget: { monthly: number; perTask: number };
+  currency: Currency;
   remember: boolean;
   quiet: boolean;
   quietHours: { from: string; to: string };
@@ -57,7 +67,8 @@ export interface WebPrefs {
 
 export const WEB_PREFS_DEFAULTS: WebPrefs = {
   trust: 'ask',
-  budget: { monthly: 20, perTask: 2 },
+  budget: { monthly: 25, perTask: 2 },
+  currency: USD,
   remember: true,
   quiet: false,
   quietHours: { from: '23:00', to: '07:00' },
@@ -78,6 +89,7 @@ const merge = (a: PrefsPatch, b: PrefsPatch): PrefsPatch => ({
   ...a,
   ...b,
   ...(a.budget || b.budget ? { budget: { ...a.budget, ...b.budget } } : {}),
+  ...(a.currency || b.currency ? { currency: { ...a.currency, ...b.currency } } : {}),
   ...(a.quietHours || b.quietHours ? { quietHours: { ...a.quietHours, ...b.quietHours } } : {}),
   ...(a.notifications || b.notifications
     ? { notifications: { ...a.notifications, ...b.notifications } }
@@ -103,6 +115,7 @@ export function openWebPrefs(
     return {
       trust: c.trust ?? fallbackTrust() ?? d.trust,
       budget: { ...d.budget, ...c.budget },
+      currency: { ...d.currency, ...c.currency },
       remember: c.remember ?? d.remember,
       quiet: c.quiet ?? d.quiet,
       quietHours: { ...d.quietHours, ...c.quietHours },
@@ -188,6 +201,17 @@ export function createSpend(store: EventStore, now: () => Date = () => new Date(
 }
 export type Spend = () => Promise<number>;
 
+/** Throws when this month's spend has reached the monthly cap, so no new task starts. */
+export async function assertUnderMonthlyCap(prefs: WebPrefsStore, spend: Spend): Promise<void> {
+  const { budget, currency } = prefs.get();
+  const used = await spend();
+  if (used >= budget.monthly)
+    throw new HttpError(
+      402,
+      `This month's budget is used up (${formatMoney(used, currency)} of ${formatMoney(budget.monthly, currency)}). Raise it in Settings to start more tasks.`,
+    );
+}
+
 const perM = (n: number) =>
   n === 0 ? 'free' : `$${n < 1 ? n.toFixed(2) : n.toFixed(1)} per million tokens in`;
 const NAMES: Record<string, string> = {
@@ -204,7 +228,7 @@ export function settingsView(d: SettingsDeps, spentMonth: number) {
   const keyed = d.needsKey?.(provider) ?? provider !== 'ollama';
   const cost = d.pricing ? perM(d.pricing.inPerMTok) : 'price not known';
   return {
-    currency: '$',
+    currency: symbolOf(d.prefs.get().currency.code),
     providers: [
       {
         id: provider,

@@ -84,8 +84,30 @@ describe('Settings', () => {
     });
     expect(stored('budget.month')).toBe('35');
     expect(stored('budget.task')).toBe('3.5');
-    expect(screen.getByText('Per task, Remy stops and asks at £3.50.')).toBeTruthy();
+    expect(screen.getByText('Per task, Remy stops and asks at $3.50.')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('19');
+  });
+
+  it('shows amounts in the chosen currency and keeps them in dollars underneath', async () => {
+    await open('budget', 'Budget');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Currency code' }), {
+      target: { value: 'GBP' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: /one US dollar/ }), {
+      target: { value: '0.5' },
+    });
+    expect(stored('currency.code')).toBe('"GBP"');
+    expect(stored('currency.rate')).toBe('0.5');
+    // 2 USD per task at 0.5 GBP per dollar is 1.00 pound.
+    expect(screen.getByText('Per task, Remy stops and asks at £1.00.')).toBeTruthy();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop one task at' }), {
+      target: { value: '3' },
+    });
+    expect(stored('budget.task')).toBe('6'); // 3 pounds is 6 dollars
+    fireEvent.change(screen.getByRole('textbox', { name: 'Currency code' }), {
+      target: { value: 'G1B' },
+    });
+    expect(stored('currency.code')).toBe('"GBP"'); // malformed, so nothing is saved
   });
 
   it('lists Light as not available and keeps Dark chosen', async () => {

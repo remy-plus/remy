@@ -22,7 +22,13 @@ import { listenServe, type ServeListening } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
-import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
+import {
+  assertUnderMonthlyCap,
+  configWithPrefs,
+  createSpend,
+  openWebPrefs,
+  settingsRoutes,
+} from './serve-settings.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 
 const usage = { inTokens: 10, outTokens: 10 };
@@ -63,6 +69,8 @@ interface Rig {
   notes?: string[];
   routeModel?: ScriptedModelClient;
   machines?: number;
+  /** Pretend this much was spent this month (USD). */
+  spent?: number;
 }
 
 async function serve(script: ModelResponse[], rig: Rig = {}) {
@@ -127,6 +135,11 @@ async function serve(script: ModelResponse[], rig: Rig = {}) {
           },
           prefs.chosen(),
           trust,
+        ),
+      beforeStart: () =>
+        assertUnderMonthlyCap(
+          prefs,
+          rig.spent === undefined ? spend : async () => rig.spent as number,
         ),
       tokenHash: () => serveTokenHash(home),
       log: () => {},
@@ -213,7 +226,8 @@ describe('settings', () => {
     expect(r.status).toBe(200);
     expect(r.json.prefs).toEqual({
       trust: 'ask',
-      budget: { monthly: 20, perTask: 2 },
+      budget: { monthly: 25, perTask: 2 },
+      currency: { code: 'USD', perUsd: 1 },
       remember: true,
       quiet: false,
       quietHours: { from: '23:00', to: '07:00' },
@@ -243,7 +257,7 @@ describe('settings', () => {
     expect(put.status).toBe(200);
     expect(put.json.prefs).toMatchObject({
       trust: 'away',
-      budget: { monthly: 20, perTask: 3.5 },
+      budget: { monthly: 25, perTask: 3.5 },
       quietHours: { from: '22:30', to: '07:00' },
       notifications: { approvals: true, finished: true, noticed: true, reviewAt: '08:00' },
       quiet: true,
@@ -328,6 +342,34 @@ describe('settings', () => {
     const b = await api('/api/tasks', { method: 'POST', body: { prompt: 'two', trust: 'ask' } });
     const cfg2 = (await store.read(b.json.taskId))[0]?.event as unknown as Cfg;
     expect(cfg2.config.permissions.trust).toBeUndefined();
+  });
+});
+
+describe('currency and the monthly cap', () => {
+  it('keeps a currency choice and shows its sign', async () => {
+    const { api } = await serve([]);
+    const r = await api('/api/settings', {
+      method: 'PUT',
+      body: { currency: { code: 'GBP', perUsd: 0.79 } },
+    });
+    expect(r.json.currency).toBe('£');
+    expect(r.json.prefs.currency).toEqual({ code: 'GBP', perUsd: 0.79 });
+    for (const bad of [{ code: 'gbp' }, { code: 'ZZZ9' }, { perUsd: 0 }, { perUsd: -2 }])
+      expect((await api('/api/settings', { method: 'PUT', body: { currency: bad } })).status).toBe(
+        400,
+      );
+  });
+
+  it('refuses a new task once the month has spent the cap, and starts again when it is raised', async () => {
+    const { api } = await serve([call('finish', { answer: 'a' })], { spent: 0.5 });
+    await api('/api/settings', { method: 'PUT', body: { budget: { monthly: 0.4 } } });
+    const refused = await api('/api/tasks', { method: 'POST', body: { prompt: 'again' } });
+    expect(refused.status).toBe(402);
+    expect(refused.json.error ?? refused.text).toMatch(/budget is used up/);
+    await api('/api/settings', { method: 'PUT', body: { budget: { monthly: 25 } } });
+    expect((await api('/api/tasks', { method: 'POST', body: { prompt: 'again' } })).status).toBe(
+      201,
+    );
   });
 });
 

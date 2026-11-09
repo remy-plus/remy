@@ -3,6 +3,7 @@
 // card text are untrusted words, already cut short and cleaned by collectReview; the screen shows
 // them as text.
 import { type EventStore, fold, MAX_WAITING_CARDS } from '@remy/core';
+import { formatMoney } from './currency.ts';
 import { collectReview, parseSince, type ReviewItem } from './review.ts';
 import type { Schedule } from './schedule.ts';
 import type { ApiRoute } from './serve.ts';
@@ -21,7 +22,7 @@ const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const usd = (n: number) => `$${n.toFixed(2)}`;
+const usd = formatMoney;
 const KIND: Record<string, string> = {
   write: 'Writes',
   send_as_user: 'Sends as you',
@@ -91,7 +92,7 @@ export async function buildReview(d: ReviewRouteDeps, sinceText: string | null) 
     tiles: [
       { value: String(finished), label: 'tasks finished' },
       { value: String(waiting), label: 'needs your OK' },
-      { value: usd(spent), label: 'spent on models' },
+      { value: usd(spent, d.prefs.get().currency), label: 'spent on models' },
       { value: String(sent), label: 'sent as you' },
     ],
     timeline: chronological.map((i) => ({

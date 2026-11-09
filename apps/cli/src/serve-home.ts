@@ -12,6 +12,7 @@ import {
   type TaskSummary,
   waitingCards,
 } from '@remy/core';
+import { formatMoney } from './currency.ts';
 import { cleanText } from './review.ts';
 import type { ApiRoute } from './serve.ts';
 import type { Spend, WebPrefsStore } from './serve-settings.ts';
@@ -37,7 +38,7 @@ const CARDS_MAX = 6;
 const WORKING_MAX = 12;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const usd = (n: number) => `$${n.toFixed(2)}`;
+const usd = formatMoney;
 const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -100,7 +101,9 @@ export function createHome(d: HomeDeps) {
           state: 'working',
           done,
           total: plan.length,
-          line: doing ? clean(doing.text, 140) : `${usd(st.costUsd)} so far`,
+          line: doing
+            ? clean(doing.text, 140)
+            : `${usd(st.costUsd, d.prefs.get().currency)} so far`,
         };
       });
 
@@ -150,7 +153,7 @@ export function createHome(d: HomeDeps) {
         stats: [
           `${plural(running, 'task')} running`,
           `${plural(ended.length, 'task')} ended in the last ${NOTICED_HOURS} hours`,
-          `${usd(spent)} spent this month`,
+          `${usd(spent, prefs.currency)} spent this month`,
         ],
         asks: [] as string[],
       },

@@ -331,6 +331,7 @@ describe('settings copied to and from the server', () => {
   const prefs: ServerPrefs = {
     trust: 'steady',
     budget: { monthly: 30, perTask: 4 },
+    currency: { code: 'GBP', perUsd: 0.79 },
     remember: false,
     quiet: true,
     quietHours: { from: '22:00', to: '06:30' },

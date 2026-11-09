@@ -9,6 +9,8 @@ export interface SettingValues {
   trust: TrustLevel;
   'budget.month': number;
   'budget.task': number;
+  'currency.code': string;
+  'currency.rate': number;
   memory: boolean;
   quiet: boolean;
   escalate: boolean;
@@ -22,8 +24,10 @@ export interface SettingValues {
 
 export const DEFAULTS: SettingValues = {
   trust: 'ask',
-  'budget.month': 20,
+  'budget.month': 25,
   'budget.task': 2,
+  'currency.code': 'USD',
+  'currency.rate': 1,
   memory: true,
   quiet: false,
   escalate: true,
@@ -82,6 +86,10 @@ const toPatch = (key: SettingKey, v: unknown): SettingsPatch | null => {
       return { budget: { monthly: v as number } };
     case 'budget.task':
       return { budget: { perTask: v as number } };
+    case 'currency.code':
+      return { currency: { code: v as string } };
+    case 'currency.rate':
+      return { currency: { perUsd: v as number } };
     case 'memory':
       return { remember: v as boolean };
     case 'quiet':
@@ -114,6 +122,8 @@ export function applyServerPrefs(p: ServerPrefs) {
   set('trust', p.trust);
   set('budget.month', p.budget.monthly);
   set('budget.task', p.budget.perTask);
+  set('currency.code', p.currency.code);
+  set('currency.rate', p.currency.perUsd);
   set('memory', p.remember);
   set('quiet', p.quiet);
   set('quiet.from', p.quietHours.from);
