@@ -50,7 +50,7 @@ export function MonthlyBudgetRow({ data }: SectionProps) {
   const used = data?.budget.usedMonth;
   const share = used === undefined || cap <= 0 ? 0 : Math.min(1, used / cap);
   return (
-    <Row title="Monthly budget" help="Remy will not start a new task once the month has used it.">
+    <Row title="Monthly budget" help="Once the month's budget is used, Remy starts no new tasks.">
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
         <Money
           key={`${code}${rate}`}
@@ -240,7 +240,8 @@ export function Budget(props: SectionProps) {
   return (
     <>
       <p className="mt-0 mb-6 max-w-[560px] text-[16px] text-muted">
-        Remy tells you before it goes over either limit.
+        Remy stops a task at its limit and asks before going on. Once the month's budget is used, it
+        starts no new tasks.
       </p>
       <MonthlyBudgetRow {...props} />
       <CurrencyRow />
