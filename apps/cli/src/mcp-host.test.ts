@@ -233,6 +233,19 @@ describe('startMcp', () => {
     await host.close();
   });
 
+  it('names the tools a server offered, switched-off ones included', async () => {
+    const fake = fakeServer([echo, tool('Delete Page')], () => text('ok'));
+    saveSaved(home, {
+      mcpServers: { s: { command: 'a', tools: { 'Delete Page': { disabled: true } } } },
+      disabled: [],
+    });
+    const host = startMcp({ ...base(), options: () => fake.options });
+    await host.ready;
+    expect(host.toolNames('s').sort()).toEqual(['Delete Page', 'echo']);
+    expect(host.toolNames('nobody')).toEqual([]);
+    await host.close();
+  });
+
   it('scrubs secrets from failure notes and keeps the stderr tail for debug only', async () => {
     secrets().set('s.T', 'sekrit-token-77');
     saveSaved(home, {

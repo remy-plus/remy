@@ -51,6 +51,8 @@ export interface McpHostDeps {
 export interface McpHost extends ConnectionsApi {
   /** Adds the tools loaded so far, and any that load later, to this registry. */
   attach(registry: ToolRegistry): void;
+  /** The server's own names for the tools it offered when it started (empty until then). */
+  toolNames(name: string): string[];
   /** Starts a server that was just saved. Resolves with a line for the transcript. */
   start(name: string): Promise<string>;
   /** Settles when every server is up or failed, or the start budget is spent. Never rejects. */
@@ -63,7 +65,7 @@ export interface McpHost extends ConnectionsApi {
 
 type State =
   | { phase: 'starting' }
-  | { phase: 'connected'; tools: Tool[] }
+  | { phase: 'connected'; tools: Tool[]; raw: string[] }
   | { phase: 'needs_signin' }
   | { phase: 'failed'; reason: string };
 
@@ -153,7 +155,7 @@ export function startMcp(deps: McpHostDeps): McpHost {
           deps.debug?.('mcp.stderr', { server: name, tail: deps.redact(tail) });
         return fail(name, err.error, sourceOf(name));
       }
-      states.set(name, { phase: 'connected', tools: r.tools });
+      states.set(name, { phase: 'connected', tools: r.tools, raw: r.listed[name] ?? [] });
       for (const reg of registries) addTo(reg, r.tools);
     } catch (e) {
       fail(name, e instanceof Error ? e.message : String(e), sourceOf(name));
@@ -219,6 +221,10 @@ export function startMcp(deps: McpHostDeps): McpHost {
       for (const st of states.values()) if (st.phase === 'connected') addTo(registry, st.tools);
     },
     ready,
+    toolNames(name) {
+      const st = states.get(name);
+      return st?.phase === 'connected' ? [...st.raw] : [];
+    },
     onNote(fn) {
       for (const n of notes) fn(n);
       listeners.push(fn);

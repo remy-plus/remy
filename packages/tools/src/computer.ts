@@ -59,6 +59,8 @@ export interface SshConfig {
   port?: number;
   /** Path to a private key file. Never the key itself. */
   keyPath?: string;
+  /** Seconds ssh waits to connect (default 15). */
+  connectTimeoutSec?: number;
 }
 
 /**
@@ -78,6 +80,9 @@ export function sshComputer(cfg: SshConfig, exec: Exec = nodeExec): Computer {
     throw new Error(`Invalid port: ${cfg.port}`);
   }
   if (cfg.keyPath?.startsWith('-')) throw new Error(`Invalid keyPath: ${cfg.keyPath}`);
+  const connectTimeout = cfg.connectTimeoutSec ?? 15;
+  if (!(Number.isInteger(connectTimeout) && connectTimeout > 0 && connectTimeout <= 120))
+    throw new Error(`Invalid connectTimeoutSec: ${connectTimeout}`);
   const target = `${cfg.user}@${cfg.host}`;
   return {
     name: cfg.name,
@@ -89,7 +94,7 @@ export function sshComputer(cfg: SshConfig, exec: Exec = nodeExec): Computer {
         '-o',
         'StrictHostKeyChecking=yes',
         '-o',
-        'ConnectTimeout=15',
+        `ConnectTimeout=${connectTimeout}`,
         ...(cfg.port ? ['-p', String(cfg.port)] : []),
         ...(cfg.keyPath ? ['-i', cfg.keyPath, '-o', 'IdentitiesOnly=yes'] : []),
         target,

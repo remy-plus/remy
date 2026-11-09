@@ -164,6 +164,7 @@ import {
 } from './search-vm.ts';
 import { listenServe } from './serve.ts';
 import { resolveServeBind } from './serve-bind.ts';
+import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
@@ -2178,6 +2179,25 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),
             log: (line) => out(st.dim(line)),
+            mounts: [
+              createConnectMount({
+                home,
+                cwd: deps.cwd,
+                userHome: deps.homeDir ?? homedir(),
+                fromConfig: () => cfg().mcpServers ?? {},
+                ...(mcp && { host: mcp }),
+                secrets: secretsFor(),
+                computers: () => cfg().computers ?? [],
+                // The file Remy reads: the folder's own, else the one in REMY_HOME.
+                saveComputers: (list) =>
+                  writeComputers(
+                    [join(deps.cwd, 'remy.config.json'), join(home, 'remy.config.json')].find(
+                      existsSync,
+                    ) ?? join(home, 'remy.config.json'),
+                    list,
+                  ),
+              }),
+            ],
           },
           bind,
         );

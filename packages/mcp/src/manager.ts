@@ -13,6 +13,8 @@ export interface McpLoadResult {
   tools: Tool[];
   /** Servers that could not be reached or listed. The rest still load. */
   errors: { server: string; error: string; needsAuth?: boolean }[];
+  /** The server's own name for every tool it listed, switched-off ones included, by server. */
+  listed: Record<string, string[]>;
 }
 
 /** All configured servers: one lazy connection each, one place to shut them down. */
@@ -68,7 +70,7 @@ export class McpManager {
         }
       }),
     );
-    const result: McpLoadResult = { tools: [], errors: [] };
+    const result: McpLoadResult = { tools: [], errors: [], listed: {} };
     // Wrapped in config order, sharing one name set, so names are stable and unique across servers.
     const taken = new Set<string>();
     for (const l of listings) {
@@ -80,6 +82,7 @@ export class McpManager {
         });
         continue;
       }
+      result.listed[l.server] = l.listed.map((t) => t.name);
       const config = this.#configs[l.server] as McpServerConfig;
       result.tools.push(...toTools(l.server, this.connection(l.server), l.listed, config, taken));
     }

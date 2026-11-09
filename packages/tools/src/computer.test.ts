@@ -45,7 +45,20 @@ describe('sshComputer', () => {
     expect(c.where).toBe('ssh remy@10.0.0.5:2222');
   });
 
+  it('uses the connect timeout it is given', async () => {
+    let seen: string[] = [];
+    const exec: Exec = async (_f, args) => {
+      seen = args;
+      return { exitCode: 0, stdout: '', stderr: '' };
+    };
+    await sshComputer({ ...cfg, connectTimeoutSec: 10 }, exec).run('true', { timeoutMs: 1000 });
+    expect(seen).toContain('ConnectTimeout=10');
+  });
+
   it.each([
+    { connectTimeoutSec: 0 },
+    { connectTimeoutSec: 1.5 },
+    { connectTimeoutSec: 9999 },
     { host: '-oProxyCommand=evil' },
     { user: '-x' },
     { host: 'a b' },
