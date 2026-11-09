@@ -45,7 +45,26 @@ const PROMPT_MAX = 20_000;
 const LIST_DEFAULT = 50;
 const LIST_MAX = 200;
 
+/** What an extra API route sees: the method, the parts of the path after /api, and a body reader. */
+export interface ApiCtx {
+  method: string;
+  /** The path after /api, split on '/': `/api/settings` is ['settings']. */
+  parts: string[];
+  url: URL;
+  /** Reads and strictly parses the JSON body (64 KB at most); a bad body is a 400. */
+  body<T>(schema: z.ZodType<T>, optional?: boolean): Promise<T>;
+}
+export interface ApiResult {
+  status: number;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+/** An extra route set: answers its own paths, and returns undefined for any other (then 404). */
+export type ApiRoute = (ctx: ApiCtx) => Promise<ApiResult | undefined>;
+
 export interface ServeDeps {
+  /** Further API routes (home, review, settings, ...), tried after the token check. */
+  routes?: ApiRoute[];
   store: EventStore;
   /** One runtime for every task this server runs. */
   runtime: RemyRuntime;
@@ -122,7 +141,7 @@ const extendBody = z
   .object({ steps: amount.optional(), costUsd: amount.optional(), wallMs: amount.optional() })
   .strict();
 
-class HttpError extends Error {
+export class HttpError extends Error {
   readonly status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -357,6 +376,16 @@ export function createServe(deps: ServeDeps) {
 
     try {
       const parts = path.split('/').slice(2); // after /api
+      const ctx: ApiCtx = {
+        method,
+        parts,
+        url,
+        body: (schema, optional) => bodyOf(req, schema, optional),
+      };
+      for (const route of deps.routes ?? []) {
+        const r = await route(ctx);
+        if (r) return reply(r.status, r.body, r.headers);
+      }
       const [head, id, action] = parts;
       if (head !== 'tasks' || parts.length > 3) return reply(404);
       if (id === undefined || id === '') {
