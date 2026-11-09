@@ -503,6 +503,7 @@ describe('review', () => {
       needs: null,
       awayNote: null,
     });
+    expect(r.json.span).toMatch(/^([A-Z][a-z]{2} )?\d\d:\d\d to \d\d:\d\d$/);
     expect(r.json.tiles.map((t: { label: string }) => t.label)).toEqual([
       'tasks finished',
       'needs your OK',

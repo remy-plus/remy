@@ -19,6 +19,7 @@ export interface ReviewRouteDeps {
 
 const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const usd = (n: number) => `$${n.toFixed(2)}`;
 const KIND: Record<string, string> = {
@@ -82,7 +83,7 @@ export async function buildReview(d: ReviewRouteDeps, sinceText: string | null) 
   }
   const trust = d.prefs.get().trust;
   return {
-    span: `${hhmm(since)} to ${hhmm(now)}`,
+    span: `${since.toDateString() === now.toDateString() ? '' : `${DAYS[since.getDay()]} `}${hhmm(since)} to ${hhmm(now)}`,
     headline: items.length
       ? `${plural(items.length, 'task')} ran.${needing.length ? ` ${needing.length === 1 ? 'One needs' : `${needing.length} need`} you.` : ''}`
       : 'Nothing ran without you.',
