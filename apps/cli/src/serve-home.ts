@@ -34,6 +34,8 @@ export interface HomeDeps {
 
 const NOTICED_HOURS = 4;
 const NOTICED_MAX = 5;
+/** A task marked running with no events for this long has no runner; it is shown as stopped. */
+const STALE_MS = 30 * 60_000;
 const CARDS_MAX = 6;
 const WORKING_MAX = 12;
 
@@ -53,6 +55,9 @@ export function createHome(d: HomeDeps) {
     const open = all.filter((s) =>
       ['running', 'waiting_approval', 'waiting_user'].includes(s.status),
     );
+    const live = (s: TaskSummary) =>
+      s.status === 'running' && t.getTime() - new Date(s.updatedAt).getTime() < STALE_MS;
+    const stalled = open.filter((s) => s.status === 'running' && !live(s)).length;
     const states = new Map<string, TaskState>();
     for (const s of open) states.set(s.taskId, fold(await d.store.read(s.taskId)));
 
@@ -87,7 +92,7 @@ export function createHome(d: HomeDeps) {
     }
 
     const working = open
-      .filter((s) => s.status === 'running')
+      .filter(live)
       .slice(0, WORKING_MAX)
       .map((s) => {
         const st = states.get(s.taskId) as TaskState;
@@ -130,11 +135,17 @@ export function createHome(d: HomeDeps) {
       });
     }
 
+    if (stalled > 0)
+      noticed.push({
+        at: hhmm(t),
+        text: `${plural(stalled, 'task')} stopped without finishing. Nothing has touched ${stalled === 1 ? 'it' : 'them'} for over 30 minutes.`,
+      });
+
     const prefs = d.prefs.get();
     const notes = d.notesCount();
     const newToday = d.notesToday?.() ?? 0;
     const asks = needsYou.length;
-    const running = open.filter((s) => s.status === 'running').length;
+    const running = open.filter(live).length;
     const spent = await d.spend();
     return {
       status: {
