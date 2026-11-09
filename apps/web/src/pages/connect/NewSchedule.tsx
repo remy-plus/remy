@@ -78,7 +78,11 @@ export function NewSchedule() {
       });
       window.location.hash = '#/schedules';
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'That did not work.');
+      setProblem(
+        e instanceof Error
+          ? e.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+      );
     }
   };
   const once = async () => {
@@ -91,7 +95,11 @@ export function NewSchedule() {
       const { taskId } = await api.startTask(prompt.trim());
       window.location.hash = `#/tasks/${taskId}`;
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'That did not work.');
+      setProblem(
+        e instanceof Error
+          ? e.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+      );
     }
   };
   const bad = (k: keyof typeof errors) => ({

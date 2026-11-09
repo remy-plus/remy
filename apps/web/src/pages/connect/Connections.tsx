@@ -44,7 +44,11 @@ export function Connections() {
       await refresh();
       setSaid(line);
     } catch (e) {
-      setSaid(e instanceof Error ? e.message : 'That did not work.');
+      setSaid(
+        e instanceof Error
+          ? e.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+      );
     }
   };
   const connected = data.apps.filter((a) => a.status === 'connected').length;

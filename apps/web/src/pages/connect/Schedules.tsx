@@ -21,7 +21,12 @@ export function Schedules() {
 
   const refresh = async () => setData(await api.schedules());
   const fail = (e: unknown) =>
-    setSaid({ text: e instanceof Error ? e.message : 'That did not work.' });
+    setSaid({
+      text:
+        e instanceof Error
+          ? e.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+    });
   const toggle = (s: ScheduleItem, on: boolean) =>
     api.setScheduleEnabled(s.id, on).then(refresh, fail);
   const runNow = (s: ScheduleItem) =>

@@ -187,7 +187,9 @@ function FailureCard({
 /** What a failed task shows when the server gives no explanation of its own. */
 const plainFailure = (reason?: string): TaskFailure => ({
   title: 'Remy stopped this task',
-  body: reason ?? 'Something went wrong, and Remy stopped.',
+  body:
+    reason ??
+    'Remy stopped before finishing. The log shows its last step. Start the task again, or change it first.',
   notes: [],
   why: {
     lead: 'Remy stops instead of guessing.',

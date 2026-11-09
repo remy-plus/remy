@@ -33,7 +33,11 @@ export function useLoad<T>(load: (api: RemyApi) => Promise<T>) {
         setError(null);
       })
       .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : 'Remy could not be reached.'),
+        setError(
+          e instanceof Error
+            ? e.message
+            : 'Remy could not be reached. Check that it is running, then reload.',
+        ),
       );
   }, [api]);
   useEffect(reload, [reload]);

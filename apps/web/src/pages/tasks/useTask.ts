@@ -53,7 +53,12 @@ export function useTask(id: string): TaskState {
         setError(null);
       })
       .catch((e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : 'Remy could not be reached.');
+        if (live)
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Remy could not be reached. Check that it is running, then reload.',
+          );
       });
     return () => {
       live = false;

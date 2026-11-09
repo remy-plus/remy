@@ -70,7 +70,11 @@ export function SignIn({
       setSetting('onboarded', true);
       onSignedIn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'That did not work. Try again.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+      );
     } finally {
       setBusy(false);
     }
@@ -130,7 +134,8 @@ export function SignIn({
           </p>
           <p aria-live="polite" className="mt-1 mb-0 text-muted">
             {health === null && 'Checking the server'}
-            {health === 'down' && 'Remy could not be reached at this address.'}
+            {health === 'down' &&
+              'Remy could not be reached at this address. Check the address and that Remy is running.'}
             {health && health !== 'down' && (
               <>
                 Remy {health.version}

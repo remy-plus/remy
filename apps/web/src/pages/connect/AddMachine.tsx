@@ -131,7 +131,11 @@ export function AddMachine() {
       await api.addMachine(input());
       window.location.hash = '#/connections';
     } catch (err) {
-      setProblem(err instanceof Error ? err.message : 'That did not work.');
+      setProblem(
+        err instanceof Error
+          ? err.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+      );
     }
   };
 

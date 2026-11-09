@@ -20,7 +20,12 @@ export function Skills() {
   const skill = data.skills.find((s) => s.name === name) ?? data.skills[0];
   const refresh = async () => setData(await api.skills());
   const fail = (e: unknown) =>
-    setSaid({ text: e instanceof Error ? e.message : 'That did not work.' });
+    setSaid({
+      text:
+        e instanceof Error
+          ? e.message
+          : 'That did not work. Check that Remy is still running, then try again.',
+    });
 
   return (
     <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">

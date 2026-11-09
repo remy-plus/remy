@@ -58,7 +58,9 @@ describe('SignIn', () => {
     type('wrong-token');
     submit();
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toBe('That token was not accepted.');
+    expect(alert.textContent).toBe(
+      'That token was not accepted. Check it for a missing character, then try again.',
+    );
     const field = screen.getByLabelText('Access token');
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(field.getAttribute('aria-describedby')).toBe(alert.id);
@@ -82,11 +84,15 @@ describe('SignIn', () => {
       throw new TypeError('network');
     });
     show(down);
-    expect(await screen.findByText('Remy could not be reached at this address.')).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'Remy could not be reached at this address. Check the address and that Remy is running.',
+      ),
+    ).toBeTruthy();
     type('good-token');
     submit();
     expect((await screen.findByRole('alert')).textContent).toBe(
-      'Remy could not be reached at this address.',
+      'Remy could not be reached at this address. Check the address and that Remy is running.',
     );
     expect(saved()).toBeNull();
   });

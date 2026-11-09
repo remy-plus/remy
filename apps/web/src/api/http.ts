@@ -85,7 +85,10 @@ export function createHttpApi(opts: {
     if (res.status === 401) opts.onUnauthorized?.();
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new ApiError(res.status, body.error ?? 'The request failed.');
+      throw new ApiError(
+        res.status,
+        body.error ?? 'The request failed. Check that Remy is still running, then try again.',
+      );
     }
     return res;
   }
@@ -201,9 +204,14 @@ export function createHttpApi(opts: {
           headers: { authorization: `Bearer ${token.trim()}` },
         });
       } catch {
-        throw new Error('Remy could not be reached at this address.');
+        throw new Error(
+          'Remy could not be reached at this address. Check the address and that Remy is running.',
+        );
       }
-      if (res.status === 401 || res.status === 403) throw new Error('That token was not accepted.');
+      if (res.status === 401 || res.status === 403)
+        throw new Error(
+          'That token was not accepted. Check it for a missing character, then try again.',
+        );
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? 'The server did not accept that.');

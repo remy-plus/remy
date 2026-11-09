@@ -97,7 +97,12 @@ export function Brain() {
     setConfirming(false);
     setSaid('');
   };
-  const fail = (e: unknown) => setSaid(e instanceof Error ? e.message : 'That did not work.');
+  const fail = (e: unknown) =>
+    setSaid(
+      e instanceof Error
+        ? e.message
+        : 'That did not work. Check that Remy is still running, then try again.',
+    );
   const refresh = async (d?: BrainData) => setData(d ?? (await api.brain()));
 
   const edges = data.notes.flatMap((n) =>
