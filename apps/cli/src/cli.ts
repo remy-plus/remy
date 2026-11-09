@@ -165,9 +165,13 @@ import {
 import { listenServe } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
 import { resolveServeBind } from './serve-bind.ts';
+import { createBrainMount } from './serve-brain.ts';
+import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
+import { createSchedulesMount } from './serve-schedules.ts';
 import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
+import { createSkillsMount } from './serve-skills.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
@@ -175,6 +179,7 @@ import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
+import { DEFAULT_PORT as DEFAULT_WEBHOOK_PORT } from './webhook-bind.ts';
 import { BODY_MAX_BYTES, webhookConfig, webhookPrompt } from './webhook-payload.ts';
 import { daemonWebhooks, processStarter, startWebhooks } from './webhook-service.ts';
 import { openHooks } from './webhook-store.ts';
@@ -1584,7 +1589,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       effectOf: (tool) => registry?.get(tool)?.effect,
       riskOf: (tool) => registry?.get(tool)?.risk,
       approvals: standing(),
-      skills: () => plainSkills(skills().list(), skills().problems()),
+      skills: () => plainSkills(skills().all(), skills().problems(), skills().disabled()),
       schedules: () => plainSchedules(openSchedules(home).list()),
       review: async (window) => {
         const now = new Date();
@@ -1838,13 +1843,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       case 'skills': {
         const sub = rest[0] ?? 'list';
         if (sub === 'list') {
-          out(plainSkills(skills().list(), skills().problems()));
+          out(plainSkills(skills().all(), skills().problems(), skills().disabled()));
           return 0;
         }
         if (sub === 'show') {
           need(2, 'remy skills show <name>');
           const hit = skills()
-            .list()
+            .all()
             .find((s) => s.name === rest[1]);
           if (!hit) throw new Error(`There is no skill named ${rest[1]}. See remy skills list.`);
           out(plainSkill(hit));
@@ -2245,6 +2250,34 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),
             log: (line) => out(st.dim(line)),
+            mounts: [
+              createConnectMount({
+                home,
+                cwd: deps.cwd,
+                userHome: deps.homeDir ?? homedir(),
+                fromConfig: () => cfg().mcpServers ?? {},
+                ...(mcp && { host: mcp }),
+                secrets: secretsFor(),
+                computers: () => cfg().computers ?? [],
+                // The file Remy reads: the folder's own, else the one in REMY_HOME.
+                saveComputers: (list) =>
+                  writeComputers(
+                    [join(deps.cwd, 'remy.config.json'), join(home, 'remy.config.json')].find(
+                      existsSync,
+                    ) ?? join(home, 'remy.config.json'),
+                    list,
+                  ),
+              }),
+              createSkillsMount({ skills: skills() }),
+              createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
+              createSchedulesMount({
+                schedules: openSchedules(home),
+                hooks: openHooks(home),
+                webhookPort: Number(env.REMY_WEBHOOK_PORT) || DEFAULT_WEBHOOK_PORT,
+                trust: trustNow,
+                maxCostUsd: () => taskConfig(file, model.id, home).budget.maxCostUsd,
+              }),
+            ],
           },
           bind,
         );

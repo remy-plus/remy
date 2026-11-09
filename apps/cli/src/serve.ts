@@ -32,6 +32,7 @@ import {
 } from '@remy/core';
 import { z } from 'zod';
 import type { ServeBind } from './serve-bind.ts';
+import type { Mount } from './serve-mount.ts';
 import { createStaticHandler } from './serve-static.ts';
 import { listItem, type Redact, redactDeep, taskView } from './serve-view.ts';
 import { bearer, safeEqual } from './webhook-auth.ts';
@@ -91,6 +92,8 @@ export interface ServeDeps {
   busyMs?: number;
   /** How many times to try (default 40, which outlasts a crashed runner's lease). */
   busyTries?: number;
+  /** Extra routes (connections, skills, schedules, brain), asked after the token check, in order. */
+  mounts?: Mount[];
 }
 
 export interface ServeListening {
@@ -296,9 +299,14 @@ export function createServe(deps: ServeDeps) {
     const body = await bodyOf(req, startBody);
     if (body.trust !== undefined && !isTrustLevel(body.trust))
       throw new HttpError(400, 'trust must be ask, steady or away.');
+    return beginTask(body.prompt, body.trust as TrustLevel | undefined);
+  }
+
+  /** Creates a task and starts it in the background; shared by POST /api/tasks and the mounts. */
+  async function beginTask(prompt: string, trust?: TrustLevel) {
     const taskId = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
-    const config = deps.config(taskId, body.trust as TrustLevel | undefined);
-    await store.createTask(taskId, body.prompt, config);
+    const config = deps.config(taskId, trust);
+    await store.createTask(taskId, prompt, config);
     track(taskId);
     ensureRun(taskId);
     return { taskId };
@@ -391,6 +399,10 @@ export function createServe(deps: ServeDeps) {
       for (const route of deps.routes ?? []) {
         const r = await route(ctx);
         if (r) return reply(r.status, r.body, r.headers);
+      }
+      for (const mount of deps.mounts ?? []) {
+        const m = await mount({ req, method, url, parts, startTask: beginTask });
+        if (m) return reply(m.status, m.body && redactDeep(m.body, redact), m.headers);
       }
       const [head, id, action] = parts;
       if (head !== 'tasks' || parts.length > 3) return reply(404);

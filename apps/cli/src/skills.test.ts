@@ -33,6 +33,22 @@ function put(dir: string, folder: string, text: string, extra: Record<string, st
   return join(dir, folder);
 }
 
+describe('skill store, switching off', () => {
+  it('hides a switched-off skill from list but not from all, and brings it back', () => {
+    put(join(home, 'skills'), 'research', md('research', 'My own research steps'));
+    const s = openSkills(home, cwd);
+    expect(s.setEnabled('nobody', false)).toBe(false);
+    expect(s.setEnabled('research', false)).toBe(true);
+    expect(s.list().map((k) => k.name)).not.toContain('research');
+    expect(s.all().map((k) => k.name)).toContain('research');
+    expect(s.disabled()).toEqual(['research']);
+    expect(plainSkills(s.all(), [], s.disabled())).toContain('[off] ');
+    expect(s.setEnabled('research', true)).toBe(true);
+    expect(s.list().map((k) => k.name)).toContain('research');
+    expect(s.disabled()).toEqual([]);
+  });
+});
+
 describe('skill store', () => {
   it('reads yours, the project and the built-ins, yours first by name', () => {
     put(join(home, 'skills'), 'research', md('research', 'My own research steps'));
