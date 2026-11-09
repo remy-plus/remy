@@ -1,0 +1,23 @@
+# Remy on a home server. Start it with: docker compose up -d --build
+# The one-time sign-in token is printed in the first start's log: docker compose logs remy
+services:
+  remy:
+    build: .
+    image: remy:local
+    container_name: remy
+    restart: unless-stopped
+    # Pick a model by setting these in a file named .env next to this one (never commit it), for
+    # example REMY_PROFILE=openrouter, REMY_MODEL=<model id>, OPENROUTER_API_KEY=<your key>.
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      # Reachable from this machine only. To reach it from a phone, publish it on a private
+      # network address instead, such as your Tailscale address: "100.x.y.z:7790:7790".
+      # Never publish it as "7790:7790" on a network you do not trust: there is no TLS.
+      - "127.0.0.1:7790:7790"
+    volumes:
+      - remy-data:/data
+
+volumes:
+  remy-data:
