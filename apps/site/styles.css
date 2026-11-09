@@ -103,15 +103,18 @@ h1 {
 .lede { font-size: var(--t-lede); line-height: 1.45; max-width: 34em; }
 .hero .lede { margin-top: clamp(20px, 2.4vw, 32px); }
 .hero-act { margin-top: clamp(28px, 3vw, 44px); display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
-.where { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 10px; max-width: 32em; }
+.where { font-size: 14px; color: var(--muted); display: flex; align-items: baseline; gap: 10px; max-width: 32em; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; display: inline-block; margin-right: 8px; }
-.where .dot { margin-right: 0; }
+.where .dot { margin-right: 0; transform: translateY(-1px); }
 .dot.now { background: var(--signal); }
 .dot.next { background: var(--text); }
 
 /* The stage: one flat field that holds a working fragment at true size. */
-.stage { background: var(--surface); border-radius: 18px; padding: clamp(14px, 2.4vw, 36px); }
-.hero-stage { min-height: 560px; display: flex; align-items: center; }
+.stage { background: none; padding: 0; }
+.hero-stage { display: flex; align-items: center; }
+.hero .win { background: var(--surface); padding: clamp(20px, 2.2vw, 32px); font-size: 15.5px; min-height: 470px; }
+.hero .win-title { font-size: 16px; }
+.hero .what { font-size: 18px; }
 
 /* ---- Interface fragments (data-ui). The product's own conventions apply inside. */
 .win { background: var(--raise); border-radius: var(--r); padding: 20px; width: 100%; font-size: 14px; line-height: 1.5; }
@@ -144,7 +147,7 @@ h1 {
 .no { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--stone); }
 .no:hover { background: #26262b; }
 .yes:active, .no:active { transform: scale(0.97); }
-kbd { font: 500 12px/1 var(--mono); padding: 3px 6px; border-radius: 5px; background: rgba(0, 0, 0, 0.2); }
+kbd { font: 500 12px/1 var(--mono); padding: 3px 6px; border-radius: 5px; background: rgba(0, 0, 0, 0.18); color: inherit; }
 .no kbd { background: #26262b; }
 .fine { color: var(--muted); font-size: 14px; margin-top: 12px; }
 .result { margin-top: 6px; min-height: 0; font-size: 18px; }
@@ -167,8 +170,8 @@ h3 { font-size: var(--t-h3); font-weight: 500; line-height: 1.12; letter-spacing
 .frag { background: var(--surface); border-radius: 16px; padding: clamp(18px, 2.4vw, 32px); font-size: 14px; transition: background 0.25s; }
 .cap:hover .frag { background: #1b1b1f; }
 .f-h { font-weight: 600; font-size: 14px; margin-bottom: 14px; }
-.rows li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 14px 16px; background: var(--raise); border-radius: 8px; margin-top: 6px; transition: transform 0.2s var(--ease); }
-.rows li:hover { transform: translateX(4px); }
+.rows li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 14px 14px; border-radius: 8px; transition: background 0.2s; }
+.rows li:hover { background: var(--raise); }
 .rows li span:first-child { color: var(--muted); }
 .rows em { font-style: normal; font-size: 14px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
 .rows em.ok { color: var(--signal); background: rgba(168, 196, 154, 0.1); }
@@ -179,14 +182,14 @@ h3 { font-size: var(--t-h3); font-weight: 500; line-height: 1.12; letter-spacing
 /* 3. Pinned story */
 .how-h { margin-bottom: clamp(24px, 4vw, 56px); }
 .how-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 5vw, 96px); align-items: start; }
-.how-steps li { min-height: 72svh; display: flex; flex-direction: column; justify-content: center; max-width: 30em; color: var(--muted); transition: color 0.3s; }
-.how-steps li:first-child { min-height: 60svh; }
+.how-steps li { min-height: 48svh; display: flex; flex-direction: column; justify-content: center; max-width: 30em; color: var(--muted); transition: color 0.3s; }
+.how-steps li:first-child { min-height: 44svh; }
 .how-steps .big { font-size: var(--t-h3); font-weight: 500; letter-spacing: -0.02em; line-height: 1.12; color: inherit; }
 .how-steps li p + p { margin-top: 14px; font-size: 18px; }
 .how-steps li.on { color: var(--text); }
-.how-stage { position: sticky; top: 14vh; background: var(--surface); border-radius: 18px; height: min(560px, 72svh); padding: clamp(14px, 2.4vw, 32px); }
+.how-stage { position: sticky; top: 14vh; background: var(--surface); border-radius: 18px; height: min(440px, 60svh); padding: clamp(14px, 2.4vw, 32px); }
 .win.small { height: 100%; position: relative; padding: 0; overflow: hidden; }
-.s { position: absolute; inset: 0; padding: 24px; display: flex; flex-direction: column; justify-content: center; gap: 10px; opacity: 0; transform: translateY(10px); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease), visibility 0s 0.4s; pointer-events: none; visibility: hidden; }
+.s { position: absolute; inset: 0; padding: 32px; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; opacity: 0; transform: translateY(10px); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease), visibility 0s 0.4s; pointer-events: none; visibility: hidden; }
 .s .said { font-size: var(--t-lede); line-height: 1.25; letter-spacing: -0.015em; font-weight: 500; }
 .s .what { font-size: var(--t-lede); }
 .s .btns span { height: 40px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 8px; font-weight: 600; }
@@ -244,7 +247,7 @@ details code { color: var(--text); }
 .start-in { background: var(--surface); border-radius: 24px; padding: clamp(32px, 6vw, 96px); display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: clamp(32px, 5vw, 80px); align-items: center; min-height: min(640px, 80svh); }
 .start h2 { font-size: var(--t-display); line-height: 0.96; max-width: 7em; }
 .start .lede { margin-top: 24px; }
-.dialog { background: var(--bg); padding: 26px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); max-width: 560px; justify-self: end; }
+.dialog { background: var(--bg); padding: 26px; max-width: 560px; justify-self: end; }
 .dialog .win-title { margin-bottom: 16px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .cmd { position: relative; background: var(--raise); border-radius: 10px; padding: 18px 96px 18px 18px; }
 .cmd pre { margin: 0; font: 400 14px/1.9 var(--mono); white-space: pre-wrap; word-break: break-word; }
@@ -255,7 +258,7 @@ details code { color: var(--text); }
 
 /* Footer: the name returns at full width, then one quiet line. */
 .foot { padding-bottom: 28px; }
-.word { font: 700 clamp(9px, calc((100vw - 2 * var(--m)) / 33), 46px) / 1.1 var(--mono); white-space: pre; overflow: hidden; font-variant-ligatures: none; margin: 0 0 clamp(40px, 6vw, 88px); }
+.word { font: 700 clamp(9px, calc((100vw - 2 * var(--m)) / 33), 30px) / 1.1 var(--mono); white-space: pre; overflow: hidden; font-variant-ligatures: none; margin: 0 0 clamp(40px, 6vw, 88px); }
 .word span { display: block; }
 .word span:nth-child(1) { color: #94928d; } .word span:nth-child(2) { color: #a09e99; } .word span:nth-child(3) { color: #b0aea8; }
 .word span:nth-child(4) { color: #c0bdb8; } .word span:nth-child(5) { color: #d6d4ce; } .word span:nth-child(6) { color: #edebe6; }
@@ -302,8 +305,8 @@ html.js .step.wait.shown .no { animation: pulse 2.4s ease-in-out 1.2s 2; }
   .how-steps li, .how-steps li:first-child { min-height: 0; padding-block: 28px; color: var(--text); }
   .safe h2, .faq-h { position: static; }
   .surfaces li { grid-template-columns: 1fr; gap: 6px; padding: 22px; }
-  .rows li { grid-template-columns: 1fr; gap: 4px; }
-  .rows em { justify-self: start; }
+  .rows li { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; }
+  .rows li span:first-child { grid-column: 1 / -1; }
   .win-bar { flex-direction: column; gap: 4px; }
   .dialog { justify-self: stretch; }
   .foot-line { grid-template-columns: 1fr; gap: 10px; }
