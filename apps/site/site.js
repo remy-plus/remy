@@ -121,11 +121,11 @@
       for (const s of seq) s.classList.add('shown');
       return;
     }
-    await wait(700);
+    await wait(250);
     for (const s of seq) {
       if (me !== run) return;
       s.classList.add('shown');
-      await wait(s === seq[seq.length - 2] ? 650 : 520);
+      await wait(s === seq[seq.length - 2] ? 380 : 230);
     }
   };
 
