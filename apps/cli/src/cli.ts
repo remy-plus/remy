@@ -165,6 +165,7 @@ import {
 import { listenServe } from './serve.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
+import { createSchedulesMount } from './serve-schedules.ts';
 import { createSkillsMount } from './serve-skills.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
@@ -173,6 +174,7 @@ import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
+import { DEFAULT_PORT as DEFAULT_WEBHOOK_PORT } from './webhook-bind.ts';
 import { BODY_MAX_BYTES, webhookConfig, webhookPrompt } from './webhook-payload.ts';
 import { daemonWebhooks, processStarter, startWebhooks } from './webhook-service.ts';
 import { openHooks } from './webhook-store.ts';
@@ -2199,6 +2201,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   ),
               }),
               createSkillsMount({ skills: skills() }),
+              createSchedulesMount({
+                schedules: openSchedules(home),
+                hooks: openHooks(home),
+                webhookPort: Number(env.REMY_WEBHOOK_PORT) || DEFAULT_WEBHOOK_PORT,
+                trust: trustNow,
+                maxCostUsd: () => taskConfig(file, model.id, home).budget.maxCostUsd,
+              }),
             ],
           },
           bind,
