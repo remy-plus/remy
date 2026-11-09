@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Logo } from './Logo.tsx';
 
 export const NAV = [
   { label: 'Home', href: '#/', match: (p: string) => p === '/' },
@@ -28,13 +27,13 @@ export const NAV = [
 /** The bar: logo, the five places, and a status slot on the right. */
 export function Header({ path, status }: { path: string; status?: ReactNode }) {
   return (
-    <header className="grid items-center gap-x-4 gap-y-3 border-b border-line px-5 py-3 md:h-[66px] md:grid-cols-[auto_minmax(0,1fr)_auto] md:py-0 sm:px-8">
+    <header className="grid items-center gap-x-4 gap-y-3 px-5 py-3 md:h-[66px] md:grid-cols-[auto_minmax(0,1fr)_auto] md:py-0 sm:px-8">
       <a href="#/" className="justify-self-start" aria-label="Remy, home">
-        <Logo />
+        <span className="font-mono text-[18px] font-bold tracking-[0.06em] text-text">REMY</span>
       </a>
       <nav
         aria-label="Main"
-        className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[13px] md:flex-nowrap md:justify-self-center md:gap-x-6"
+        className="flex flex-wrap gap-x-5 gap-y-1 text-[14px] font-medium md:flex-nowrap md:justify-self-center md:gap-x-6"
       >
         {NAV.map((item) => {
           const current = item.match(path);
