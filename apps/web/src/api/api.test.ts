@@ -63,10 +63,21 @@ describe('mock adapter', () => {
 });
 
 describe('adapter choice', () => {
-  it('uses the mock with ?mock=1 or without a token, otherwise http', () => {
-    expect(chooseApi('?mock=1', 'tok').kind).toBe('mock');
-    expect(chooseApi('', null).kind).toBe('mock');
-    expect(chooseApi('', 'tok').kind).toBe('http');
+  it('uses the mock only with ?mock=1; everything else is the real server', () => {
+    expect(chooseApi('?mock=1').kind).toBe('mock');
+    expect(chooseApi('').kind).toBe('http');
+    expect(chooseApi('?x=1').kind).toBe('http');
+  });
+
+  it('asks to sign in again when the server answers 401', async () => {
+    const again = vi.fn();
+    const api = createHttpApi({
+      token: () => 'old',
+      onUnauthorized: again,
+      fetch: (async () => new Response('{}', { status: 401 })) as unknown as typeof fetch,
+    });
+    await expect(api.listTasks()).rejects.toMatchObject({ status: 401 });
+    expect(again).toHaveBeenCalledOnce();
   });
 });
 

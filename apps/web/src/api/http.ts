@@ -68,6 +68,8 @@ const notAvailable = {
 
 export function createHttpApi(opts: {
   token: () => string | null;
+  /** Called when the server says 401, so the app can ask for a token again. */
+  onUnauthorized?: () => void;
   base?: string;
   fetch?: typeof fetch;
 }): RemyApi {
@@ -80,6 +82,7 @@ export function createHttpApi(opts: {
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (init.body) headers.set('content-type', 'application/json');
     const res = await doFetch(`${base}${path}`, { ...init, headers });
+    if (res.status === 401) opts.onUnauthorized?.();
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       throw new ApiError(res.status, body.error ?? 'The request failed.');

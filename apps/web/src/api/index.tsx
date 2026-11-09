@@ -9,14 +9,26 @@ const readToken = () => {
   try {
     return window.localStorage.getItem(TOKEN_KEY);
   } catch {
-    return null; // storage can be blocked; the mock then runs
+    return null; // storage can be blocked; sign-in then asks again
   }
 };
 
-/** The mock runs with `?mock=1`, or when no token is stored yet. Otherwise the real server. */
-export function chooseApi(search = window.location.search, token = readToken()): RemyApi {
+/** Sends the person to sign in, and forgets a token the server did not accept. */
+function signInAgain() {
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // blocked storage: there is nothing to forget
+  }
+  if (window.location.hash !== '#/sign-in') window.location.hash = '#/sign-in';
+}
+
+/** The mock runs only with `?mock=1` (a demo link). Everything else talks to the real server. */
+export function chooseApi(search = window.location.search): RemyApi {
   const forced = new URLSearchParams(search).get('mock') === '1';
-  return forced || !token ? createMockApi() : createHttpApi({ token: readToken });
+  return forced
+    ? createMockApi()
+    : createHttpApi({ token: readToken, onUnauthorized: signInAgain });
 }
 
 const ApiContext = createContext<RemyApi | null>(null);

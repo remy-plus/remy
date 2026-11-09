@@ -18,9 +18,10 @@ if (!dialog.showModal) {
   };
 }
 
-// A visit that is not the first, so Home does not send tests to the first-run steps.
-// The first-run tests remove this flag on purpose.
+// Tests run on the mock, as a demo link does. Only `?mock=1` picks the mock; the sign-in tests
+// clear it on purpose. A visit that is not the first keeps Home out of the first-run steps.
 beforeEach(() => {
+  window.history.replaceState({}, '', '/?mock=1');
   window.localStorage.setItem('remy.onboarded', 'true');
 });
 

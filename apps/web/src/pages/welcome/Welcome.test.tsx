@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../App.tsx';
 import { a11yProblems } from '../../a11y.testing.ts';
@@ -101,10 +101,13 @@ describe('Welcome', () => {
 });
 
 describe('first visit', () => {
-  it('sends a first visit from Home to step 1', async () => {
-    window.localStorage.removeItem('remy.onboarded');
-    open('#/');
-    await waitFor(() => expect(window.location.hash).toBe('#/welcome/1'));
+  it('sends a visit with no token from any page to sign-in, never to fake data', async () => {
+    window.history.replaceState({}, '', '/');
+    for (const start of ['#/', '#/tasks', '#/settings']) {
+      cleanup();
+      open(start);
+      await waitFor(() => expect(window.location.hash).toBe('#/sign-in'));
+    }
   });
 
   it('does not send someone who signed in or already finished', async () => {
