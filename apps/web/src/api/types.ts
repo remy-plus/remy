@@ -281,8 +281,8 @@ export interface RemyApi {
   review(): Promise<ReviewData>;
   /** No server route yet: marks a stopped task as done after the person checked by hand. */
   markDone(id: string): Promise<void>;
-  // Connections, skills, schedules and the brain (package 6.3 group B). The server has no routes
-  // for these yet: the mock serves them and the http adapter says "not connected" for each.
+  // Connections, skills, schedules and the brain (package 6.3 group B). `remy serve` serves all of
+  // these except `signInApp` and `resolveSuggestion`, which only the mock answers.
   connections(): Promise<ConnectionsData>;
   setPermission(appId: string, permissionId: string, on: boolean): Promise<void>;
   disconnectApp(appId: string): Promise<void>;
@@ -328,7 +328,8 @@ export interface ConnectedApp {
 export interface Machine {
   name: string;
   detail: string;
-  status: 'reachable' | 'unreachable';
+  /** `unchecked` until the person runs a test: a list never makes an ssh call. */
+  status: 'reachable' | 'unreachable' | 'unchecked';
 }
 export interface ConnectionsData {
   apps: ConnectedApp[];

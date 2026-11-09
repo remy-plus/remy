@@ -128,6 +128,132 @@ describe('http adapter', () => {
     expect(new Headers(init.headers).get('last-event-id')).toBe('4');
   });
 
+  describe('connections, skills, schedules and the brain', () => {
+    const stub = (reply: unknown = { ok: true }, status = 200) => {
+      const fetcher = vi.fn(async () => new Response(JSON.stringify(reply), { status }));
+      const api = createHttpApi({ token: () => 'tok', fetch: fetcher as unknown as typeof fetch });
+      const last = () => {
+        const [url, init] = fetcher.mock.calls.at(-1) as unknown as [string, RequestInit];
+        return {
+          url,
+          method: init.method,
+          body: init.body ? JSON.parse(init.body as string) : undefined,
+          auth: new Headers(init.headers).get('authorization'),
+        };
+      };
+      return { api, last, fetcher };
+    };
+
+    it('reads connections and the catalog, and sends permission changes', async () => {
+      const { api, last } = stub({ apps: [], machines: [] });
+      expect(await api.connections()).toEqual({ apps: [], machines: [] });
+      expect(last()).toMatchObject({ url: '/api/connections', auth: 'Bearer tok' });
+      await api.setPermission('notion', 'update_page', false);
+      expect(last()).toMatchObject({
+        url: '/api/connections/notion/permissions',
+        method: 'POST',
+        body: { permissionId: 'update_page', on: false },
+      });
+      await api.disconnectApp('notion');
+      expect(last()).toMatchObject({ url: '/api/connections/notion', method: 'DELETE' });
+      const cat = stub({ apps: [{ id: 'linear', name: 'Linear', blurb: '', levels: [] }] });
+      expect((await cat.api.appCatalog()).map((a) => a.id)).toEqual(['linear']);
+      expect(cat.last().url).toBe('/api/catalog');
+      await api.connectApp('linear', 'act');
+      expect(last()).toMatchObject({
+        url: '/api/connections',
+        method: 'POST',
+        body: { catalogId: 'linear', level: 'act' },
+      });
+    });
+
+    it('never sends a key path with a machine', async () => {
+      const { api, last } = stub({ ok: true, lines: ['Connected.'] });
+      const m = { name: 'home', host: 'h.example.com', port: 22, user: 'remy', keyPath: '/k/id' };
+      expect((await api.testMachine(m)).ok).toBe(true);
+      expect(last()).toMatchObject({
+        url: '/api/machines/test',
+        body: { name: 'home', host: 'h.example.com', user: 'remy', port: 22 },
+      });
+      expect(JSON.stringify(last().body)).not.toContain('/k/id');
+      await api.addMachine({ ...m, port: 0 });
+      expect(last()).toMatchObject({ url: '/api/machines', method: 'POST' });
+      expect(last().body).toEqual({ name: 'home', host: 'h.example.com', user: 'remy' });
+    });
+
+    it('calls the skill routes', async () => {
+      const { api, last } = stub({ skills: [], suggestion: null });
+      expect(await api.skills()).toEqual({ skills: [], suggestion: null });
+      await api.setSkillEnabled('rename receipts', false);
+      expect(last()).toMatchObject({
+        url: '/api/skills/rename%20receipts/enabled',
+        body: { enabled: false },
+      });
+      const run = stub({ taskId: 'task_1' });
+      expect(await run.api.runSkill('one')).toEqual({ taskId: 'task_1' });
+      expect(run.last()).toMatchObject({ url: '/api/skills/one/run', method: 'POST' });
+    });
+
+    it('calls the schedule routes and sends only the prompt and the phrase', async () => {
+      const { api, last } = stub({ id: 'sched_1' });
+      expect(
+        await api.createSchedule({
+          prompt: 'Draft it',
+          when: 'every day at 9',
+          timezone: 'Europe/London',
+          runsOn: 'this machine',
+        }),
+      ).toEqual({ id: 'sched_1' });
+      expect(last()).toMatchObject({
+        url: '/api/schedules',
+        method: 'POST',
+        body: { prompt: 'Draft it', when: 'every day at 9' },
+      });
+      await api.setScheduleEnabled('sched_1', false);
+      expect(last()).toMatchObject({
+        url: '/api/schedules/sched_1/enabled',
+        body: { enabled: false },
+      });
+      await api.runScheduleNow('sched_1');
+      expect(last()).toMatchObject({ url: '/api/schedules/sched_1/run', method: 'POST' });
+      await api.setWebhookEnabled('new-invoice', true);
+      expect(last()).toMatchObject({
+        url: '/api/webhooks/new-invoice/enabled',
+        body: { enabled: true },
+      });
+    });
+
+    it('calls the brain routes', async () => {
+      const { api, last } = stub({ total: 0 });
+      await api.brain();
+      expect(last()).toMatchObject({ url: '/api/brain', auth: 'Bearer tok' });
+      await api.updateNote('mem_1', 'Lives in Porto');
+      expect(last()).toMatchObject({
+        url: '/api/brain/mem_1',
+        method: 'PUT',
+        body: { text: 'Lives in Porto' },
+      });
+      await api.deleteNote('mem_1');
+      expect(last()).toMatchObject({ url: '/api/brain/mem_1', method: 'DELETE' });
+    });
+
+    it('shows the server message when a change is refused', async () => {
+      const { api } = stub({ error: 'Remy will not add a command from the web app.' }, 400);
+      const err = await api.connectApp('x', 'act').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err).toMatchObject({
+        status: 400,
+        message: 'Remy will not add a command from the web app.',
+      });
+    });
+
+    it('says what is done in the terminal, for sign-in and suggestions', async () => {
+      const { api } = stub();
+      await expect(api.signInApp('slack')).rejects.toThrow('remy connect auth');
+      await expect(api.resolveSuggestion(true)).rejects.toBeInstanceOf(ApiError);
+    });
+  });
+
   it('skips a damaged event line', () => {
     const seen: StreamEvent[] = [];
     createSseParser((e) => seen.push(e))(

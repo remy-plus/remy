@@ -115,7 +115,11 @@ export function Connections() {
                 <p className="m-0 mt-1 text-[14px] text-muted">{m.detail}</p>
               </div>
               <span className={`${mono} text-[12px] text-muted`}>
-                {m.status === 'reachable' ? 'Reachable' : 'Not reachable'}
+                {m.status === 'reachable'
+                  ? 'Reachable'
+                  : m.status === 'unchecked'
+                    ? 'Not checked'
+                    : 'Not reachable'}
               </span>
               <button
                 type="button"

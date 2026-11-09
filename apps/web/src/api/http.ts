@@ -2,12 +2,19 @@
 // EventSource cannot send an Authorization header.
 import type {
   ApproveBody,
+  BrainData,
+  CatalogApp,
+  ConnectionsData,
   ExtendBody,
   Health,
   HomeData,
+  MachineInput,
+  MachineTest,
   RemyApi,
   ReviewData,
+  SchedulesData,
   SettingsData,
+  SkillsData,
   StreamEvent,
   TaskListItem,
   TaskView,
@@ -48,27 +55,15 @@ export function createSseParser(onEvent: (e: StreamEvent) => void) {
 
 const NOT_YET = 'Not connected to a server yet';
 const no = () => Promise.reject(new ApiError(501, NOT_YET));
+/** Still mock only: the server has no route for these. */
 const notAvailable = {
-  connections: no,
-  setPermission: no,
-  disconnectApp: no,
-  signInApp: no,
-  appCatalog: no,
-  connectApp: no,
-  testMachine: no,
-  addMachine: no,
-  skills: no,
-  setSkillEnabled: no,
-  runSkill: no,
+  // Signing in to an app happens in a browser window on the machine Remy runs on.
+  signInApp: () =>
+    Promise.reject(
+      new ApiError(501, 'Signing in is done in the terminal: run remy connect auth <name>.'),
+    ),
+  // The CLI never suggests skills, so the list says `suggestion: null` and this is never called.
   resolveSuggestion: no,
-  schedules: no,
-  setScheduleEnabled: no,
-  runScheduleNow: no,
-  setWebhookEnabled: no,
-  createSchedule: no,
-  brain: no,
-  updateNote: no,
-  deleteNote: no,
 } satisfies Partial<RemyApi>;
 /** The server has no routes for settings yet. */
 const notYet = <T>(): Promise<T> => Promise.reject(new Error('This is not available yet.'));
@@ -98,6 +93,19 @@ export function createHttpApi(opts: {
   const post = async (path: string, body: unknown = {}) => {
     await call(path, { method: 'POST', body: JSON.stringify(body) });
   };
+  const send = async (method: string, path: string, body?: unknown) => {
+    await call(path, { method, ...(body !== undefined && { body: JSON.stringify(body) }) });
+  };
+  const machineBody = (m: MachineInput) => ({
+    name: m.name,
+    host: m.host,
+    user: m.user,
+    ...(m.port ? { port: m.port } : {}),
+  });
+  const machineRequest = (m: MachineInput): RequestInit => ({
+    method: 'POST',
+    body: JSON.stringify(machineBody(m)),
+  });
   const task = (id: string) => `/api/tasks/${encodeURIComponent(id)}`;
 
   const api: RemyApi = {
@@ -142,7 +150,45 @@ export function createHttpApi(opts: {
     async markDone(): Promise<void> {
       throw new ApiError(404, 'Marking a task done is not available from the server yet.');
     },
-    // Mock-only for now: the server has no routes for connections, skills, schedules or the brain.
+    // Connections, machines, skills, schedules, webhooks and the brain are served by remy serve.
+    connections: () => json<ConnectionsData>('/api/connections'),
+    setPermission: (appId, permissionId, on) =>
+      post(`/api/connections/${encodeURIComponent(appId)}/permissions`, { permissionId, on }),
+    disconnectApp: (appId) => send('DELETE', `/api/connections/${encodeURIComponent(appId)}`),
+    async appCatalog() {
+      return (await json<{ apps: CatalogApp[] }>('/api/catalog')).apps;
+    },
+    connectApp: (catalogId, level) => post('/api/connections', { catalogId, level }),
+    // The key is never sent: the server uses the keys of the account Remy runs under.
+    testMachine: (m) => json<MachineTest>('/api/machines/test', machineRequest(m)),
+    addMachine: (m) => post('/api/machines', machineBody(m)),
+    skills: () => json<SkillsData>('/api/skills'),
+    setSkillEnabled: (name, enabled) =>
+      post(`/api/skills/${encodeURIComponent(name)}/enabled`, { enabled }),
+    runSkill: (name) =>
+      json<{ taskId: string }>(`/api/skills/${encodeURIComponent(name)}/run`, {
+        method: 'POST',
+        body: '{}',
+      }),
+    schedules: () => json<SchedulesData>('/api/schedules'),
+    setScheduleEnabled: (id, enabled) =>
+      post(`/api/schedules/${encodeURIComponent(id)}/enabled`, { enabled }),
+    runScheduleNow: (id) =>
+      json<{ taskId: string }>(`/api/schedules/${encodeURIComponent(id)}/run`, {
+        method: 'POST',
+        body: '{}',
+      }),
+    setWebhookEnabled: (id, enabled) =>
+      post(`/api/webhooks/${encodeURIComponent(id)}/enabled`, { enabled }),
+    // The server runs on this machine in its own time zone, so only the text and the phrase go.
+    createSchedule: (s) =>
+      json<{ id: string }>('/api/schedules', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: s.prompt, when: s.when }),
+      }),
+    brain: () => json<BrainData>('/api/brain'),
+    updateNote: (id, text) => send('PUT', `/api/brain/${encodeURIComponent(id)}`, { text }),
+    deleteNote: (id) => send('DELETE', `/api/brain/${encodeURIComponent(id)}`),
     ...notAvailable,
     settings: () => notYet<SettingsData>(),
     health: () => json<Health>('/api/health'),
