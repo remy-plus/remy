@@ -44,6 +44,12 @@ export interface SkillCandidate {
 }
 
 export interface SkillStore extends SkillsPort {
+  /** Every skill, switched-off ones included. `list` leaves those out: Remy never sees them. */
+  all(): Skill[];
+  /** Names switched off with `setEnabled`. */
+  disabled(): string[];
+  /** Switches a skill off or on for Remy (nothing is deleted). False when no skill has that name. */
+  setEnabled(name: string, enabled: boolean): boolean;
   save(draft: SkillDraft): { path: string };
   used(name: string): void;
   /** Skills that could not be read, with why. */
@@ -108,6 +114,15 @@ export function openSkills(home: string, cwd: string): SkillStore {
     mkdirSync(mine, { recursive: true });
     writeFileSync(sourcesPath, JSON.stringify(sources, null, 2));
   };
+  const offPath = join(mine, '.disabled.json');
+  const loadOff = (): string[] => {
+    try {
+      const raw = JSON.parse(readFileSync(offPath, 'utf8')) as unknown;
+      return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  };
   const loadUses = (): Record<string, number> => {
     try {
       const raw = JSON.parse(readFileSync(usesPath, 'utf8')) as unknown;
@@ -132,7 +147,19 @@ export function openSkills(home: string, cwd: string): SkillStore {
     return { skills: withUses(merged), problems };
   };
   return {
-    list: () => read().skills,
+    list: () => {
+      const off = new Set(loadOff());
+      return read().skills.filter((k) => !off.has(k.name));
+    },
+    all: () => read().skills,
+    disabled: loadOff,
+    setEnabled(name, enabled) {
+      if (!read().skills.some((k) => k.name === name)) return false;
+      const rest = loadOff().filter((n) => n !== name);
+      mkdirSync(mine, { recursive: true });
+      writeFileSync(offPath, JSON.stringify(enabled ? rest : [...rest, name]));
+      return true;
+    },
     problems: () => read().problems,
     prepare(path) {
       const abs = resolve(cwd, path);
@@ -225,7 +252,11 @@ const SOURCE_LABEL: Record<SkillSource, string> = {
 const firstSentence = (t: string) => t.split(/(?<=[.!?])\s/)[0] ?? t;
 
 /** The plain list for `remy skills list` and `/skills`. */
-export function plainSkills(skills: Skill[], problems: SkillProblem[] = []): string {
+export function plainSkills(
+  skills: Skill[],
+  problems: SkillProblem[] = [],
+  off: string[] = [],
+): string {
   const lines = skills.length ? [] : ['No skills yet.'];
   for (const source of ['yours', 'web', 'project', 'builtin'] as const) {
     const group = skills.filter((s) => s.source === source);
@@ -234,7 +265,7 @@ export function plainSkills(skills: Skill[], problems: SkillProblem[] = []): str
     lines.push(`Skills (${SOURCE_LABEL[source]})`);
     for (const s of group)
       lines.push(
-        `  ${s.name.padEnd(20)} ${s.learned ? '[learned] ' : ''}${firstSentence(s.description)}`,
+        `  ${s.name.padEnd(20)} ${off.includes(s.name) ? '[off] ' : ''}${s.learned ? '[learned] ' : ''}${firstSentence(s.description)}`,
       );
   }
   for (const p of problems) lines.push('', `Skipped ${p.path}: ${p.error}`);

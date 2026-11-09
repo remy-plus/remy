@@ -165,6 +165,7 @@ import {
 import { listenServe } from './serve.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
+import { createSkillsMount } from './serve-skills.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
@@ -1581,7 +1582,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       effectOf: (tool) => registry?.get(tool)?.effect,
       riskOf: (tool) => registry?.get(tool)?.risk,
       approvals: standing(),
-      skills: () => plainSkills(skills().list(), skills().problems()),
+      skills: () => plainSkills(skills().all(), skills().problems(), skills().disabled()),
       schedules: () => plainSchedules(openSchedules(home).list()),
       review: async (window) => {
         const now = new Date();
@@ -1835,13 +1836,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       case 'skills': {
         const sub = rest[0] ?? 'list';
         if (sub === 'list') {
-          out(plainSkills(skills().list(), skills().problems()));
+          out(plainSkills(skills().all(), skills().problems(), skills().disabled()));
           return 0;
         }
         if (sub === 'show') {
           need(2, 'remy skills show <name>');
           const hit = skills()
-            .list()
+            .all()
             .find((s) => s.name === rest[1]);
           if (!hit) throw new Error(`There is no skill named ${rest[1]}. See remy skills list.`);
           out(plainSkill(hit));
@@ -2197,6 +2198,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                     list,
                   ),
               }),
+              createSkillsMount({ skills: skills() }),
             ],
           },
           bind,
