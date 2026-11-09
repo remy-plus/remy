@@ -318,7 +318,7 @@ html.js .step.wait.shown .no { animation: pulse 2.4s ease-in-out 1.2s 2; }
 
 /* 3b. Real screens */
 .app { padding-block: var(--gap) 0; }
-.app-shots { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(16px, 2vw, 28px); align-items: end; }
+.app-shots { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(16px, 2vw, 28px); align-items: start; }
 .shot { background: var(--surface); border-radius: 18px; padding: clamp(12px, 1.6vw, 24px); transition: background 0.25s; }
 .shot:hover { background: var(--raise); }
 .shot img { display: block; width: 100%; height: auto; border-radius: 10px; }
