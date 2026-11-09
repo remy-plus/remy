@@ -17,6 +17,7 @@ import { askUser, finish } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { listenServe, type ServeListening } from './serve.ts';
+import { homeRoutes } from './serve-home.ts';
 import { configWithPrefs, createSpend, openWebPrefs, settingsRoutes } from './serve-settings.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 
@@ -77,6 +78,14 @@ async function serve(script: ModelResponse[], rig: Rig = {}) {
   const s = await listenServe(
     {
       routes: [
+        homeRoutes({
+          store,
+          prefs,
+          spend,
+          machines: () => rig.machines ?? 0,
+          notesCount: () => notes.length,
+          notesToday: () => notes.length,
+        }),
         settingsRoutes(
           {
             home,
@@ -141,18 +150,31 @@ async function serve(script: ModelResponse[], rig: Rig = {}) {
   return { s, store, api, model, notes, prefs };
 }
 
+const until = async <T>(fn: () => Promise<T | undefined | false>, ms = 4000): Promise<T> => {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() > end) throw new Error('timed out waiting');
+    await new Promise((r) => setTimeout(r, 15));
+  }
+};
+
 const ROUTES: [string, string][] = [
+  ['GET', '/api/home'],
   ['GET', '/api/settings'],
   ['PUT', '/api/settings'],
 ];
 
 describe('every new route', () => {
   it('needs the bearer token and sends no CORS headers', async () => {
-    const { api, s } = await serve([]);
+    // One server per route: wrong tokens lock an address out after five tries.
     for (const [method, path] of ROUTES) {
+      const { api } = await serve([]);
       expect((await api(path, { method, token: null })).status, path).toBe(401);
       expect((await api(path, { method, token: 'wrong' })).status, path).toBe(401);
     }
+    const { s } = await serve([]);
     const res = await fetch(`http://127.0.0.1:${s.port}/api/settings`, {
       headers: { authorization: `Bearer ${token}`, origin: 'https://evil.example' },
     });
@@ -161,6 +183,7 @@ describe('every new route', () => {
 
   it('answers a wrong method with 405', async () => {
     const { api } = await serve([]);
+    expect((await api('/api/home', { method: 'POST', body: {} })).status).toBe(405);
     expect((await api('/api/settings', { method: 'POST', body: {} })).status).toBe(405);
     expect((await api('/api/settings', { method: 'DELETE' })).status).toBe(405);
   });
@@ -288,5 +311,141 @@ describe('settings', () => {
     const b = await api('/api/tasks', { method: 'POST', body: { prompt: 'two', trust: 'ask' } });
     const cfg2 = (await store.read(b.json.taskId))[0]?.event as unknown as Cfg;
     expect(cfg2.config.permissions.trust).toBeUndefined();
+  });
+});
+
+describe('home', () => {
+  it('has the right shape with no tasks, and invents nothing', async () => {
+    const { api } = await serve([]);
+    const r = await api('/api/home');
+    expect(r.status).toBe(200);
+    expect(r.json.status).toMatchObject({
+      running: 0,
+      machinesUp: 0,
+      notes: 0,
+      trust: 'ask',
+      quiet: false,
+    });
+    expect(r.json.status.time).toMatch(/^\d\d:\d\d$/);
+    expect(r.json.briefing.headline).toBe('Nothing needs you.');
+    expect(r.json.briefing.asks).toEqual([]);
+    expect(r.json).toMatchObject({
+      satellites: [],
+      needsYou: [],
+      working: [],
+      noticed: [],
+      alert: null,
+      brain: null,
+    });
+  });
+
+  it('shows cards, working tasks with a step rail, and what ended', async () => {
+    const { api, store } = await serve(
+      [
+        call('note', { text: 'Hello <b>Dana</b>' }),
+        call('ask_user', { question: 'Which flight?' }),
+        call('finish', { answer: 'All done.' }),
+      ],
+      { machines: 2, notes: ['n1', 'n2', 'n3'] },
+    );
+    await api('/api/settings', { method: 'PUT', body: { trust: 'steady', quiet: true } });
+    const one = (await api('/api/tasks', { method: 'POST', body: { prompt: 'Email Dana' } })).json
+      .taskId;
+    await until(async () => (await api(`/api/tasks/${one}`)).json.status === 'waiting_approval');
+    const two = (await api('/api/tasks', { method: 'POST', body: { prompt: 'Book a flight' } }))
+      .json.taskId;
+    await until(async () => (await api(`/api/tasks/${two}`)).json.status === 'waiting_user');
+    // A task that is running, with a plan of three steps, one done.
+    await store.createTask('task_plan', 'Rename invoices', {
+      model: 'scripted',
+      permissions: { autoApprove: ['read'] },
+      budget: DEFAULT_BUDGET,
+      workspaceDir: '/w',
+    });
+    const lease = await store.acquireLease('task_plan', 'test', 60_000);
+    if (!lease) throw new Error('no lease');
+    const steps = [
+      { text: 'Find the files', status: 'done' },
+      { text: 'Rename them', status: 'doing' },
+      { text: 'Check', status: 'pending' },
+    ];
+    await store.append(
+      'task_plan',
+      1,
+      [
+        {
+          type: 'model.responded',
+          step: 1,
+          calls: [{ callId: 'c1', tool: 'update_plan', args: { steps }, argsHash: 'h1' }],
+          usage: { inTokens: 1, outTokens: 1 },
+          costUsd: 0.02,
+          latencyMs: 1,
+        },
+        { type: 'policy.decided', callId: 'c1', decision: { kind: 'allow' }, risk: 'read' },
+        { type: 'tool.started', callId: 'c1', idempotencyKey: 'c1', attempt: 1 },
+        {
+          type: 'tool.completed',
+          callId: 'c1',
+          result: { ok: true, content: 'ok', trust: 'trusted' },
+          latencyMs: 1,
+        },
+      ],
+      lease,
+    );
+    await store.releaseLease(lease);
+
+    const r = await api('/api/home');
+    expect(r.status).toBe(200);
+    expect(r.json.status).toMatchObject({
+      running: 1,
+      machinesUp: 2,
+      notes: 3,
+      trust: 'steady',
+      quiet: true,
+    });
+    expect(r.json.briefing.headline).toBe('2 things need you.');
+    const card = r.json.needsYou.find((c: { taskId: string }) => c.taskId === one);
+    expect(card).toMatchObject({ kind: 'send as user', title: 'Email Dana' });
+    expect(card.detail).toContain('Send: Hello');
+    expect(card.approval.callId).toBeTruthy();
+    expect(card.approval.argsHash).toBeTruthy();
+    const ask = r.json.needsYou.find((c: { taskId: string }) => c.taskId === two);
+    expect(ask).toMatchObject({ kind: 'question', detail: 'Which flight?' });
+    expect(ask.approval).toBeUndefined();
+    expect(r.json.working).toEqual([
+      {
+        taskId: 'task_plan',
+        title: 'Rename invoices',
+        state: 'working',
+        done: 1,
+        total: 3,
+        line: 'Rename them',
+      },
+    ]);
+    expect(r.json.brain).toEqual({ notes: 3, newToday: 3, connected: [] });
+
+    // Answer the question: it finishes and shows up under Noticed.
+    await api(`/api/tasks/${two}/answer`, { body: { answer: 'The 9am' } });
+    await until(async () => (await api(`/api/tasks/${two}`)).json.status === 'succeeded');
+    const after = await api('/api/home');
+    expect(after.json.noticed).toHaveLength(1);
+    expect(after.json.noticed[0].text).toBe('Finished: Book a flight');
+    expect(after.json.noticed[0].at).toMatch(/^\d\d:\d\d$/);
+    expect(after.json.briefing.headline).toBe('1 thing needs you.');
+  });
+
+  it('cleans task text and never sends markup or control characters', async () => {
+    const { api } = await serve([call('ask_user', { question: 'Go?\u0007\u001b[31m now' })]);
+    const id = (
+      await api('/api/tasks', {
+        method: 'POST',
+        body: { prompt: 'Line one\nline <script>x</script>' },
+      })
+    ).json.taskId;
+    await until(async () => (await api(`/api/tasks/${id}`)).json.status === 'waiting_user');
+    const r = await api('/api/home');
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: that is what is checked
+    expect(r.text).not.toMatch(/[\u0000-\u0008\u000b-\u001f]/);
+    expect(r.json.needsYou[0].title).toBe('Line one line <script>x</script>');
   });
 });
