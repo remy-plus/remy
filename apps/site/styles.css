@@ -174,6 +174,7 @@ h3 { font-size: var(--t-h3); font-weight: 500; line-height: 1.12; letter-spacing
 .rows em.ok { color: var(--signal); background: rgba(168, 196, 154, 0.1); }
 .rows em.ask { color: var(--text); background: #2a2a2f; }
 .rows code { color: var(--text); }
+.rows .mid { min-width: 0; overflow-wrap: anywhere; }
 
 /* 3. Pinned story */
 .how-h { margin-bottom: clamp(24px, 4vw, 56px); }
