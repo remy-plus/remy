@@ -40,7 +40,7 @@ export function Server({ data }: SectionProps) {
             <p className="m-0 text-[13px] text-muted">
               Copy it now. Remy shows it once, and every signed-in device needs it.
             </p>
-            <code className="mt-2 inline-block rounded-md border border-line bg-surface px-3 py-2 font-mono text-[13px] break-all">
+            <code className="mt-2 inline-block rounded-md border border-edge bg-surface px-3 py-2 font-mono text-[13px] break-all">
               {fresh}
             </code>
           </div>
@@ -56,7 +56,7 @@ export function Server({ data }: SectionProps) {
           {data.server.lastSignIns.map((s) => (
             <li
               key={s.at + s.where}
-              className="flex list-none justify-between gap-4 border-b border-line py-2 text-[14px] first:pt-0 last:border-b-0"
+              className="flex list-none justify-between gap-4 border-b border-edge py-2 text-[14px] first:pt-0 last:border-b-0"
             >
               <span>{s.where}</span>
               <span className="font-mono text-[12px] text-muted">{s.at}</span>
@@ -91,7 +91,7 @@ export function About({ data }: SectionProps) {
       {rows.map(([k, v]) => (
         <div
           key={k}
-          className="grid gap-x-10 gap-y-1 border-t border-line py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]"
+          className="grid gap-x-10 gap-y-1 border-t border-edge py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]"
         >
           <dt className="text-[15px] font-medium">{k}</dt>
           <dd className="m-0 font-mono text-[14px] break-words">{v}</dd>

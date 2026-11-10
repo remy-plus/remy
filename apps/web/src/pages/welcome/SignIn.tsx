@@ -125,7 +125,7 @@ export function SignIn({
 
         <section
           aria-label="Server status"
-          className="font-mono mt-6 rounded-[10px] border border-line bg-surface px-4 py-3.5 text-[12px] leading-relaxed"
+          className="font-mono mt-6 rounded-[10px] border border-edge bg-surface px-4 py-3.5 text-[12px] leading-relaxed"
         >
           <p className="m-0 flex items-center gap-2 text-text">
             <span

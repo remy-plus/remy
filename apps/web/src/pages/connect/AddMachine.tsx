@@ -149,7 +149,7 @@ export function AddMachine() {
           <Eyebrow>Test result</Eyebrow>
           <div
             role="status"
-            className={`mt-3 mb-8 rounded-[10px] border bg-surface px-4 py-3 text-[13px] ${test && test !== 'running' && test.ok ? 'border-signal' : 'border-line'}`}
+            className={`mt-3 mb-8 rounded-[10px] border bg-surface px-4 py-3 text-[13px] ${test && test !== 'running' && test.ok ? 'border-signal' : 'border-edge'}`}
           >
             {test === null && <p className="m-0 text-muted">Not tested yet.</p>}
             {test === 'running' && <p className="m-0 text-muted">Testing</p>}

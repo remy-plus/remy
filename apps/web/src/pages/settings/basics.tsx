@@ -140,7 +140,7 @@ export function CurrencyRow() {
               setCodeText(v);
               if (validCode(v)) setCode(v);
             }}
-            className="h-[38px] w-[88px] rounded-md border border-stone bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
+            className="h-[38px] w-[88px] rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
           />
         </label>
         <label className="flex flex-col gap-1 text-[13px] text-muted">
@@ -157,7 +157,7 @@ export function CurrencyRow() {
               const n = Number.parseFloat(e.target.value);
               if (Number.isFinite(n) && n > 0) setRate(n);
             }}
-            className="h-[38px] w-[120px] rounded-md border border-stone bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
+            className="h-[38px] w-[120px] rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
           />
         </label>
       </div>

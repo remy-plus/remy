@@ -67,7 +67,7 @@ export function AddConnection() {
                 {app.levels.map((l) => (
                   <label
                     key={l.id}
-                    className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line bg-surface px-4 py-3 has-[:checked]:border-signal has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text"
+                    className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-edge bg-surface px-4 py-3 has-[:checked]:border-text has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text"
                   >
                     <input
                       type="radio"
@@ -87,7 +87,7 @@ export function AddConnection() {
                 ))}
               </div>
             </div>
-            <p className="mt-5 mb-5 rounded-[10px] border border-line px-4 py-3 text-[14px] leading-relaxed text-muted">
+            <p className="mt-5 mb-5 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-relaxed text-muted">
               Remy never gets your password. You can disconnect at any time and the access ends at
               once.
             </p>
@@ -125,7 +125,7 @@ export function AddConnection() {
         {shown.map((a) => (
           <label
             key={a.id}
-            className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-line bg-surface px-4 py-4 has-[:checked]:border-signal has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text"
+            className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-edge bg-surface px-4 py-4 has-[:checked]:border-text has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text"
           >
             <input
               type="radio"
@@ -141,7 +141,7 @@ export function AddConnection() {
                 {a.name}
                 {a.spendsMoney && (
                   <span
-                    className={`${mono} rounded-[4px] border border-line bg-raise px-1.5 py-px text-[11px] font-normal text-muted`}
+                    className={`${mono} rounded-[4px] border border-edge bg-raise px-1.5 py-px text-[11px] font-normal text-muted`}
                   >
                     spends money
                   </span>
@@ -153,7 +153,7 @@ export function AddConnection() {
         ))}
       </div>
       {shown.length === 0 && <p className="text-[14px] text-muted">No app matches “{query}”.</p>}
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-dashed border-stone px-4 py-4">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-dashed border-edge-hi px-4 py-4">
         <div className="min-w-0 max-w-[520px]">
           <h2 className="m-0 text-[16px] font-medium">Something else?</h2>
           <p className="m-0 mt-1 text-[14px] text-muted">

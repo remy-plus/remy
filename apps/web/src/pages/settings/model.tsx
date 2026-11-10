@@ -20,7 +20,7 @@ function ProviderRow({ p, inUse, onUse }: { p: Provider; inUse: boolean; onUse: 
   const hasKey = p.state === 'key_in_use' || p.state === 'key_saved';
   const status = `${STATE[p.state]}${inUse ? ' · in use' : ''}`;
   return (
-    <li className="list-none border-b border-line py-4">
+    <li className="list-none border-b border-edge py-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-60">
           <h4 className="m-0 text-[15px] font-medium">{p.name}</h4>
@@ -77,7 +77,7 @@ export function Model({ data }: SectionProps) {
   return (
     <>
       <h3 className={heading}>Providers</h3>
-      <ul className="m-0 border-t border-line p-0">
+      <ul className="m-0 border-t border-edge p-0">
         {data.providers.map((p) => (
           <ProviderRow key={p.id} p={p} inUse={p.id === current} onUse={() => setChosen(p.id)} />
         ))}
@@ -86,11 +86,11 @@ export function Model({ data }: SectionProps) {
       <h3 className={`${heading} mt-8`}>Which model does what</h3>
       <dl className="m-0 grid max-w-[620px] grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-3 sm:grid-cols-[192px_minmax(0,1fr)]">
         <dt className="self-center text-[15px]">Everyday tasks</dt>
-        <dd className="m-0 rounded-md border border-stone bg-surface px-3 py-[9px] font-mono text-[13px]">
+        <dd className="m-0 rounded-md border border-edge-hi bg-surface px-3 py-[9px] font-mono text-[13px]">
           {data.models.everyday} · {data.models.everydayCost}
         </dd>
         <dt className="self-center text-[15px]">Hard tasks</dt>
-        <dd className="m-0 rounded-md border border-stone bg-surface px-3 py-[9px] font-mono text-[13px]">
+        <dd className="m-0 rounded-md border border-edge-hi bg-surface px-3 py-[9px] font-mono text-[13px]">
           {data.models.hard} · {data.models.hardCost}
         </dd>
       </dl>

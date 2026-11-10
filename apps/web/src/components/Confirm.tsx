@@ -39,7 +39,7 @@ export function Confirm({
         e.preventDefault();
         onCancel();
       }}
-      className="m-auto w-[min(440px,calc(100vw-32px))] rounded-[14px] border border-stone bg-surface p-6 text-text backdrop:bg-black/60"
+      className="m-auto w-[min(440px,calc(100vw-32px))] rounded-[14px] border border-edge-hi bg-surface p-6 text-text backdrop:bg-black/60"
     >
       {open && (
         <>

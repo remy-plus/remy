@@ -29,7 +29,7 @@ export function Skills() {
 
   return (
     <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">
-      <div className="min-w-0 border-b border-line px-5 py-8 sm:px-8 lg:border-r lg:border-b-0 lg:pr-8 lg:pl-14">
+      <div className="min-w-0 border-b border-edge px-5 py-8 sm:px-8 lg:border-r lg:border-b-0 lg:pr-8 lg:pl-14">
         <h1 className="m-0 text-[30px] font-normal leading-tight">Skills</h1>
         <p className="mt-3 mb-6 text-base text-muted">
           How you like things done, saved so Remy does them the same way every time.
@@ -39,7 +39,7 @@ export function Skills() {
         {data.suggestion && (
           <section
             aria-labelledby="suggested-h"
-            className="mt-6 rounded-[10px] border border-stone bg-surface p-4"
+            className="mt-6 rounded-[10px] border border-edge-hi bg-surface p-4"
           >
             <h2 id="suggested-h" className={`${mono} m-0 text-[12px] font-normal text-signal`}>
               Suggested
@@ -90,7 +90,7 @@ export function Skills() {
                 >
                   <span
                     aria-hidden="true"
-                    className={`${mono} absolute top-0.5 left-0 grid size-[19px] place-items-center rounded-full border border-stone bg-bg text-[10px] text-muted`}
+                    className={`${mono} absolute top-0.5 left-0 grid size-[19px] place-items-center rounded-full border border-edge-hi bg-bg text-[10px] text-muted`}
                   >
                     {i + 1}
                   </span>
@@ -102,7 +102,7 @@ export function Skills() {
             {skill.why && (
               <section
                 aria-labelledby="why-h"
-                className="mb-4 max-w-[680px] rounded-[10px] border border-line bg-surface p-4"
+                className="mb-4 max-w-[680px] rounded-[10px] border border-edge bg-surface p-4"
               >
                 <h3 id="why-h" className={`${mono} m-0 mb-2 text-[12px] font-normal text-muted`}>
                   Why this skill exists
@@ -189,12 +189,12 @@ function SkillGroup({
                 type="button"
                 aria-current={on ? 'true' : undefined}
                 onClick={() => onPick(s.name)}
-                className={`block w-full cursor-pointer rounded-[10px] border bg-transparent px-3.5 py-3 text-left text-text hover:bg-surface ${on ? 'border-line bg-surface' : 'border-transparent'}`}
+                className={`block w-full cursor-pointer rounded-[10px] border bg-transparent px-3.5 py-3 text-left text-text hover:bg-surface ${on ? 'border-edge bg-surface' : 'border-transparent'}`}
               >
                 <span className="flex items-center justify-between gap-3">
                   <span className={`${mono} text-[14px] font-medium`}>{s.name}</span>
                   <span
-                    className={`${mono} rounded-[4px] border px-1.5 py-px text-[12px] ${s.source === 'learned' ? 'border-signal text-signal' : 'border-stone text-muted'}`}
+                    className={`${mono} rounded-[4px] border px-1.5 py-px text-[12px] ${s.source === 'learned' ? 'border-signal text-signal' : 'border-edge-hi text-muted'}`}
                   >
                     {TAG[s.source]}
                   </span>

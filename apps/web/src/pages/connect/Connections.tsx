@@ -22,7 +22,7 @@ const STATUS: Record<ConnectedApp['status'], string> = {
   not_connected: 'Not connected',
 };
 
-const row = 'flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-line py-4';
+const row = 'flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-edge py-4';
 
 export function Connections() {
   const { api, data, setData, error } = useLoad((a) => a.connections());
@@ -82,7 +82,7 @@ export function Connections() {
             {connected} of {data.apps.length} connected
           </span>
         </div>
-        <ul className="m-0 list-none border-t border-line p-0">
+        <ul className="m-0 list-none border-t border-edge p-0">
           {data.apps.map((a) => (
             <AppRow
               key={a.id}
@@ -102,7 +102,7 @@ export function Connections() {
             Remy asks before every command
           </span>
         </div>
-        <ul className="m-0 list-none border-t border-line p-0">
+        <ul className="m-0 list-none border-t border-edge p-0">
           {data.machines.map((m) => (
             <li
               key={m.name}
@@ -110,7 +110,7 @@ export function Connections() {
             >
               <span
                 aria-hidden="true"
-                className={`${mono} grid size-10 shrink-0 place-items-center rounded-md border border-stone text-[11px]`}
+                className={`${mono} grid size-10 shrink-0 place-items-center rounded-md border border-edge-hi text-[11px]`}
               >
                 {'>_'}
               </span>
@@ -214,7 +214,7 @@ function Panel({
       <div>
         <Eyebrow>{machine.name} · how Remy behaves</Eyebrow>
         <p className="mt-4 mb-0 text-[14px] text-muted">{machine.detail}</p>
-        <p className="mt-4 mb-0 rounded-[10px] border border-line px-4 py-3 text-[14px] text-muted">
+        <p className="mt-4 mb-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] text-muted">
           Every command asks you first and is shown in full. Output from the machine is treated as
           untrusted text, not orders.
         </p>
@@ -244,7 +244,7 @@ function Panel({
         {app.permissions.map((p) => (
           <li
             key={p.id}
-            className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-b-0"
+            className="flex items-center justify-between gap-4 border-b border-edge py-3 last:border-b-0"
           >
             <div className="min-w-0">
               <p className="m-0 text-[15px] font-medium">{p.label}</p>
@@ -254,7 +254,7 @@ function Panel({
           </li>
         ))}
       </ul>
-      <p className="mt-4 mb-4 rounded-[10px] border border-line px-4 py-3 text-[14px] leading-relaxed text-muted">
+      <p className="mt-4 mb-4 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-relaxed text-muted">
         {app.untrusted}
       </p>
       <button type="button" className={quiet} onClick={onDisconnect}>

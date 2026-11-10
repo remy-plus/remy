@@ -5,7 +5,7 @@ import { type SettingKey, useSetting } from '../../settings.ts';
 import { Row, Toggle } from './controls.tsx';
 
 const time =
-  'h-[38px] w-[130px] rounded-md border border-stone bg-surface px-3 font-mono text-[13px] text-text outline-none focus-visible:border-text [color-scheme:dark]';
+  'h-[38px] w-[130px] rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text outline-none focus-visible:border-text [color-scheme:dark]';
 
 function Time({
   name,
@@ -82,7 +82,7 @@ export function Notifications() {
           <span className="text-[14px] text-muted">turns quiet mode on and off by itself</span>
         </div>
       </Row>
-      <div className="flex flex-wrap items-center gap-4 border-t border-line pt-5">
+      <div className="flex flex-wrap items-center gap-4 border-t border-edge pt-5">
         <button type="button" className={buttonQuiet} onClick={test}>
           Send a test notification
         </button>

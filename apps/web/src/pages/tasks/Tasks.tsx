@@ -37,7 +37,7 @@ function Row({ t, group, api }: { t: TaskListItem; group: Group; api: RemyApi })
   const state = t.label ?? stateWord(t.status);
   const live = group === 'running';
   return (
-    <li className="list-none border-b border-line last:border-b-0">
+    <li className="list-none border-b border-edge last:border-b-0">
       <a
         href={`#/tasks/${encodeURIComponent(t.id)}`}
         className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-1.5 py-4 text-text no-underline hover:bg-surface sm:grid-cols-[minmax(0,1fr)_180px_110px]"
@@ -75,7 +75,7 @@ function Shortcut({
   return (
     <a
       href={href}
-      className="mb-3 block rounded-[10px] border border-line bg-surface p-4 text-text no-underline hover:border-stone"
+      className="mb-3 block rounded-[10px] border border-edge bg-surface p-4 text-text no-underline hover:border-edge-hi"
     >
       <span className={`${mono} block text-[12px] text-muted`}>{eyebrow}</span>
       <span className="mt-1 block text-[17px] font-medium">{title}</span>
@@ -143,7 +143,7 @@ export function Tasks() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tasks by what they were about"
-            className="min-w-0 flex-[1_1_260px] rounded-[10px] border border-stone bg-surface px-5 py-3 text-[16px] text-text outline-none placeholder:text-muted"
+            className="min-w-0 flex-[1_1_260px] rounded-[10px] border border-edge-hi bg-surface px-5 py-3 text-[16px] text-text outline-none placeholder:text-muted"
           />
           <fieldset aria-label="Filter tasks" className="m-0 flex flex-wrap gap-2 border-0 p-0">
             {FILTERS.map((f) => (
@@ -152,7 +152,7 @@ export function Tasks() {
                 type="button"
                 aria-pressed={filter === f.id}
                 onClick={() => setFilter(f.id)}
-                className={`${mono} cursor-pointer rounded-full border bg-transparent px-4 py-2 text-[12px] whitespace-nowrap ${filter === f.id ? 'border-signal text-text' : 'border-line text-muted hover:text-text'}`}
+                className={`${mono} cursor-pointer rounded-full border bg-transparent px-4 py-2 text-[12px] whitespace-nowrap ${filter === f.id ? 'border-signal text-text' : 'border-edge text-muted hover:text-text'}`}
               >
                 {f.label}
                 {tasks && <span className="ml-1.5">{count(f.id)}</span>}
@@ -182,7 +182,7 @@ export function Tasks() {
           return (
             <section key={g.id} aria-label={g.title} className="mb-8">
               <div
-                className={`${mono} flex items-baseline justify-between border-b border-line pb-2 text-[12px] text-muted`}
+                className={`${mono} flex items-baseline justify-between border-b border-edge pb-2 text-[12px] text-muted`}
               >
                 <h2 className="m-0 text-[12px] font-normal">{g.title}</h2>
                 <span>{rows.length}</span>
@@ -199,7 +199,7 @@ export function Tasks() {
 
       <aside
         aria-label="Shortcuts"
-        className="border-t border-line px-5 py-8 lg:border-t-0 lg:border-l lg:px-7"
+        className="border-t border-edge px-5 py-8 lg:border-t-0 lg:border-l lg:px-7"
       >
         <Shortcut
           href="#/review"

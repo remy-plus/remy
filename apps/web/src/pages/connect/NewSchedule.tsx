@@ -113,7 +113,7 @@ export function NewSchedule() {
       </p>
     );
   const label = `${mono} mb-2 block text-[12px] text-muted`;
-  const small = `${mono} rounded-[10px] border border-line bg-bg px-3.5 py-2 text-[14px] text-text aria-[invalid=true]:border-[#d98b7a]`;
+  const small = `${mono} rounded-[10px] border border-edge bg-bg px-3.5 py-2 text-[14px] text-text aria-[invalid=true]:border-[#d98b7a]`;
 
   return (
     <div className="px-5 py-10 sm:px-8">
@@ -121,7 +121,7 @@ export function NewSchedule() {
         onSubmit={submit}
         noValidate
         aria-labelledby={`${uid}-title`}
-        className="mx-auto max-w-[680px] rounded-[14px] border border-line bg-surface p-5 sm:p-8"
+        className="mx-auto max-w-[680px] rounded-[14px] border border-edge bg-surface p-5 sm:p-8"
       >
         <h1 id={`${uid}-title`} className="m-0 text-[26px] font-normal leading-tight">
           New schedule
@@ -148,11 +148,11 @@ export function NewSchedule() {
           <p id={`${uid}-often`} className={`${label} mb-2`}>
             How often
           </p>
-          <div className="inline-flex max-w-full flex-wrap overflow-hidden rounded-md border border-stone">
+          <div className="inline-flex max-w-full flex-wrap overflow-hidden rounded-md border border-edge-hi">
             {HOW_OFTEN.map((o) => (
               <label
                 key={o}
-                className={`${mono} cursor-pointer border-r border-stone px-4 py-2 text-[13px] last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text ${often === o ? 'bg-signal font-medium text-signal-ink' : 'text-muted hover:text-text'}`}
+                className={`${mono} cursor-pointer border-r border-edge-hi px-4 py-2 text-[13px] last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text ${often === o ? 'bg-signal font-medium text-signal-ink' : 'text-muted hover:text-text'}`}
               >
                 <input
                   type="radio"
@@ -271,7 +271,7 @@ export function NewSchedule() {
           </div>
         </div>
 
-        <p className="mt-6 mb-6 rounded-[10px] border border-line px-4 py-3 text-[14px] leading-relaxed text-muted">
+        <p className="mt-6 mb-6 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-relaxed text-muted">
           While it runs, Remy works at trust level{' '}
           <strong className="font-semibold text-text">{data.policy.trust}</strong> and stops to ask
           if a run costs more than {data.policy.stopAbove}.

@@ -20,7 +20,7 @@ function Marked({ text, mark }: { text: string; mark?: string }) {
 function Kbd({ children }: { children: ReactNode }) {
   return (
     <kbd
-      className={`${mono} hidden rounded border border-line px-1.5 text-[11px] text-muted sm:inline`}
+      className={`${mono} hidden rounded border border-edge px-1.5 text-[11px] text-muted sm:inline`}
     >
       {children}
     </kbd>
@@ -130,7 +130,7 @@ export function ApprovalDialog({
         e.preventDefault(); // Esc is a decision, not just a close
         void decide(false);
       }}
-      className="m-0 mt-auto max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[18px] border border-stone bg-surface p-0 text-text backdrop:bg-black/70 sm:m-auto sm:max-w-[920px] sm:rounded-[18px]"
+      className="m-0 mt-auto max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[18px] border border-edge-hi bg-surface p-0 text-text backdrop:bg-black/70 sm:m-auto sm:max-w-[920px] sm:rounded-[18px]"
     >
       <div className="grid sm:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 p-5 sm:p-8">
@@ -151,10 +151,10 @@ export function ApprovalDialog({
             {detail?.title ?? 'Approve this action?'}
           </h2>
 
-          <div className="overflow-hidden rounded-[10px] border border-line bg-bg">
+          <div className="overflow-hidden rounded-[10px] border border-edge bg-bg">
             {detail?.headers && (
               <dl
-                className={`${mono} m-0 border-b border-line px-4 py-3 text-[13px] leading-[1.7]`}
+                className={`${mono} m-0 border-b border-edge px-4 py-3 text-[13px] leading-[1.7]`}
               >
                 {detail.headers.map((h) => (
                   <div key={h.k} className="flex gap-2">
@@ -172,7 +172,7 @@ export function ApprovalDialog({
               ))}
               {detail?.attachment && (
                 <p
-                  className={`${mono} mt-4 mb-0 inline-block rounded-md border border-line px-3 py-1.5 text-[12px]`}
+                  className={`${mono} mt-4 mb-0 inline-block rounded-md border border-edge px-3 py-1.5 text-[12px]`}
                 >
                   {detail.attachment}
                 </p>
@@ -229,7 +229,7 @@ export function ApprovalDialog({
           <div className="mt-4 sm:hidden">
             <ul className={`${mono} m-0 flex flex-wrap gap-2 p-0 text-[12px] text-muted`}>
               {[...effects.map((e) => e.label), 'Used once'].map((c) => (
-                <li key={c} className="list-none rounded-full border border-line px-3 py-1">
+                <li key={c} className="list-none rounded-full border border-edge px-3 py-1">
                   {c}
                 </li>
               ))}
@@ -242,7 +242,7 @@ export function ApprovalDialog({
 
         <aside
           aria-label="About this approval"
-          className="hidden border-l border-line bg-bg/60 p-6 sm:block"
+          className="hidden border-l border-edge bg-bg/60 p-6 sm:block"
         >
           <h3 className={`${mono} m-0 mb-2 text-[12px] font-normal text-muted`}>
             What this will do
@@ -251,7 +251,7 @@ export function ApprovalDialog({
             {effects.map((e) => (
               <li
                 key={e.label}
-                className="flex list-none items-baseline justify-between gap-3 border-b border-line py-3 text-[14px] first:pt-1 last:border-b-0"
+                className="flex list-none items-baseline justify-between gap-3 border-b border-edge py-3 text-[14px] first:pt-1 last:border-b-0"
               >
                 <span>{e.label}</span>
                 {e.value && <span className={`${mono} text-[11px] text-muted`}>{e.value}</span>}
@@ -266,7 +266,7 @@ export function ApprovalDialog({
             <span className="whitespace-nowrap">
               Trust level:{' '}
               <span
-                className={`${mono} rounded-full border border-line px-2 py-0.5 text-[12px] text-text`}
+                className={`${mono} rounded-full border border-edge px-2 py-0.5 text-[12px] text-text`}
               >
                 {task?.config.trust ?? 'ask'}
               </span>

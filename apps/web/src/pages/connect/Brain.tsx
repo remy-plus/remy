@@ -152,7 +152,7 @@ export function Brain() {
                 type="button"
                 aria-pressed={filter === c.id}
                 onClick={() => setFilter(c.id)}
-                className={`${mono} cursor-pointer rounded-full border px-3 py-1.5 text-[12px] whitespace-nowrap ${filter === c.id ? 'border-text bg-raise text-text' : 'border-line bg-transparent text-muted hover:text-text'}`}
+                className={`${mono} cursor-pointer rounded-full border px-3 py-1.5 text-[12px] whitespace-nowrap ${filter === c.id ? 'border-text bg-raise text-text' : 'border-edge bg-transparent text-muted hover:text-text'}`}
               >
                 {c.label} {c.n.toLocaleString('en')}
               </button>
@@ -160,7 +160,7 @@ export function Brain() {
           </fieldset>
         </div>
 
-        <div className="relative aspect-[4/5] overflow-hidden rounded-[14px] border border-line bg-surface sm:aspect-[930/728]">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-[14px] border border-edge bg-surface sm:aspect-[930/728]">
           <svg
             aria-hidden="true"
             viewBox="0 0 100 100"
@@ -241,7 +241,7 @@ export function Brain() {
 
       <aside
         aria-label="Selected note"
-        className="min-w-0 border-t border-line px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l"
+        className="min-w-0 border-t border-edge px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l"
       >
         {selected ? (
           <div>
@@ -321,7 +321,7 @@ export function Brain() {
                   {[...around].map((id) => {
                     const n = byId.get(id);
                     return n ? (
-                      <li key={id} className="border-b border-line last:border-b-0">
+                      <li key={id} className="border-b border-edge last:border-b-0">
                         <button
                           type="button"
                           onClick={() => {
@@ -345,7 +345,7 @@ export function Brain() {
             <section aria-labelledby="from-h">
               <Eyebrow id="from-h">Where it came from</Eyebrow>
               <p
-                className={`${mono} mt-2 mb-0 rounded-[10px] border border-line px-4 py-3 text-[12px] leading-relaxed text-muted`}
+                className={`${mono} mt-2 mb-0 rounded-[10px] border border-edge px-4 py-3 text-[12px] leading-relaxed text-muted`}
               >
                 {selected.origin}
               </p>

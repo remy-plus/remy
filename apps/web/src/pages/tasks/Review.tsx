@@ -53,7 +53,7 @@ export function Review() {
 
         <ul className="m-0 mb-8 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-4">
           {data.tiles.map((t) => (
-            <li key={t.label} className="rounded-[10px] border border-line bg-surface px-4 py-4">
+            <li key={t.label} className="rounded-[10px] border border-edge bg-surface px-4 py-4">
               <p className={`${mono} m-0 text-[26px] font-medium`}>{t.value}</p>
               <p className={`${mono} mt-1 mb-0 text-[12px] text-muted`}>{t.label}</p>
             </li>
@@ -89,7 +89,7 @@ export function Review() {
                     {e.title}
                     {e.tag && (
                       <span
-                        className={`${mono} ml-2 rounded border border-line px-1.5 py-px text-[11px] font-normal text-muted`}
+                        className={`${mono} ml-2 rounded border border-edge px-1.5 py-px text-[11px] font-normal text-muted`}
                       >
                         {e.tag}
                       </span>
@@ -105,14 +105,14 @@ export function Review() {
 
       <aside
         aria-label="Needs you"
-        className="border-t border-line px-5 py-8 lg:border-t-0 lg:border-l lg:px-7"
+        className="border-t border-edge px-5 py-8 lg:border-t-0 lg:border-l lg:px-7"
       >
         <div className={`${mono} mb-3 flex justify-between text-[12px] text-muted`}>
           <h2 className="m-0 text-[12px] font-normal">Needs you</h2>
           <span>{needs ? 1 : 0}</span>
         </div>
         {needs ? (
-          <div className="mb-4 rounded-[10px] border border-stone bg-surface p-4">
+          <div className="mb-4 rounded-[10px] border border-edge-hi bg-surface p-4">
             <p className={`${mono} m-0 text-[12px] text-muted`}>{needs.kind}</p>
             <h3 className="mt-1 mb-2 text-[17px] font-semibold">{needs.title}</h3>
             <p className="m-0 mb-3 text-[14px] leading-snug text-muted">{needs.quote}</p>
@@ -129,7 +129,7 @@ export function Review() {
           <p className="mb-4 text-[14px] text-muted">Nothing is waiting for you.</p>
         )}
         {data.awayNote && (
-          <p className="m-0 rounded-[10px] border border-line px-4 py-3 text-[14px] leading-[1.6] text-muted">
+          <p className="m-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-[1.6] text-muted">
             Trust was set to{' '}
             <strong className="font-medium text-text">{data.awayNote.trust}</strong> for the night.{' '}
             {data.awayNote.text}

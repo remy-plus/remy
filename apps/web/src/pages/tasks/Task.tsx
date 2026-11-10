@@ -61,7 +61,7 @@ function Log({
   if (!lines.length) return <p className="m-0 text-[14px] text-muted">Nothing yet.</p>;
   return (
     <ul
-      className={`${mono} m-0 p-0 text-[13px] leading-[1.7] ${wide ? '' : 'rounded-[10px] border border-line bg-surface px-4 py-3'}`}
+      className={`${mono} m-0 p-0 text-[13px] leading-[1.7] ${wide ? '' : 'rounded-[10px] border border-edge bg-surface px-4 py-3'}`}
     >
       {lines.map((l) => (
         <li key={l.seq} className="flex list-none gap-3 text-muted">
@@ -95,7 +95,7 @@ function WaitingCard({
   if (!card) return null;
   const risk = RISK[card.risk];
   return (
-    <div className="mt-3 rounded-[10px] border border-stone bg-surface p-4">
+    <div className="mt-3 rounded-[10px] border border-edge-hi bg-surface p-4">
       <p className={`${mono} m-0 text-[12px] text-muted`}>{risk.kind}</p>
       <p className="mt-2 mb-3 text-[15px] leading-snug">{card.preview}</p>
       <div className="flex flex-wrap gap-2">
@@ -143,7 +143,7 @@ function FailureCard({
   return (
     <section
       aria-label="Why this stopped"
-      className="mt-3 max-w-[680px] rounded-[10px] border border-stone bg-surface p-4"
+      className="mt-3 max-w-[680px] rounded-[10px] border border-edge-hi bg-surface p-4"
     >
       <h3 className={`${mono} m-0 text-[12px] font-normal`}>{failure.title}</h3>
       <p className="mt-1 mb-3 text-[16px] leading-snug">{failure.body}</p>
@@ -233,7 +233,7 @@ function PlanBar({ plan }: { plan: NonNullable<TaskView['plan']> }) {
 function Helper({ h }: { h: HelperView }) {
   const idle = h.status === 'waiting';
   return (
-    <li className="list-none rounded-[10px] border border-line bg-surface p-4">
+    <li className="list-none rounded-[10px] border border-edge bg-surface p-4">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className={`${mono} m-0 text-[14px] font-bold`}>{h.name}</h3>
         <span className={`${mono} text-[12px] ${idle ? 'text-muted' : 'text-signal'}`}>
@@ -298,7 +298,7 @@ function MakingPanel({ making, draft }: { making: Making; draft: RefObject<HTMLE
         {making.files.map((f) => (
           <li
             key={f.name}
-            className={`${mono} flex list-none justify-between gap-3 border-b border-line py-2.5 text-[13px]`}
+            className={`${mono} flex list-none justify-between gap-3 border-b border-edge py-2.5 text-[13px]`}
           >
             <span className="min-w-0 break-words">{f.name}</span>
             <span className="shrink-0 text-muted">{f.meta}</span>
@@ -346,7 +346,7 @@ function BrainView({
   return (
     <div className="grid flex-1 lg:grid-cols-[minmax(0,1fr)_400px]">
       <div className="min-w-0 px-5 py-8 sm:px-14 lg:pl-[120px]">
-        <h1 className="m-0 mb-8 max-w-[620px] rounded-[10px] border border-line bg-surface px-5 py-4 text-[17px] leading-snug font-normal">
+        <h1 className="m-0 mb-8 max-w-[620px] rounded-[10px] border border-edge bg-surface px-5 py-4 text-[17px] leading-snug font-normal">
           {task.prompt}
         </h1>
         <p className={`${mono} m-0 mb-3 text-[12px] text-signal`}>
@@ -366,7 +366,7 @@ function BrainView({
                 {it.chips.map((ch) => (
                   <span
                     key={ch}
-                    className={`${mono} mr-1.5 inline-block rounded border border-line px-1.5 py-px text-[11px] text-muted`}
+                    className={`${mono} mr-1.5 inline-block rounded border border-edge px-1.5 py-px text-[11px] text-muted`}
                   >
                     {ch}
                   </span>
@@ -378,7 +378,7 @@ function BrainView({
         {c && (
           <section
             aria-label="Contradiction"
-            className="max-w-[760px] rounded-[10px] border border-stone bg-surface p-5"
+            className="max-w-[760px] rounded-[10px] border border-edge-hi bg-surface p-5"
           >
             <h3 className={`${mono} m-0 mb-3 text-[13px] font-normal`}>
               <span aria-hidden="true">◆ </span>Contradiction
@@ -386,7 +386,7 @@ function BrainView({
             <p className="m-0 mb-4 text-[15px] leading-[1.6]">{c.text}</p>
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
               {[c.left, c.right].map((x) => (
-                <div key={x.label} className="rounded-[10px] border border-line bg-bg p-4">
+                <div key={x.label} className="rounded-[10px] border border-edge bg-bg p-4">
                   <p className={`${mono} m-0 text-[12px] text-muted`}>{x.label}</p>
                   <p className={`${mono} mt-1 mb-0 text-[22px] font-medium`}>{x.value}</p>
                 </div>
@@ -418,14 +418,14 @@ function BrainView({
         ref={evidence}
         tabIndex={-1}
         aria-label="Sources"
-        className="border-t border-line px-5 py-8 outline-none lg:border-t-0 lg:border-l lg:px-7"
+        className="border-t border-edge px-5 py-8 outline-none lg:border-t-0 lg:border-l lg:px-7"
       >
         <SideTitle aside={brain.used}>What Remy used</SideTitle>
         <ol className="m-0 list-none p-0">
           {brain.sources.map((s, i) => (
             <li
               key={s.title}
-              className="grid grid-cols-[24px_minmax(0,1fr)] border-b border-line py-3 first:pt-1"
+              className="grid grid-cols-[24px_minmax(0,1fr)] border-b border-edge py-3 first:pt-1"
             >
               <span className={`${mono} text-[12px] text-muted`}>{i + 1}</span>
               <span className="min-w-0">
@@ -467,7 +467,7 @@ function Composer({
     <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-5 sm:px-14">
       <form
         onSubmit={submit}
-        className="flex items-center gap-3 rounded-[14px] border border-stone bg-surface py-2.5 pr-2.5 pl-5"
+        className="flex items-center gap-3 rounded-[14px] border border-edge-hi bg-surface py-2.5 pr-2.5 pl-5"
       >
         <input
           id="task-composer"
@@ -585,7 +585,7 @@ function TaskScreen({ id }: { id: string }) {
   const sideLog = (
     <aside
       aria-label="What Remy did"
-      className="border-t border-line px-5 py-8 lg:border-t-0 lg:border-l lg:px-8"
+      className="border-t border-edge px-5 py-8 lg:border-t-0 lg:border-l lg:px-8"
     >
       <SideTitle>What Remy did</SideTitle>
       <Log events={events} utc={utc} />
@@ -632,7 +632,7 @@ function TaskScreen({ id }: { id: string }) {
           {view.pause && (
             <section
               aria-label="Paused"
-              className="mb-6 max-w-[680px] rounded-[10px] border border-stone bg-surface p-4"
+              className="mb-6 max-w-[680px] rounded-[10px] border border-edge-hi bg-surface p-4"
             >
               <p className="m-0 mb-1 text-[16px]">
                 Remy paused at the {view.pause.limit} limit: {view.pause.steps} steps,{' '}
@@ -658,7 +658,7 @@ function TaskScreen({ id }: { id: string }) {
           {view.pendingQuestion && (
             <section
               aria-label="Question from Remy"
-              className="mb-6 max-w-[680px] rounded-[10px] border border-stone bg-surface p-4"
+              className="mb-6 max-w-[680px] rounded-[10px] border border-edge-hi bg-surface p-4"
             >
               <p className={`${mono} m-0 text-[12px] text-muted`}>Remy asks</p>
               <p className="mt-2 mb-3 text-[16px]">{view.pendingQuestion.question}</p>
@@ -682,7 +682,7 @@ function TaskScreen({ id }: { id: string }) {
           )}
 
           {view.found && (
-            <p className="mb-6 rounded-[10px] border border-stone px-5 py-4 text-[15px] leading-snug">
+            <p className="mb-6 rounded-[10px] border border-edge-hi px-5 py-4 text-[15px] leading-snug">
               <span aria-hidden="true">◆ </span>
               <strong className="font-semibold">Found something while working.</strong> {view.found}
             </p>
@@ -707,7 +707,7 @@ function TaskScreen({ id }: { id: string }) {
         {helpers && view.making ? (
           <aside
             aria-label="Draft"
-            className="border-t border-line px-5 py-8 lg:border-t-0 lg:border-l lg:px-8"
+            className="border-t border-edge px-5 py-8 lg:border-t-0 lg:border-l lg:px-8"
           >
             <MakingPanel making={view.making} draft={draft} />
           </aside>

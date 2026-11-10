@@ -192,12 +192,12 @@ export function CommandPalette() {
       onClose={close}
       onClick={(e) => e.target === e.currentTarget && close()}
       onKeyDown={onKeyDown}
-      className="mx-auto mt-[min(150px,12vh)] mb-auto w-[min(760px,calc(100vw-32px))] overflow-hidden rounded-[14px] border border-stone bg-surface p-0 text-text backdrop:bg-black/70"
+      className="mx-auto mt-[min(150px,12vh)] mb-auto w-[min(760px,calc(100vw-32px))] overflow-hidden rounded-[14px] border border-edge-hi bg-surface p-0 text-text backdrop:bg-black/70"
     >
       {open && (
         <>
-          <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-            <kbd className="font-mono hidden rounded border border-line bg-raise px-1.5 py-1 text-[11px] text-muted sm:block">
+          <div className="flex items-center gap-3 border-b border-edge px-5 py-4">
+            <kbd className="font-mono hidden rounded border border-edge bg-raise px-1.5 py-1 text-[11px] text-muted sm:block">
               ⌘K
             </kbd>
             <input
@@ -264,12 +264,12 @@ export function CommandPalette() {
           {error && (
             <p
               role="alert"
-              className="font-mono m-0 border-t border-line px-5 py-3 text-[12px] text-muted"
+              className="font-mono m-0 border-t border-edge px-5 py-3 text-[12px] text-muted"
             >
               {error}
             </p>
           )}
-          <p className="font-mono m-0 flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-5 py-3 text-[12px] text-muted">
+          <p className="font-mono m-0 flex flex-wrap gap-x-5 gap-y-1 border-t border-edge px-5 py-3 text-[12px] text-muted">
             <span>
               <Key>↑↓</Key> move
             </span>
@@ -291,7 +291,7 @@ export function CommandPalette() {
 
 function Key({ children }: { children: string }) {
   return (
-    <kbd className="font-mono mr-1 rounded border border-line bg-raise px-1.5 py-0.5 text-[11px] text-text">
+    <kbd className="font-mono mr-1 rounded border border-edge bg-raise px-1.5 py-0.5 text-[11px] text-text">
       {children}
     </kbd>
   );

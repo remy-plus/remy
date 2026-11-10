@@ -6,7 +6,7 @@ export type VoiceMode = 'closed' | 'listening' | 'editing';
 
 function Key({ children }: { children: string }) {
   return (
-    <kbd className="font-mono mr-1.5 rounded border border-line bg-surface px-1.5 py-0.5 text-[12px] text-text">
+    <kbd className="font-mono mr-1.5 rounded border border-edge bg-surface px-1.5 py-0.5 text-[12px] text-text">
       {children}
     </kbd>
   );
@@ -61,7 +61,7 @@ export function VoiceOverlay(props: {
               props.onSend();
             }
           }}
-          className="mt-6 block w-[min(720px,100%)] resize-none rounded-[14px] border border-stone bg-surface p-4 text-[22px] text-text outline-none placeholder:text-muted focus-visible:border-text"
+          className="mt-6 block w-[min(720px,100%)] resize-none rounded-[14px] border border-edge-hi bg-surface p-4 text-[22px] text-text outline-none placeholder:text-muted focus-visible:border-text"
         />
       ) : (
         <p

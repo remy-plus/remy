@@ -21,7 +21,7 @@ export function StatusBar({ status, sample }: { status: HomeData['status']; samp
         </span>
       ))}
       <span>Trust: {status.trust}</span>
-      <span className="hidden rounded-full border border-line px-3 py-1 min-[1400px]:inline">
+      <span className="hidden rounded-full border border-edge px-3 py-1 min-[1400px]:inline">
         Quiet: {status.quiet ? 'on' : 'off'}
       </span>
       <span>{status.time}</span>

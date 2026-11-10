@@ -42,7 +42,7 @@ function Trace({ at }: { at: number }) {
           >
             <span
               aria-hidden="true"
-              className={`relative z-10 grid size-4 place-items-center rounded-full border text-[9px] leading-none ${current ? 'border-signal bg-signal text-signal-ink' : 'border-stone bg-bg'}`}
+              className={`relative z-10 grid size-4 place-items-center rounded-full border text-[9px] leading-none ${current ? 'border-signal bg-signal text-signal-ink' : 'border-edge-hi bg-bg'}`}
             >
               {done ? '✓' : i + 1}
             </span>
@@ -140,7 +140,7 @@ function StepOne() {
         {WAYS.map((w) => (
           <label
             key={w.id}
-            className="flex cursor-pointer items-start gap-4 rounded-[10px] border border-line bg-surface px-5 py-4 has-checked:border-signal has-checked:bg-raise has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-text"
+            className="flex cursor-pointer items-start gap-4 rounded-[10px] border border-edge bg-surface px-5 py-4 has-checked:border-text has-checked:bg-raise has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-text"
           >
             <input
               type="radio"
@@ -224,11 +224,11 @@ function StepTwo() {
         {APPS.map((a) => (
           <li
             key={a.name}
-            className="flex list-none flex-wrap items-center gap-x-4 gap-y-3 rounded-[10px] border border-line bg-surface px-4 py-4"
+            className="flex list-none flex-wrap items-center gap-x-4 gap-y-3 rounded-[10px] border border-edge bg-surface px-4 py-4"
           >
             <span
               aria-hidden="true"
-              className="font-mono grid size-[26px] shrink-0 place-items-center rounded-md border border-stone text-[12px] text-muted"
+              className="font-mono grid size-[26px] shrink-0 place-items-center rounded-md border border-edge-hi text-[12px] text-muted"
             >
               {a.name[0]}
             </span>
@@ -286,7 +286,7 @@ function StepThree() {
       title="Tell Remy what you need done."
       lead="Anything you would do on a computer. Start small. Remy shows its work and asks before it sends or spends."
     >
-      <div className="flex gap-3 rounded-[14px] border border-stone bg-surface p-3.5 focus-within:border-text">
+      <div className="flex gap-3 rounded-[14px] border border-edge-hi bg-surface p-3.5 focus-within:border-text">
         <textarea
           aria-label="What you need done"
           placeholder="Summarise this week's emails from Dana"
@@ -318,7 +318,7 @@ function StepThree() {
             <button
               type="button"
               onClick={() => setText(t)}
-              className="w-full cursor-pointer rounded-md border border-line bg-surface px-3.5 py-3 text-left text-[15px] text-text hover:bg-raise"
+              className="w-full cursor-pointer rounded-md border border-edge bg-surface px-3.5 py-3 text-left text-[15px] text-text hover:bg-raise"
             >
               {t}
             </button>

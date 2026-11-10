@@ -53,7 +53,7 @@ export function Schedules() {
                 >
                   <span
                     aria-hidden="true"
-                    className={`absolute top-1 left-0 size-[11px] rounded-full border border-stone ${t.soon ? 'border-signal bg-signal' : 'bg-bg'}`}
+                    className={`absolute top-1 left-0 size-[11px] rounded-full border border-edge-hi ${t.soon ? 'border-signal bg-signal' : 'bg-bg'}`}
                   />
                   <p className={`${mono} m-0 text-[12px] text-muted`}>{t.at}</p>
                   <p className="m-0 text-[16px]">
@@ -66,7 +66,7 @@ export function Schedules() {
           </section>
           <section aria-labelledby="away-h">
             <Eyebrow id="away-h">While you were away</Eyebrow>
-            <p className="mt-3 mb-0 rounded-[10px] border border-line bg-surface px-4 py-3 text-[14px] leading-relaxed text-muted">
+            <p className="mt-3 mb-0 rounded-[10px] border border-edge bg-surface px-4 py-3 text-[14px] leading-relaxed text-muted">
               {data.away}{' '}
               <a href="#/review" className="text-text underline">
                 Open the overnight review
@@ -82,11 +82,11 @@ export function Schedules() {
           <Eyebrow id="recurring-h">Recurring</Eyebrow>
           <span className={`${mono} text-[12px] text-muted`}>{data.schedules.length}</span>
         </div>
-        <ul className="m-0 list-none border-t border-line p-0">
+        <ul className="m-0 list-none border-t border-edge p-0">
           {data.schedules.map((s) => (
             <li
               key={s.id}
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b border-line py-4 min-[900px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_40px_84px]"
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b border-edge py-4 min-[900px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_40px_84px]"
             >
               <div className="col-span-2 min-w-0 min-[900px]:col-span-1">
                 <h3 className="m-0 text-[16px] font-medium">{s.title}</h3>
@@ -134,7 +134,7 @@ export function Schedules() {
         </div>
         <ul className="m-0 list-none p-0">
           {data.webhooks.map((w) => (
-            <li key={w.id} className="rounded-[10px] border border-line bg-surface p-4">
+            <li key={w.id} className="rounded-[10px] border border-edge bg-surface p-4">
               <div className="flex items-center justify-between gap-4">
                 <h3 className="m-0 text-[16px] font-medium">{w.name}</h3>
                 <Switch
