@@ -63,7 +63,7 @@ describe('SignIn', () => {
     );
     const field = screen.getByLabelText('Access token');
     expect(field.getAttribute('aria-invalid')).toBe('true');
-    expect(field.getAttribute('aria-describedby')).toBe(alert.id);
+    expect(field.getAttribute('aria-describedby')).toContain(alert.id);
     expect(saved()).toBeNull();
     expect(onSignedIn).not.toHaveBeenCalled();
   });

@@ -169,6 +169,34 @@ body {
   }
 }
 
+/* Placeholder lines while something loads: a slow sweep, never a flashing bar. Reduced motion: still. */
+@keyframes sweep {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+.skeleton {
+  background-color: var(--raise);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--text) 9%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+  }
+}
+
 /* The History drawer slides in from the left, the dock's menu sheet drops in. Reduced motion: none. */
 @keyframes slide-in {
   from {

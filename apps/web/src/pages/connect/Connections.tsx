@@ -25,11 +25,11 @@ const STATUS: Record<ConnectedApp['status'], string> = {
 const row = 'flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-edge py-4';
 
 export function Connections() {
-  const { api, data, setData, error } = useLoad((a) => a.connections());
+  const { api, data, setData, error, reload } = useLoad((a) => a.connections());
   const [selected, setSelected] = useState<Selected | null>(null);
   const [said, setSaid] = useState('');
-  if (error) return <Unavailable message={error} />;
-  if (!data) return <Loading />;
+  if (error) return <Unavailable message={error} onRetry={reload} />;
+  if (!data) return <Loading label="Loading your connections" />;
 
   const first = data.apps.find((a) => a.status === 'connected') ?? data.apps[0];
   const current: Selected | null = selected ?? (first ? { kind: 'app', id: first.id } : null);

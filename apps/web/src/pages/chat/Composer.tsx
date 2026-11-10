@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Icon } from '../../components/Icon.tsx';
 import type { MindState } from '../../lib/mind.ts';
 import {
   canSpeak,
@@ -9,33 +10,6 @@ import {
   useListener,
 } from '../../lib/voice.ts';
 import { useSetting } from '../../settings.ts';
-
-/** A 16 px line icon. Decorative: the button around it carries the name. */
-function Icon({
-  children,
-  fill = 'none',
-  strokeWidth = 1.6,
-}: {
-  children: React.ReactNode;
-  fill?: string;
-  strokeWidth?: number;
-}) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill={fill}
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {children}
-    </svg>
-  );
-}
 
 const MAX = 144; // six lines of 24 px. The textarea has no padding of its own, so a full box scrolls on whole lines.
 
@@ -177,12 +151,16 @@ export function Composer({
           }}
           onKeyDown={onKey}
           placeholder={placeholder}
+          aria-describedby={`${id}-keys`}
           style={{ outline: 'none' }}
           className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-h-[144px] min-w-0 flex-1 resize-none overflow-x-hidden border-0 bg-transparent p-0 my-1 text-[16px] leading-6 text-text outline-none placeholder:text-muted sm:text-[15px]"
         />
+        <span id={`${id}-keys`} className="sr-only">
+          Enter sends. Shift and Enter starts a new line.
+        </span>
         <button
           type="button"
-          aria-label="Speak replies"
+          aria-label="Speak replies aloud"
           aria-pressed={speak}
           onClick={() => {
             if (speak) cancelSpeech();
@@ -191,14 +169,7 @@ export function Composer({
           }}
           className={`${ghost} hover:bg-raise hover:text-text ${speak ? 'text-text' : 'text-muted'}`}
         >
-          <Icon>
-            <path d="M4 9v6h4l5 4V5L8 9H4z" />
-            {speak ? (
-              <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
-            ) : (
-              <path d="M17 9l5 6M22 9l-5 6" />
-            )}
-          </Icon>
+          <Icon name={speak ? 'speak' : 'mute'} />
         </button>
         <button
           type="button"
@@ -207,10 +178,7 @@ export function Composer({
           onClick={toggle}
           className={`${ghost} hover:bg-raise hover:text-text ${listening ? 'bg-raise text-text' : 'text-muted'}`}
         >
-          <Icon>
-            <rect x="9" y="3" width="6" height="12" rx="3" />
-            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-          </Icon>
+          <Icon name="mic" />
         </button>
         {(onStop || speaking) && (
           <button
@@ -222,9 +190,7 @@ export function Composer({
             }}
             className={`${ghost} ring-1 ring-edge-hi text-text hover:bg-raise`}
           >
-            <Icon fill="currentColor" strokeWidth={0}>
-              <rect x="7" y="7" width="10" height="10" rx="2" />
-            </Icon>
+            <Icon name="stop" />
           </button>
         )}
         <button
@@ -233,9 +199,7 @@ export function Composer({
           disabled={!value.trim()}
           className={`${ghost} ${value.trim() ? 'bg-text text-bg hover:bg-white' : 'bg-raise text-muted'}`}
         >
-          <Icon strokeWidth={2}>
-            <path d="M12 19V5M6 11l6-6 6 6" />
-          </Icon>
+          <Icon name="send" />
         </button>
       </div>
       {interim && (

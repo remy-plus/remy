@@ -90,8 +90,12 @@ describe('Brain', () => {
     ).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /^Priya Nair, / })).toBeNull();
     fireEvent.change(box, { target: { value: 'zzzz' } });
-    expect(screen.getByText('No note matches.')).toBeTruthy();
+    expect(screen.getByText('No note matches that.')).toBeTruthy();
     expect(screen.getByText('No note is selected.')).toBeTruthy();
+    // A search that hides everything always has a way back.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the search' }));
+    expect((box as HTMLInputElement).value).toBe('');
+    expect(screen.queryByText('No note matches that.')).toBeNull();
   });
 
   it('edits and deletes a note', async () => {

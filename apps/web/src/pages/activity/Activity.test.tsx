@@ -32,6 +32,19 @@ describe('Activity', () => {
     expect(all).not.toMatch(/waiting_approval|succeeded|cancelled/);
   });
 
+  it('gives an empty list a way out instead of a dead end', async () => {
+    const api = { ...createMockApi(), listTasks: async () => [] };
+    render(
+      <ApiProvider api={api}>
+        <Activity />
+      </ApiProvider>,
+    );
+    expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ask Remy for something' }).getAttribute('href')).toBe(
+      '#/',
+    );
+  });
+
   it('names every state without jargon', () => {
     expect(plainState('running')).toBe('Working');
     expect(plainState('waiting_approval')).toBe('Waiting for you');

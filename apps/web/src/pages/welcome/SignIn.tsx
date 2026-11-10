@@ -7,6 +7,7 @@ import { type Health, type RemyApi, useApi } from '../../api/index.tsx';
 import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
 import { Logo } from '../../components/Logo.tsx';
 import { buttonPrimary, field } from '../../components/ui.ts';
+import { describeError } from '../../lib/errors.ts';
 import { setSetting } from '../../settings.ts';
 
 export const TOKEN_STORAGE_KEY = 'remy.token';
@@ -72,9 +73,7 @@ export function SignIn({
       onSignedIn();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'That did not work. Check that Remy is still running, then try again.',
+        describeError(err, 'That did not work. Check that Remy is still running, then try again.'),
       );
     } finally {
       setBusy(false);
@@ -99,6 +98,10 @@ export function SignIn({
           <label htmlFor={`${id}-token`} className="font-mono block text-[12px] text-muted">
             Access token
           </label>
+          <p id={`${id}-help`} className="mt-1.5 mb-0 text-[13px] leading-snug text-muted">
+            Remy prints this once, when you run{' '}
+            <code className="font-mono text-text">remy serve</code> on the server.
+          </p>
           <input
             id={`${id}-token`}
             type="password"
@@ -106,7 +109,7 @@ export function SignIn({
             value={token}
             onChange={(e) => setToken(e.target.value)}
             aria-invalid={error ? true : undefined}
-            aria-describedby={error ? `${id}-error` : undefined}
+            aria-describedby={error ? `${id}-error ${id}-help` : `${id}-help`}
             className={`${field} mt-2 block w-full py-3 ${error ? 'border-text' : ''}`}
           />
           {error && (
@@ -155,6 +158,10 @@ export function SignIn({
         <p className="mt-6 mb-0 text-[14px] text-muted">
           Lost it? On the server, run{' '}
           <code className="font-mono text-text">remy serve token --rotate</code>.
+        </p>
+        <p className="mt-4 mb-0 border-t border-edge pt-4 text-[13px] leading-relaxed text-muted">
+          Remy runs on your server. Your chats, keys and files stay there, and nothing is sent
+          anywhere else.
         </p>
       </div>
     </div>

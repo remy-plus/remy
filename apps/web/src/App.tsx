@@ -95,7 +95,7 @@ export function App() {
       .then((d) => {
         if (!live) return;
         if (d.prefs) applyServerPrefs(d.prefs);
-        bindServerSettings((patch) => void api.updateSettings(patch).catch(() => {}));
+        bindServerSettings((patch) => api.updateSettings(patch));
       })
       .catch(() => {}); // the Settings screen says what is missing
     return () => {

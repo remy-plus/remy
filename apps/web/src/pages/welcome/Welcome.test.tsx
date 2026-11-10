@@ -30,7 +30,9 @@ describe('Welcome', () => {
         .map((li) => li.getAttribute('aria-current')),
     ).toEqual(['step', null, null]);
     expect(screen.getAllByRole('radio')).toHaveLength(3);
-    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
+    expect(screen.getByRole('link', { name: 'Save and continue' }).getAttribute('href')).toBe(
+      '#/welcome/2',
+    );
     // No bar across the top on a full-page screen.
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
@@ -40,7 +42,7 @@ describe('Welcome', () => {
     const box = (await screen.findByLabelText('Your OpenRouter key')) as HTMLInputElement;
     expect(box.type).toBe('password');
     fireEvent.change(box, { target: { value: 'sk-not-a-real-key' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Test the key first' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check the model' }));
     expect(await screen.findByText('Both models answered.')).toBeTruthy();
     expect(box.value).toBe('');
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('sk-not-a-real-key');
@@ -70,7 +72,7 @@ describe('Welcome', () => {
   it('step 3 starts a task and opens it', async () => {
     window.localStorage.removeItem('remy.onboarded');
     open('#/welcome/3');
-    const start = (await screen.findByRole('button', { name: 'Start' })) as HTMLButtonElement;
+    const start = (await screen.findByRole('button', { name: 'Ask Remy' })) as HTMLButtonElement;
     expect(start.disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: /Find three flights to Lisbon/ }));
     expect((screen.getByLabelText('What you need done') as HTMLTextAreaElement).value).toBe(

@@ -131,12 +131,36 @@ const toPatch = (key: SettingKey, v: unknown): SettingsPatch | null => {
   }
 };
 
-let push: ((patch: SettingsPatch) => void) | null = null;
+let push: ((patch: SettingsPatch) => Promise<void>) | null = null;
 
 /** Sends each change of a server-kept setting to `send`; null stops. Used when a real server is in use. */
-export const bindServerSettings = (send: ((patch: SettingsPatch) => void) | null) => {
+export const bindServerSettings = (send: ((patch: SettingsPatch) => Promise<void>) | null) => {
   push = send;
 };
+
+/** Whether the server has the latest change. A setting that silently fails to save is a lie. */
+export type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
+let saveState: SaveState = 'idle';
+const saveListeners = new Set<() => void>();
+const setSaveState = (s: SaveState) => {
+  saveState = s;
+  for (const l of saveListeners) l();
+};
+const subscribeSave = (notify: () => void) => {
+  saveListeners.add(notify);
+  return () => saveListeners.delete(notify);
+};
+
+/** The state of the last write, for tests and for anything outside React. */
+export const getSaveState = (): SaveState => saveState;
+
+/** The state of the last write to the server, for the Settings screen to show. */
+export const useSaveState = (): SaveState =>
+  useSyncExternalStore(
+    subscribeSave,
+    () => saveState,
+    () => 'idle' as SaveState,
+  );
 
 /** Copies the server's saved values into this browser without sending them back. */
 export function applyServerPrefs(p: ServerPrefs) {
@@ -159,7 +183,13 @@ export function applyServerPrefs(p: ServerPrefs) {
 export const setSetting = <K extends SettingKey>(key: K, value: SettingValues[K]) => {
   writeRaw(key, JSON.stringify(value));
   const patch = push && toPatch(key, value);
-  if (patch) push?.(patch);
+  if (!patch || !push) return;
+  const send = push;
+  setSaveState('saving');
+  send(patch).then(
+    () => setSaveState('saved'),
+    () => setSaveState('failed'),
+  );
 };
 
 /** Forgets one setting, so it falls back to its default. */

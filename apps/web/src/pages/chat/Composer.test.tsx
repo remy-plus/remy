@@ -235,7 +235,7 @@ describe('Composer spoken replies', () => {
 
   it('is off by default and the toggle stores the choice', () => {
     render(<Host />);
-    const t = screen.getByRole('button', { name: 'Speak replies' });
+    const t = screen.getByRole('button', { name: 'Speak replies aloud' });
     expect(t.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(t);
     expect(t.getAttribute('aria-pressed')).toBe('true');
@@ -249,7 +249,7 @@ describe('Composer spoken replies', () => {
     const { rerender } = render(
       <Host onVoice={onVoice} answer={{ id: 'old', text: 'Old answer.' }} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Speak replies' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Speak replies aloud' }));
     expect(spoken).toEqual([]); // an answer already there is never read out
     rerender(
       <Host
@@ -275,7 +275,7 @@ describe('Composer spoken replies', () => {
     win.SpeechRecognition = FakeRecognition;
     installFakeAudio();
     const { rerender } = render(<Host />);
-    fireEvent.click(screen.getByRole('button', { name: 'Speak replies' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Speak replies aloud' }));
     rerender(<Host answer={{ id: 'a', text: 'Hello there.' }} />);
     expect(spoken).toEqual(['Hello there.']);
     const before = cancelled;

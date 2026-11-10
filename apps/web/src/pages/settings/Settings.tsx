@@ -1,5 +1,7 @@
 import { type ComponentType, useCallback, useEffect, useState } from 'react';
 import { type SettingsData, useApi } from '../../api/index.tsx';
+import { Icon } from '../../components/Icon.tsx';
+import { useSaveState } from '../../settings.ts';
 import { Budget, Trust } from './basics.tsx';
 import { DockSection } from './dock.tsx';
 import { Memory } from './memory.tsx';
@@ -23,6 +25,7 @@ const isSection = (s: string): s is SectionId => SECTIONS.some((x) => x.id === s
 /** Settings: a list of sections on the left, the chosen one on the right. On a phone the list goes on top. */
 export function Settings({ section = 'dock' }: { section?: string }) {
   const api = useApi();
+  const save = useSaveState();
   const [data, setData] = useState<SettingsData | null>(null);
   const [n, setN] = useState(0);
   const reload = useCallback(() => setN((x) => x + 1), []);
@@ -73,6 +76,18 @@ export function Settings({ section = 'dock' }: { section?: string }) {
           <h2 className="m-0 mb-7 text-[32px] leading-tight font-normal tracking-tight">
             {label ?? 'Settings'}
           </h2>
+          {save !== 'idle' && (
+            <p
+              role="status"
+              className={`-mt-5 mb-6 flex items-center gap-2 text-[13px] ${save === 'failed' ? 'text-text' : 'text-muted'}`}
+            >
+              {save === 'saved' && <Icon name="check" className="shrink-0 text-signal" />}
+              {save === 'saving' && 'Saving'}
+              {save === 'saved' && 'Saved'}
+              {save === 'failed' &&
+                'That did not save. Check that Remy is running, then try again.'}
+            </p>
+          )}
           {View ? (
             <View data={data} reload={reload} />
           ) : (

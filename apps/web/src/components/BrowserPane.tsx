@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { type BrowserState, useApi } from '../api/index.tsx';
+import { Skeleton } from './Skeleton.tsx';
 import { buttonQuiet } from './ui.ts';
 
 export const FRAME_EVERY_MS = 500;
@@ -176,12 +177,24 @@ export function BrowserPane({ compact = false }: { compact?: boolean }) {
             className="block aspect-[16/10] w-full object-cover object-top"
           />
         ) : (
-          <div className="flex aspect-[16/10] items-center justify-center px-6 text-center text-[14px] leading-[1.6] text-muted">
-            {problem
-              ? 'The view will come back when Remy is reachable.'
-              : open
-                ? 'Loading the page'
-                : 'When Remy uses the web, you will see its browser here.'}
+          <div className="flex aspect-[16/10] flex-col items-center justify-center gap-3 px-6 text-center text-[14px] leading-[1.6] text-muted">
+            {problem ? (
+              <p className="m-0">The view will come back when Remy is reachable.</p>
+            ) : open ? (
+              <Skeleton label="Loading the page" lines={3} className="w-full max-w-[280px]" />
+            ) : (
+              <>
+                <p className="m-0">When Remy uses the web, you will see its browser here.</p>
+                {!compact && (
+                  <a
+                    href="#/"
+                    className="rounded-full border border-edge-hi px-4 py-2 text-[13px] font-medium text-text no-underline transition-colors duration-300 hover:bg-raise"
+                  >
+                    Ask Remy to look something up
+                  </a>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

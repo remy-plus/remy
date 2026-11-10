@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ChatSummary, useApi } from '../api/index.tsx';
+import { describeError } from '../lib/errors.ts';
 import { ago, group } from '../lib/when.ts';
 import { Confirm } from './Confirm.tsx';
 import { buttonPrimary, field } from './ui.ts';
@@ -27,7 +28,7 @@ export function HistoryDrawer({ open, onClose }: { open: boolean; onClose: () =>
           setChats(c);
           setError('');
         })
-        .catch(() => setError('Remy could not load your chats.')),
+        .catch((e: unknown) => setError(describeError(e, 'Remy could not load your chats.'))),
     [api],
   );
 
@@ -47,8 +48,8 @@ export function HistoryDrawer({ open, onClose }: { open: boolean; onClose: () =>
     if (!title || title === c.title) return;
     try {
       await api.renameChat(c.id, title);
-    } catch {
-      setError('That name was not saved.');
+    } catch (e) {
+      setError(describeError(e, 'That name was not saved. Try again.'));
     }
     void load();
   };
@@ -58,8 +59,8 @@ export function HistoryDrawer({ open, onClose }: { open: boolean; onClose: () =>
     if (!c) return;
     try {
       await api.deleteChat(c.id);
-    } catch {
-      setError('That chat was not deleted.');
+    } catch (e) {
+      setError(describeError(e, 'That chat was not deleted. Try again.'));
     }
     void load();
   };

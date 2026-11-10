@@ -10,11 +10,11 @@ const TAG: Record<SkillItem['source'], string> = {
 };
 
 export function Skills() {
-  const { api, data, setData, error } = useLoad((a) => a.skills());
+  const { api, data, setData, error, reload } = useLoad((a) => a.skills());
   const [name, setName] = useState<string | null>(null);
   const [said, setSaid] = useState<{ text: string; taskId?: string } | null>(null);
-  if (error) return <Unavailable message={error} />;
-  if (!data) return <Loading />;
+  if (error) return <Unavailable message={error} onRetry={reload} />;
+  if (!data) return <Loading label="Loading your skills" />;
 
   const mine = data.skills.filter((s) => s.source !== 'builtin');
   const builtin = data.skills.filter((s) => s.source === 'builtin');

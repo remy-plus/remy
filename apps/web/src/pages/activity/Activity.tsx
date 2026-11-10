@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { type TaskListItem, type TaskStatus, useApi } from '../../api/index.tsx';
+import { Skeleton } from '../../components/Skeleton.tsx';
+import { describeError } from '../../lib/errors.ts';
 import { ago } from '../../lib/when.ts';
 
 type Kind = 'working' | 'waiting' | 'earlier';
@@ -35,7 +37,9 @@ export function Activity() {
     api
       .listTasks()
       .then((t) => live && setTasks(t))
-      .catch(() => live && setError('Remy could not load its activity.'));
+      .catch(
+        (e: unknown) => live && setError(describeError(e, 'Remy could not load its activity.')),
+      );
     return () => {
       live = false;
     };
@@ -70,15 +74,20 @@ export function Activity() {
           {error}
         </p>
       )}
-      {!tasks && !error && (
-        <p role="status" className="text-[14px] text-muted">
-          Loading
-        </p>
-      )}
+      {!tasks && !error && <Skeleton label="Loading your activity" variant="rows" lines={4} />}
       {tasks && tasks.length === 0 && (
-        <p className="text-[14px] text-muted">
-          Nothing yet. When Remy works on a job, it shows here.
-        </p>
+        <div className="rounded-[14px] border border-edge bg-surface px-5 py-6">
+          <p className="m-0 text-[16px] leading-snug text-text">Nothing here yet.</p>
+          <p className="mt-1 mb-0 text-[14px] leading-snug text-muted">
+            When Remy works on something, it shows here so you can see what it did.
+          </p>
+          <a
+            href="#/"
+            className="mt-4 inline-block rounded-full border border-text bg-text px-4 py-2 text-[14px] font-medium text-bg no-underline transition-colors duration-300 hover:bg-white"
+          >
+            Ask Remy for something
+          </a>
+        </div>
       )}
       {GROUPS.map((g) => {
         const rows = (tasks ?? []).filter((t) => kindOf(t.status) === g.kind);

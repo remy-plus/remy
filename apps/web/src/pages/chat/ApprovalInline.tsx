@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { type ApprovalCard, useApi } from '../../api/index.tsx';
+import { Icon } from '../../components/Icon.tsx';
+import { describeError } from '../../lib/errors.ts';
 import { approvalSentence } from '../../lib/feed.ts';
 
 const pill =
@@ -26,6 +28,7 @@ export function ApprovalInline({
   const api = useApi();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [answered, setAnswered] = useState<'yes' | 'no' | null>(null);
   const answer = useRef<(granted: boolean) => void>(() => {});
   answer.current = async (granted) => {
     if (busy) return;
@@ -33,9 +36,10 @@ export function ApprovalInline({
     setProblem(null);
     try {
       await api.approve(taskId, { callId: card.callId, argsHash: card.argsHash, granted });
+      setAnswered(granted ? 'yes' : 'no');
       onResolved();
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'Remy could not send that. Try again.');
+      setProblem(describeError(e, 'Remy could not send that. Try again.'));
     } finally {
       setBusy(false);
     }
@@ -61,30 +65,42 @@ export function ApprovalInline({
         {approvalSentence(card.preview, card.risk)}
       </p>
       {card.reason && <p className="mt-1 mb-0 text-[13px] text-muted">{card.reason}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => answer.current(true)}
-          className={`${pill} border-text bg-text text-bg hover:bg-white`}
-        >
-          Approve
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => answer.current(false)}
-          className={`${pill} border-edge-hi bg-transparent text-text hover:bg-raise`}
-        >
-          Not now
-        </button>
-        <span
-          aria-hidden="true"
-          className="ml-1 hidden font-mono text-[12px] text-muted sm:[@media(hover:hover)]:inline"
-        >
-          Enter to approve, Esc to decline
-        </span>
-      </div>
+      {answered ? (
+        <p role="status" className="mt-3 mb-0 flex items-center gap-2 text-[14px] text-text">
+          <Icon name="check" className="shrink-0 text-signal" />
+          {answered === 'yes'
+            ? 'Approved. Remy is carrying on.'
+            : 'Not now. Remy carries on without it.'}
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => answer.current(true)}
+              className={`${pill} border-text bg-text text-bg hover:bg-white`}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => answer.current(false)}
+              className={`${pill} border-edge-hi bg-transparent text-text hover:bg-raise`}
+            >
+              Not now
+            </button>
+            <span
+              aria-hidden="true"
+              className="ml-1 hidden font-mono text-[12px] text-muted sm:[@media(hover:hover)]:inline"
+            >
+              Enter to approve, Esc to decline
+            </span>
+          </div>
+          <p className="mt-2 mb-0 text-[13px] text-muted">Remy carries on as soon as you answer.</p>
+        </>
+      )}
       {problem && (
         <p role="alert" className="mt-3 mb-0 text-[13px] text-muted">
           {problem}

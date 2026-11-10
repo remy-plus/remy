@@ -12,6 +12,8 @@ import octocat from '../../assets/logos/octocat.svg';
 import slack from '../../assets/logos/slack.svg';
 import stripe from '../../assets/logos/stripe.svg';
 import zoom from '../../assets/logos/zoom.svg';
+import { Skeleton } from '../../components/Skeleton.tsx';
+import { describeError } from '../../lib/errors.ts';
 
 export const mono = 'font-mono';
 const base = `cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50 no-underline`;
@@ -34,9 +36,7 @@ export function useLoad<T>(load: (api: RemyApi) => Promise<T>) {
       })
       .catch((e: unknown) =>
         setError(
-          e instanceof Error
-            ? e.message
-            : 'Remy could not be reached. Check that it is running, then reload.',
+          describeError(e, 'Remy could not be reached. Check that it is running, then reload.'),
         ),
       );
   }, [api]);
@@ -84,20 +84,23 @@ export function Page({
   );
 }
 
-export function Unavailable({ message }: { message: string }) {
+/** What went wrong, in the server's own words when it has them, with a way to try again. */
+export function Unavailable({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <p role="status" className="px-5 py-12 text-base text-muted sm:px-8">
-      {message}
-    </p>
+    <div role="status" className="px-5 py-12 sm:px-8">
+      <p className="m-0 max-w-[560px] text-base leading-relaxed text-text">{message}</p>
+      {onRetry && (
+        <button type="button" onClick={onRetry} className={`${quiet} mt-4`}>
+          Try again
+        </button>
+      )}
+    </div>
   );
 }
 
-export function Loading() {
-  return (
-    <p role="status" className="px-5 py-12 text-base text-muted sm:px-8">
-      Loading
-    </p>
-  );
+/** The page taking shape, named, so the wait says what it is for. */
+export function Loading({ label = 'Loading this page' }: { label?: string }) {
+  return <Skeleton label={label} lines={4} className="px-5 py-12 sm:px-8" />;
 }
 
 /** A real switch: a native checkbox with the switch role, so the keyboard works without extra code. */

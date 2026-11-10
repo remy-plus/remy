@@ -1,5 +1,7 @@
 // The real adapter: fetch with a bearer token. Streaming uses fetch, not EventSource, because
 // EventSource cannot send an Authorization header.
+
+import { GENERIC, statusMessage } from '../lib/errors.ts';
 import type {
   ApproveBody,
   BrainData,
@@ -89,10 +91,8 @@ export function createHttpApi(opts: {
     if (res.status === 401) opts.onUnauthorized?.();
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new ApiError(
-        res.status,
-        body.error ?? 'The request failed. Check that Remy is still running, then try again.',
-      );
+      // The server's own sentence when it sent one; otherwise the status says what happened.
+      throw new ApiError(res.status, body.error ?? statusMessage(res.status) ?? GENERIC);
     }
     return res;
   }

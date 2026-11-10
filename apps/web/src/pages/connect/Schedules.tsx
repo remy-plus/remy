@@ -15,10 +15,10 @@ import {
 } from './ui.tsx';
 
 export function Schedules() {
-  const { api, data, setData, error } = useLoad((a) => a.schedules());
+  const { api, data, setData, error, reload } = useLoad((a) => a.schedules());
   const [said, setSaid] = useState<{ text: string; taskId?: string } | null>(null);
-  if (error) return <Unavailable message={error} />;
-  if (!data) return <Loading />;
+  if (error) return <Unavailable message={error} onRetry={reload} />;
+  if (!data) return <Loading label="Loading your schedules" />;
 
   const refresh = async () => setData(await api.schedules());
   const fail = (e: unknown) =>

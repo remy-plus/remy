@@ -3,9 +3,11 @@
 import { type ReactNode, useId, useState } from 'react';
 import { useApi } from '../../api/index.tsx';
 import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
+import { Icon } from '../../components/Icon.tsx';
 import { Logo } from '../../components/Logo.tsx';
 import { Orb } from '../../components/Orb.tsx';
 import { buttonPrimary, buttonQuiet, field } from '../../components/ui.ts';
+import { describeError } from '../../lib/errors.ts';
 import { setSetting } from '../../settings.ts';
 
 const STEPS = ['Pick a model', 'Connect your apps', 'Ask for something'];
@@ -117,13 +119,14 @@ function StepOne() {
   const name = useId();
   const [way, setWay] = useState<(typeof WAYS)[number]['id']>('own');
   const [key, setKey] = useState('');
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState<{ text: string; ok: boolean } | null>(null);
   const test = async () => {
-    setKey(''); // the browser never keeps a key
     try {
-      setNote((await api.testModels()).detail);
+      const { detail } = await api.testModels();
+      setKey(''); // the browser never keeps a key, and the check is done with it
+      setNote({ text: detail, ok: true });
     } catch (e) {
-      setNote(e instanceof Error ? e.message : 'The test did not run.');
+      setNote({ text: describeError(e, 'The check did not run. Try again.'), ok: false });
     }
   };
   return (
@@ -189,15 +192,24 @@ function StepOne() {
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/2">
-          Continue
+          Save and continue
         </a>
         <button type="button" className={`${buttonQuiet} px-5 py-3`} onClick={test}>
-          Test the key first
+          Check the model
         </button>
-        <p role="status" className="m-0 text-[13px] text-muted">
-          {note}
-        </p>
       </div>
+      {note && (
+        <p
+          role="status"
+          className="mt-3 mb-0 flex items-start gap-2 text-[13px] leading-snug text-text"
+        >
+          <Icon
+            name={note.ok ? 'check' : 'close'}
+            className={`mt-0.5 shrink-0 ${note.ok ? 'text-signal' : 'text-muted'}`}
+          />
+          <span className="min-w-0">{note.text}</span>
+        </p>
+      )}
       <SkipSetup />
     </Frame>
   );
@@ -244,7 +256,7 @@ function StepTwo() {
       </ul>
       <div className="mt-6 flex flex-wrap gap-3">
         <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/3">
-          Continue
+          Next: ask for something
         </a>
         <a className={`${buttonQuiet} px-5 py-3 no-underline`} href="#/welcome/3">
           Skip for now
@@ -273,7 +285,7 @@ function StepThree() {
       finish();
       window.location.hash = `#/tasks/${encodeURIComponent(taskId)}`;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Remy could not start that.');
+      setError(describeError(e, 'Remy could not start that. Try again.'));
     }
   };
   return (
@@ -297,7 +309,7 @@ function StepThree() {
           disabled={!text.trim()}
           onClick={start}
         >
-          Start
+          Ask Remy
         </button>
       </div>
       {error && (

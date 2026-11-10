@@ -14,15 +14,15 @@ import {
 } from './ui.tsx';
 
 export function AddConnection() {
-  const { api, data, error } = useLoad((a) => a.appCatalog());
+  const { api, data, error, reload } = useLoad((a) => a.appCatalog());
   const [picked, setPicked] = useState('');
   const [level, setLevel] = useState<PermissionLevel>('draft');
   const [query, setQuery] = useState('');
   const [byAddress, setByAddress] = useState(false);
   const [problem, setProblem] = useState('');
   const groupId = useId();
-  if (error) return <Unavailable message={error} />;
-  if (!data) return <Loading />;
+  if (error) return <Unavailable message={error} onRetry={reload} />;
+  if (!data) return <Loading label="Loading the apps you can connect" />;
 
   const shown = data.filter((a) => a.name.toLowerCase().includes(query.trim().toLowerCase()));
   const app: CatalogApp | undefined = data.find((a) => a.id === (picked || data[0]?.id));

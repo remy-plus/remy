@@ -59,6 +59,13 @@ const jobOf = async (over: Partial<TaskView>): Promise<TaskView> => ({
 });
 
 describe('empty chat', () => {
+  it('offers to carry on with the newest chat, and says what Remy will not do unasked', async () => {
+    show(createMockApi());
+    const link = await screen.findByRole('link', { name: /Pick up where you left off/ });
+    expect(link.getAttribute('href')).toMatch(/^#\/chat\//);
+    expect(screen.getByText(/asks before it sends anything as you or spends money/)).toBeTruthy();
+  });
+
   it('shows the greeting, a labelled box and the suggestions', () => {
     show(createMockApi());
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/Good|Still up/);
@@ -97,6 +104,13 @@ describe('empty chat', () => {
 });
 
 describe('chat view', () => {
+  it('names what it is opening instead of saying "Loading"', () => {
+    const api = { ...createMockApi(), getChat: () => new Promise<never>(() => {}) };
+    show(api, 'c1');
+    expect(screen.getByText('Opening your chat')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/^Loading$/);
+  });
+
   it('lists the turns with their answers', async () => {
     show(createMockApi(), 'chat_week');
     expect(await screen.findByText('Plan my week around the dentist on Tuesday')).toBeTruthy();
@@ -188,6 +202,13 @@ describe('waiting for approval', () => {
         granted: true,
       }),
     );
+  });
+
+  it('says what happens next, then confirms the answer', async () => {
+    await setup();
+    expect(screen.getByText('Remy carries on as soon as you answer.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText('Approved. Remy is carrying on.')).toBeTruthy();
   });
 
   it('Not now declines with the same hash', async () => {

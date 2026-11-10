@@ -3,6 +3,7 @@ import { type ChatSummary, useApi } from '../api/index.tsx';
 import type { MindState } from '../lib/mind.ts';
 import { DEFAULTS, useSetting } from '../settings.ts';
 import { HistoryDrawer } from './HistoryDrawer.tsx';
+import { Icon } from './Icon.tsx';
 import { MindGlyph } from './MindGlyph.tsx';
 
 export interface DockItem {
@@ -222,9 +223,9 @@ export function Dock({ path }: { path: string }) {
               href="#/"
               aria-label="New chat"
               title="New chat"
-              className={`${pill} ${idle} text-[16px] leading-6`}
+              className={`${pill} ${idle} flex items-center`}
             >
-              +
+              <Icon name="plus" />
             </a>
           </>
         )}

@@ -41,7 +41,7 @@ export function whenPhrase(o: {
 }
 
 export function NewSchedule() {
-  const { api, data, error } = useLoad((a) => a.schedules());
+  const { api, data, error, reload } = useLoad((a) => a.schedules());
   const uid = useId();
   const [prompt, setPrompt] = useState('');
   const [often, setOften] = useState<Often>('Weekly');
@@ -59,8 +59,8 @@ export function NewSchedule() {
   const [runsOn, setRunsOn] = useState('this machine');
   const [errors, setErrors] = useState<Partial<Record<'prompt' | 'time' | 'custom', string>>>({});
   const [problem, setProblem] = useState('');
-  if (error) return <Unavailable message={error} />;
-  if (!data) return <Loading />;
+  if (error) return <Unavailable message={error} onRetry={reload} />;
+  if (!data) return <Loading label="Loading your connections" />;
 
   const check = () => {
     const e: typeof errors = {};

@@ -1,7 +1,9 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import { type ChatTurn, type TaskView, useApi } from '../../api/index.tsx';
 import { BrowserPane } from '../../components/BrowserPane.tsx';
+import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
+import { describeError } from '../../lib/errors.ts';
 import { type FeedLine, feedLines } from '../../lib/feed.ts';
 import type { MindState } from '../../lib/mind.ts';
 import { ago } from '../../lib/when.ts';
@@ -20,14 +22,14 @@ function Marker({ state }: { state: FeedLine['state'] }) {
   const base = 'mt-[5px] flex size-3.5 shrink-0 items-center justify-center rounded-full';
   if (state === 'done')
     return (
-      <span aria-hidden="true" className={`${base} border border-signal text-[9px] text-signal`}>
-        ✓
+      <span aria-hidden="true" className={`${base} border border-signal text-signal`}>
+        <Icon name="check" size={9} />
       </span>
     );
   if (state === 'failed')
     return (
-      <span aria-hidden="true" className={`${base} bg-text font-mono text-[10px] text-bg`}>
-        ×
+      <span aria-hidden="true" className={`${base} bg-text text-bg`}>
+        <Icon name="close" size={9} />
       </span>
     );
   if (state === 'waiting')
@@ -147,7 +149,7 @@ function Question({
       setText('');
       onDone();
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'Remy could not send that.');
+      setProblem(describeError(e, 'Remy could not send that. Try again.'));
     }
   };
   return (

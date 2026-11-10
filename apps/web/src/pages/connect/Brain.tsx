@@ -69,7 +69,7 @@ export function nextLinked(
 }
 
 export function Brain() {
-  const { api, data, setData, error } = useLoad((a) => a.brain());
+  const { api, data, setData, error, reload } = useLoad((a) => a.brain());
   const [pick, setPick] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -79,8 +79,8 @@ export function Brain() {
   const nodes = useRef(new Map<string, HTMLButtonElement>());
 
   const links = useMemo(() => neighbours(data?.notes ?? []), [data]);
-  if (error) return <Unavailable message={error} />;
-  if (!data) return <Loading />;
+  if (error) return <Unavailable message={error} onRetry={reload} />;
+  if (!data) return <Loading label="Loading what Remy knows" />;
 
   const q = query.trim().toLowerCase();
   const visible = data.notes.filter(
@@ -122,6 +122,12 @@ export function Brain() {
     if (to) nodes.current.get(to.id)?.focus();
   };
 
+  const narrowed = filter !== 'all' || query.trim() !== '';
+  const clear = () => {
+    setFilter('all');
+    setQuery('');
+  };
+
   const chips: { id: Filter; label: string; n: number }[] = [
     { id: 'all', label: 'All', n: data.total },
     { id: 'person', label: 'People', n: data.counts.person },
@@ -160,6 +166,15 @@ export function Brain() {
               </button>
             ))}
           </fieldset>
+          {narrowed && (
+            <button
+              type="button"
+              onClick={clear}
+              className={`${mono} cursor-pointer rounded-full border border-edge bg-transparent px-3 py-1.5 text-[12px] whitespace-nowrap text-muted hover:text-text`}
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         <div className="relative aspect-[4/5] overflow-hidden rounded-[14px] border border-edge bg-surface sm:aspect-[930/728]">
@@ -214,12 +229,24 @@ export function Brain() {
             );
           })}
           {visible.length === 0 && (
-            <p
+            <div
               role="status"
-              className="absolute inset-0 m-0 grid place-items-center text-[14px] text-muted"
+              className="absolute inset-0 grid place-items-center px-6 text-center"
             >
-              No note matches.
-            </p>
+              <div>
+                <p className="m-0 text-[15px] text-text">No note matches that.</p>
+                <p className="mt-1 mb-0 text-[13px] leading-snug text-muted">
+                  Try another word, or show everything again.
+                </p>
+                <button
+                  type="button"
+                  onClick={clear}
+                  className={`${quiet} mt-3 px-4 py-2 text-[13px]`}
+                >
+                  Clear the search
+                </button>
+              </div>
+            </div>
           )}
           <p
             className={`${mono} pointer-events-none absolute bottom-3 left-4 m-0 flex max-sm:bottom-9 flex-wrap gap-x-4 text-[12px] text-muted`}

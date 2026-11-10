@@ -1,9 +1,12 @@
 // The front door: a conversation with Remy. `id` is absent for a new chat.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ChatView, useApi } from '../../api/index.tsx';
+import { type ChatSummary, type ChatView, useApi } from '../../api/index.tsx';
+import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
+import { Skeleton } from '../../components/Skeleton.tsx';
+import { describeError } from '../../lib/errors.ts';
 import type { MindState } from '../../lib/mind.ts';
-import { greeting } from '../../lib/when.ts';
+import { ago, greeting } from '../../lib/when.ts';
 import { Composer } from './Composer.tsx';
 import { Turn } from './Feed.tsx';
 
@@ -22,7 +25,24 @@ interface VoiceNow {
 }
 const IDLE: VoiceNow = { state: null, level: 0 };
 
-const problemOf = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
+const problemOf = (e: unknown, fallback: string) => describeError(e, fallback);
+
+/** The newest chat, so the front door offers to carry on instead of asking the person to start over. */
+function useLastChat(): ChatSummary | null {
+  const api = useApi();
+  const [last, setLast] = useState<ChatSummary | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .listChats()
+      .then((c) => live && setLast(c[0] ?? null))
+      .catch(() => {}); // no history is not a problem worth a message
+    return () => {
+      live = false;
+    };
+  }, [api]);
+  return last;
+}
 
 function EmptyChat() {
   const api = useApi();
@@ -30,6 +50,7 @@ function EmptyChat() {
   const [problem, setProblem] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [voice, setVoice] = useState<VoiceNow>(IDLE);
+  const last = useLastChat();
   const send = async () => {
     const t = text.trim();
     if (!t || sending) return;
@@ -55,10 +76,26 @@ function EmptyChat() {
       <div className="w-full text-left">
         <Composer value={text} onChange={setText} onSend={send} onVoice={setVoice} autoFocus />
       </div>
+      <p className="mt-2.5 mb-0 w-full px-4 text-left text-[13px] leading-snug text-muted">
+        Remy asks before it sends anything as you or spends money.
+      </p>
       {problem && (
         <p role="alert" className="mt-3 mb-0 text-[14px] text-muted">
           {problem}
         </p>
+      )}
+      {last && (
+        <a
+          href={`#/chat/${encodeURIComponent(last.id)}`}
+          className="mt-5 flex w-full items-center gap-3 rounded-[14px] border border-edge bg-surface px-4 py-3 text-left text-text no-underline transition-colors duration-300 hover:border-edge-hi hover:bg-raise"
+        >
+          <Icon name="clock" className="shrink-0 text-muted" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] text-muted">Pick up where you left off</span>
+            <span className="mt-0.5 block text-[15px] leading-snug break-words">{last.title}</span>
+          </span>
+          <span className="shrink-0 text-[12px] text-muted">{ago(last.updatedAt)}</span>
+        </a>
       )}
       <ul className="m-0 mt-4 flex w-full list-none flex-col gap-0.5 p-0 text-left">
         {SUGGESTIONS.map((s, i) => (
@@ -66,7 +103,7 @@ function EmptyChat() {
             <button
               type="button"
               onClick={() => setText(s)}
-              className="h-9 w-full cursor-pointer truncate rounded-[10px] border-0 bg-transparent px-4 text-left text-[14px] text-muted transition-colors duration-300 hover:bg-surface hover:text-text"
+              className="w-full cursor-pointer rounded-[10px] border-0 bg-transparent px-4 py-2 text-left text-[14px] leading-snug text-muted transition-colors duration-300 hover:bg-surface hover:text-text"
             >
               {s}
             </button>
@@ -192,9 +229,20 @@ function OpenChat({ id }: { id: string }) {
     );
   if (!chat)
     return (
-      <p role="status" className="px-5 pt-32 text-center text-[14px] text-muted">
-        Opening the chat
-      </p>
+      <div className="mx-auto w-full max-w-[720px] px-4 pt-6">
+        <div className="flex justify-end">
+          <span
+            aria-hidden="true"
+            className="skeleton block h-10 w-[min(60%,320px)] rounded-[18px]"
+          />
+        </div>
+        <div className="mt-6 flex gap-3">
+          <div className="hidden shrink-0 sm:block">
+            <MindGlyph state="thinking" size={48} />
+          </div>
+          <Skeleton label="Opening your chat" lines={3} className="min-w-0 flex-1" />
+        </div>
+      </div>
     );
 
   return (

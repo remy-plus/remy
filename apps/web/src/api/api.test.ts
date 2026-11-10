@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applyServerPrefs, bindServerSettings, getSetting, setSetting } from '../settings.ts';
+import {
+  applyServerPrefs,
+  bindServerSettings,
+  getSaveState,
+  getSetting,
+  setSetting,
+} from '../settings.ts';
 import { ApiError, createHttpApi, createSseParser } from './http.ts';
 import { chooseApi } from './index.tsx';
 import { createMockApi } from './mock.ts';
@@ -353,7 +359,9 @@ describe('settings copied to and from the server', () => {
 
   it('copies the server values in without sending them back, then sends each change', () => {
     const sent: unknown[] = [];
-    bindServerSettings((p) => sent.push(p));
+    bindServerSettings(async (p) => {
+      sent.push(p);
+    });
     applyServerPrefs(prefs);
     expect(sent).toEqual([]);
     expect(getSetting('trust')).toBe('steady');
@@ -372,6 +380,20 @@ describe('settings copied to and from the server', () => {
     bindServerSettings(null);
     setSetting('trust', 'ask');
     expect(sent).toHaveLength(3);
+  });
+
+  it('says whether the server took the change, instead of failing quietly', async () => {
+    let refuse = false;
+    bindServerSettings(async () => {
+      if (refuse) throw new Error('the server is away');
+    });
+    setSetting('trust', 'away');
+    expect(getSaveState()).toBe('saving');
+    await vi.waitFor(() => expect(getSaveState()).toBe('saved'));
+    refuse = true;
+    setSetting('trust', 'ask');
+    await vi.waitFor(() => expect(getSaveState()).toBe('failed'));
+    bindServerSettings(null);
   });
 });
 
