@@ -72,6 +72,36 @@
     for (const e of rv) io.observe(e);
   }
 
+  // ---- The nav logo appears once the big wordmark has left the screen.
+  const brand = d.querySelector('.brand');
+  const heroMark = d.querySelector('.hero .wm');
+  if (brand && heroMark && 'IntersectionObserver' in window) {
+    new IntersectionObserver(([e]) => brand.classList.toggle('show', !e.isIntersecting), { rootMargin: '-80px 0px 0px 0px' }).observe(heroMark);
+  }
+
+  // ---- Modes: arrow keys move between tabs; one panel shows at a time.
+  const tabs = [...d.querySelectorAll('[role="tab"]')];
+  const pick = (tab, focus) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      const p = d.getElementById(t.getAttribute('aria-controls'));
+      if (p) p.hidden = !on;
+    }
+    if (focus) tab.focus();
+  };
+  for (const [i, t] of tabs.entries()) {
+    t.addEventListener('click', () => pick(t, false));
+    t.addEventListener('keydown', (e) => {
+      const n = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (n) {
+        e.preventDefault();
+        pick(tabs[(i + n + tabs.length) % tabs.length], true);
+      }
+    });
+  }
+
   // ---- Pinned story: the stage follows whichever statement is in view.
   const stage = d.getElementById('stage');
   const steps = [...d.querySelectorAll('.how-steps li')];
@@ -90,27 +120,33 @@
     for (const s of steps) so.observe(s);
   }
 
-  // ---- Hero: a sample task plays back, then waits for the visitor's yes or no.
-  const demo = d.getElementById('demo');
+  // ---- Hero: a sample task plays back in the app, then waits for the visitor's yes or no.
+  const demo = d.getElementById('demo-app');
   if (!demo) return;
   const seq = [...demo.querySelectorAll('[data-seq]')];
   const ask = d.getElementById('ask');
+  const modal = d.getElementById('modal');
   const result = d.getElementById('result');
+  const trace = d.getElementById('trace');
+  const log = d.getElementById('log');
+  const logAsk = d.getElementById('log-ask');
   const approve = d.getElementById('approve');
   const decline = d.getElementById('decline');
   const replay = d.getElementById('replay');
-  const card = ask.querySelector('.card');
-  const mark = ask.querySelector('.tx');
+  const askText = ask.querySelector('.tx');
+  const clock = (s) => `09:14:${String(s).padStart(2, '0')}`;
   let run = 0;
   let decided = false;
+  let extra = [];
 
   const resetDemo = () => {
     decided = false;
+    for (const e of extra) e.remove();
+    extra = [];
     for (const s of seq) s.classList.remove('shown');
     ask.className = 'step wait';
-    ask.dataset.seq = '';
-    mark.innerHTML = '<b>Write file</b> <span class="dim">waiting for your OK</span>';
-    card.hidden = false;
+    askText.innerHTML = '<b>Write file</b> <span class="dim">waiting for your OK</span>';
+    modal.hidden = false;
     result.textContent = '';
   };
 
@@ -121,27 +157,41 @@
       for (const s of seq) s.classList.add('shown');
       return;
     }
-    await wait(250);
+    await wait(300);
     for (const s of seq) {
       if (me !== run) return;
       s.classList.add('shown');
-      await wait(s === seq[seq.length - 2] ? 380 : 230);
+      await wait(s === ask ? 200 : 260);
     }
+  };
+
+  const addLog = (time, text) => {
+    const li = d.createElement('li');
+    li.innerHTML = `<time>${time}</time> ${text}`;
+    log.append(li);
+    extra.push(li);
   };
 
   const decide = (yes) => {
     if (decided) return;
     decided = true;
-    card.hidden = true;
+    modal.hidden = true;
     ask.classList.remove('wait');
+    ask.classList.add('done');
     if (yes) {
-      ask.classList.add('done');
-      mark.innerHTML = '<b>Write file</b> reply.md <span class="dim">you approved</span>';
+      askText.innerHTML = '<b>Write file</b> <span class="dim">reply.md</span>';
+      const end = d.createElement('li');
+      end.className = 'step done';
+      end.innerHTML = '<span class="mk" aria-hidden="true"></span><span class="tx"><b>Finished</b></span>';
+      trace.append(end);
+      extra.push(end);
+      addLog(clock(31), 'you approved');
+      addLog(clock(33), 'finished');
       result.textContent =
         'Draft saved to reply.md. Northwind is $1,240 cheaper over twelve months. Nothing has been sent.';
     } else {
-      ask.classList.add('done');
-      mark.innerHTML = '<b>Write file</b> <span class="dim">you declined, nothing was written</span>';
+      askText.innerHTML = '<b>Write file</b> <span class="dim">you declined, nothing was written</span>';
+      addLog(clock(31), 'you declined');
       result.textContent = 'Understood. reply.md was not written. What should change?';
     }
     if (status) status.textContent = result.textContent;
@@ -151,15 +201,14 @@
   decline.addEventListener('click', () => decide(false));
   replay.addEventListener('click', play);
   d.addEventListener('keydown', (e) => {
-    if (decided || !demo.matches(':hover, :focus-within')) return;
-    if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
+    if (decided || modal.hidden) return;
+    if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLAnchorElement)) {
       e.preventDefault();
       decide(true);
     }
     if (e.key === 'Escape') decide(false);
   });
 
-  // Start when the hero is on screen, which is at load.
   if ('IntersectionObserver' in window) {
     const ho = new IntersectionObserver((es) => {
       if (es.some((e) => e.isIntersecting)) {
