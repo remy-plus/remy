@@ -166,6 +166,7 @@ import { listenServe } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { createBrainMount } from './serve-brain.ts';
+import { chatRoutes } from './serve-chats.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
@@ -2227,6 +2228,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 rotateToken: () => makeServeToken(home),
                 model,
               }),
+              chatRoutes({ home, store, redact }),
               settingsRoutes(
                 {
                   home,

@@ -373,3 +373,100 @@ describe('settings copied to and from the server', () => {
     expect(sent).toHaveLength(3);
   });
 });
+
+describe('chats, http adapter', () => {
+  const reply = (body: unknown, status = 200) =>
+    vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  const make = (fetcher: ReturnType<typeof reply>) =>
+    createHttpApi({ token: () => 'tok', fetch: fetcher as unknown as typeof fetch });
+  const last = (f: ReturnType<typeof reply>) =>
+    f.mock.calls.at(-1) as unknown as [string, RequestInit];
+
+  it('lists chats and unwraps them', async () => {
+    const chats = [{ id: 'chat_1', title: 'Hi', updatedAt: 't', preview: 'p', state: 'resting' }];
+    const f = reply({ chats });
+    expect(await make(f).listChats()).toEqual(chats);
+    expect(last(f)[0]).toBe('/api/chats');
+  });
+
+  it('gets one chat by an encoded id', async () => {
+    const f = reply({ id: 'chat_1', title: 'Hi', turns: [] });
+    expect((await make(f).getChat('chat_1')).turns).toEqual([]);
+    expect(last(f)[0]).toBe('/api/chats/chat_1');
+  });
+
+  it('sends a message with only the fields that were given', async () => {
+    const f = reply({ chatId: 'chat_1', taskId: 'task_1' }, 201);
+    const api = make(f);
+    expect(await api.sendMessage('Hello')).toEqual({ chatId: 'chat_1', taskId: 'task_1' });
+    let [url, init] = last(f);
+    expect(url).toBe('/api/chats/messages');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ text: 'Hello' });
+    await api.sendMessage('More', 'chat_1', 'steady');
+    [url, init] = last(f);
+    expect(JSON.parse(String(init.body))).toEqual({
+      text: 'More',
+      chatId: 'chat_1',
+      trust: 'steady',
+    });
+  });
+
+  it('renames with PUT and deletes with DELETE', async () => {
+    const f = reply({ ok: true });
+    const api = make(f);
+    await api.renameChat('chat_1', 'New name');
+    let [url, init] = last(f);
+    expect([url, init.method, JSON.parse(String(init.body))]).toEqual([
+      '/api/chats/chat_1',
+      'PUT',
+      { title: 'New name' },
+    ]);
+    await api.deleteChat('chat_1');
+    [url, init] = last(f);
+    expect([url, init.method]).toEqual(['/api/chats/chat_1', 'DELETE']);
+  });
+
+  it('shows the server message when a send is refused', async () => {
+    const f = reply({ error: 'This month is used up.' }, 402);
+    await expect(make(f).sendMessage('Hi')).rejects.toThrow('This month is used up.');
+  });
+});
+
+describe('chats, mock adapter', () => {
+  it('has two sample chats, newest first', async () => {
+    const chats = await createMockApi().listChats();
+    expect(chats.map((c) => c.id)).toEqual(['chat_week', 'chat_flights']);
+    expect(chats[0]).toMatchObject({ state: 'resting', title: 'Plan my week' });
+    expect((await createMockApi().getChat('chat_week')).turns).toHaveLength(2);
+  });
+
+  it('a message makes a chat whose turn finishes after a short delay', async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const { chatId, taskId } = await api.sendMessage('Book a table for Friday.');
+      let view = await api.getChat(chatId);
+      expect(view.title).toBe('Book a table for Friday');
+      expect(view.turns[0]).toMatchObject({ taskId, state: 'working' });
+      expect((await api.listChats())[0]).toMatchObject({ id: chatId, state: 'working' });
+      await vi.advanceTimersByTimeAsync(500);
+      view = await api.getChat(chatId);
+      expect(view.turns[0]?.state).toBe('done');
+      expect(view.turns[0]?.answer).toContain('Book a table');
+      await api.sendMessage('And for Saturday', chatId);
+      expect((await api.getChat(chatId)).turns).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('renames, deletes and rejects unknown chats', async () => {
+    const api = createMockApi();
+    await api.renameChat('chat_week', 'Week');
+    expect((await api.getChat('chat_week')).title).toBe('Week');
+    await api.deleteChat('chat_week');
+    await expect(api.getChat('chat_week')).rejects.toThrow('There is no such chat.');
+    await expect(api.sendMessage('x', 'chat_nope')).rejects.toThrow('There is no such chat.');
+  });
+});
