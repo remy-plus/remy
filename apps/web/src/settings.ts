@@ -20,6 +20,8 @@ export interface SettingValues {
   'quiet.from': string;
   'quiet.to': string;
   onboarded: boolean;
+  /** The dock's items, in order. Browser-local. */
+  dock: string[];
 }
 
 export const DEFAULTS: SettingValues = {
@@ -37,6 +39,7 @@ export const DEFAULTS: SettingValues = {
   'quiet.from': '23:00',
   'quiet.to': '07:00',
   onboarded: false,
+  dock: ['chat', 'activity', 'browser', 'brain', 'connections', 'settings'],
 };
 
 export type SettingKey = keyof SettingValues;
@@ -68,6 +71,11 @@ const parse = <K extends SettingKey>(key: K, raw: string | null): SettingValues[
   if (raw === null) return DEFAULTS[key];
   try {
     const v: unknown = JSON.parse(raw);
+    if (Array.isArray(DEFAULTS[key])) {
+      return Array.isArray(v) && v.every((x) => typeof x === 'string')
+        ? (v as SettingValues[K])
+        : DEFAULTS[key];
+    }
     return typeof v === typeof DEFAULTS[key] ? (v as SettingValues[K]) : DEFAULTS[key];
   } catch {
     return DEFAULTS[key];
@@ -105,7 +113,7 @@ const toPatch = (key: SettingKey, v: unknown): SettingsPatch | null => {
     case 'notify.review':
       return { notifications: { reviewAt: v as string } };
     default:
-      return null; // `escalate` and `onboarded` stay in this browser
+      return null; // `escalate`, `onboarded` and `dock` stay in this browser
   }
 };
 
