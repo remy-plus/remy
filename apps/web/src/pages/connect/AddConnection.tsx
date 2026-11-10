@@ -143,7 +143,7 @@ export function AddConnection() {
                   <span
                     className={`${mono} rounded-[4px] border border-edge bg-raise px-1.5 py-px text-[11px] font-normal text-muted`}
                   >
-                    spends money
+                    Can spend money
                   </span>
                 )}
               </span>
@@ -157,8 +157,8 @@ export function AddConnection() {
         <div className="min-w-0 max-w-[520px]">
           <h2 className="m-0 text-[16px] font-medium">Something else?</h2>
           <p className="m-0 mt-1 text-[14px] text-muted">
-            Add any tool that speaks MCP by its address. Remy treats it as untrusted until you say
-            otherwise.
+            For a technical user: add a custom app by its address. It must speak MCP, a standard way
+            for AI tools to connect. Remy handles it with caution until you say otherwise.
           </p>
           {byAddress && (
             <p role="status" className="mt-2 mb-0 text-[14px] text-text">
