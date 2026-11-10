@@ -47,7 +47,7 @@ export function Settings({ section = 'trust' }: { section?: string }) {
     <div className="mx-auto max-w-[1440px] md:grid md:min-h-[calc(100vh-66px)] md:grid-cols-[260px_minmax(0,1fr)]">
       <nav
         aria-label="Settings sections"
-        className="border-b border-line px-5 py-4 md:border-r md:border-b-0 md:py-8 md:pr-5 md:pl-10"
+        className="border-b border-edge px-5 py-4 md:border-r md:border-b-0 md:py-8 md:pr-5 md:pl-10"
       >
         <ul className="-mx-3 m-0 flex flex-wrap gap-1 p-0 md:mx-0 md:block md:space-y-1">
           {SECTIONS.map((s) => {
@@ -57,7 +57,7 @@ export function Settings({ section = 'trust' }: { section?: string }) {
                 <a
                   href={`#/settings/${s.id}`}
                   aria-current={on ? 'true' : undefined} // the main bar already marks Settings as the page
-                  className={`font-mono block rounded-md border px-3 py-2 text-[13px] no-underline ${on ? 'border-line bg-surface text-text' : 'border-transparent text-muted hover:text-text'}`}
+                  className={`block rounded-xl border px-3.5 py-2.5 text-[15px] font-medium no-underline transition-colors duration-300 ${on ? 'border-edge bg-surface text-text' : 'border-transparent text-muted hover:text-text'}`}
                 >
                   {s.label}
                 </a>
