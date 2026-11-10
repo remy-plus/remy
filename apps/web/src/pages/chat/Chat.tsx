@@ -47,27 +47,27 @@ function EmptyChat() {
     }
   };
   return (
-    <div className="page-in mx-auto flex min-h-dvh w-full max-w-[720px] flex-col items-center justify-center px-5 pt-20 pb-12 text-center">
-      <MindGlyph state={voice.state ?? 'rest'} level={voice.level} size={220} />
-      <h1 className="m-0 mt-6 text-[34px] leading-[1.15] font-medium tracking-tight sm:text-[40px]">
+    <div className="page-in mx-auto flex min-h-[calc(100dvh-80px)] w-full max-w-[640px] flex-col items-center justify-center px-4 pb-16 text-center">
+      <MindGlyph state={voice.state ?? 'rest'} level={voice.level} size={128} />
+      <h1 className="m-0 mt-4 text-[28px] leading-[1.2] font-medium tracking-tight">
         {greeting()}
       </h1>
-      <p className="mt-2 mb-8 text-[18px] text-muted">What do you need?</p>
+      <p className="mt-1 mb-6 text-[15px] text-muted">What do you need?</p>
       <div className="w-full text-left">
-        <Composer value={text} onChange={setText} onSend={send} onVoice={setVoice} big autoFocus />
+        <Composer value={text} onChange={setText} onSend={send} onVoice={setVoice} autoFocus />
       </div>
       {problem && (
         <p role="alert" className="mt-3 mb-0 text-[14px] text-muted">
           {problem}
         </p>
       )}
-      <ul className="m-0 mt-6 flex list-none flex-wrap justify-center gap-2 p-0">
+      <ul className="m-0 mt-4 flex w-full list-none flex-col gap-0.5 p-0 text-left">
         {SUGGESTIONS.map((s, i) => (
           <li key={s} className="rise" style={{ '--i': i + 2 } as React.CSSProperties}>
             <button
               type="button"
               onClick={() => setText(s)}
-              className="cursor-pointer rounded-full border border-edge bg-transparent px-4 py-2 text-[14px] text-text transition-colors duration-300 hover:bg-raise"
+              className="h-9 w-full cursor-pointer truncate rounded-[10px] border-0 bg-transparent px-4 text-left text-[14px] text-muted transition-colors duration-300 hover:bg-surface hover:text-text"
             >
               {s}
             </button>
@@ -213,8 +213,8 @@ function OpenChat({ id }: { id: string }) {
     );
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <div className="mx-auto w-full max-w-[760px] flex-1 px-5 pt-28 pb-44">
+    <div className="flex min-h-[calc(100dvh-80px)] flex-col">
+      <div className="mx-auto w-full max-w-[720px] flex-1 px-4 pt-4 pb-8">
         <h1 className="sr-only">{chat.title}</h1>
         {chat.turns.map((t, i) => (
           <Turn
@@ -228,16 +228,16 @@ function OpenChat({ id }: { id: string }) {
         ))}
         <div ref={end} />
       </div>
-      <div className="sticky bottom-0 bg-gradient-to-t from-bg from-70% to-transparent px-5 pt-4 pb-5">
-        <div className="mx-auto max-w-[760px]">
+      <div className="sticky bottom-0 bg-bg px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))]">
+        <div className="mx-auto max-w-[720px]">
           {problem && (
-            <p role="alert" className="m-0 mb-2 px-2 text-[13px] text-muted">
+            <p role="alert" className="m-0 mb-2 px-4 text-[13px] text-muted">
               {problem}
             </p>
           )}
           {voice.state === 'listening' && (
             <div className="mb-2 flex justify-center">
-              <MindGlyph state="listening" level={voice.level} size={160} />
+              <MindGlyph state="listening" level={voice.level} size={96} />
             </div>
           )}
           <Composer

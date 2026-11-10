@@ -3,11 +3,37 @@ import type { MindState } from '../../lib/mind.ts';
 import { canSpeak, claimVoice, speakable, speakChunks, useListener } from '../../lib/voice.ts';
 import { useSetting } from '../../settings.ts';
 
-const pill =
-  'cursor-pointer rounded-full border font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-40';
+/** A 16 px line icon. Decorative: the button around it carries the name. */
+function Icon({
+  children,
+  fill = 'none',
+  strokeWidth = 1.6,
+}: {
+  children: React.ReactNode;
+  fill?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={fill}
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {children}
+    </svg>
+  );
+}
+
+const MAX = 152; // six lines of 24 px plus the textarea's own padding
 
 /**
- * The one input card. Enter sends, Shift+Enter starts a new line. While a job runs, `onStop` shows a
+ * The one input: a single line that grows as the text does, up to six. Enter sends, Shift+Enter starts a new line. While a job runs, `onStop` shows a
  * Stop button; typing stays open so the next message can wait its turn.
  */
 export function Composer({
@@ -15,7 +41,6 @@ export function Composer({
   onChange,
   onSend,
   onStop,
-  big = false,
   placeholder = 'Ask Remy to do anything',
   autoFocus = false,
   hint,
@@ -26,7 +51,6 @@ export function Composer({
   onChange: (v: string) => void;
   onSend: () => void;
   onStop?: () => void;
-  big?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
   /** A calm line under the card, for example the message waiting to go next. */
@@ -85,13 +109,28 @@ export function Composer({
     onVoice?.({ state: listening ? 'listening' : speaking ? 'working' : null, level });
   }, [listening, speaking, level, onVoice]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the box regrows whenever the text changes
+  // The box regrows whenever the text, the placeholder or its width changes (a Stop button appearing
+  // narrows it), so one line never shows as two.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placeholder changes the measured line
   useEffect(() => {
     const el = area.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, big ? 240 : 180)}px`;
-  }, [value, big]);
+    const grow = () => {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, MAX)}px`;
+    };
+    grow();
+    if (typeof ResizeObserver === 'undefined') return;
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth !== width) {
+        width = el.clientWidth;
+        grow();
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [value, placeholder]);
 
   useEffect(() => {
     if (autoFocus) area.current?.focus();
@@ -104,6 +143,9 @@ export function Composer({
     }
   };
 
+  const ghost =
+    'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 transition-[color,background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] disabled:cursor-default';
+
   return (
     <form
       onSubmit={(e) => {
@@ -112,16 +154,14 @@ export function Composer({
       }}
       className="w-full"
     >
-      <div
-        className={`flex items-end gap-2 rounded-[22px] border border-edge-hi bg-surface px-4 py-3 transition-[border-color,background-color] duration-300 focus-within:border-text/40 focus-within:bg-raise ${big ? 'min-h-[120px] sm:px-5 sm:py-4' : ''}`}
-      >
+      <div className="flex items-end gap-1 rounded-[24px] border border-edge bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-edge-hi">
         <label htmlFor={id} className="sr-only">
           Ask Remy to do anything
         </label>
         <textarea
           id={id}
           ref={area}
-          rows={big ? 2 : 1}
+          rows={1}
           value={value}
           onChange={(e) => {
             listener.edited();
@@ -130,7 +170,7 @@ export function Composer({
           onKeyDown={onKey}
           placeholder={placeholder}
           style={{ outline: 'none' }}
-          className={`[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-h-60 min-w-0 overflow-x-hidden flex-1 resize-none border-0 bg-transparent py-2 text-text outline-none placeholder:text-muted ${big ? 'text-[18px] leading-[1.5]' : 'text-[16px] leading-[1.5]'}`}
+          className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-h-[152px] min-w-0 flex-1 resize-none overflow-x-hidden border-0 bg-transparent px-0 py-1 text-[16px] leading-6 text-text outline-none placeholder:text-muted sm:text-[15px]"
         />
         <button
           type="button"
@@ -140,71 +180,57 @@ export function Composer({
             if (speak) cancelSpeech();
             setVoice({ speak: !speak });
           }}
-          className={`${pill} flex size-10 shrink-0 items-center justify-center border-edge-hi p-0 text-text hover:bg-raise ${speak ? 'bg-raise' : 'bg-transparent text-muted'}`}
+          className={`${ghost} hover:bg-raise hover:text-text ${speak ? 'text-text' : 'text-muted'}`}
         >
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <Icon>
             <path d="M4 9v6h4l5 4V5L8 9H4z" />
             {speak ? (
               <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
             ) : (
               <path d="M17 9l5 6M22 9l-5 6" />
             )}
-          </svg>
+          </Icon>
         </button>
         <button
           type="button"
           aria-label="Talk to Remy"
           aria-pressed={listening}
           onClick={toggle}
-          className={`${pill} flex size-10 shrink-0 items-center justify-center border-edge-hi bg-transparent p-0 text-text hover:bg-raise ${listening ? 'bg-raise' : ''}`}
+          className={`${ghost} hover:bg-raise hover:text-text ${listening ? 'bg-raise text-text' : 'text-muted'}`}
         >
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <Icon>
             <rect x="9" y="3" width="6" height="12" rx="3" />
             <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-          </svg>
+          </Icon>
         </button>
         {(onStop || speaking) && (
           <button
             type="button"
+            aria-label="Stop"
             onClick={() => {
               cancelSpeech();
               onStop?.();
             }}
-            className={`${pill} h-10 shrink-0 border-edge-hi bg-transparent px-4 text-[14px] text-text hover:bg-raise`}
+            className={`${ghost} border border-edge-hi text-text hover:bg-raise`}
           >
-            Stop
+            <Icon fill="currentColor" strokeWidth={0}>
+              <rect x="7" y="7" width="10" height="10" rx="2" />
+            </Icon>
           </button>
         )}
         <button
           type="submit"
+          aria-label="Send"
           disabled={!value.trim()}
-          className={`${pill} h-10 shrink-0 border-text bg-text px-5 text-[14px] text-bg hover:bg-white`}
+          className={`${ghost} ${value.trim() ? 'bg-text text-bg hover:bg-white' : 'bg-raise text-muted'}`}
         >
-          Send
+          <Icon strokeWidth={2}>
+            <path d="M12 19V5M6 11l6-6 6 6" />
+          </Icon>
         </button>
       </div>
       {interim && (
-        <p aria-hidden="true" className="m-0 mt-2 px-2 text-[14px] text-muted italic">
+        <p aria-hidden="true" className="m-0 mt-2 px-4 text-[14px] text-muted">
           {interim}
         </p>
       )}
@@ -212,12 +238,12 @@ export function Composer({
         {announce}
       </p>
       {(problem || (!supported && listening)) && (
-        <p role="alert" className="m-0 mt-2 px-2 text-[13px] text-muted">
+        <p role="alert" className="m-0 mt-2 px-4 text-[13px] text-muted">
           {problem}
         </p>
       )}
       {hint && (
-        <p role="status" className="m-0 mt-2 px-2 text-[13px] text-muted">
+        <p role="status" className="m-0 mt-2 px-4 text-[13px] text-muted">
           {hint}
         </p>
       )}
