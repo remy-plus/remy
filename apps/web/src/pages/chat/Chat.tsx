@@ -229,7 +229,7 @@ function OpenChat({ id }: { id: string }) {
         <div ref={end} />
       </div>
       <div className="sticky bottom-0 bg-bg px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))]">
-        <div className="mx-auto max-w-[720px]">
+        <div className="mx-auto max-w-[688px]">
           {problem && (
             <p role="alert" className="m-0 mb-2 px-4 text-[13px] text-muted">
               {problem}

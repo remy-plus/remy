@@ -113,7 +113,11 @@ function Answer({ text }: { text: string }) {
           {p}
         </p>
       ))}
-      <button type="button" onClick={copy} className={`${quiet} h-7 px-3 text-[12px]`}>
+      <button
+        type="button"
+        onClick={copy}
+        className="-ml-2 h-7 cursor-pointer rounded-full border-0 bg-transparent px-2 text-[12px] text-muted transition-colors duration-300 hover:text-text"
+      >
         {copied ? 'Copied' : 'Copy'}
       </button>
     </div>
