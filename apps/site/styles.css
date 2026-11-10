@@ -1462,3 +1462,25 @@ details,
     display: none;
   }
 }
+
+/* Big screens: the whole design scales up in steps, so a 4K monitor looks as composed as a laptop. */
+@media (min-width: 1700px) {
+  html {
+    zoom: 1.2;
+  }
+}
+@media (min-width: 2100px) {
+  html {
+    zoom: 1.45;
+  }
+}
+@media (min-width: 2600px) {
+  html {
+    zoom: 1.8;
+  }
+}
+@media (min-width: 3300px) {
+  html {
+    zoom: 2.2;
+  }
+}
