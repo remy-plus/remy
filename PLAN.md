@@ -817,3 +817,8 @@ Stage 5 is signed off (26 dark screens, Doop canvas https://doop.design/c/ZuevZV
 | 6.5 | **Done 2026-11-08** (`remy serve` serves the app with a strict policy; the image was built and run for real, 279 MB, node 22 alpine; `docker compose` itself not run; docs/home-server.md). Docker image and sign-in for a home server or VM. | Starts from a clean machine; reached by phone; killed mid-task loses nothing |
 
 **6.0 result:** `remy --help` starts in 0.14 s from the shipped bundle (0.21 s from source through pnpm) using about 124 to 151 MB. Replay runs 325 cases in 0.74 s, so Remy's own work between model calls is about 1 ms per case. Nothing is slow enough to justify a rewrite; the time in a real task is the model and the network. Later gain, if wanted: lazy-load rarely used command modules. See `docs/reports/perf-2026-11-08.md`.
+
+## Web v1 redesign (2026-11-10)
+
+The owner's direction: Remy is Jarvis, a person on your computer, not a task tool. Chat is home; tasks become "Activity"; a floating, customizable top dock replaces the header tabs; plain words replace "Trust: ask" and military time; a living ASCII "mind" shows what Remy is doing; voice and a live Browser panel follow. The full brief, the plain-words table, the chats API and the work packages are in `docs/web-v1.md`. This supersedes the screen list from Stage 5 where they disagree. Money rule: the $25 API credit is only for Remy's own tests and evals; design and build work runs on the owner's Claude plan (Opus or Sonnet, Haiku helpers for small jobs; Fable only for rare hard tasks, because it burns the weekly quota).
+
