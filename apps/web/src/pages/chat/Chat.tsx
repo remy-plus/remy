@@ -226,7 +226,7 @@ function OpenChat({ id }: { id: string }) {
             {...(spoken && { answer: spoken })}
             {...(busy && { onStop: stop })}
             {...(queued && { hint: `Next, when I'm done: ${queued}` })}
-            placeholder={busy ? 'Add something for next' : 'Ask Remy to do anything'}
+            placeholder={busy ? 'Add a follow-up' : 'Ask Remy to do anything'}
           />
         </div>
       </div>

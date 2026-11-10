@@ -18,6 +18,21 @@ const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOSt
 
 const seeds = (): MockChat[] => [
   {
+    // A turn that is waiting on the "Draft a correction to Dana" job in mock.ts, so the live turn and its
+    // approval card can be seen in the demo.
+    id: 'chat_dana',
+    title: 'Correction to Dana',
+    updatedAt: ago(2),
+    turns: [
+      {
+        taskId: 'task_correction',
+        prompt: 'Send Dana a correction on the Q3 vendor total',
+        state: 'waiting',
+        at: ago(2),
+      },
+    ],
+  },
+  {
     id: 'chat_week',
     title: 'Plan my week',
     updatedAt: ago(35),

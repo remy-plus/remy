@@ -105,6 +105,16 @@ describe('chat view', () => {
     expect(screen.getAllByRole('button', { name: 'Copy' })).toHaveLength(2);
   });
 
+  it('shows the Mind only on a live turn, not beside finished answers', async () => {
+    show(createMockApi(), 'chat_week');
+    await screen.findByText(/Monday and Wednesday are open/);
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+    cleanup();
+    show(createMockApi(), 'chat_dana');
+    await screen.findByText('Send Dana a correction on the Q3 vendor total');
+    await waitFor(() => expect(screen.getAllByRole('img').length).toBeGreaterThan(0));
+  });
+
   it('folds a finished feed into "What I did" with plain lines', async () => {
     const job = await jobOf({
       status: 'succeeded',

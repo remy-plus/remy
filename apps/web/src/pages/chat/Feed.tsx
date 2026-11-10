@@ -109,7 +109,10 @@ function Answer({ text }: { text: string }) {
   return (
     <div className="rise answer-block mt-0.5" style={rise(1)}>
       {paragraphs.map((p) => (
-        <p key={p} className="mt-0 mb-3 text-[15px] leading-[1.7] break-words text-text">
+        <p
+          key={p}
+          className="mt-0 mb-3 max-w-[68ch] text-[15px] leading-[1.7] break-words text-text last:mb-1"
+        >
           {p}
         </p>
       ))}
@@ -213,9 +216,9 @@ function Failed({
 function Shell({ mind, children }: { mind?: MindState; children: React.ReactNode }) {
   if (!mind) return <div className="mt-5 min-w-0">{children}</div>;
   return (
-    <div className="mt-5 flex gap-3">
-      <div className="mt-px shrink-0">
-        <MindGlyph state={mind} size={32} />
+    <div className="mt-5 flex gap-0 sm:gap-3">
+      <div className="hidden shrink-0 sm:block">
+        <MindGlyph state={mind} size={48} />
       </div>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -333,7 +336,7 @@ export function Turn({
 }) {
   const live = turn.state === 'working' || turn.state === 'waiting';
   return (
-    <article className="mb-8" aria-label={`You asked: ${turn.prompt}`}>
+    <article className="mb-6" aria-label={`You asked: ${turn.prompt}`}>
       <div className="rise flex justify-end" style={rise(index === 0 ? 0 : 1)}>
         <p className="m-0 max-w-[85%] rounded-[18px] bg-surface px-4 py-2.5 text-[15px] leading-6 break-words whitespace-pre-wrap text-text">
           {turn.prompt}

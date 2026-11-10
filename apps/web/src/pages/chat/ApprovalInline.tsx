@@ -3,7 +3,7 @@ import { type ApprovalCard, useApi } from '../../api/index.tsx';
 import { approvalSentence } from '../../lib/feed.ts';
 
 const pill =
-  'cursor-pointer rounded-full border h-8 px-3.5 text-[13px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50';
+  'cursor-pointer rounded-full border h-10 px-4 sm:h-8 sm:px-3.5 text-[13px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50';
 
 const editable = (t: EventTarget | null) =>
   t instanceof HTMLElement &&
@@ -78,7 +78,10 @@ export function ApprovalInline({
         >
           Not now
         </button>
-        <span aria-hidden="true" className="ml-1 hidden font-mono text-[12px] text-muted sm:inline">
+        <span
+          aria-hidden="true"
+          className="ml-1 hidden font-mono text-[12px] text-muted sm:[@media(hover:hover)]:inline"
+        >
           Enter to approve, Esc to decline
         </span>
       </div>
