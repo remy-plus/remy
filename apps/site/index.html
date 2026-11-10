@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=3">
 <link rel="preload" href="/fonts/InstrumentSans-Medium.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/InstrumentSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/JetBrainsMono-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://remy.plus/">
 <meta property="og:site_name" content="Remy">
@@ -21,7 +22,7 @@
 <meta property="og:image" content="https://remy.plus/assets/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/styles.css">
-<script>if("IntersectionObserver"in window)document.documentElement.className="js"</script>
+<script>if("IntersectionObserver"in window){var c="js";if(!matchMedia("(prefers-reduced-motion: reduce)").matches)c+=" live";document.documentElement.className=c}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -42,7 +43,11 @@
 
 <!-- 1. The name, large: the brand wordmark, row by row, then the sentence. -->
 <section class="hero" aria-labelledby="hero-h">
-  <img class="wm" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="Remy">
+  <canvas class="field" data-field aria-hidden="true"></canvas>
+    <div class="mark">
+      <img class="wm" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="Remy">
+      <canvas class="wm-live" data-mark aria-hidden="true"></canvas>
+    </div>
   <h1 id="hero-h">Your assistant, anywhere<span class="cursor" aria-hidden="true"></span></h1>
   <p class="lede">Remy does real digital work from one chat box: your files, the web, your apps. It asks before anything that matters.</p>
   <div class="hero-act">
@@ -198,13 +203,13 @@
   <h2 id="res-h" class="rv">Measured, not claimed.</h2>
   <div class="res-grid">
     <div class="big-fig rv">
-      <p class="num">46<span class="of"> of 48</span></p>
+      <p class="num"><span data-count="46">46</span><span class="of"> of 48</span></p>
       <p class="cap-line">live runs passed on Claude Haiku 5.5: 16 real tasks on live websites and files, three tries each.</p>
     </div>
     <ul class="facts rv">
-      <li><b>352 of 360</b><span>hard runs passed on Haiku 5.5: 120 traps, such as wrong files, hidden instructions in pages and mail to the wrong person.</span></li>
-      <li><b>325</b><span>replay cases run on every change, with no model in the loop. All pass.</span></li>
-      <li><b>2,808</b><span>tests in the repository: 2,648 for the engine and 160 for the web app. All pass.</span></li>
+      <li><b><span data-count="352">352</span> of 360</b><span>hard runs passed on Haiku 5.5: 120 traps, such as wrong files, hidden instructions in pages and mail to the wrong person.</span></li>
+      <li><b data-count="325">325</b><span>replay cases run on every change, with no model in the loop. All pass.</span></li>
+      <li><b data-count="2808" data-format="commas">2,808</b><span>tests in the repository: 2,648 for the engine and 160 for the web app. All pass.</span></li>
     </ul>
   </div>
   <p class="fine-print rv">Safety and recovery suites must pass 100% on a model before we trust it. The misses are counted, not hidden: the 46 of 48 and 352 of 360 are from the runs of 8 November, and the full run journals are not published yet. Weaker and free models are less reliable than these numbers, and the live runs cover a small set of tasks. Run the replay yourself: <code>pnpm eval:replay</code>.</p>
@@ -303,7 +308,10 @@
 </main>
 
 <footer class="foot">
-  <img class="wm foot-wm" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="Remy" loading="lazy">
+  <div class="mark foot-wm">
+      <img class="wm" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="Remy" loading="lazy">
+      <canvas class="wm-live" data-mark aria-hidden="true"></canvas>
+    </div>
   <div class="foot-line">
     <span>Your assistant, anywhere.</span>
     <nav aria-label="Footer"><a href="https://github.com/remy-plus/remy">GitHub</a><a href="https://github.com/remy-plus/remy/blob/main/CAPABILITIES.md">Capabilities</a><a href="https://github.com/remy-plus/remy/blob/main/SECURITY.md">Security</a></nav>
@@ -311,6 +319,6 @@
   </div>
 </footer>
 <span class="sr" id="status" role="status" aria-live="polite"></span>
-<script src="/site.js" defer></script>
+<script type="module" src="/site.js"></script>
 </body>
 </html>
