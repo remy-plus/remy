@@ -1,6 +1,13 @@
 import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { MindState } from '../../lib/mind.ts';
-import { canSpeak, claimVoice, speakable, speakChunks, useListener } from '../../lib/voice.ts';
+import {
+  canSpeak,
+  claimVoice,
+  speakable,
+  speakChunks,
+  unlockAudio,
+  useListener,
+} from '../../lib/voice.ts';
 import { useSetting } from '../../settings.ts';
 
 /** A 16 px line icon. Decorative: the button around it carries the name. */
@@ -179,6 +186,7 @@ export function Composer({
           aria-pressed={speak}
           onClick={() => {
             if (speak) cancelSpeech();
+            else unlockAudio();
             setVoice({ speak: !speak });
           }}
           className={`${ghost} hover:bg-raise hover:text-text ${speak ? 'text-text' : 'text-muted'}`}
