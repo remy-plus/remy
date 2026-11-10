@@ -24,6 +24,8 @@ export interface SettingValues {
   dock: string[];
   /** How the app is laid out. Browser-local. */
   layout: 'simple' | 'command';
+  /** Whether Remy speaks the final answer of a finished turn. Browser-local. */
+  voice: { speak: boolean };
 }
 
 export const DEFAULTS: SettingValues = {
@@ -43,6 +45,7 @@ export const DEFAULTS: SettingValues = {
   onboarded: false,
   dock: ['chat', 'activity', 'browser', 'brain', 'connections', 'settings'],
   layout: 'simple',
+  voice: { speak: false },
 };
 
 export type SettingKey = keyof SettingValues;

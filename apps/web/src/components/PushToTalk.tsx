@@ -3,6 +3,7 @@
 // audio itself. Without that API the overlay says so and lets the person type instead.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '../api/index.tsx';
+import { voiceClaim } from '../lib/voice.ts';
 import { type VoiceMode, VoiceOverlay } from './VoiceOverlay.tsx';
 
 interface SpeechResult {
@@ -156,7 +157,11 @@ export function PushToTalk() {
 
   // The window event, and holding Space.
   useEffect(() => {
-    const onEvent = () => open();
+    const onEvent = () => {
+      const c = voiceClaim();
+      if (c) c.toggle();
+      else open();
+    };
     const onDown = (e: KeyboardEvent) => {
       if (e.code !== 'Space' && e.key !== ' ') return;
       if (holding.current) {
@@ -167,7 +172,9 @@ export function PushToTalk() {
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => {
         holding.current = true;
-        open();
+        const c = voiceClaim();
+        if (c) c.begin();
+        else open();
       }, HOLD_MS);
     };
     const onUp = (e: KeyboardEvent) => {
@@ -176,7 +183,9 @@ export function PushToTalk() {
       if (!holding.current) return;
       holding.current = false;
       e.preventDefault(); // the focused button must not take the release as a click
-      if (live.current.mode === 'listening') void live.current.send(live.current.text);
+      const c = voiceClaim();
+      if (c) c.release();
+      else if (live.current.mode === 'listening') void live.current.send(live.current.text);
     };
     window.addEventListener('remy:voice', onEvent);
     window.addEventListener('keydown', onDown);

@@ -89,13 +89,10 @@ describe('empty chat', () => {
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/chat\/chat_mock/));
   });
 
-  it('the mic button asks for voice', () => {
-    const heard = vi.fn();
-    window.addEventListener('remy:voice', heard);
+  it('the mic button says so when the browser cannot listen', async () => {
     show(createMockApi());
     fireEvent.click(screen.getByRole('button', { name: 'Talk to Remy' }));
-    window.removeEventListener('remy:voice', heard);
-    expect(heard).toHaveBeenCalled();
+    expect(await screen.findByText("This browser can't listen. You can still type.")).toBeTruthy();
   });
 });
 
