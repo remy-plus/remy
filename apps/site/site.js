@@ -27,7 +27,9 @@
       }, 1800);
     };
     const text = () =>
-      [...target.querySelectorAll('.line')].map((l) => l.textContent.replace(/^\$ /, '')).join('\n');
+      [...target.querySelectorAll('.line')]
+        .map((l) => l.textContent.replace(/^\$ /, ''))
+        .join('\n');
     const legacy = () => {
       const t = d.createElement('textarea');
       t.value = text();
@@ -76,7 +78,9 @@
   const brand = d.querySelector('.brand');
   const heroMark = d.querySelector('.hero .wm');
   if (brand && heroMark && 'IntersectionObserver' in window) {
-    new IntersectionObserver(([e]) => brand.classList.toggle('show', !e.isIntersecting), { rootMargin: '-80px 0px 0px 0px' }).observe(heroMark);
+    new IntersectionObserver(([e]) => brand.classList.toggle('show', !e.isIntersecting), {
+      rootMargin: '-80px 0px 0px 0px',
+    }).observe(heroMark);
   }
 
   // ---- Modes: arrow keys move between tabs; one panel shows at a time.
@@ -129,7 +133,6 @@
   const result = d.getElementById('result');
   const trace = d.getElementById('trace');
   const log = d.getElementById('log');
-  const logAsk = d.getElementById('log-ask');
   const approve = d.getElementById('approve');
   const decline = d.getElementById('decline');
   const replay = d.getElementById('replay');
@@ -182,7 +185,8 @@
       askText.innerHTML = '<b>Write file</b> <span class="dim">reply.md</span>';
       const end = d.createElement('li');
       end.className = 'step done';
-      end.innerHTML = '<span class="mk" aria-hidden="true"></span><span class="tx"><b>Finished</b></span>';
+      end.innerHTML =
+        '<span class="mk" aria-hidden="true"></span><span class="tx"><b>Finished</b></span>';
       trace.append(end);
       extra.push(end);
       addLog(clock(31), 'you approved');
@@ -190,7 +194,8 @@
       result.textContent =
         'Draft saved to reply.md. Northwind is $1,240 cheaper over twelve months. Nothing has been sent.';
     } else {
-      askText.innerHTML = '<b>Write file</b> <span class="dim">you declined, nothing was written</span>';
+      askText.innerHTML =
+        '<b>Write file</b> <span class="dim">you declined, nothing was written</span>';
       addLog(clock(31), 'you declined');
       result.textContent = 'Understood. reply.md was not written. What should change?';
     }
@@ -202,7 +207,11 @@
   replay.addEventListener('click', play);
   d.addEventListener('keydown', (e) => {
     if (decided || modal.hidden) return;
-    if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLAnchorElement)) {
+    if (
+      e.key === 'Enter' &&
+      !(e.target instanceof HTMLButtonElement) &&
+      !(e.target instanceof HTMLAnchorElement)
+    ) {
       e.preventDefault();
       decide(true);
     }
