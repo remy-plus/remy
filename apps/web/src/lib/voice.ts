@@ -205,11 +205,38 @@ let source: AudioSource | null = null;
 /** After the server says it has no voice (no key, no credit), it is not asked again for this long. */
 export const VOICE_BACKOFF_MS = 60_000;
 let silentUntil = 0;
+/** After the browser blocks autoplay, the server voice is not asked again until a press unlocks audio. */
+let blockedUntil = 0;
 
 /** Where Remy's voice comes from (the connected server), or null for the browser's voice only. */
 export const bindVoiceSource = (s: AudioSource | null) => {
   source = s;
   silentUntil = 0;
+  blockedUntil = 0;
+};
+
+// A tiny silent WAV (one sample): playing it from a button press tells the browser audio is welcome.
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAESsAABErAAABAAgAZGF0YQIAAACAgA==';
+
+/**
+ * Call from a click or key press (the speaker button, the mic): plays a silent sound so the browser
+ * lets Remy's voice play later, when the reply arrives without a press. Never throws.
+ */
+export const unlockAudio = () => {
+  if (typeof Audio === 'undefined') return;
+  try {
+    const a = new Audio(SILENT_WAV);
+    a.volume = 0;
+    void a
+      .play()
+      .then(() => {
+        blockedUntil = 0;
+      })
+      .catch(() => {});
+  } catch {
+    // no audio here; nothing to unlock
+  }
 };
 
 const browserVoice = () =>
@@ -234,6 +261,8 @@ export interface SpeakEnv {
   makeUrl?(blob: Blob): string;
   revokeUrl?(url: string): void;
   makePlayer?(url: string): PlayerLike;
+  /** The browser refused to start audio (autoplay blocked). */
+  onBlocked?(): void;
   /** The browser's voice; undefined when it has none. */
   synth?: SpeechSynthesis | undefined;
   lang?: string;
@@ -242,7 +271,8 @@ export interface SpeakEnv {
 const realEnv = (): SpeakEnv => {
   const fetchAudio: AudioSource | undefined = source
     ? (text, signal) => {
-        if (Date.now() < silentUntil) return Promise.reject(new Error('voice is off for now'));
+        if (Date.now() < Math.max(silentUntil, blockedUntil))
+          return Promise.reject(new Error('voice is off for now'));
         return (source as AudioSource)(text, signal).catch((e: unknown) => {
           const status = (e as { status?: number } | null)?.status;
           if (status === 503 || status === 402) silentUntil = Date.now() + VOICE_BACKOFF_MS;
@@ -255,6 +285,9 @@ const realEnv = (): SpeakEnv => {
     makeUrl: (b) => URL.createObjectURL(b),
     revokeUrl: (u) => URL.revokeObjectURL(u),
     makePlayer: (url) => new Audio(url),
+    onBlocked: () => {
+      blockedUntil = Date.now() + VOICE_BACKOFF_MS;
+    },
     synth: browserVoice() ? window.speechSynthesis : undefined,
     lang: typeof navigator === 'undefined' ? 'en-GB' : navigator.language || 'en-GB',
   };
@@ -274,6 +307,10 @@ export function speakWith(env: SpeakEnv, chunks: string[], onDone: () => void): 
   let stopped = false;
   let finished = false;
   let browserSpeaking = false;
+  let gaveUp = false; // the server voice is done with: nothing new is kept, nothing more is asked
+  const release = (u: string) => {
+    if (urls.delete(u)) env.revokeUrl?.(u);
+  };
   let stopPlayer: (() => void) | null = null;
   const abort = new AbortController();
   const urls = new Set<string>();
@@ -287,6 +324,9 @@ export function speakWith(env: SpeakEnv, chunks: string[], onDone: () => void): 
 
   /** The browser's voice reads chunks `from` to the end. */
   const speakInBrowser = (from: number) => {
+    gaveUp = true;
+    abort.abort(); // the request for the next chunk is no longer wanted
+    for (const u of [...urls]) release(u);
     if (!synth) return finish();
     browserSpeaking = true;
     synth.cancel();
@@ -309,7 +349,7 @@ export function speakWith(env: SpeakEnv, chunks: string[], onDone: () => void): 
     if (i >= chunks.length || !fetchAudio) return Promise.resolve(null);
     audio[i] ??= fetchAudio(chunks[i] as string, abort.signal).then(
       (blob) => {
-        if (stopped) return null;
+        if (stopped || gaveUp || finished) return null;
         const url = env.makeUrl?.(blob) ?? null;
         if (url) urls.add(url);
         return url;
@@ -344,7 +384,11 @@ export function speakWith(env: SpeakEnv, chunks: string[], onDone: () => void): 
       player.onended = () => end(true);
       player.onerror = () => end(false);
       try {
-        player.play().catch(() => end(false)); // autoplay blocked or no decoder
+        player.play().catch((e: unknown) => {
+          // autoplay blocked or no decoder
+          if ((e as { name?: string } | null)?.name === 'NotAllowedError') env.onBlocked?.();
+          end(false);
+        });
       } catch {
         end(false);
       }
@@ -359,6 +403,7 @@ export function speakWith(env: SpeakEnv, chunks: string[], onDone: () => void): 
       if (!url) return speakInBrowser(i);
       pending = fetchChunk(i + 1); // the next one arrives while this one plays
       const played = await play(url);
+      release(url); // this chunk is done: free its audio now, not at the end
       if (stopped) return;
       if (!played) return speakInBrowser(i);
     }
@@ -481,6 +526,7 @@ export function useListener(opts: ListenerOptions) {
       return;
     }
     cancelPause();
+    unlockAudio(); // a press is the moment the browser lets audio start
     o.current.onStart?.();
     const mine = ++token.current;
     setListening(true);

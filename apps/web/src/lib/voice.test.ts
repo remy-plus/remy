@@ -12,6 +12,7 @@ import {
   speakable,
   speakChunks,
   speakWith,
+  unlockAudio,
 } from './voice.ts';
 
 describe('speakable', () => {
@@ -133,7 +134,11 @@ function rig(o: { fetch?: boolean; blocked?: boolean; synth?: boolean } = {}): R
   return {
     env: {
       fetchAudio: o.fetch === false ? undefined : fetchAudio,
-      makeUrl: (b) => `blob:${(b as Blob & { _t?: string })._t ?? ++n}`,
+      makeUrl: (b) => {
+        const u = `blob:${(b as Blob & { _t?: string })._t ?? ++n}`;
+        log.push(`make ${u}`);
+        return u;
+      },
       revokeUrl: (u) => log.push(`revoke ${u}`),
       makePlayer: (url) => {
         const p = new FakePlayer(url, log, o.blocked === true);
@@ -287,6 +292,79 @@ describe('speaking with the server voice', () => {
     r.answer('One.', false);
     await tick();
     expect(done).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('cleanup and autoplay', () => {
+  it('revokes each chunk URL as soon as that chunk finishes', async () => {
+    const r = rig();
+    speakWith(r.env, ['One.', 'Two.'], vi.fn());
+    r.answer('One.');
+    await tick();
+    r.answer('Two.');
+    r.players[0]?.end();
+    await tick();
+    expect(r.log.filter((l) => l.startsWith('revoke'))).toHaveLength(1); // chunk one, mid-reply
+  });
+
+  it('when playing fails, aborts the next request and revokes a URL that arrives late', async () => {
+    const r = rig({ blocked: true });
+    const done = vi.fn();
+    speakWith(r.env, ['One.', 'Two.'], done);
+    r.answer('One.');
+    await tick();
+    await tick();
+    expect(r.aborted()).toBe(true); // the request for chunk two was aborted
+    r.answer('Two.'); // it still answers: the object URL must not be made, let alone leaked
+    await tick();
+    await tick();
+    // every object URL that was made has been revoked: none leaks
+    expect(r.log.filter((l) => l.startsWith('make'))).toHaveLength(
+      r.log.filter((l) => l.startsWith('revoke')).length,
+    );
+    expect(r.log.filter((l) => l.startsWith('make'))).toHaveLength(1);
+    expect(r.spoken).toEqual(['One.', 'Two.']);
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports NotAllowedError to the page so it can back off', async () => {
+    const r = rig({ blocked: true });
+    const onBlocked = vi.fn();
+    speakWith({ ...r.env, onBlocked }, ['One.'], vi.fn());
+    r.answer('One.');
+    await tick();
+    await tick();
+    expect(onBlocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('a blocked autoplay turns the server voice off for a while; unlockAudio is safe to call', async () => {
+    const calls: string[] = [];
+    bindVoiceSource(async (text) => {
+      calls.push(text);
+      return new Blob([text]);
+    });
+    vi.stubGlobal(
+      'Audio',
+      class {
+        volume = 1;
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        play() {
+          return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
+        }
+        pause() {}
+      },
+    );
+    vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:x', revokeObjectURL: () => {} });
+    speakChunks(['One.'], vi.fn());
+    await tick();
+    await tick();
+    speakChunks(['Two.'], vi.fn());
+    await tick();
+    expect(calls).toEqual(['One.']); // not asked again
+    expect(() => unlockAudio()).not.toThrow();
+    bindVoiceSource(null);
+    vi.unstubAllGlobals();
   });
 });
 

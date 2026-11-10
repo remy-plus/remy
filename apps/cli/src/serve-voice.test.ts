@@ -1,14 +1,18 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { HttpError } from './serve.ts';
 import { type Kit, startKit } from './serve-kit.test-kit.ts';
+import { createSpend } from './serve-settings.ts';
 import {
+  createFishKeySource,
   createVoiceMount,
   DEFAULT_VOICE_ID,
   MSG_NO_KEY,
   openVoiceLedger,
   readFishKey,
+  readFishKeyAsync,
   VOICE_TEXT_MAX,
   type VoiceMountDeps,
 } from './serve-voice.ts';
@@ -181,9 +185,46 @@ describe('POST /api/voice/speak', () => {
     await speak({ text: 'é' }); // 2 bytes
     expect(ledger.monthUsd(new Date(2026, 10, 1))).toBeCloseTo((14 * 15) / 1_000_000, 10);
     expect(ledger.monthUsd(new Date(2026, 9, 1))).toBe(0);
-    expect(keys).toEqual([KEY, KEY]);
+    expect(keys).toEqual([KEY]); // only a changed key is passed on
     expect(statSync(join(home, 'voice-usage.json')).mode & 0o777).toBe(0o600);
     expect(readFileSync(join(home, 'voice-usage.json'), 'utf8')).not.toContain(KEY);
+  });
+
+  it('refuses with the budget message when the monthly cap is reached, and calls nothing', async () => {
+    const { seen, speak } = await start({
+      extra: {
+        assertBudget: async () => {
+          throw new HttpError(402, "This month's budget is used up.");
+        },
+      },
+    });
+    const res = await speak({ text: 'Hello.' });
+    expect(res.status).toBe(402);
+    expect(((await res.json()) as { error: string }).error).toContain('budget');
+    expect(seen).toHaveLength(0);
+  });
+
+  it('passes a changed key on again, and reads an async key', async () => {
+    let key = KEY;
+    const keys: string[] = [];
+    const { speak } = await start({ extra: { key: async () => key, onKey: (k) => keys.push(k) } });
+    await speak({ text: 'One.' });
+    key = 'another-key';
+    await speak({ text: 'Two.' });
+    expect(keys).toEqual([KEY, 'another-key']);
+  });
+
+  it('logs a voice-usage.json that cannot be written, and still answers', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'remy-voice-'));
+    dirs.push(home);
+    mkdirSync(join(home, 'voice-usage.json.tmp')); // a directory in the way makes the write fail
+    const lines: string[] = [];
+    const ledger = openVoiceLedger(home, undefined, (l) => lines.push(l));
+    const { speak } = await start({ extra: { ledger } });
+    expect((await speak({ text: 'Hello.' })).status).toBe(200);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('voice-usage.json');
+    expect(lines[0]).not.toContain(KEY);
   });
 
   it('does not count a failed call', async () => {
@@ -229,5 +270,95 @@ describe('readFishKey', () => {
     expect(readFishKey({ REMY_KEYCHAIN: 'off' }, 'darwin', e.run)).toBeUndefined();
     expect(readFishKey({}, 'darwin', exec('', 44).run)).toBeUndefined();
     expect(e.calls).toHaveLength(0);
+  });
+});
+
+describe('readFishKeyAsync', () => {
+  it('prefers FISH_API_KEY and skips the Keychain', async () => {
+    let called = 0;
+    const exec = async () => {
+      called += 1;
+      return { status: 0, stdout: 'x\n' };
+    };
+    expect(await readFishKeyAsync({ FISH_API_KEY: ' k ' }, 'darwin', exec)).toBe('k');
+    expect(called).toBe(0);
+  });
+
+  it('reads the Keychain with a timeout of about 2 seconds', async () => {
+    const seen: { args: string[]; timeout: number }[] = [];
+    const exec = async (_c: string, args: string[], timeout: number) => {
+      seen.push({ args, timeout });
+      return { status: 0, stdout: 'from-keychain\n' };
+    };
+    expect(await readFishKeyAsync({}, 'darwin', exec)).toBe('from-keychain');
+    expect(seen[0]?.args).toEqual(['find-generic-password', '-s', 'remy', '-a', 'fish', '-w']);
+    expect(seen[0]?.timeout).toBe(2000);
+  });
+
+  it('treats a timed-out, failed or throwing Keychain read as no key', async () => {
+    expect(
+      await readFishKeyAsync({}, 'darwin', async () => ({ status: null, stdout: '' })),
+    ).toBeUndefined();
+    expect(
+      await readFishKeyAsync({}, 'darwin', async () => ({ status: 44, stdout: 'x' })),
+    ).toBeUndefined();
+    expect(
+      await readFishKeyAsync({}, 'darwin', async () => {
+        throw new Error('boom');
+      }),
+    ).toBeUndefined();
+    expect(
+      await readFishKeyAsync({}, 'linux', async () => ({ status: 0, stdout: 'x' })),
+    ).toBeUndefined();
+  });
+
+  it('does not block while the Keychain is slow (a real command killed at the timeout)', async () => {
+    const { realAsyncExec } = await import('./serve-voice.ts');
+    const t = Date.now();
+    const r = await realAsyncExec('sleep', ['5'], 100);
+    expect(Date.now() - t).toBeLessThan(2000);
+    expect(r.status).not.toBe(0);
+  });
+});
+
+describe('createFishKeySource', () => {
+  it('caches, shares a lookup in flight, and refreshes after the ttl', async () => {
+    let n = 0;
+    let at = 0;
+    const src = createFishKeySource(
+      async () => `key${++n}`,
+      1000,
+      () => at,
+    );
+    expect(src.peek()).toBeUndefined(); // first peek starts a lookup
+    expect(await Promise.all([src.get(), src.get()])).toEqual(['key1', 'key1']);
+    expect(n).toBe(1);
+    expect(src.peek()).toBe('key1');
+    at = 2000;
+    expect(await src.get()).toBe('key2');
+  });
+
+  it('a failing lookup means no key', async () => {
+    const src = createFishKeySource(async () => {
+      throw new Error('x');
+    });
+    expect(await src.get()).toBeUndefined();
+  });
+});
+
+describe('createSpend extra', () => {
+  it('passes the injected now through to the extra cost', async () => {
+    const seen: Date[] = [];
+    const at = new Date(2026, 10, 10);
+    const spend = createSpend(
+      { listTasks: async () => [] } as never,
+      () => at,
+      (d) => {
+        seen.push(d);
+        return 1.5;
+      },
+    );
+    expect(await spend()).toBe(1.5);
+    expect(seen).toEqual([at]);
   });
 });

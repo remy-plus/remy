@@ -203,7 +203,7 @@ export function createSpend(
   store: EventStore,
   now: () => Date = () => new Date(),
   /** Other costs this month (spoken replies), in US dollars. */
-  extra: () => number = () => 0,
+  extra: (at: Date) => number = () => 0,
 ) {
   let cache: { at: number; usd: number; month: string } | undefined;
   return async (): Promise<number> => {
@@ -216,7 +216,7 @@ export function createSpend(
       if (new Date(s.createdAt).getTime() < start) continue;
       usd += fold(await store.read(s.taskId)).costUsd;
     }
-    usd += extra();
+    usd += extra(t);
     cache = { at: t.getTime(), usd, month };
     return usd;
   };

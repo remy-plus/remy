@@ -11,10 +11,11 @@
 // Answers: 503 with a plain message when there is no key (the web app then uses the browser's voice),
 // 413 for text over the cap, 429 while too many are in flight, 402/502/504 when Fish refuses, fails
 // or is slow. Every successful call is counted in `voice-usage.json` and added to the month's spend.
+import { execFile } from 'node:child_process';
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { type Exec, keychainGet, realExec } from './credentials.ts';
+import { type Exec, KEYCHAIN_SERVICE, keychainGet, realExec } from './credentials.ts';
 import { guard, HttpFail, jsonBody, type Mount, methodNotAllowed } from './serve-mount.ts';
 
 export const FISH_URL = 'https://api.fish.audio/v1/tts';
@@ -52,6 +53,88 @@ export function readFishKey(
   return keychainGet(exec, 'fish')?.trim() || undefined;
 }
 
+/** Runs a command without blocking the server; `timedOut` is true when it was killed for being slow. */
+export type AsyncExec = (
+  cmd: string,
+  args: string[],
+  timeoutMs: number,
+) => Promise<{ status: number | null; stdout: string }>;
+
+export const realAsyncExec: AsyncExec = (cmd, args, timeoutMs) =>
+  new Promise((resolve) => {
+    try {
+      execFile(
+        cmd,
+        args,
+        { encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL' },
+        (err, stdout) => {
+          if (!err) return resolve({ status: 0, stdout });
+          const code = (err as { code?: unknown }).code;
+          resolve({ status: typeof code === 'number' ? code : null, stdout: '' });
+        },
+      );
+    } catch {
+      resolve({ status: null, stdout: '' });
+    }
+  });
+
+/** How long a Keychain read may take. A locked Keychain waits for a prompt; that counts as "no key". */
+export const KEYCHAIN_TIMEOUT_MS = 2000;
+
+/** Like `readFishKey`, but never blocks the server and gives up on a slow or locked Keychain. */
+export async function readFishKeyAsync(
+  env: Record<string, string | undefined>,
+  platform: NodeJS.Platform = process.platform,
+  exec: AsyncExec = realAsyncExec,
+  timeoutMs = KEYCHAIN_TIMEOUT_MS,
+): Promise<string | undefined> {
+  const fromEnv = env.FISH_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+  if (platform !== 'darwin' || env.REMY_KEYCHAIN === 'off') return undefined;
+  try {
+    const r = await exec(
+      'security',
+      ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', 'fish', '-w'],
+      timeoutMs,
+    );
+    const value = r.stdout.replace(/\r?\n$/, '').trim();
+    return r.status === 0 && value ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The key, cached for `ttlMs` (a lookup in flight is shared). `peek` answers at once from the cache. */
+export function createFishKeySource(
+  read: () => Promise<string | undefined>,
+  ttlMs = 30_000,
+  now: () => number = Date.now,
+) {
+  let cache: { at: number; key: string | undefined } | undefined;
+  let inflight: Promise<string | undefined> | undefined;
+  const refresh = () => {
+    inflight ??= read()
+      .catch(() => undefined)
+      .then((key) => {
+        cache = { at: now(), key };
+        return key;
+      })
+      .finally(() => {
+        inflight = undefined;
+      });
+    return inflight;
+  };
+  return {
+    get: (): Promise<string | undefined> =>
+      cache && now() - cache.at <= ttlMs ? Promise.resolve(cache.key) : refresh(),
+    /** The last known key without waiting; starts a refresh when it is stale. */
+    peek: (): string | undefined => {
+      if (!cache || now() - cache.at > ttlMs) void refresh();
+      return cache?.key;
+    },
+  };
+}
+
 // ---- what voice has cost this month
 
 export interface VoiceLedger {
@@ -63,7 +146,11 @@ export interface VoiceLedger {
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 /** Counts calls, bytes and dollars per month in REMY_HOME/voice-usage.json (0600, atomic). */
-export function openVoiceLedger(home: string, now: () => Date = () => new Date()): VoiceLedger {
+export function openVoiceLedger(
+  home: string,
+  now: () => Date = () => new Date(),
+  log: (line: string) => void = () => {},
+): VoiceLedger {
   const file = join(home, 'voice-usage.json');
   type Row = { calls: number; bytes: number; usd: number };
   const read = (): Record<string, Row> => {
@@ -88,8 +175,12 @@ export function openVoiceLedger(home: string, now: () => Date = () => new Date()
         writeFileSync(tmp, `${JSON.stringify(all, null, 2)}\n`, { mode: 0o600 });
         chmodSync(tmp, 0o600);
         renameSync(tmp, file);
-      } catch {
-        // The words were already spoken; a ledger that cannot be written must not break them.
+      } catch (e) {
+        // The words were already spoken, so the call still succeeds; but a ledger that cannot be
+        // written means the month's voice spend is undercounted, and that is worth a line.
+        log(
+          `voice-usage.json could not be written: ${e instanceof Error ? e.message : 'unknown error'}`,
+        );
       }
     },
     monthUsd(at = now()) {
@@ -103,12 +194,14 @@ export function openVoiceLedger(home: string, now: () => Date = () => new Date()
 
 export interface VoiceMountDeps {
   /** The Fish key, or undefined when there is none. Read on each request, so adding one needs no restart. */
-  key(): string | undefined;
+  key(): string | undefined | Promise<string | undefined>;
   /** The voice model id to speak with (a setting). */
   voiceId(): string;
   ledger?: VoiceLedger;
-  /** Called with a key that was found, so the server's redaction can hide it. */
+  /** Called when a key was found that differs from the last one, so redaction can hide it. */
   onKey?(key: string): void;
+  /** Throws (HttpError 402) when the month's budget is used up, so no more audio is bought. */
+  assertBudget?(): Promise<void> | void;
   fetch?: typeof fetch;
   model?: string;
   timeoutMs?: number;
@@ -125,6 +218,7 @@ export function createVoiceMount(deps: VoiceMountDeps): Mount {
   const maxChars = deps.maxChars ?? VOICE_TEXT_MAX;
   const url = deps.url ?? FISH_URL;
   let inFlight = 0;
+  let lastKey: string | undefined;
 
   return guard(async ({ req, method, parts }) => {
     if (parts[0] !== 'voice' || parts[1] !== 'speak' || parts.length !== 2) return undefined;
@@ -136,9 +230,13 @@ export function createVoiceMount(deps: VoiceMountDeps): Mount {
     if (text.length > maxChars)
       throw new HttpFail(413, 'That is too long to read aloud. It stays on screen.');
 
-    const key = deps.key();
+    const key = await deps.key();
     if (!key) throw new HttpFail(503, MSG_NO_KEY);
-    deps.onKey?.(key);
+    if (key !== lastKey) {
+      lastKey = key;
+      deps.onKey?.(key);
+    }
+    await deps.assertBudget?.();
 
     if (inFlight >= VOICE_MAX_IN_FLIGHT)
       throw new HttpFail(429, 'Remy is still reading the last part. Try again in a moment.');
