@@ -208,7 +208,7 @@ function Shell({ mind, children }: { mind: MindState; children: React.ReactNode 
   return (
     <div className="mt-4 flex gap-3">
       <div className="mt-1 shrink-0">
-        <MindGlyph state={mind} size={28} />
+        <MindGlyph state={mind} size={40} />
       </div>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
