@@ -767,6 +767,12 @@ export function createMockApi(): RemyApi {
     async settings() {
       return { ...SETTINGS, notes };
     },
+    async browserState() {
+      return { open: true, url: MOCK_BROWSER.url, title: MOCK_BROWSER.title };
+    },
+    async browserFrame() {
+      return mockFrame();
+    },
     async health(): Promise<Health> {
       return { ok: true, version: SETTINGS.about.version };
     },
@@ -791,4 +797,26 @@ export function createMockApi(): RemyApi {
     async sendTestNotification() {},
   };
   return api;
+}
+
+const MOCK_BROWSER = { url: 'https://northwind.com/pricing', title: 'Pricing | Northwind' };
+
+/** A tiny inline SVG standing in for a page, as a data URL (no external assets). */
+function mockFrame(): string {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">' +
+    '<rect width="1280" height="800" fill="#F4F2EE"/>' +
+    '<rect width="1280" height="72" fill="#FFFFFF"/>' +
+    '<rect x="48" y="26" width="120" height="20" rx="4" fill="#0F0F10"/>' +
+    '<rect x="880" y="28" width="60" height="16" rx="8" fill="#C9C7C2"/>' +
+    '<rect x="960" y="28" width="60" height="16" rx="8" fill="#C9C7C2"/>' +
+    '<rect x="1040" y="28" width="60" height="16" rx="8" fill="#C9C7C2"/>' +
+    '<rect x="120" y="150" width="620" height="44" rx="8" fill="#0F0F10"/>' +
+    '<rect x="120" y="220" width="460" height="18" rx="6" fill="#B8B5AE"/>' +
+    '<rect x="120" y="254" width="520" height="18" rx="6" fill="#B8B5AE"/>' +
+    '<rect x="120" y="360" width="320" height="300" rx="16" fill="#FFFFFF" stroke="#DAD7D0"/>' +
+    '<rect x="480" y="360" width="320" height="300" rx="16" fill="#FFFFFF" stroke="#DAD7D0"/>' +
+    '<rect x="840" y="360" width="320" height="300" rx="16" fill="#FFFFFF" stroke="#DAD7D0"/>' +
+    '</svg>';
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

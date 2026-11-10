@@ -3,6 +3,7 @@
 import type {
   ApproveBody,
   BrainData,
+  BrowserState,
   CatalogApp,
   ChatSent,
   ChatSummary,
@@ -209,6 +210,12 @@ export function createHttpApi(opts: {
       await call('/api/settings', { method: 'PUT', body: JSON.stringify(patch) });
     },
     health: () => json<Health>('/api/health'),
+    browserState: () => json<BrowserState>('/api/browser/state'),
+    async browserFrame() {
+      const res = await call('/api/browser/frame', { cache: 'no-store' });
+      if (res.status === 204) return null;
+      return URL.createObjectURL(await res.blob());
+    },
     async testToken(token) {
       let res: Response;
       try {
