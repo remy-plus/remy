@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useApi } from './api/index.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
-import { Header } from './components/Header.tsx';
+import { Dock } from './components/Dock.tsx';
 import { PushToTalk } from './components/PushToTalk.tsx';
-import { StatusBar } from './components/StatusBar.tsx';
-import { useHome } from './hooks.ts';
+import { Activity } from './pages/activity/Activity.tsx';
+import { Browser } from './pages/browser/Browser.tsx';
+import { Chat } from './pages/chat/Chat.tsx';
 import { AddConnection } from './pages/connect/AddConnection.tsx';
 import { AddMachine } from './pages/connect/AddMachine.tsx';
 import { Brain } from './pages/connect/Brain.tsx';
@@ -12,12 +13,10 @@ import { Connections } from './pages/connect/Connections.tsx';
 import { NewSchedule } from './pages/connect/NewSchedule.tsx';
 import { Schedules } from './pages/connect/Schedules.tsx';
 import { Skills } from './pages/connect/Skills.tsx';
-import { Home } from './pages/Home.tsx';
 import { Placeholder } from './pages/Placeholder.tsx';
 import { Settings } from './pages/settings/Settings.tsx';
 import { Review } from './pages/tasks/Review.tsx';
 import { Task } from './pages/tasks/Task.tsx';
-import { Tasks } from './pages/tasks/Tasks.tsx';
 import { Quiet } from './pages/welcome/Quiet.tsx';
 import { SignIn } from './pages/welcome/SignIn.tsx';
 import { useFirstRun } from './pages/welcome/useFirstRun.ts';
@@ -25,13 +24,25 @@ import { Welcome } from './pages/welcome/Welcome.tsx';
 import { matchRoute, useHashPath } from './router.ts';
 import { applyServerPrefs, bindServerSettings } from './settings.ts';
 
-function Page({ path, home }: { path: string; home: ReturnType<typeof useHome> }) {
+/** Old addresses move to their new home without leaving a step in the back button. */
+function Redirect({ to }: { to: string }) {
+  useEffect(() => window.location.replace(to), [to]);
+  return null;
+}
+
+function Page({ path }: { path: string }) {
   const { name, params } = matchRoute(path);
   switch (name) {
     case 'home':
-      return <Home home={home} />;
+      return <Chat />;
+    case 'chat':
+      return <Chat id={params.id} />;
+    case 'activity':
+      return <Activity />;
+    case 'browser':
+      return <Browser />;
     case 'tasks':
-      return <Tasks />;
+      return <Redirect to="#/activity" />;
     case 'task':
       return <Task id={params.id} />;
     case 'review':
@@ -72,7 +83,7 @@ export function App() {
   const path = useHashPath();
   useFirstRun(path);
   const api = useApi();
-  const home = useHome();
+  const bare = BARE.has(matchRoute(path).name);
   const main = useRef<HTMLElement>(null);
   const shown = useRef(path);
   // With a real server, copy its saved settings in once, then write each change back.
@@ -112,15 +123,10 @@ export function App() {
       >
         Skip to main content
       </a>
-      {!BARE.has(matchRoute(path).name) && (
-        <Header
-          path={path}
-          status={home.data && <StatusBar status={home.data.status} sample={api.kind === 'mock'} />}
-        />
-      )}
-      <main id="main" ref={main} tabIndex={-1} className="outline-none">
+      {bare || <Dock path={path} />}
+      <main id="main" ref={main} tabIndex={-1} className={`outline-none ${bare ? '' : 'pt-20'}`}>
         <div key={path} className="page-in">
-          <Page path={path} home={home} />
+          <Page path={path} />
         </div>
       </main>
       <CommandPalette />

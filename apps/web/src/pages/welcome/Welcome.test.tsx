@@ -112,13 +112,13 @@ describe('first visit', () => {
     window.localStorage.removeItem('remy.onboarded');
     window.localStorage.setItem('remy.token', 'abc');
     open('#/');
-    await screen.findByRole('heading', { level: 1, name: /need/ });
+    await screen.findByRole('navigation', { name: 'Main' });
     expect(window.location.hash).toBe('#/');
   });
 
   it('leaves a visit that is already done alone', async () => {
     open('#/'); // the test setup marks the visit as done
-    await screen.findByRole('heading', { level: 1, name: /need/ });
+    await screen.findByRole('navigation', { name: 'Main' });
     expect(window.location.hash).toBe('#/');
   });
 });

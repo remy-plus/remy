@@ -59,7 +59,9 @@ describe('Schedules', () => {
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('complementary')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: 'Schedules' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Tasks' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Activity' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
     for (const s of screen.getAllByRole('switch'))
       expect(s.getAttribute('aria-label')).toBeTruthy();

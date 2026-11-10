@@ -6,7 +6,7 @@ import { ApiProvider } from '../api/index.tsx';
 import { createMockApi } from '../api/mock.ts';
 
 const app = () => {
-  window.location.hash = '#/tasks';
+  window.location.hash = '#/activity';
   return render(
     <ApiProvider api={createMockApi()}>
       <App />
@@ -54,7 +54,7 @@ describe('PushToTalk without speech recognition', () => {
     talk();
     fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(window.location.hash).toBe('#/tasks');
+    expect(window.location.hash).toBe('#/activity');
     talk();
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());

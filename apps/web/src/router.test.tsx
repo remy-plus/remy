@@ -25,6 +25,9 @@ describe('matchRoute', () => {
   it('matches every route and reads its params', () => {
     expect(matchRoute('/').name).toBe('home');
     expect(matchRoute('/tasks').name).toBe('tasks');
+    expect(matchRoute('/chat/chat_1')).toEqual({ name: 'chat', params: { id: 'chat_1' } });
+    expect(matchRoute('/activity').name).toBe('activity');
+    expect(matchRoute('/browser').name).toBe('browser');
     expect(matchRoute('/tasks/task_1')).toEqual({ name: 'task', params: { id: 'task_1' } });
     expect(matchRoute('/brain').name).toBe('brain');
     expect(matchRoute('/skills').name).toBe('skills');
@@ -48,18 +51,20 @@ describe('matchRoute', () => {
 });
 
 describe('App routing', () => {
-  const cases: [hash: string, heading: string | RegExp, current: string | null][] = [
-    ['#/', /Three things need you/, 'Home'],
-    ['#/tasks', 'Tasks', 'Tasks'],
-    ['#/tasks/task_flights', "Book Dana's flights", 'Tasks'],
+  const cases: [hash: string, heading: string | RegExp | null, current: string | null][] = [
+    ['#/', null, 'Chat'], // the chat page has its own tests
+    ['#/chat/chat_week', null, 'Chat'],
+    ['#/activity', 'Activity', 'Activity'],
+    ['#/browser', 'Browser', 'Browser'],
+    ['#/tasks/task_flights', "Book Dana's flights", 'Activity'],
     [
       '#/review',
       'Three tasks ran. One is waiting for you. Nothing was sent or paid without your OK.',
-      null,
+      'Activity',
     ],
     ['#/brain', 'Brain', 'Brain'],
     ['#/skills', 'Skills', 'Brain'],
-    ['#/schedules', 'Schedules', 'Tasks'],
+    ['#/schedules', 'Schedules', 'Activity'],
     ['#/connections', 'Connections', 'Connections'],
     ['#/settings', 'Settings', 'Settings'],
     ['#/settings/trust', 'Settings', 'Settings'],
@@ -68,7 +73,9 @@ describe('App routing', () => {
     it(`renders ${hash}`, async () => {
       window.location.hash = hash;
       render(app());
-      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeTruthy();
+      if (heading)
+        expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeTruthy();
+      else await screen.findByRole('navigation', { name: 'Main' });
       const marked = screen
         .getAllByRole('link')
         .filter((a) => a.getAttribute('aria-current') === 'page');
@@ -78,7 +85,7 @@ describe('App routing', () => {
 
   it('follows the address bar and moves focus to the page', async () => {
     render(app());
-    await screen.findByRole('heading', { level: 1 });
+    await screen.findByRole('navigation', { name: 'Main' });
     go('#/brain');
     expect(await screen.findByRole('heading', { level: 1, name: 'Brain' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBe('page');
@@ -92,10 +99,28 @@ describe('App routing', () => {
   });
 
   it('skip link focuses main without changing the route', () => {
-    window.location.hash = '#/tasks';
+    window.location.hash = '#/activity';
     render(app());
     screen.getByRole('link', { name: 'Skip to main content' }).click();
     expect(document.activeElement).toBe(screen.getByRole('main'));
-    expect(window.location.hash).toBe('#/tasks');
+    expect(window.location.hash).toBe('#/activity');
+  });
+
+  it('sends the old tasks address to Activity', async () => {
+    window.location.hash = '#/tasks';
+    render(app());
+    expect(await screen.findByRole('heading', { level: 1, name: 'Activity' })).toBeTruthy();
+    expect(window.location.hash).toBe('#/activity');
+  });
+
+  it('shows the dock on app pages and not on the full-page screens', async () => {
+    window.location.hash = '#/brain';
+    const { unmount } = render(app());
+    expect(await screen.findByRole('navigation', { name: 'Main' })).toBeTruthy();
+    unmount();
+    window.location.hash = '#/sign-in';
+    render(app());
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
 });

@@ -157,3 +157,37 @@ body {
     animation: none;
   }
 }
+
+/* The History drawer slides in from the left, the dock's menu sheet drops in. Reduced motion: none. */
+@keyframes slide-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes drop-in {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.history-drawer[open] {
+  animation: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.dock-sheet[open] {
+  animation: drop-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .history-drawer[open],
+  .dock-sheet[open] {
+    animation: none;
+  }
+}
