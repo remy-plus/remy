@@ -23,8 +23,8 @@ describe('Quiet', () => {
     open();
     expect(await screen.findByRole('heading', { level: 1, name: 'Quiet.' })).toBeTruthy();
     expect(window.localStorage.getItem('remy.quiet')).toBe('true');
-    expect(await screen.findByText(/3 need your OK/)).toBeTruthy();
-    expect(screen.getByText(/Quiet mode · until 07:00/)).toBeTruthy();
+    expect(await screen.findByText(/3 waiting for you/)).toBeTruthy();
+    expect(screen.getByText(/until 7:00.?AM/)).toBeTruthy();
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
 

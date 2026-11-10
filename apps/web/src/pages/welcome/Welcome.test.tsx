@@ -21,9 +21,7 @@ const open = (hash: string) => {
 describe('Welcome', () => {
   it('step 1 offers three ways to think, marks the step and goes on', async () => {
     open('#/welcome/1');
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Choose how Remy thinks.' }),
-    ).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: "Hi, I'm Remy." })).toBeTruthy();
     const trace = screen.getByRole('list', { name: 'Setup steps' });
     expect(within(trace).getAllByRole('listitem')).toHaveLength(3);
     expect(
@@ -39,7 +37,7 @@ describe('Welcome', () => {
 
   it('keeps no key: the field is a password box and testing clears it', async () => {
     open('#/welcome/1');
-    const box = (await screen.findByLabelText('API key for OpenRouter')) as HTMLInputElement;
+    const box = (await screen.findByLabelText('Your OpenRouter key')) as HTMLInputElement;
     expect(box.type).toBe('password');
     fireEvent.change(box, { target: { value: 'sk-not-a-real-key' } });
     fireEvent.click(screen.getByRole('button', { name: 'Test the key first' }));
@@ -54,13 +52,13 @@ describe('Welcome', () => {
     expect(
       screen.getByRole('link', { name: 'Sign in to a home server' }).getAttribute('href'),
     ).toBe('#/sign-in');
-    expect(screen.queryByLabelText('API key for OpenRouter')).toBeNull();
+    expect(screen.queryByLabelText('Your OpenRouter key')).toBeNull();
   });
 
   it('step 2 lists apps and can be skipped', async () => {
     open('#/welcome/2');
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Connect what Remy can reach.' }),
+      await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
     ).toBeTruthy();
     expect(screen.getByText('Connected')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Skip for now' }).getAttribute('href')).toBe(
@@ -72,7 +70,7 @@ describe('Welcome', () => {
   it('step 3 starts a task and opens it', async () => {
     window.localStorage.removeItem('remy.onboarded');
     open('#/welcome/3');
-    const start = (await screen.findByRole('button', { name: 'Start task' })) as HTMLButtonElement;
+    const start = (await screen.findByRole('button', { name: 'Start' })) as HTMLButtonElement;
     expect(start.disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: /Find three flights to Lisbon/ }));
     expect((screen.getByLabelText('What you need done') as HTMLTextAreaElement).value).toBe(
