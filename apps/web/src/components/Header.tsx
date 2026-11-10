@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { Logo } from './Logo.tsx';
+
 export const NAV = [
   { label: 'Home', href: '#/', match: (p: string) => p === '/' },
   {
@@ -29,7 +31,7 @@ export function Header({ path, status }: { path: string; status?: ReactNode }) {
   return (
     <header className="grid items-center gap-x-4 gap-y-3 px-5 py-3 md:h-[66px] md:grid-cols-[auto_minmax(0,1fr)_auto] md:py-0 sm:px-8">
       <a href="#/" className="justify-self-start" aria-label="Remy, home">
-        <span className="font-mono text-[18px] font-bold tracking-[0.06em] text-text">REMY</span>
+        <Logo />
       </a>
       <nav
         aria-label="Main"
