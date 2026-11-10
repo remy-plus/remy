@@ -125,6 +125,7 @@ function OpenChat({ id }: { id: string }) {
     end.current?.scrollIntoView?.({ block: 'end', behavior: 'smooth' });
   }, [turnCount]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-attach when the chat (and its column) first appears
   // New lines, an approval card or an answer make the chat taller: follow them, but only when the
   // person is already near the bottom, so reading further up is never interrupted.
   useEffect(() => {
