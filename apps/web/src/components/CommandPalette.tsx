@@ -6,7 +6,7 @@ import { setSetting } from '../settings.ts';
 
 interface Item {
   id: string;
-  group: 'Ask your brain' | 'Tasks' | 'Do something';
+  group: 'Ask your brain' | 'Jobs' | 'Do something';
   label: string;
   hint: string;
   run: () => void | Promise<void>;
@@ -14,15 +14,15 @@ interface Item {
   starts?: boolean;
 }
 
-const GROUPS: Item['group'][] = ['Ask your brain', 'Tasks', 'Do something'];
+const GROUPS: Item['group'][] = ['Ask your brain', 'Jobs', 'Do something'];
 const STATUS: Record<TaskStatus, string> = {
-  running: 'running',
+  running: 'working',
   waiting_approval: 'waiting for you',
   waiting_user: 'waiting for you',
   paused: 'paused',
   succeeded: 'done',
   failed: 'failed',
-  cancelled: 'stopped',
+  cancelled: "didn't finish",
 };
 const SUGGESTIONS = ['What do I still owe anyone?', 'What changed since Friday?'];
 
@@ -118,7 +118,7 @@ export function CommandPalette() {
   for (const s of SUGGESTIONS)
     if (matches(s, q) && s !== q) add('Ask your brain', s, '', () => start(s), true);
   for (const t of tasks.filter((t) => matches(t.prompt, q)).slice(0, 4))
-    add('Tasks', t.prompt, STATUS[t.status], () => go(`#/tasks/${encodeURIComponent(t.id)}`));
+    add('Jobs', t.prompt, STATUS[t.status], () => go(`#/tasks/${encodeURIComponent(t.id)}`));
   if (q) add('Do something', q, 'asks before sending', () => start(q), true);
   const actions: [string, string, () => void][] = [
     [
@@ -129,9 +129,9 @@ export function CommandPalette() {
         go('#/quiet');
       },
     ],
-    ['Talk to Remy', 'push to talk', () => window.dispatchEvent(new Event('remy:voice'))],
+    ['Talk to Remy', 'hold Space', () => window.dispatchEvent(new Event('remy:voice'))],
     ['Add a connection', 'Gmail, Notion, files', () => go('#/connections/add')],
-    ['Open the overnight review', '', () => go('#/review')],
+    ['Open the review', '', () => go('#/review')],
     ['Open settings', '', () => go('#/settings')],
     ['Go to Home', '', () => go('#/')],
   ];

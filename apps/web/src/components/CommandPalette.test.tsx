@@ -86,7 +86,7 @@ describe('CommandPalette', () => {
     const input = await box();
     fireEvent.change(input, { target: { value: 'invoices' } });
     // The task row is the one that is not "ask" or "do something".
-    const tasks = screen.getByRole('group', { name: 'Tasks' });
+    const tasks = screen.getByRole('group', { name: 'Jobs' });
     const row = within(tasks).getByRole('option', { name: /Rename invoices/ });
     fireEvent.mouseMove(row);
     expect(input.getAttribute('aria-activedescendant')).toBe(row.id);
