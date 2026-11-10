@@ -1,0 +1,24 @@
+/* Remy motion, shared by the site and the web app. Uses the tokens in ../tokens.css:
+   --ease-soft, --dur-fast, --dur, --dur-slow, --edge, --edge-hi.
+   Nothing snaps: every move eases out slowly. Under reduced motion all of it switches off. */
+@keyframes remy-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes remy-pop {
+  0% { opacity: 0; transform: scale(0.55); }
+  60% { transform: scale(1.14); }
+  100% { opacity: 1; transform: scale(1); }
+}
+/* The cursor: the one place the accent blinks. */
+@keyframes remy-blink { 50% { opacity: 0; } }
+/* Wordmark rows draw in from the top, light to dense. The live version decodes glyph by glyph. */
+@keyframes remy-rows { to { clip-path: inset(0 0 0 0); } }
+
+.remy-rise { animation: remy-rise var(--dur) var(--ease-soft) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.remy-pop { animation: remy-pop 0.42s var(--ease-soft) both; }
+.remy-cursor { display: inline-block; width: 0.5em; height: 0.92em; background: var(--signal); animation: remy-blink 1.1s steps(1) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .remy-rise, .remy-pop, .remy-cursor { animation: none; }
+}
