@@ -318,7 +318,7 @@ Options for run
   --model <id>          Model id
   --base-url <url>      Any OpenAI-compatible endpoint
   --auto <risks>        Risks approved without asking (default read). Example: read,write
-  --workspace <dir>     Folder the task may read and write (default ~/.remy/workspaces/<id>)
+  --workspace <dir>     Folder the task may read and write (default ~/.remy/workspaces/<id>; remy serve uses it for every task)
   --max-steps <n>       Step budget (default ${DEFAULT_BUDGET.maxSteps})
   --max-cost <usd>      Cost budget (default ${DEFAULT_BUDGET.maxCostUsd})
   --background          Start the task and return at once; follow it with remy attach
@@ -2251,7 +2251,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             home,
             version: version(),
             config: (id, trust) => {
-              const config = taskConfig(file, model.id, join(home, 'workspaces', id));
+              // --workspace points every web task at one folder the person chose (say, ~/Desktop).
+              const folder = flags.workspace
+                ? resolve(cwd, flags.workspace)
+                : join(home, 'workspaces', id);
+              const config = taskConfig(file, model.id, folder);
               mkdirSync(config.workspaceDir, { recursive: true });
               return configWithPrefs(config, webPrefs.chosen(), trust);
             },

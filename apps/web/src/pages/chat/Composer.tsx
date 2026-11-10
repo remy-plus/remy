@@ -130,7 +130,7 @@ export function Composer({
           onKeyDown={onKey}
           placeholder={placeholder}
           style={{ outline: 'none' }}
-          className={`max-h-60 min-w-0 flex-1 resize-none border-0 bg-transparent py-2 text-text outline-none placeholder:text-muted ${big ? 'text-[18px] leading-[1.5]' : 'text-[16px] leading-[1.5]'}`}
+          className={`[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-h-60 min-w-0 overflow-x-hidden flex-1 resize-none border-0 bg-transparent py-2 text-text outline-none placeholder:text-muted ${big ? 'text-[18px] leading-[1.5]' : 'text-[16px] leading-[1.5]'}`}
         />
         <button
           type="button"

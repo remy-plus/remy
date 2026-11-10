@@ -822,3 +822,15 @@ Stage 5 is signed off (26 dark screens, Doop canvas https://doop.design/c/ZuevZV
 
 The owner's direction: Remy is Jarvis, a person on your computer, not a task tool. Chat is home; tasks become "Activity"; a floating, customizable top dock replaces the header tabs; plain words replace "Trust: ask" and military time; a living ASCII "mind" shows what Remy is doing; voice and a live Browser panel follow. The full brief, the plain-words table, the chats API and the work packages are in `docs/web-v1.md`. This supersedes the screen list from Stage 5 where they disagree. Money rule: the $25 API credit is only for Remy's own tests and evals; design and build work runs on the owner's Claude plan (Opus or Sonnet, Haiku helpers for small jobs; Fable only for rare hard tasks, because it burns the weekly quota).
 
+
+## Mac control: use any app on the host Mac (owner request, 2026-11-10)
+
+**Rule from the owner.** When Remy is hosted on the person's own Mac, it can use any app on that Mac without setup friction. When it is hosted on a VPS or home server, there is no Mac to drive: it uses Connections (MCP) and the cloud or local browser instead. This pulls the Phase 4 "device agent" forward as a built-in tool pack, not a separate Tauri app: `remy serve` already runs on the Mac, so the tools run in-process.
+
+**Route order on a Mac (most reliable first).** (1) An app's own MCP server or API. (2) Scripting: `osascript` (AppleScript and JXA) for apps that have a dictionary (Mail, Calendar, Notes, Finder, Music, Safari, Messages), `open`, and `shortcuts run`. (3) UI by the accessibility tree through System Events (read the window, click a named control, type). (4) Screenshot (`screencapture`) plus a vision model and synthetic clicks, only when 1 to 3 cannot reach it.
+
+**Rules that stay.** Tools run as `AuthorizedCall` only; every tool has an `effect` class (reading a window is `none`, sending or clicking Send is `reconcilable` or `unsafe_to_retry`); screen text is untrusted and taints the task; approvals bind to `argsHash`; a visible "Remy is using your Mac" indicator and a kill switch (stop the task, release control) are required; an allow-list of apps the person turned on, default empty, asked per app on first use.
+
+**Setup people never do by hand.** macOS asks once for Accessibility, Screen Recording and Automation. First run walks through them in plain words and `remy doctor` shows which are missing. Hosts that are not macOS, or are headless, do not offer these tools at all and say what to use instead.
+
+**Work packages.** M1 `mac_script` (osascript/JXA) with app allow-list, risk classes, tests with a fake runner. M2 `mac_ui` (accessibility read, click, type) behind the same gate. M3 `mac_screen` (screenshot, vision click). M4 permission walkthrough in the web app and `remy doctor`. M5 live eval suite (Notes, Calendar, Finder, Mail draft-only) that must pass on a real Mac before this ships. Safety and recovery suites stay at 100%.
