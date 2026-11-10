@@ -1,0 +1,9 @@
+// The REMY wordmark as characters, copied from branding/logo/remy-wordmark.txt. Keep it intact.
+export const WORDMARK: readonly string[] = [
+  ':::::::..    .,::::::    .        :     .-:.     ::-.',
+  ";;;;``;;;;   ;;;;''''    ;;,.    ;;;     ';;.   ;;;;'",
+  " [[[,/[[['    [[cccc     [[[[, ,[[[[,      '[[,[[['",
+  ' $$$$$$c      $$""""     $$$$$$$$"$$$        c$$"',
+  ' 888b "88bo,  888oo,__   888 Y88" 888o     ,8P"`',
+  ' MMMM   "W"   """"YUMMM  MMM  M\'  "MMM    mM"',
+];
