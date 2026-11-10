@@ -2,6 +2,7 @@
 // keys never go through the browser, and the list of apps in step 2 is sample data for now.
 import { type ReactNode, useId, useState } from 'react';
 import { useApi } from '../../api/index.tsx';
+import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
 import { Logo } from '../../components/Logo.tsx';
 import { Orb } from '../../components/Orb.tsx';
 import { buttonPrimary, buttonQuiet, field } from '../../components/ui.ts';
@@ -67,27 +68,30 @@ function Frame({
 }) {
   const [head, rest] = CAPTION[at] as [string, string];
   return (
-    <div className="mx-auto grid min-h-screen max-w-[1440px] gap-10 px-5 pt-10 pb-12 sm:px-14 lg:grid-cols-[minmax(0,588px)_minmax(0,1fr)] lg:gap-[120px]">
-      <div className="min-w-0">
-        <a href="#/" aria-label="Remy, home" className="inline-block">
-          <Logo size="min(8px, 2.5vw)" />
-        </a>
-        <div className="mt-9">
-          <Trace at={at} />
+    <div className="relative overflow-hidden">
+      <DotField className="absolute inset-0 h-full w-full [mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)] [-webkit-mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)]" />
+      <div className="relative mx-auto grid min-h-screen max-w-[1440px] gap-10 px-5 pt-10 pb-12 sm:px-14 lg:grid-cols-[minmax(0,588px)_minmax(0,1fr)] lg:gap-[120px]">
+        <div className="min-w-0">
+          <a href="#/" aria-label="Remy, home" className="block w-[min(340px,100%)]">
+            <AsciiMark fallback={<Logo size="min(8px, 2.5vw)" />} />
+          </a>
+          <div className="mt-9">
+            <Trace at={at} />
+          </div>
+          <h1 className="mt-10 mb-0 text-[34px] leading-[1.15] font-medium tracking-tight">
+            {title}
+          </h1>
+          <p className="mt-3 mb-0 max-w-[510px] text-[16px] leading-relaxed text-muted">{lead}</p>
+          <div className="mt-8">{children}</div>
         </div>
-        <h1 className="mt-10 mb-0 text-[34px] leading-[1.15] font-medium tracking-tight">
-          {title}
-        </h1>
-        <p className="mt-3 mb-0 max-w-[510px] text-[16px] leading-relaxed text-muted">{lead}</p>
-        <div className="mt-8">{children}</div>
-      </div>
-      <div className="hidden flex-col items-center justify-center lg:flex">
-        <Orb satellites={LABELS[at] ?? []} />
-        <p className="font-mono mt-4 mb-0 text-center text-[12px] leading-relaxed text-muted">
-          <span className="text-text">{head}</span>
-          <br />
-          <span className="inline-block max-w-[320px]">{rest}</span>
-        </p>
+        <div className="hidden flex-col items-center justify-center lg:flex">
+          <Orb satellites={LABELS[at] ?? []} />
+          <p className="font-mono mt-4 mb-0 text-center text-[12px] leading-relaxed text-muted">
+            <span className="text-text">{head}</span>
+            <br />
+            <span className="inline-block max-w-[320px]">{rest}</span>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { createHttpApi } from '../../api/http.ts';
 import { type Health, type RemyApi, useApi } from '../../api/index.tsx';
+import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
 import { Logo } from '../../components/Logo.tsx';
 import { buttonPrimary, field } from '../../components/ui.ts';
 import { setSetting } from '../../settings.ts';
@@ -83,9 +84,10 @@ export function SignIn({
   const host = window.location.host || 'this server';
   const secure = window.location.protocol === 'https:';
   return (
-    <div className="grid min-h-screen place-items-center bg-[radial-gradient(ellipse_at_center,#171917_0%,transparent_62%)] px-5 py-12">
-      <div className="w-full max-w-[460px]">
-        <Logo size="min(11px, 2.8vw)" />
+    <div className="relative grid min-h-screen place-items-center overflow-hidden px-5 py-12">
+      <DotField className="absolute inset-0 h-full w-full [mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)] [-webkit-mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)]" />
+      <div className="relative w-full max-w-[460px]">
+        <AsciiMark fallback={<Logo size="min(11px, 2.8vw)" />} />
         <h1 className="mt-10 mb-0 text-[28px] leading-tight font-medium tracking-tight">
           Sign in to your Remy.
         </h1>
