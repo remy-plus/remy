@@ -125,6 +125,19 @@ function OpenChat({ id }: { id: string }) {
     end.current?.scrollIntoView?.({ block: 'end', behavior: 'smooth' });
   }, [turnCount]);
 
+  // New lines, an approval card or an answer make the chat taller: follow them, but only when the
+  // person is already near the bottom, so reading further up is never interrupted.
+  useEffect(() => {
+    const col = end.current?.parentElement;
+    if (!col || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const gap = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+      if (gap < 420) end.current?.scrollIntoView?.({ block: 'end', behavior: 'smooth' });
+    });
+    ro.observe(col);
+    return () => ro.disconnect();
+  }, [chat?.id]);
+
   const post = useCallback(
     async (t: string) => {
       setProblem(null);
@@ -189,7 +202,7 @@ function OpenChat({ id }: { id: string }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <div className="mx-auto w-full max-w-[760px] flex-1 px-5 pt-28 pb-6">
+      <div className="mx-auto w-full max-w-[760px] flex-1 px-5 pt-28 pb-44">
         <h1 className="sr-only">{chat.title}</h1>
         {chat.turns.map((t, i) => (
           <Turn
