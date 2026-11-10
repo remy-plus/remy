@@ -10,6 +10,14 @@
   --line: #26262a;
   --signal: #a8c49a; /* accent only: the one primary action per view, finished steps, live dots */
   --signal-ink: #1e2a18;
+  /* Edges are tone, not lines: paper at low strength. */
+  --edge: rgba(237, 235, 230, 0.08);
+  --edge-hi: rgba(237, 235, 230, 0.16);
+  /* Motion: one soft expo-out easing, and long durations. Nothing snaps. */
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.3s;
+  --dur: 0.6s;
+  --dur-slow: 1.1s;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-sans: 'Instrument Sans', system-ui, sans-serif;
   --radius-sm: 6px;

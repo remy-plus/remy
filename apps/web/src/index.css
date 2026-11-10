@@ -12,6 +12,8 @@
   --color-muted: var(--muted);
   --color-stone: var(--stone);
   --color-line: var(--line);
+  --color-edge: var(--edge);
+  --color-edge-hi: var(--edge-hi);
   --color-signal: var(--signal);
   --color-signal-ink: var(--signal-ink);
 }
@@ -94,7 +96,7 @@ body {
   padding: 8px 12px;
   background: var(--raise);
   color: var(--text);
-  border: 1px solid var(--stone);
+  border: 1px solid var(--edge-hi);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 13px;
