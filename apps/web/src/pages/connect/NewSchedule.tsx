@@ -5,6 +5,12 @@ const HOW_OFTEN = ['Hourly', 'Daily', 'Weekly', 'Monthly', 'Custom'] as const;
 type Often = (typeof HOW_OFTEN)[number];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+// Plain wording for the trust levels the server stores as ask / steady / away.
+const TRUST_WORDS: Record<string, string> = {
+  ask: 'Check with me first',
+  steady: 'Handle routine things',
+  away: "Work on its own while I'm away",
+};
 
 const ordinal = (n: number) => {
   const suffix = ['th', 'st', 'nd', 'rd'];
@@ -226,7 +232,7 @@ export function NewSchedule() {
                 </>
               )}
               <label htmlFor={`${uid}-time`} className="sr-only">
-                Time
+                At
               </label>
               <input
                 id={`${uid}-time`}
@@ -272,9 +278,11 @@ export function NewSchedule() {
         </div>
 
         <p className="mt-6 mb-6 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-relaxed text-muted">
-          While it runs, Remy works at trust level{' '}
-          <strong className="font-semibold text-text">{data.policy.trust}</strong> and stops to ask
-          if a run costs more than {data.policy.stopAbove}.
+          How much Remy does on its own:{' '}
+          <strong className="font-semibold text-text">
+            {TRUST_WORDS[data.policy.trust] ?? data.policy.trust}
+          </strong>
+          . It stops to ask if a run costs more than {data.policy.stopAbove}.
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="submit" className={primary}>
