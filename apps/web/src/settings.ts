@@ -17,6 +17,8 @@ export interface SettingValues {
   'notify.finished': boolean;
   'notify.noticed': boolean;
   'notify.review': string;
+  /** The Fish Audio voice model id Remy speaks with. */
+  'voice.id': string;
   'quiet.from': string;
   'quiet.to': string;
   onboarded: boolean;
@@ -27,6 +29,9 @@ export interface SettingValues {
   /** Whether Remy speaks the final answer of a finished turn. Browser-local. */
   voice: { speak: boolean };
 }
+
+/** The voice model used until another is chosen. Must match the server's default. */
+export const DEFAULT_VOICE_ID = 'e13fa398a7f445a685316a3de6089ce7';
 
 export const DEFAULTS: SettingValues = {
   trust: 'ask',
@@ -40,6 +45,7 @@ export const DEFAULTS: SettingValues = {
   'notify.finished': true,
   'notify.noticed': false,
   'notify.review': '07:30',
+  'voice.id': DEFAULT_VOICE_ID,
   'quiet.from': '23:00',
   'quiet.to': '07:00',
   onboarded: false,
@@ -118,6 +124,8 @@ const toPatch = (key: SettingKey, v: unknown): SettingsPatch | null => {
       return { notifications: { noticed: v as boolean } };
     case 'notify.review':
       return { notifications: { reviewAt: v as string } };
+    case 'voice.id':
+      return { voice: { id: v as string } };
     default:
       return null; // `escalate`, `onboarded`, `dock` and `layout` stay in this browser
   }
@@ -145,6 +153,7 @@ export function applyServerPrefs(p: ServerPrefs) {
   set('notify.finished', p.notifications.finished);
   set('notify.noticed', p.notifications.noticed);
   set('notify.review', p.notifications.reviewAt);
+  if (p.voice) set('voice.id', p.voice.id); // an older server has no voice setting
 }
 
 export const setSetting = <K extends SettingKey>(key: K, value: SettingValues[K]) => {

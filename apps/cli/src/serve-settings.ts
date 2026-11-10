@@ -10,6 +10,7 @@ import { fold } from '@remy/core';
 import { z } from 'zod';
 import { type Currency, formatMoney, isCurrencyCode, symbolOf, USD } from './currency.ts';
 import { type ApiCtx, type ApiResult, type ApiRoute, HttpError } from './serve.ts';
+import { DEFAULT_VOICE_ID, VOICE_ID_RE } from './serve-voice.ts';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const hhmm = z.string().regex(HHMM, 'Use HH:MM, for example 07:30.');
@@ -46,6 +47,15 @@ export const prefsPatch = z
       })
       .partial()
       .strict(),
+    /** The voice Remy speaks with: a Fish Audio voice model id. */
+    voice: z
+      .object({
+        id: z
+          .string()
+          .regex(VOICE_ID_RE, 'Use the voice model id from fish.audio: letters and digits.'),
+      })
+      .partial()
+      .strict(),
     /** The app is dark only. */
     appearance: z.literal('dark'),
   })
@@ -62,6 +72,7 @@ export interface WebPrefs {
   quiet: boolean;
   quietHours: { from: string; to: string };
   notifications: { approvals: boolean; finished: boolean; noticed: boolean; reviewAt: string };
+  voice: { id: string };
   appearance: 'dark';
 }
 
@@ -73,6 +84,7 @@ export const WEB_PREFS_DEFAULTS: WebPrefs = {
   quiet: false,
   quietHours: { from: '23:00', to: '07:00' },
   notifications: { approvals: true, finished: true, noticed: false, reviewAt: '07:30' },
+  voice: { id: DEFAULT_VOICE_ID },
   appearance: 'dark',
 };
 
@@ -94,6 +106,7 @@ const merge = (a: PrefsPatch, b: PrefsPatch): PrefsPatch => ({
   ...(a.notifications || b.notifications
     ? { notifications: { ...a.notifications, ...b.notifications } }
     : {}),
+  ...(a.voice || b.voice ? { voice: { ...a.voice, ...b.voice } } : {}),
 });
 
 /** `fallbackTrust` is the terminal's saved level, used until the web app sets one. */
@@ -120,6 +133,7 @@ export function openWebPrefs(
       quiet: c.quiet ?? d.quiet,
       quietHours: { ...d.quietHours, ...c.quietHours },
       notifications: { ...d.notifications, ...c.notifications },
+      voice: { ...d.voice, ...c.voice },
       appearance: 'dark',
     };
   };
@@ -177,13 +191,20 @@ export interface SettingsDeps {
   notesCount: () => number | null;
   /** Providers that need a key (for the status word). */
   needsKey?: (provider: string) => boolean;
+  /** Whether a voice key is saved, so Settings can say what spoken replies will use. */
+  voiceReady?: () => boolean;
   now?: () => Date;
 }
 
 const SPEND_TTL_MS = 30_000;
 
 /** Spend on models since the start of this month, from the task events. Cached for 30 s. */
-export function createSpend(store: EventStore, now: () => Date = () => new Date()) {
+export function createSpend(
+  store: EventStore,
+  now: () => Date = () => new Date(),
+  /** Other costs this month (spoken replies), in US dollars. */
+  extra: () => number = () => 0,
+) {
   let cache: { at: number; usd: number; month: string } | undefined;
   return async (): Promise<number> => {
     const t = now();
@@ -195,6 +216,7 @@ export function createSpend(store: EventStore, now: () => Date = () => new Date(
       if (new Date(s.createdAt).getTime() < start) continue;
       usd += fold(await store.read(s.taskId)).costUsd;
     }
+    usd += extra();
     cache = { at: t.getTime(), usd, month };
     return usd;
   };
@@ -240,6 +262,7 @@ export function settingsView(d: SettingsDeps, spentMonth: number) {
     models: { everyday: d.modelId, hard: d.modelId, everydayCost: cost, hardCost: cost },
     budget: { usedMonth: Math.round(spentMonth * 100) / 100, daysLeft: daysInMonth - t.getDate() },
     notes: d.notesCount() ?? 0,
+    voice: { ready: d.voiceReady?.() ?? false },
     server: { address: d.address(), lastSignIns: [] as { at: string; where: string }[] },
     about: {
       version: d.version,

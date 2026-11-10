@@ -247,6 +247,8 @@ export interface ServerPrefs {
   quiet: boolean;
   quietHours: { from: string; to: string };
   notifications: { approvals: boolean; finished: boolean; noticed: boolean; reviewAt: string };
+  /** The voice Remy speaks with: a Fish Audio voice model id. */
+  voice: { id: string };
   appearance: 'dark';
 }
 export type SettingsPatch = {
@@ -264,6 +266,8 @@ export interface SettingsData {
   models: { everyday: string; hard: string; everydayCost: string; hardCost: string };
   budget: { usedMonth: number; daysLeft: number };
   notes: number;
+  /** Whether the server has a voice key. Without one, spoken replies use the browser's voice. */
+  voice?: { ready: boolean };
   server: {
     address: string;
     lastSignIns: { at: string; where: string }[];
@@ -299,6 +303,11 @@ export interface RemyApi {
   cancel(id: string): Promise<void>;
   extend(id: string, body?: ExtendBody): Promise<void>;
   settings(): Promise<SettingsData>;
+  /**
+   * Audio for a short piece of text, in Remy's voice (POST /api/voice/speak). Rejects with an
+   * ApiError whose status says why (503: no voice key). Not on the mock, which has no voice.
+   */
+  speakAudio?(text: string, signal?: AbortSignal): Promise<Blob>;
   /** Saves some of the values in `ServerPrefs`. Rejects with a message safe to show. */
   updateSettings(patch: SettingsPatch): Promise<void>;
   health(): Promise<Health>;

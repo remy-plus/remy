@@ -193,44 +193,197 @@ export function speakable(answer: string): string[] {
 }
 
 // ---- Speaking ----
-export const canSpeak = () =>
+// Remy's own voice comes from the server (POST /api/voice/speak, Fish Audio): one short piece of text in,
+// one audio file out, so the key never reaches the browser. Chunks play in order, the next one is fetched
+// while the current one plays. With no voice key (503), no credit (402), a network error or a browser that
+// blocks audio, the rest of the reply is read by the browser's own voice instead.
+
+/** Fetches audio for one piece of text. Rejects when the server cannot make it. */
+export type AudioSource = (text: string, signal: AbortSignal) => Promise<Blob>;
+
+let source: AudioSource | null = null;
+/** After the server says it has no voice (no key, no credit), it is not asked again for this long. */
+export const VOICE_BACKOFF_MS = 60_000;
+let silentUntil = 0;
+
+/** Where Remy's voice comes from (the connected server), or null for the browser's voice only. */
+export const bindVoiceSource = (s: AudioSource | null) => {
+  source = s;
+  silentUntil = 0;
+};
+
+const browserVoice = () =>
   typeof window !== 'undefined' &&
   'speechSynthesis' in window &&
   typeof SpeechSynthesisUtterance !== 'undefined';
 
-/** Speaks `chunks` one after another. `onDone` fires once, when they end or are cancelled. */
-export function speakChunks(chunks: string[], onDone: () => void): () => void {
-  if (!canSpeak() || chunks.length === 0) {
+export const canSpeak = () => source !== null || browserVoice();
+
+/** The small part of an audio element the player uses. */
+export interface PlayerLike {
+  play(): Promise<void>;
+  pause(): void;
+  onended: ((e: Event) => void) | null;
+  onerror: ((e: Event | string) => void) | null;
+}
+
+/** What `speakWith` needs from the page. The defaults are the real ones; tests pass fakes. */
+export interface SpeakEnv {
+  /** Audio for a piece of text; undefined when there is no server voice. */
+  fetchAudio?: AudioSource | undefined;
+  makeUrl?(blob: Blob): string;
+  revokeUrl?(url: string): void;
+  makePlayer?(url: string): PlayerLike;
+  /** The browser's voice; undefined when it has none. */
+  synth?: SpeechSynthesis | undefined;
+  lang?: string;
+}
+
+const realEnv = (): SpeakEnv => {
+  const fetchAudio: AudioSource | undefined = source
+    ? (text, signal) => {
+        if (Date.now() < silentUntil) return Promise.reject(new Error('voice is off for now'));
+        return (source as AudioSource)(text, signal).catch((e: unknown) => {
+          const status = (e as { status?: number } | null)?.status;
+          if (status === 503 || status === 402) silentUntil = Date.now() + VOICE_BACKOFF_MS;
+          throw e;
+        });
+      }
+    : undefined;
+  return {
+    fetchAudio,
+    makeUrl: (b) => URL.createObjectURL(b),
+    revokeUrl: (u) => URL.revokeObjectURL(u),
+    makePlayer: (url) => new Audio(url),
+    synth: browserVoice() ? window.speechSynthesis : undefined,
+    lang: typeof navigator === 'undefined' ? 'en-GB' : navigator.language || 'en-GB',
+  };
+};
+
+/**
+ * Speaks `chunks` in order and returns a function that stops it. `onDone` fires once, when they end or
+ * are cancelled. With no server voice (or when it fails) the browser's voice takes over from the chunk
+ * that could not be played.
+ */
+export function speakWith(env: SpeakEnv, chunks: string[], onDone: () => void): () => void {
+  const { fetchAudio, synth } = env;
+  if (chunks.length === 0 || (!fetchAudio && !synth)) {
     onDone();
     return () => {};
   }
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  let left = chunks.length;
+  let stopped = false;
   let finished = false;
+  let browserSpeaking = false;
+  let stopPlayer: (() => void) | null = null;
+  const abort = new AbortController();
+  const urls = new Set<string>();
   const finish = () => {
     if (finished) return;
     finished = true;
+    for (const u of urls) env.revokeUrl?.(u);
+    urls.clear();
     onDone();
   };
-  for (const c of chunks) {
-    const u = new SpeechSynthesisUtterance(c);
-    u.lang = navigator.language || 'en-GB';
-    u.onend = () => {
-      left -= 1;
-      if (left <= 0) finish();
-    };
-    u.onerror = finish;
-    synth.speak(u);
-  }
-  return () => {
-    try {
-      synth.cancel();
-    } finally {
-      finish();
+
+  /** The browser's voice reads chunks `from` to the end. */
+  const speakInBrowser = (from: number) => {
+    if (!synth) return finish();
+    browserSpeaking = true;
+    synth.cancel();
+    let left = chunks.length - from;
+    for (const c of chunks.slice(from)) {
+      const u = new SpeechSynthesisUtterance(c);
+      u.lang = env.lang ?? 'en-GB';
+      u.onend = () => {
+        left -= 1;
+        if (left <= 0) finish();
+      };
+      u.onerror = finish;
+      synth.speak(u);
     }
   };
+
+  // One request per chunk, each started when the one before it has arrived.
+  const audio: Promise<string | null>[] = [];
+  const fetchChunk = (i: number): Promise<string | null> => {
+    if (i >= chunks.length || !fetchAudio) return Promise.resolve(null);
+    audio[i] ??= fetchAudio(chunks[i] as string, abort.signal).then(
+      (blob) => {
+        if (stopped) return null;
+        const url = env.makeUrl?.(blob) ?? null;
+        if (url) urls.add(url);
+        return url;
+      },
+      () => null,
+    );
+    return audio[i] as Promise<string | null>;
+  };
+
+  /** Plays one file to its end. Resolves false when it cannot (blocked, broken) or when stopped. */
+  const play = (url: string) =>
+    new Promise<boolean>((resolve) => {
+      let player: PlayerLike;
+      try {
+        player = (env.makePlayer as (u: string) => PlayerLike)(url);
+      } catch {
+        return resolve(false);
+      }
+      const end = (ok: boolean) => {
+        stopPlayer = null;
+        player.onended = player.onerror = null;
+        resolve(ok);
+      };
+      stopPlayer = () => {
+        try {
+          player.pause();
+        } catch {
+          // already stopped
+        }
+        end(false);
+      };
+      player.onended = () => end(true);
+      player.onerror = () => end(false);
+      try {
+        player.play().catch(() => end(false)); // autoplay blocked or no decoder
+      } catch {
+        end(false);
+      }
+    });
+
+  void (async () => {
+    if (!fetchAudio || !env.makePlayer) return speakInBrowser(0);
+    let pending = fetchChunk(0);
+    for (let i = 0; i < chunks.length; i++) {
+      const url = await pending;
+      if (stopped) return;
+      if (!url) return speakInBrowser(i);
+      pending = fetchChunk(i + 1); // the next one arrives while this one plays
+      const played = await play(url);
+      if (stopped) return;
+      if (!played) return speakInBrowser(i);
+    }
+    finish();
+  })();
+
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    abort.abort();
+    stopPlayer?.();
+    if (browserSpeaking) {
+      try {
+        synth?.cancel();
+      } catch {
+        // nothing to cancel
+      }
+    }
+    finish();
+  };
 }
+
+/** Speaks `chunks` one after another. `onDone` fires once, when they end or are cancelled. */
+export const speakChunks = (chunks: string[], onDone: () => void): (() => void) =>
+  speakWith(realEnv(), chunks, onDone);
 
 // ---- Claiming the talk button ----
 // The full-screen talk window (PushToTalk) handles `remy:voice` and held Space only while no composer

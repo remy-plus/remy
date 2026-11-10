@@ -347,6 +347,7 @@ describe('settings copied to and from the server', () => {
     quiet: true,
     quietHours: { from: '22:00', to: '06:30' },
     notifications: { approvals: true, finished: false, noticed: true, reviewAt: '08:15' },
+    voice: { id: 'abcdef0123456789' },
     appearance: 'dark',
   };
 

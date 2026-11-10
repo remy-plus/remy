@@ -1,4 +1,5 @@
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useMemo } from 'react';
+import { bindVoiceSource } from '../lib/voice.ts';
 import { createHttpApi } from './http.ts';
 import { createMockApi } from './mock.ts';
 import type { RemyApi } from './types.ts';
@@ -35,6 +36,12 @@ const ApiContext = createContext<RemyApi | null>(null);
 
 export function ApiProvider({ api, children }: { api?: RemyApi; children: ReactNode }) {
   const value = useMemo(() => api ?? chooseApi(), [api]);
+  // Spoken replies come from the connected server; the mock has none and uses the browser's voice.
+  useEffect(() => {
+    const speak = value.speakAudio?.bind(value);
+    bindVoiceSource(speak ? (text, signal) => speak(text, signal) : null);
+    return () => bindVoiceSource(null);
+  }, [value]);
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>;
 }
 
