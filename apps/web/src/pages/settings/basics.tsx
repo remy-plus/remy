@@ -1,5 +1,4 @@
-// Trust, budget and appearance. Trust shows a row from each of the other small sections too, as the
-// frame does, so the same rows are exported and reused. All values live in the settings store.
+// Trust, spending and the small rows other sections reuse. All values live in the settings store.
 import { useState } from 'react';
 import type { TrustLevel } from '../../api/index.tsx';
 import { useSetting } from '../../settings.ts';
@@ -29,7 +28,7 @@ export function TrustRow() {
   const [trust, setTrust] = useSetting('trust');
   return (
     <Row
-      title="How much Remy does on its own"
+      title="Choose a level"
       help="Sending as you and spending money always wait for you, at every level."
     >
       <Segmented label="Trust level" value={trust} options={TRUST_OPTIONS} onChange={setTrust} />
@@ -63,8 +62,8 @@ export function MonthlyBudgetRow({ data }: SectionProps) {
           onChange={(v) => setCap(v / rate)}
         />
         {data && (
-          <p className="m-0 font-mono text-[12px] text-muted">
-            {money(symbol, data.budget.usedMonth * rate)} used · {data.budget.daysLeft} days left
+          <p className="m-0 text-[13px] text-muted">
+            {money(symbol, data.budget.usedMonth * rate)} used, {data.budget.daysLeft} days left
           </p>
         )}
       </div>
@@ -143,7 +142,7 @@ export function CurrencyRow() {
               setCodeText(v);
               if (validCode(v)) setCode(v);
             }}
-            className="h-[38px] w-[88px] rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
+            className="h-[38px] w-[88px] rounded-md border border-edge-hi bg-surface px-3 text-[13px] text-text outline-none focus:border-text"
           />
         </label>
         <label className="flex flex-col gap-1 text-[13px] text-muted">
@@ -160,7 +159,7 @@ export function CurrencyRow() {
               const n = Number.parseFloat(e.target.value);
               if (Number.isFinite(n) && n > 0) setRate(n);
             }}
-            className="h-[38px] w-[120px] rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text outline-none focus:border-text"
+            className="h-[38px] w-[120px] rounded-md border border-edge-hi bg-surface px-3 text-[13px] text-text outline-none focus:border-text"
           />
         </label>
       </div>
@@ -208,34 +207,8 @@ export function QuietRow() {
   );
 }
 
-export function AppearanceRow() {
-  return (
-    <Row title="Appearance" help="Dark is the default.">
-      <Segmented
-        label="Appearance"
-        value="dark"
-        options={[
-          { value: 'dark', label: 'Dark' },
-          { value: 'light', label: 'Light', disabled: true },
-        ]}
-        onChange={() => undefined}
-      />
-      <p className="mt-3 mb-0 text-[13px] text-muted">Light: not available yet.</p>
-    </Row>
-  );
-}
-
-export function Trust(props: SectionProps) {
-  return (
-    <>
-      <TrustRow />
-      <MonthlyBudgetRow {...props} />
-      <CurrencyRow />
-      <RememberRow />
-      <QuietRow />
-      <AppearanceRow />
-    </>
-  );
+export function Trust() {
+  return <TrustRow />;
 }
 
 export function Budget(props: SectionProps) {
@@ -255,15 +228,6 @@ export function Budget(props: SectionProps) {
             : 'Remy stays on the everyday model, even for hard tasks.'}
         </p>
       </Row>
-    </>
-  );
-}
-
-export function Appearance() {
-  return (
-    <>
-      <AppearanceRow />
-      <QuietRow />
     </>
   );
 }

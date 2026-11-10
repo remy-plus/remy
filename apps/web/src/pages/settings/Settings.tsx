@@ -1,19 +1,19 @@
 import { type ComponentType, useCallback, useEffect, useState } from 'react';
 import { type SettingsData, useApi } from '../../api/index.tsx';
-import { Appearance, Budget, Trust } from './basics.tsx';
+import { Budget, Trust } from './basics.tsx';
+import { DockSection } from './dock.tsx';
 import { Memory } from './memory.tsx';
 import { Model } from './model.tsx';
 import { Notifications } from './notifications.tsx';
-import { SECTIONS, type SectionId, type SectionProps } from './sections.ts';
-import { About, Server } from './server.tsx';
+import { SECTION_ALIASES, SECTIONS, type SectionId, type SectionProps } from './sections.ts';
+import { Computer } from './server.tsx';
 
 const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
+  dock: DockSection,
   trust: Trust,
   budget: Budget,
-  appearance: Appearance,
   memory: Memory,
-  server: Server,
-  about: About,
+  computer: Computer,
   model: Model,
   notifications: Notifications,
 };
@@ -21,7 +21,7 @@ const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
 const isSection = (s: string): s is SectionId => SECTIONS.some((x) => x.id === s);
 
 /** Settings: a list of sections on the left, the chosen one on the right. On a phone the list goes on top. */
-export function Settings({ section = 'trust' }: { section?: string }) {
+export function Settings({ section = 'dock' }: { section?: string }) {
   const api = useApi();
   const [data, setData] = useState<SettingsData | null>(null);
   const [n, setN] = useState(0);
@@ -39,7 +39,8 @@ export function Settings({ section = 'trust' }: { section?: string }) {
     };
   }, [api, n]);
 
-  const current = isSection(section) ? section : null;
+  const wanted = SECTION_ALIASES[section] ?? section;
+  const current = isSection(wanted) ? wanted : null;
   const View = current ? VIEWS[current] : undefined;
   const label = SECTIONS.find((s) => s.id === current)?.label;
 

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useApi } from '../../api/index.tsx';
 import { buttonQuiet } from '../../components/ui.ts';
 import { type SettingKey, useSetting } from '../../settings.ts';
+import { QuietRow } from './basics.tsx';
 import { Row, Toggle } from './controls.tsx';
 
 const time =
-  'h-[38px] w-[130px] rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text outline-none focus-visible:border-text [color-scheme:dark]';
+  'h-[38px] w-[130px] rounded-md border border-edge-hi bg-surface px-3 text-[14px] text-text outline-none focus-visible:border-text [color-scheme:dark]';
 
 function Time({
   name,
@@ -77,7 +78,7 @@ export function Notifications() {
       <Row title="Overnight review" help="A summary of what ran while you were away.">
         <div className="flex flex-wrap items-center gap-4">
           <Time name="notify.review" text="Send it at" label="Overnight review: send it at" />
-          <span className="text-[14px] text-muted">every day · after quiet hours</span>
+          <span className="text-[14px] text-muted">every day, after quiet hours</span>
         </div>
       </Row>
       <Row title="Quiet hours" help="Only approvals get through.">
@@ -87,6 +88,7 @@ export function Notifications() {
           <span className="text-[14px] text-muted">turns quiet mode on and off by itself</span>
         </div>
       </Row>
+      <QuietRow />
       <div className="flex flex-wrap items-center gap-4 border-t border-edge pt-5">
         <button type="button" className={buttonQuiet} onClick={test}>
           Send a test notification
