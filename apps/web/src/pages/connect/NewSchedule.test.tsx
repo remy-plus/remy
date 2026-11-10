@@ -81,7 +81,9 @@ describe('New schedule', () => {
     await screen.findByRole('radiogroup', { name: 'How often' });
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: 'New schedule' })).toBeTruthy();
-    expect(screen.getByText(/How much Remy does on its own/).textContent).toMatch(/Handle routine things/);
+    expect(screen.getByText(/How much Remy does on its own/).textContent).toMatch(
+      /Handle routine things/,
+    );
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
   });
 });
