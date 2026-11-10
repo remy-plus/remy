@@ -56,7 +56,7 @@ export function DotField({ className = '' }: { className?: string }) {
     const canvas = ref.current;
     if (!canvas) return;
     const field = createDotField(canvas);
-    if (field) canvas.style.opacity = '0.5';
+    if (field) canvas.style.opacity = '0.3';
     return () => field?.destroy();
   }, []);
   return (
