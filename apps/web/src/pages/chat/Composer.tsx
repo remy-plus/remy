@@ -30,7 +30,7 @@ function Icon({
   );
 }
 
-const MAX = 152; // six lines of 24 px plus the textarea's own padding
+const MAX = 144; // six lines of 24 px. The textarea has no padding of its own, so a full box scrolls on whole lines.
 
 /**
  * The one input: a single line that grows as the text does, up to six. Enter sends, Shift+Enter starts a new line. While a job runs, `onStop` shows a
@@ -109,18 +109,17 @@ export function Composer({
     onVoice?.({ state: listening ? 'listening' : speaking ? 'working' : null, level });
   }, [listening, speaking, level, onVoice]);
 
-  // The box regrows whenever the text, the placeholder or its width changes (a Stop button appearing
-  // narrows it), so one line never shows as two.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: placeholder changes the measured line
-  useEffect(() => {
+  // One observer for the life of the box: it regrows when the width changes (a Stop button appearing
+  // narrows it), so one line never shows as two. Typing calls `grow` directly.
+  const grow = useCallback(() => {
     const el = area.current;
     if (!el) return;
-    const grow = () => {
-      el.style.height = 'auto';
-      el.style.height = `${Math.min(el.scrollHeight, MAX)}px`;
-    };
-    grow();
-    if (typeof ResizeObserver === 'undefined') return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, MAX)}px`;
+  }, []);
+  useEffect(() => {
+    const el = area.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
     let width = el.clientWidth;
     const ro = new ResizeObserver(() => {
       if (el.clientWidth !== width) {
@@ -130,7 +129,9 @@ export function Composer({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [value, placeholder]);
+  }, [grow]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: value and placeholder change the measured text
+  useEffect(grow, [value, placeholder, grow]);
 
   useEffect(() => {
     if (autoFocus) area.current?.focus();
@@ -170,7 +171,7 @@ export function Composer({
           onKeyDown={onKey}
           placeholder={placeholder}
           style={{ outline: 'none' }}
-          className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-h-[152px] min-w-0 flex-1 resize-none overflow-x-hidden border-0 bg-transparent px-0 py-1 text-[16px] leading-6 text-text outline-none placeholder:text-muted sm:text-[15px]"
+          className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-h-[144px] min-w-0 flex-1 resize-none overflow-x-hidden border-0 bg-transparent p-0 my-1 text-[16px] leading-6 text-text outline-none placeholder:text-muted sm:text-[15px]"
         />
         <button
           type="button"

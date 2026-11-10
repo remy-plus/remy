@@ -435,10 +435,11 @@ describe('chats, http adapter', () => {
 });
 
 describe('chats, mock adapter', () => {
-  it('has two sample chats, newest first', async () => {
+  it('has three sample chats, newest first', async () => {
     const chats = await createMockApi().listChats();
-    expect(chats.map((c) => c.id)).toEqual(['chat_week', 'chat_flights']);
-    expect(chats[0]).toMatchObject({ state: 'resting', title: 'Plan my week' });
+    expect(chats.map((c) => c.id)).toEqual(['chat_dana', 'chat_week', 'chat_flights']);
+    expect(chats[0]).toMatchObject({ state: 'waiting', title: 'Correction to Dana' });
+    expect(chats[1]).toMatchObject({ state: 'resting', title: 'Plan my week' });
     expect((await createMockApi().getChat('chat_week')).turns).toHaveLength(2);
   });
 

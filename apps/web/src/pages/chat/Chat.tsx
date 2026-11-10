@@ -8,7 +8,6 @@ import { Composer } from './Composer.tsx';
 import { Turn } from './Feed.tsx';
 
 const POLL_MS = 2000;
-const DONE_MS = 2000;
 
 const SUGGESTIONS = [
   'Summarise the files in my Documents folder',
@@ -47,7 +46,7 @@ function EmptyChat() {
     }
   };
   return (
-    <div className="page-in mx-auto flex min-h-[calc(100dvh-80px)] w-full max-w-[640px] flex-col items-center justify-center px-4 pb-16 text-center">
+    <div className="page-in mx-auto flex min-h-[calc(100dvh-80px)] w-full max-w-[560px] flex-col items-center justify-center px-4 pb-16 text-center">
       <MindGlyph state={voice.state ?? 'rest'} level={voice.level} size={128} />
       <h1 className="m-0 mt-4 text-[28px] leading-[1.2] font-medium tracking-tight">
         {greeting()}
@@ -88,7 +87,6 @@ function OpenChat({ id }: { id: string }) {
   const [text, setText] = useState('');
   const [queued, setQueued] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [justDone, setJustDone] = useState(false);
   const [voice, setVoice] = useState<VoiceNow>(IDLE);
   const end = useRef<HTMLDivElement>(null);
 
@@ -114,18 +112,6 @@ function OpenChat({ id }: { id: string }) {
     const t = setInterval(() => void load(), POLL_MS);
     return () => clearInterval(t);
   }, [busy, load]);
-
-  // Just finished: the mind shows "done" for about two seconds, then rests.
-  const was = useRef(false);
-  useEffect(() => {
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (was.current && !busy && chat) {
-      setJustDone(true);
-      t = setTimeout(() => setJustDone(false), DONE_MS);
-    }
-    was.current = busy;
-    return () => clearTimeout(t);
-  }, [busy, chat]);
 
   const turnCount = chat?.turns.length ?? 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when a turn is added
@@ -187,7 +173,6 @@ function OpenChat({ id }: { id: string }) {
     }
   };
 
-  const resting: MindState = voice.state ?? (justDone ? 'done' : 'rest');
   const last = chat?.turns.at(-1);
   const spoken =
     last?.state === 'done' && last.answer ? { id: last.taskId, text: last.answer } : undefined;
@@ -217,14 +202,7 @@ function OpenChat({ id }: { id: string }) {
       <div className="mx-auto w-full max-w-[720px] flex-1 px-4 pt-4 pb-8">
         <h1 className="sr-only">{chat.title}</h1>
         {chat.turns.map((t, i) => (
-          <Turn
-            key={t.taskId}
-            turn={t}
-            index={i}
-            mind={i === chat.turns.length - 1 ? resting : 'rest'}
-            onChanged={load}
-            onRetry={(p) => void post(p)}
-          />
+          <Turn key={t.taskId} turn={t} index={i} onChanged={load} onRetry={(p) => void post(p)} />
         ))}
         <div ref={end} />
       </div>
@@ -248,7 +226,7 @@ function OpenChat({ id }: { id: string }) {
             {...(spoken && { answer: spoken })}
             {...(busy && { onStop: stop })}
             {...(queued && { hint: `Next, when I'm done: ${queued}` })}
-            placeholder={busy ? 'Add something for next' : 'Ask Remy to do anything'}
+            placeholder={busy ? 'Add a follow-up' : 'Ask Remy to do anything'}
           />
         </div>
       </div>
