@@ -1,23 +1,17 @@
-// The REMY wordmark (figlet Cosmike), copied from branding/logo/remy-wordmark.txt.
-const LINES = [
-  ':::::::..    .,::::::    .        :     .-:.     ::-.',
-  ";;;;``;;;;   ;;;;''''    ;;,.    ;;;     ';;.   ;;;;'",
-  " [[[,/[[['    [[cccc     [[[[, ,[[[[,      '[[,[[['",
-  ' $$$$$$c      $$""""     $$$$$$$$"$$$        c$$"',
-  ' 888b "88bo,  888oo,__   888 Y88" 888o     ,8P"`',
-  ' MMMM   "W"   """"YUMMM  MMM  M\'  "MMM    mM"',
-];
+// The REMY wordmark: the outlined SVG from branding/logo, so it stays crisp at any size. `size` keeps
+// its old meaning (the font size the ASCII art was set at), which sets the height: six rows of 1.1.
+import wordmark from '../assets/brand/remy-wordmark-on-dark.svg';
 
-/** The wordmark. `size` is the font size: px, or any CSS length; the header uses the default. */
+/** The wordmark. `size` is px or any CSS length; the header uses the default. */
 export function Logo({ size = 5.6 }: { size?: number | string }) {
+  const height = typeof size === 'number' ? `${size * 6.6}px` : `calc(${size} * 6.6)`;
   return (
-    <pre
-      role="img"
-      aria-label="Remy"
-      className="m-0 select-none bg-linear-to-b from-text to-stone bg-clip-text font-mono font-bold text-transparent"
-      style={{ fontSize: typeof size === 'number' ? `${size}px` : size, lineHeight: 1.1 }}
-    >
-      {LINES.join('\n')}
-    </pre>
+    <img
+      src={wordmark}
+      alt="Remy"
+      draggable={false}
+      className="block w-auto select-none"
+      style={{ height }}
+    />
   );
 }
