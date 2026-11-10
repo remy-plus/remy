@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SkillItem } from '../../api/index.tsx';
+import { BrainTabs } from '../../components/BrainTabs.tsx';
 import { Eyebrow, Loading, mono, Notice, primary, quiet, Unavailable, useLoad } from './ui.tsx';
 
 const TAG: Record<SkillItem['source'], string> = {
@@ -30,6 +31,7 @@ export function Skills() {
   return (
     <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">
       <div className="min-w-0 border-b border-edge px-5 py-8 sm:px-8 lg:border-r lg:border-b-0 lg:pr-8 lg:pl-14">
+        <BrainTabs current="skills" />
         <h1 className="m-0 text-[30px] font-normal leading-tight">Skills</h1>
         <p className="mt-3 mb-6 text-base text-muted">
           How you like things done, saved so Remy does them the same way every time.
