@@ -24,8 +24,9 @@ describe('Activity', () => {
   it('links each row to its job and uses plain words', async () => {
     show();
     await screen.findByRole('region', { name: 'Earlier' });
+    const shortcuts = screen.getByRole('navigation', { name: 'Shortcuts' });
     for (const a of screen.getAllByRole('link'))
-      expect(a.getAttribute('href')).toMatch(/^#\/tasks\/[^/]+$/);
+      if (!shortcuts.contains(a)) expect(a.getAttribute('href')).toMatch(/^#\/tasks\/[^/]+$/);
     const all = document.body.textContent ?? '';
     expect(all).not.toMatch(/\d{1,2}:\d{2}:\d{2}/);
     expect(all).not.toMatch(/waiting_approval|succeeded|cancelled/);

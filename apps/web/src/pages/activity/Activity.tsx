@@ -44,6 +44,26 @@ export function Activity() {
   return (
     <div className="mx-auto max-w-[760px] px-5 pt-8 pb-16 sm:px-8">
       <h1 className="m-0 text-[32px] font-medium tracking-tight">Activity</h1>
+      <nav aria-label="Shortcuts" className="mt-6 mb-8 grid gap-3 sm:grid-cols-2">
+        <a
+          href="#/review"
+          className="rounded-[14px] border border-edge bg-surface px-5 py-4 text-text no-underline hover:border-edge-hi"
+        >
+          <span className="block text-[16px] font-medium">Morning summary</span>
+          <span className="mt-1 block text-[14px] text-muted">
+            What Remy finished overnight, and what needs a look from you.
+          </span>
+        </a>
+        <a
+          href="#/schedules"
+          className="rounded-[14px] border border-edge bg-surface px-5 py-4 text-text no-underline hover:border-edge-hi"
+        >
+          <span className="block text-[16px] font-medium">Scheduled jobs</span>
+          <span className="mt-1 block text-[14px] text-muted">
+            Things Remy does on its own, at the times you set.
+          </span>
+        </a>
+      </nav>
       <p className="mt-2 mb-8 text-[16px] text-muted">What Remy is doing, and what it has done.</p>
       {error && (
         <p role="alert" className="text-[14px] text-muted">
