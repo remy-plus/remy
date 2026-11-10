@@ -1,16 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { supported } from '../lib/ascii.ts';
-import { type MindState, mindCell, mindLabel } from '../lib/mind.ts';
+import {
+  blendParams,
+  ease,
+  type MindParams,
+  type MindState,
+  mindCell,
+  mindCellWith,
+  mindLabel,
+  mindParams,
+} from '../lib/mind.ts';
 
 const PAPER = '#edebe6';
 const ACCENT = '#a8c49a';
-const COLS = 15;
 const FONT = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+const FRAME_MS = 1000 / 30;
+const BLEND_S = 0.4;
 
-/** A fixed ASCII cluster for one state, used when the canvas cannot or should not animate. */
+/** A fixed ASCII sphere for one state, used when the canvas cannot or should not animate. */
 function staticCluster(state: MindState): string {
-  const cols = 13;
-  const rows = 7;
+  const cols = 23;
+  const rows = 12;
   // `done` shows its settled look, `waiting` shows the cursor lit.
   const t = state === 'done' ? 5 : state === 'waiting' ? 0 : 1.3;
   const lines: string[] = [];
@@ -23,8 +33,9 @@ function staticCluster(state: MindState): string {
 }
 
 /**
- * Remy's small living mind: a round ASCII cluster that shows what Remy is doing. Paper glyphs; the accent
- * is used only for the waiting cursor and the done flash. A static `<pre>` when motion is off or unsupported.
+ * Remy's living mind: a shaded ASCII sphere that shows what Remy is doing. Paper glyphs; the accent is
+ * used only for the waiting cursor and the done wave. States blend over about 400 ms. Capped at 30 fps,
+ * paused off screen and in hidden tabs, and a static `<pre>` when motion is off or unsupported.
  */
 export function MindGlyph({
   state,
@@ -39,13 +50,28 @@ export function MindGlyph({
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [live, setLive] = useState(supported);
-  const current = useRef({ state, level, since: performance.now() / 1000 });
+  const now0 = performance.now() / 1000;
+  const current = useRef({
+    state,
+    level,
+    since: now0,
+    // The parameters at the moment of the last change, blended toward the new state.
+    from: mindParams(state, 0, level) as MindParams,
+    changed: now0 - BLEND_S,
+    last: mindParams(state, 0, level) as MindParams,
+    phase: 0,
+    lastT: now0,
+  });
   current.current.level = level;
 
-  // The state clock restarts on every change.
   useEffect(() => {
-    current.current.state = state;
-    current.current.since = performance.now() / 1000;
+    const s = current.current;
+    if (s.state === state) return;
+    const now = performance.now() / 1000;
+    s.from = { ...s.last };
+    s.changed = now;
+    s.state = state;
+    s.since = now;
   }, [state]);
 
   useEffect(() => {
@@ -56,10 +82,11 @@ export function MindGlyph({
       setLive(false);
       return;
     }
-    const cw = size / COLS;
+    const cols = Math.max(15, Math.min(35, Math.round(size / 6.5))) | 1;
+    const cw = size / cols;
     const fs = cw / 0.6;
     const rh = fs * 1.1;
-    const rows = Math.max(1, Math.floor(size / rh));
+    const rows = Math.max(1, Math.floor(size / rh)) | 1;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(size * dpr);
     canvas.height = Math.round(size * dpr);
@@ -67,34 +94,60 @@ export function MindGlyph({
     ctx.font = `700 ${fs}px ${FONT}`;
     ctx.textBaseline = 'alphabetic';
     const yOff = (size - rows * rh) / 2;
+    // Cell positions, computed once.
+    const xs = Array.from({ length: cols }, (_, c) => c * cw);
+    const ys = Array.from({ length: rows }, (_, r) => yOff + (r + 0.8) * rh);
 
-    const draw = (now: number) => {
+    const draw = (ms: number) => {
       const s = current.current;
-      const t = now / 1000 - s.since;
+      const now = ms / 1000;
+      const t = now - s.since;
+      const k = ease((now - s.changed) / BLEND_S);
+      const target = mindParams(s.state, t, s.level);
+      const p = k >= 1 ? target : blendParams(s.from, target, k);
+      // The texture turns by the blended speed, so a state change never jumps it.
+      s.phase += p.spin * Math.min(0.1, Math.max(0, now - s.lastT));
+      s.lastT = now;
+      p.phase = s.phase;
+      s.last = p;
       ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = PAPER;
+      let alpha = -1;
+      let accent = false;
       for (let r = 0; r < rows; r++)
-        for (let c = 0; c < COLS; c++) {
-          const cell = mindCell(s.state, t, c, r, COLS, rows, s.level);
+        for (let c = 0; c < cols; c++) {
+          const cell = mindCellWith(p, now, c, r, cols, rows);
           if (cell.ch === ' ') continue;
-          ctx.fillStyle = cell.accent ? ACCENT : PAPER;
-          ctx.globalAlpha = cell.accent ? 1 : 0.25 + 0.75 * cell.light;
-          ctx.fillText(cell.ch, c * cw, yOff + (r + 0.8) * rh);
+          const a = cell.accent ? 1 : Math.round((0.22 + 0.78 * cell.light) * 40) / 40;
+          if (a !== alpha) {
+            ctx.globalAlpha = a;
+            alpha = a;
+          }
+          if (cell.accent !== accent) {
+            ctx.fillStyle = cell.accent ? ACCENT : PAPER;
+            accent = cell.accent;
+          }
+          ctx.fillText(cell.ch, xs[c] ?? 0, ys[r] ?? 0);
         }
       ctx.globalAlpha = 1;
     };
 
     let raf = 0;
-    let visible = true;
+    let lastDraw = 0;
     const tick = (ms: number) => {
       raf = requestAnimationFrame(tick);
+      if (ms - lastDraw < FRAME_MS - 1) return;
+      lastDraw = ms;
       draw(ms);
     };
+    let visible = true;
     const run = () => {
       if (!raf && visible && !document.hidden) raf = requestAnimationFrame(tick);
     };
     const stop = () => {
       cancelAnimationFrame(raf);
       raf = 0;
+      current.current.lastT = performance.now() / 1000;
     };
     const io = new IntersectionObserver(([e]) => {
       visible = e?.isIntersecting ?? false;
@@ -125,7 +178,7 @@ export function MindGlyph({
         <pre
           aria-hidden="true"
           className="m-0 flex h-full w-full items-center justify-center font-mono font-bold leading-[1.1] text-[#edebe6]"
-          style={{ fontSize: size / 13 }}
+          style={{ fontSize: size / 24 }}
         >
           {staticCluster(state)}
         </pre>
