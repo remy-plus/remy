@@ -48,7 +48,7 @@ describe('Schedules', () => {
     open();
     fireEvent.click(await screen.findByRole('button', { name: 'Run now: Rename invoices' }));
     expect(await screen.findByText('Started Rename invoices.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Open the task' }).getAttribute('href')).toMatch(
+    expect(screen.getByRole('link', { name: 'Open the job' }).getAttribute('href')).toMatch(
       /^#\/tasks\/task_mock_run/,
     );
   });

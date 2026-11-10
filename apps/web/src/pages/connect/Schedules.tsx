@@ -69,7 +69,7 @@ export function Schedules() {
             <p className="mt-3 mb-0 rounded-[10px] border border-edge bg-surface px-4 py-3 text-[14px] leading-relaxed text-muted">
               {data.away}{' '}
               <a href="#/review" className="text-text underline">
-                Open the overnight review
+                Take a look at last night
               </a>
               .
             </p>
@@ -121,7 +121,7 @@ export function Schedules() {
           {said?.text}{' '}
           {said?.taskId && (
             <a className="text-text underline" href={`#/tasks/${said.taskId}`}>
-              Open the task
+              Open the job
             </a>
           )}
         </Notice>
