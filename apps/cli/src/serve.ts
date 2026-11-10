@@ -119,14 +119,15 @@ const send = (
   body?: unknown,
   headers: Record<string, string> = {},
 ) => {
-  const text = body === undefined ? undefined : JSON.stringify(body);
+  const raw = Buffer.isBuffer(body); // an image: the mount set its content-type
+  const text = body === undefined || raw ? undefined : JSON.stringify(body);
   res.writeHead(status, {
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
     ...(text !== undefined && { 'content-type': 'application/json; charset=utf-8' }),
     ...headers,
   });
-  res.end(text);
+  res.end(raw ? body : text);
 };
 
 const TASK_ID = /^[A-Za-z0-9_.:-]{1,100}$/;
@@ -415,7 +416,12 @@ export function createServe(deps: ServeDeps) {
       }
       for (const mount of deps.mounts ?? []) {
         const m = await mount({ req, method, url, parts, startTask: beginTask });
-        if (m) return reply(m.status, m.body && redactDeep(m.body, redact), m.headers);
+        if (m)
+          return reply(
+            m.status,
+            m.body && !Buffer.isBuffer(m.body) ? redactDeep(m.body, redact) : m.body,
+            m.headers,
+          );
       }
       const [head, id, action] = parts;
       if (head !== 'tasks' || parts.length > 3) return reply(404);

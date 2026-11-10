@@ -166,6 +166,7 @@ import { listenServe } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { createBrainMount } from './serve-brain.ts';
+import { createBrowserMount } from './serve-browser.ts';
 import { chatRoutes } from './serve-chats.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { homeRoutes } from './serve-home.ts';
@@ -2278,6 +2279,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   ),
               }),
               createSkillsMount({ skills: skills() }),
+              createBrowserMount({ browser: () => browser, redact }),
               createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
               createSchedulesMount({
                 schedules: openSchedules(home),
