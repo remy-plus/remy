@@ -17,6 +17,7 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import {
   canStandingAllow,
+  type ConversationTurn,
   type EventStore,
   fold,
   isHelperTask,
@@ -41,10 +42,11 @@ import { createLockout, type Lockout } from './webhook-lockout.ts';
 import { BODY_MAX_BYTES } from './webhook-payload.ts';
 import { sha256Hex } from './webhook-token.ts';
 
+export const PROMPT_MAX_CHARS = 20_000;
 export const SERVE_BODY_MAX = BODY_MAX_BYTES; // 64 KB
 export const SERVE_READ_TIMEOUT_MS = 10_000;
 export const SERVE_BLOCK_MS = 60_000;
-const PROMPT_MAX = 20_000;
+const PROMPT_MAX = PROMPT_MAX_CHARS;
 const LIST_DEFAULT = 50;
 const LIST_MAX = 200;
 
@@ -56,6 +58,12 @@ export interface ApiCtx {
   url: URL;
   /** Reads and strictly parses the JSON body (64 KB at most); a bad body is a 400. */
   body<T>(schema: z.ZodType<T>, optional?: boolean): Promise<T>;
+  /** Starts a task as POST /api/tasks does (monthly check included), with optional earlier turns. */
+  startTask(
+    prompt: string,
+    trust?: TrustLevel,
+    context?: ConversationTurn[],
+  ): Promise<{ taskId: string }>;
 }
 export interface ApiResult {
   status: number;
@@ -305,10 +313,11 @@ export function createServe(deps: ServeDeps) {
   }
 
   /** Creates a task and starts it in the background; shared by POST /api/tasks and the mounts. */
-  async function beginTask(prompt: string, trust?: TrustLevel) {
+  async function beginTask(prompt: string, trust?: TrustLevel, context?: ConversationTurn[]) {
     await deps.beforeStart?.();
     const taskId = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
-    const config = deps.config(taskId, trust);
+    const base = deps.config(taskId, trust);
+    const config = context?.length ? { ...base, context } : base;
     await store.createTask(taskId, prompt, config);
     track(taskId);
     ensureRun(taskId);
@@ -398,6 +407,7 @@ export function createServe(deps: ServeDeps) {
         parts,
         url,
         body: (schema, optional) => bodyOf(req, schema, optional),
+        startTask: beginTask,
       };
       for (const route of deps.routes ?? []) {
         const r = await route(ctx);
