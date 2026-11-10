@@ -324,6 +324,44 @@ export interface RemyApi {
   brain(): Promise<BrainData>;
   updateNote(id: string, body: string): Promise<void>;
   deleteNote(id: string): Promise<void>;
+  // Chats (`GET /api/chats` and the routes beside it).
+  listChats(): Promise<ChatSummary[]>;
+  getChat(id: string): Promise<ChatView>;
+  /** Sends a message; without `chatId` a new chat is made from it. */
+  sendMessage(text: string, chatId?: string, trust?: TrustLevel): Promise<ChatSent>;
+  renameChat(id: string, title: string): Promise<void>;
+  /** Removes the chat only; its jobs stay in Activity. */
+  deleteChat(id: string): Promise<void>;
+}
+
+// ---- Chats ----
+export type ChatState = 'working' | 'waiting' | 'resting';
+export interface ChatSummary {
+  id: string;
+  title: string;
+  /** ISO time of the last message. */
+  updatedAt: string;
+  preview: string;
+  state: ChatState;
+}
+export type ChatTurnState = 'working' | 'waiting' | 'done' | 'failed' | 'stopped';
+export interface ChatTurn {
+  taskId: string;
+  prompt: string;
+  state: ChatTurnState;
+  /** Set once the turn has finished. */
+  answer?: string;
+  /** ISO time the turn started. */
+  at: string;
+}
+export interface ChatView {
+  id: string;
+  title: string;
+  turns: ChatTurn[];
+}
+export interface ChatSent {
+  chatId: string;
+  taskId: string;
 }
 
 // ---- Connections ----
