@@ -3,9 +3,9 @@ import type { SkillItem } from '../../api/index.tsx';
 import { Eyebrow, Loading, mono, Notice, primary, quiet, Unavailable, useLoad } from './ui.tsx';
 
 const TAG: Record<SkillItem['source'], string> = {
-  yours: 'yours',
-  learned: 'learned',
-  builtin: 'built in',
+  yours: 'Yours',
+  learned: 'Learned from you',
+  builtin: 'Built in',
 };
 
 export function Skills() {
@@ -76,7 +76,9 @@ export function Skills() {
             <p
               className={`${mono} mt-3 mb-6 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-muted`}
             >
-              <span>Used {skill.used} times</span>
+              <span>
+                Used {skill.used} {skill.used === 1 ? 'time' : 'times'}
+              </span>
               {skill.lastRun && <span>Last run {skill.lastRun}</span>}
               {skill.origin && <span>{skill.origin}</span>}
               {!skill.enabled && <span className="text-text">Turned off</span>}
@@ -146,7 +148,7 @@ export function Skills() {
                 {said?.text}{' '}
                 {said?.taskId && (
                   <a className="text-text underline" href={`#/tasks/${said.taskId}`}>
-                    Open the task
+                    Open the job
                   </a>
                 )}
               </Notice>

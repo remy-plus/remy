@@ -36,7 +36,7 @@ export function validateMachine(v: {
 const RULES = [
   'Every command asks you first and is shown in full.',
   'A command is never repeated if it may already have run.',
-  'Output from the machine is treated as untrusted text, not orders.',
+  'Anything the machine sends back is read as information, never as orders.',
   'Remove the machine here and Remy loses access at once.',
 ];
 
@@ -143,7 +143,7 @@ export function AddMachine() {
     <Page
       crumb="Add a machine"
       title="Give Remy a computer."
-      lead="A server, a VPS or any machine you can reach over ssh. Remy runs commands there with your key, and asks before each one."
+      lead="A server or any computer you can reach over a secure remote connection (SSH). Remy runs commands there with your key, and asks before each one."
       aside={
         <div>
           <Eyebrow>Test result</Eyebrow>
@@ -152,7 +152,7 @@ export function AddMachine() {
             className={`mt-3 mb-8 rounded-[10px] border bg-surface px-4 py-3 text-[13px] ${test && test !== 'running' && test.ok ? 'border-signal' : 'border-edge'}`}
           >
             {test === null && <p className="m-0 text-muted">Not tested yet.</p>}
-            {test === 'running' && <p className="m-0 text-muted">Testing</p>}
+            {test === 'running' && <p className="m-0 text-muted">Testing the connection</p>}
             {test && test !== 'running' && (
               <ul className={`${mono} m-0 list-none p-0 leading-7`}>
                 {test.lines.map((l, i) => (
@@ -217,7 +217,7 @@ export function AddMachine() {
         <Field
           id={`${uid}-key`}
           label="Key"
-          hint="Remy makes a key just for this machine. You add its public half to the server. It never leaves this device."
+          hint="Remy makes a key just for this machine. You add its public part to the server. The private part never leaves this device."
         >
           <select
             id={`${uid}-key`}

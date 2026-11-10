@@ -333,7 +333,8 @@ export function Brain() {
                         >
                           <span>{n.title}</span>
                           <span className={`${mono} shrink-0 text-[12px] text-muted`}>
-                            {n.kind} · {n.linkCount}
+                            {KIND_LABEL[n.kind]} · {n.linkCount}{' '}
+                            {n.linkCount === 1 ? 'link' : 'links'}
                           </span>
                         </button>
                       </li>

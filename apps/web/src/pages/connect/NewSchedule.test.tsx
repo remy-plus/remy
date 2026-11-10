@@ -48,7 +48,7 @@ describe('New schedule', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Hourly' }));
     expect((screen.getByRole('radio', { name: 'Hourly' }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole('radio', { name: 'Weekly' }) as HTMLInputElement).checked).toBe(false);
-    expect(screen.queryByRole('textbox', { name: 'Time' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'At' })).toBeNull();
   });
 
   it('asks for the task before saving, then saves', async () => {
@@ -70,7 +70,7 @@ describe('New schedule', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'What should Remy do?' }), {
       target: { value: 'Do a thing' },
     });
-    const time = screen.getByRole('textbox', { name: 'Time' });
+    const time = screen.getByRole('textbox', { name: 'At' });
     fireEvent.change(time, { target: { value: '8pm' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save schedule' }));
     await waitFor(() => expect(time.getAttribute('aria-invalid')).toBe('true'));
@@ -81,7 +81,9 @@ describe('New schedule', () => {
     await screen.findByRole('radiogroup', { name: 'How often' });
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: 'New schedule' })).toBeTruthy();
-    expect(screen.getByText(/trust level/).textContent).toMatch(/steady/);
+    expect(screen.getByText(/How much Remy does on its own/).textContent).toMatch(
+      /Handle routine things/,
+    );
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
   });
 });
