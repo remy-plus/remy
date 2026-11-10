@@ -215,8 +215,8 @@ function Panel({
         <Eyebrow>{machine.name} · how Remy behaves</Eyebrow>
         <p className="mt-4 mb-0 text-[14px] text-muted">{machine.detail}</p>
         <p className="mt-4 mb-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] text-muted">
-          Every command asks you first and is shown in full. Anything the machine sends back is
-          read as information, never as instructions.
+          Every command asks you first and is shown in full. Anything the machine sends back is read
+          as information, never as instructions.
         </p>
         <Notice>{said}</Notice>
       </div>
