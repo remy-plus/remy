@@ -22,15 +22,17 @@ export function ago(iso: string | number | Date, now: Date = new Date()): string
     return h === 1 ? '1 hour ago' : `${h} hours ago`;
   }
   if (days === 1) return 'yesterday';
-  if (days < 7) return new Intl.DateTimeFormat('en', { weekday: 'long' }).format(t);
-  return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(t);
+  if (days < 7) return new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(t);
+  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(t);
 }
 
 /** "6:41 PM": a clock for the rare place that needs one. */
 export function clock(iso: string | number | Date): string {
-  return new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit', hour12: true }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(iso));
 }
 
 /** "Good morning", "Good afternoon" or "Good evening". */
