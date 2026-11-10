@@ -1,4 +1,5 @@
 import { countUp, createAsciiMark, createDotField } from './ascii.js';
+import { smoothScroll } from './smooth.js';
 
 const MARK = [
   ':::::::..    .,::::::    .        :     .-:.     ::-.',
@@ -15,9 +16,54 @@ const MARK = [
   const status = d.getElementById('status');
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  const root = d.documentElement;
+  // ---- Weighted scroll, and the things that answer it: the wordmark drifts slower than the page, the
+  // product scales up into place like a lid opening, a hairline shows how far you are.
+  const bar = d.querySelector('.progress');
+  const mark = d.querySelector('.hero .mark');
+  const fieldEl = d.querySelector('.hero .field');
+  const lift = [...d.querySelectorAll('[data-fx="lift"]')];
+  const ease = (t) => 1 - (1 - t) ** 3;
+  const apply = (y) => {
+    const h = innerHeight;
+    if (bar)
+      bar.style.transform = `scaleX(${Math.min(1, y / Math.max(1, d.documentElement.scrollHeight - h))})`;
+    if (mark && y < h * 1.2) {
+      mark.style.transform = `translate3d(0, ${y * 0.18}px, 0)`;
+      mark.style.opacity = String(Math.max(0, 1 - y / (h * 0.9)));
+    }
+    if (fieldEl && y < h * 1.2) fieldEl.style.transform = `translate3d(-50%, ${y * 0.32}px, 0)`;
+    for (const el of lift) {
+      const top = el.getBoundingClientRect().top;
+      const p = Math.min(1, Math.max(0, (h * 0.96 - top) / (h * 0.62)));
+      const e = ease(p);
+      el.style.transform = `translate3d(0, ${(1 - e) * 56}px, 0) scale(${0.93 + 0.07 * e})`;
+      el.style.opacity = String(0.3 + 0.7 * e);
+    }
+  };
+  if (!reduce) {
+    const engine = smoothScroll({ onFrame: apply });
+    if (engine) root.classList.add('smooth');
+    else {
+      let ticking = false;
+      addEventListener(
+        'scroll',
+        () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            apply(scrollY);
+            ticking = false;
+          });
+        },
+        { passive: true },
+      );
+      apply(scrollY);
+    }
+  }
+
   // ---- Live ASCII: the wordmark decodes in, shimmers and follows the pointer; a halftone field flows
   // behind it; the figures count up. Reduced motion keeps the static wordmark and the numbers.
-  const root = d.documentElement;
   if (!reduce && root.classList.contains('live')) {
     (async () => {
       try {
