@@ -114,9 +114,9 @@ export function PushToTalk() {
         setListening(false);
         setProblem(
           e.error === 'not-allowed' || e.error === 'service-not-allowed'
-            ? 'The microphone is blocked for this page. Type instead.'
+            ? 'The microphone is blocked here. Type instead.'
             : e.error === 'no-speech'
-              ? 'Remy heard nothing. Try again, or type instead.'
+              ? "Remy didn't hear anything. Try again, or type instead."
               : 'Listening stopped. Try again, or type instead.',
         );
       };
@@ -125,7 +125,7 @@ export function PushToTalk() {
       r.start();
       setListening(true);
     } catch {
-      setProblem('Listening did not start. Type instead.');
+      setProblem("Listening didn't start. Type instead.");
     }
   }, [stop]);
 

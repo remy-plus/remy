@@ -31,7 +31,7 @@ describe('PushToTalk without speech recognition', () => {
     talk();
     const dialog = await screen.findByRole('dialog', { name: 'Push to talk' });
     expect(dialog).toBeTruthy();
-    expect(screen.getByText('This browser cannot listen. Type instead.')).toBeTruthy();
+    expect(screen.getByText("This browser can't listen. Type instead.")).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'What you need done' })).toBeTruthy();
     expect(screen.queryByText('release to send', { exact: false })).toBeNull();
   });
