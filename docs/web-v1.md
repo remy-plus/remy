@@ -27,17 +27,17 @@ Reference: Hearth (greeting, one big input card, slim rail and chat history), th
 
 ## Plain words (use these; search the app for the left column)
 
-| Instead of | Say |
-|---|---|
-| Tasks, a task | Chats, Activity; "a job" when you must name one |
-| Trust: ask / steady / away | **How much Remy does on its own:** "Check with me first" / "Handle routine things" / "Work on its own while I'm away" |
-| Needs your OK, Review and approve | "Waiting for you", "Take a look" then **Approve** / **Not now** |
-| Quiet: off, 'asks' pills | Say what it does, or hide it |
-| 18:40:12, military time anywhere | "just now", "2 min ago", "yesterday"; if a clock is unavoidable, 12-hour via `Intl.DateTimeFormat` |
-| Step 3, argsHash, tool names | Plain verbs: "Reading", "Writing", "Searching", "Opening" |
-| Running / waiting_approval | Working / Waiting for you |
-| Budget, per-task stop | "Spending", "Stop a job at" |
-| Stopped without finishing | "Didn't finish" with a Try again button |
+| Instead of                        | Say                                                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Tasks, a task                     | Chats, Activity; "a job" when you must name one                                                                       |
+| Trust: ask / steady / away        | **How much Remy does on its own:** "Check with me first" / "Handle routine things" / "Work on its own while I'm away" |
+| Needs your OK, Review and approve | "Waiting for you", "Take a look" then **Approve** / **Not now**                                                       |
+| Quiet: off, 'asks' pills          | Say what it does, or hide it                                                                                          |
+| 18:40:12, military time anywhere  | "just now", "2 min ago", "yesterday"; if a clock is unavoidable, 12-hour via `Intl.DateTimeFormat`                    |
+| Step 3, argsHash, tool names      | Plain verbs: "Reading", "Writing", "Searching", "Opening"                                                             |
+| Running / waiting_approval        | Working / Waiting for you                                                                                             |
+| Budget, per-task stop             | "Spending", "Stop a job at"                                                                                           |
+| Stopped without finishing         | "Didn't finish" with a Try again button                                                                               |
 
 Voice rules from the brand guide still hold: outcome first, no hype, no exclamation marks.
 
@@ -57,16 +57,16 @@ A chat is an ordered list of jobs (tasks) with a title. Storage: `REMY_HOME/chat
 
 ## Work packages
 
-| WP | What | Owner |
-|---|---|---|
-| 1 | `MindGlyph` component with states, tests, a demo state switcher in the dev page | helper |
-| 2 | Server chats (above) with tests; web `RemyApi` + mock + http adapter methods | helper |
-| 3 | Shell: floating dock, History drawer, routes and redirects, status dot | owner of this file |
-| 4 | Chat home and chat view: greeting, input card, feed, inline approval cards, suggestions | owner of this file |
-| 5 | Language and time sweep over every screen (table above) | helpers, by area |
-| 6 | Customizable dock in Settings; layout choice (Simple, Command center); simplified Settings | helper |
-| 7 | Voice: talk button, listening level to the Mind, optional spoken replies | helper |
-| 8 | Live Browser panel: `browser.screenshot()` in `packages/browser`, `GET /api/browser/frame` and `/api/browser/state`, the pane, take over | helper |
-| 9 | Command center layout with the stage | later |
+| WP  | What                                                                                                                                     | Owner              |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | `MindGlyph` component with states, tests, a demo state switcher in the dev page                                                          | helper             |
+| 2   | Server chats (above) with tests; web `RemyApi` + mock + http adapter methods                                                             | helper             |
+| 3   | Shell: floating dock, History drawer, routes and redirects, status dot                                                                   | owner of this file |
+| 4   | Chat home and chat view: greeting, input card, feed, inline approval cards, suggestions                                                  | owner of this file |
+| 5   | Language and time sweep over every screen (table above)                                                                                  | helpers, by area   |
+| 6   | Customizable dock in Settings; layout choice (Simple, Command center); simplified Settings                                               | helper             |
+| 7   | Voice: talk button, listening level to the Mind, optional spoken replies                                                                 | helper             |
+| 8   | Live Browser panel: `browser.screenshot()` in `packages/browser`, `GET /api/browser/frame` and `/api/browser/state`, the pane, take over | helper             |
+| 9   | Command center layout with the stage                                                                                                     | later              |
 
 Gates for every package: `pnpm check` green, replay unchanged, brand rules kept, reduced-motion fallback, 320 px and 1440 px checked in a real browser. Commit small and often.
