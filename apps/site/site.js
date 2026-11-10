@@ -1,8 +1,51 @@
+import { countUp, createAsciiMark, createDotField } from './ascii.js';
+
+const MARK = [
+  ':::::::..    .,::::::    .        :     .-:.     ::-.',
+  ";;;;``;;;;   ;;;;''''    ;;,.    ;;;     ';;.   ;;;;'",
+  " [[[,/[[['    [[cccc     [[[[, ,[[[[,      '[[,[[['",
+  ' $$$$$$c      $$""""     $$$$$$$$"$$$        c$$"',
+  ' 888b "88bo,  888oo,__   888 Y88" 888o     ,8P"`',
+  ' MMMM   "W"   """"YUMMM  MMM  M\'  "MMM    mM"',
+];
+
 (() => {
   const d = document;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const status = d.getElementById('status');
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ---- Live ASCII: the wordmark decodes in, shimmers and follows the pointer; a halftone field flows
+  // behind it; the figures count up. Reduced motion keeps the static wordmark and the numbers.
+  const root = d.documentElement;
+  if (!reduce && root.classList.contains('live')) {
+    (async () => {
+      try {
+        await d.fonts.load('700 20px "JetBrains Mono"');
+        for (const c of d.querySelectorAll('canvas[data-mark]')) createAsciiMark(c, MARK);
+        for (const c of d.querySelectorAll('canvas[data-field]')) createDotField(c);
+      } catch {
+        root.classList.remove('live'); // anything wrong: the static wordmark comes back
+      }
+    })();
+  }
+  if (!reduce && 'IntersectionObserver' in window) {
+    const cio = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const to = Number(e.target.dataset.count);
+          const commas = e.target.dataset.format === 'commas';
+          countUp(e.target, to, {
+            format: (n) => (commas ? n.toLocaleString('en-US') : String(n)),
+          });
+          cio.unobserve(e.target);
+        }
+      },
+      { threshold: 0.6 },
+    );
+    for (const el of d.querySelectorAll('[data-count]')) cio.observe(el);
+  }
 
   // ---- Copy button: label, colour and a polite announcement change together.
   for (const b of d.querySelectorAll('[data-copy]')) {
