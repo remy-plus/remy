@@ -25,6 +25,7 @@
 <script>document.documentElement.className="IntersectionObserver"in window?"js"+(matchMedia("(prefers-reduced-motion: reduce)").matches?"":" live"):""</script>
 </head>
 <body>
+<div class="progress" aria-hidden="true"></div>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="top">
@@ -64,7 +65,7 @@
     <p class="lede">Remy reads and plans on its own. Anything that changes something stops at a card that names the exact action.</p>
   </div>
   <div class="device rv">
-    <div class="app" data-ui id="demo-app">
+    <div class="app" data-ui id="demo-app" data-fx="lift">
       <div class="app-bar">
         <img class="app-logo" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="">
         <span class="app-nav" aria-hidden="true"><span>Home</span><span class="cur">Tasks</span><span>Brain</span><span>Connections</span><span>Settings</span></span>
