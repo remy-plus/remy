@@ -209,6 +209,14 @@ export function createHttpApi(opts: {
     updateSettings: async (patch) => {
       await call('/api/settings', { method: 'PUT', body: JSON.stringify(patch) });
     },
+    async speakAudio(text, signal) {
+      const res = await call('/api/voice/speak', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+        signal: signal ?? null,
+      });
+      return res.blob();
+    },
     health: () => json<Health>('/api/health'),
     browserState: () => json<BrowserState>('/api/browser/state'),
     async browserFrame() {

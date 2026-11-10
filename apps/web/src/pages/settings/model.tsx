@@ -5,6 +5,7 @@ import { buttonPrimary, buttonQuiet } from '../../components/ui.ts';
 import { useSetting } from '../../settings.ts';
 import { Toggle } from './controls.tsx';
 import type { SectionProps } from './sections.ts';
+import { VoiceRow } from './voice.tsx';
 
 const STATE: Record<Provider['state'], string> = {
   key_in_use: 'Key saved',
@@ -110,6 +111,9 @@ export function Model({ data }: SectionProps) {
           {test.busy ? 'Testing' : test.text}
         </p>
       </div>
+
+      <h3 className={`${heading} mt-8`}>Voice</h3>
+      <VoiceRow data={data} />
     </>
   );
 }

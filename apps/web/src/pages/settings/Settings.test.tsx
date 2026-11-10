@@ -130,6 +130,24 @@ describe('Settings', () => {
     expect(await screen.findByText('Both models answered.')).toBeTruthy();
   });
 
+  it('picks the voice and says when there is no voice key', async () => {
+    await open('model', 'Model and keys');
+    const box = screen.getByRole('textbox', { name: 'Voice id' }) as HTMLInputElement;
+    expect(box.value).toBe('e13fa398a7f445a685316a3de6089ce7');
+    fireEvent.change(box, { target: { value: 'short' } });
+    fireEvent.blur(box);
+    expect(screen.getByText(/A voice id is letters and digits/)).toBeTruthy();
+    expect(stored('voice.id')).toBeNull(); // nothing is saved
+    fireEvent.change(box, { target: { value: 'abcdef0123456789' } });
+    fireEvent.blur(box);
+    expect(stored('voice.id')).toBe('"abcdef0123456789"');
+    fireEvent.click(screen.getByRole('button', { name: 'Use the default voice' }));
+    expect(stored('voice.id')).toBe('"e13fa398a7f445a685316a3de6089ce7"');
+    expect((screen.getByRole('textbox', { name: 'Voice id' }) as HTMLInputElement).value).toBe(
+      'e13fa398a7f445a685316a3de6089ce7',
+    );
+  });
+
   it('has quiet hours and an always-on approvals switch', async () => {
     await open('notifications', 'Notifications');
     const push = screen.getByRole('switch', {

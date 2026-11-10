@@ -44,3 +44,34 @@ describe('browser api', () => {
     expect(create).toHaveBeenCalledOnce();
   });
 });
+
+describe('spoken replies api', () => {
+  it('http: posts the text with the token and returns the audio', async () => {
+    const fetcher = vi.fn(
+      async () => new Response('mp3', { status: 200, headers: { 'content-type': 'audio/mpeg' } }),
+    );
+    const api = createHttpApi({ token: () => 'secret', fetch: fetcher as unknown as typeof fetch });
+    const blob = await api.speakAudio?.('Booked for seven.');
+    expect(blob?.type).toBe('audio/mpeg');
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/voice/speak');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{"text":"Booked for seven."}');
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer secret');
+  });
+
+  it('http: a 503 rejects with the status and the plain message', async () => {
+    const fetcher = vi.fn(
+      async () => new Response('{"error":"Remy has no voice key yet."}', { status: 503 }),
+    );
+    const api = createHttpApi({ token: () => 'secret', fetch: fetcher as unknown as typeof fetch });
+    await expect(api.speakAudio?.('Hello.')).rejects.toMatchObject({
+      status: 503,
+      message: 'Remy has no voice key yet.',
+    });
+  });
+
+  it('mock: has no server voice, so the browser voice is used', () => {
+    expect(createMockApi().speakAudio).toBeUndefined();
+  });
+});
