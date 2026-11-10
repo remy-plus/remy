@@ -22,6 +22,8 @@ export interface SettingValues {
   onboarded: boolean;
   /** The dock's items, in order. Browser-local. */
   dock: string[];
+  /** Whether Remy speaks the final answer of a finished turn. Browser-local. */
+  voice: { speak: boolean };
 }
 
 export const DEFAULTS: SettingValues = {
@@ -40,6 +42,7 @@ export const DEFAULTS: SettingValues = {
   'quiet.to': '07:00',
   onboarded: false,
   dock: ['chat', 'activity', 'browser', 'brain', 'connections', 'settings'],
+  voice: { speak: false },
 };
 
 export type SettingKey = keyof SettingValues;

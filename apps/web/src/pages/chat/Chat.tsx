@@ -17,6 +17,12 @@ const SUGGESTIONS = [
   'Plan my week around the dentist on Tuesday',
 ];
 
+interface VoiceNow {
+  state: MindState | null;
+  level: number;
+}
+const IDLE: VoiceNow = { state: null, level: 0 };
+
 const problemOf = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 function EmptyChat() {
@@ -24,6 +30,7 @@ function EmptyChat() {
   const [text, setText] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [voice, setVoice] = useState<VoiceNow>(IDLE);
   const send = async () => {
     const t = text.trim();
     if (!t || sending) return;
@@ -41,13 +48,13 @@ function EmptyChat() {
   };
   return (
     <div className="page-in mx-auto flex min-h-dvh w-full max-w-[720px] flex-col items-center justify-center px-5 pt-20 pb-12 text-center">
-      <MindGlyph state="rest" size={220} />
+      <MindGlyph state={voice.state ?? 'rest'} level={voice.level} size={220} />
       <h1 className="m-0 mt-6 text-[34px] leading-[1.15] font-medium tracking-tight sm:text-[40px]">
         {greeting()}
       </h1>
       <p className="mt-2 mb-8 text-[18px] text-muted">What do you need?</p>
       <div className="w-full text-left">
-        <Composer value={text} onChange={setText} onSend={send} big autoFocus />
+        <Composer value={text} onChange={setText} onSend={send} onVoice={setVoice} big autoFocus />
       </div>
       {problem && (
         <p role="alert" className="mt-3 mb-0 text-[14px] text-muted">
@@ -82,6 +89,7 @@ function OpenChat({ id }: { id: string }) {
   const [queued, setQueued] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [justDone, setJustDone] = useState(false);
+  const [voice, setVoice] = useState<VoiceNow>(IDLE);
   const end = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -178,7 +186,10 @@ function OpenChat({ id }: { id: string }) {
     }
   };
 
-  const resting: MindState = justDone ? 'done' : 'rest';
+  const resting: MindState = voice.state ?? (justDone ? 'done' : 'rest');
+  const last = chat?.turns.at(-1);
+  const spoken =
+    last?.state === 'done' && last.answer ? { id: last.taskId, text: last.answer } : undefined;
 
   if (error && !chat)
     return (
@@ -223,10 +234,17 @@ function OpenChat({ id }: { id: string }) {
               {problem}
             </p>
           )}
+          {voice.state === 'listening' && (
+            <div className="mb-2 flex justify-center">
+              <MindGlyph state="listening" level={voice.level} size={160} />
+            </div>
+          )}
           <Composer
             value={text}
             onChange={setText}
             onSend={send}
+            onVoice={setVoice}
+            {...(spoken && { answer: spoken })}
             {...(busy && { onStop: stop })}
             {...(queued && { hint: `Next, when I'm done: ${queued}` })}
             placeholder={busy ? 'Add something for next' : 'Ask Remy to do anything'}
