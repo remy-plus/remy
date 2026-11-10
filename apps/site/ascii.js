@@ -92,7 +92,7 @@ export function createAsciiMark(canvas, lines, opts = {}) {
   let cw = 10;
   let rh = 18;
   const fontFamily = opts.fontFamily ?? '"JetBrains Mono", ui-monospace, Menlo, monospace';
-  const fit = () => {
+  const resize = () => {
     const w = canvas.clientWidth || 600;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     cw = w / cols;
@@ -106,8 +106,8 @@ export function createAsciiMark(canvas, lines, opts = {}) {
     ctx.font = `700 ${fs}px ${fontFamily}`;
     ctx.textBaseline = 'alphabetic';
   };
-  fit();
-  const ro = new ResizeObserver(fit);
+  resize();
+  const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   const ptr = opts.interactive === false ? null : pointer(canvas);
   let started = performance.now() / 1000;
@@ -180,7 +180,7 @@ export function createDotField(canvas, opts = {}) {
   const color = opts.color ?? '140,138,133';
   let w = 0;
   let h = 0;
-  const fit = () => {
+  const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     w = canvas.clientWidth || 800;
     h = canvas.clientHeight || 500;
@@ -188,8 +188,8 @@ export function createDotField(canvas, opts = {}) {
     canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
-  fit();
-  const ro = new ResizeObserver(fit);
+  resize();
+  const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   const ptr = pointer(canvas);
   const swell = { v: 0 };
