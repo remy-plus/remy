@@ -31,6 +31,12 @@
   font-weight: 500;
   font-display: swap;
 }
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url(fonts/JetBrainsMono-Bold.woff2) format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
 
 :root {
   --bg: #0f0f10;
@@ -1320,5 +1326,59 @@ html.js .modal[data-seq].shown {
 @media (max-width: 520px) {
   .more-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Live ASCII: the canvas takes over from the static wordmark; the SVG stays for screen readers. */
+.mark {
+  position: relative;
+  width: min(1120px, 100%);
+}
+.mark .wm {
+  width: 100%;
+}
+.wm-live {
+  display: none;
+  width: 100%;
+}
+html.live .wm-live {
+  display: block;
+}
+html.live .mark .wm {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+  clip-path: none;
+}
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+}
+.field {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 0;
+  width: min(1500px, 120%);
+  height: 100%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  -webkit-mask-image: radial-gradient(ellipse 55% 60% at 50% 34%, #000 20%, transparent 74%);
+  mask-image: radial-gradient(ellipse 55% 60% at 50% 34%, #000 20%, transparent 74%);
+}
+html.live .field {
+  opacity: 0.55;
+  animation: field-in 2.4s var(--ease) 0.3s both;
+}
+@keyframes field-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.55;
   }
 }
