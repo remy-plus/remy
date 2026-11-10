@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!branding",
+      "!**/assets/brand",
       "!PLAN.md",
       "!CLAUDE.md",
       "!pnpm-lock.yaml",
