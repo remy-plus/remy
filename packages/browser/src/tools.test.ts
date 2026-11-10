@@ -38,6 +38,12 @@ function fakeBrowser(page: PageSnapshot = SHOP) {
       return visible;
     },
     current: () => current,
+    async state() {
+      return { open: current !== undefined, url: current?.url ?? '', title: current?.title ?? '' };
+    },
+    async screenshot() {
+      return undefined;
+    },
     async open(url) {
       calls.push(`open ${url}`);
       current = { ...page, url };

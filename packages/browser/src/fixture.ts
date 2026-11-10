@@ -166,6 +166,13 @@ export function fixtureBrowser(
       return visible;
     },
     current: () => last,
+    async state() {
+      if (!url) return { open: false, url: '', title: '' };
+      return { open: true, url, title: snap().title };
+    },
+    async screenshot() {
+      return url ? Buffer.from(`fixture-frame:${url}`) : undefined;
+    },
     async open(u) {
       return go(u);
     },

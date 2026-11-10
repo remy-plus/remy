@@ -202,7 +202,22 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
     if (show) await p.bringToFront();
   }
 
+  /** The page Remy already has open; unlike `currentPage`, never starts a browser or a tab. */
+  function livePage(): Page | undefined {
+    return ctx && page && !page.isClosed() ? page : undefined;
+  }
+
   return {
+    async state() {
+      const p = livePage();
+      if (!p) return { open: false, url: '', title: '' };
+      return { open: true, url: p.url(), title: await p.title().catch(() => '') };
+    },
+    async screenshot() {
+      const p = livePage();
+      if (!p) return undefined;
+      return p.screenshot({ type: 'jpeg', quality: 60 }).catch(() => undefined);
+    },
     get visible() {
       return visible && ctx !== undefined;
     },
