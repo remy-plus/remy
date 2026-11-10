@@ -22,7 +22,7 @@
 <meta property="og:image" content="https://remy.plus/assets/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/styles.css">
-<script>if("IntersectionObserver"in window){var c="js";if(!matchMedia("(prefers-reduced-motion: reduce)").matches)c+=" live";document.documentElement.className=c}</script>
+<script>document.documentElement.className="IntersectionObserver"in window?"js"+(matchMedia("(prefers-reduced-motion: reduce)").matches?"":" live"):""</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -43,10 +43,10 @@
 
 <!-- 1. The name, large: the brand wordmark, row by row, then the sentence. -->
 <section class="hero" aria-labelledby="hero-h">
-  <canvas class="field" data-field aria-hidden="true"></canvas>
+  <span class="wrap-c" aria-hidden="true"><canvas class="field" data-field></canvas></span>
     <div class="mark">
       <img class="wm" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="Remy">
-      <canvas class="wm-live" data-mark aria-hidden="true"></canvas>
+      <span class="wrap-c" aria-hidden="true"><canvas class="wm-live" data-mark></canvas></span>
     </div>
   <h1 id="hero-h">Your assistant, anywhere<span class="cursor" aria-hidden="true"></span></h1>
   <p class="lede">Remy does real digital work from one chat box: your files, the web, your apps. It asks before anything that matters.</p>
@@ -310,7 +310,7 @@
 <footer class="foot">
   <div class="mark foot-wm">
       <img class="wm" src="/assets/brand/remy-wordmark-on-dark.svg" width="1272" height="264" alt="Remy" loading="lazy">
-      <canvas class="wm-live" data-mark aria-hidden="true"></canvas>
+      <span class="wrap-c" aria-hidden="true"><canvas class="wm-live" data-mark></canvas></span>
     </div>
   <div class="foot-line">
     <span>Your assistant, anywhere.</span>

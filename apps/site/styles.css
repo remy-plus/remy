@@ -1382,3 +1382,7 @@ html.live .field {
     opacity: 0.55;
   }
 }
+
+.wrap-c {
+  display: contents;
+}
