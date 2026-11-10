@@ -5,9 +5,9 @@ import { Orb } from '../components/Orb.tsx';
 import type { HomeState } from '../hooks.ts';
 
 const mono = 'font-mono';
-const button = `${mono} cursor-pointer rounded-md border px-3 py-[7px] text-[12px] whitespace-nowrap disabled:cursor-default disabled:opacity-50`;
-const quiet = `${button} border-stone bg-transparent text-text hover:bg-raise`;
-const primary = `${button} border-signal bg-signal font-medium text-signal-ink hover:brightness-95`;
+const button = `cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50`;
+const quiet = `${button} border-edge-hi bg-transparent text-text hover:bg-raise`;
+const primary = `${button} border-text bg-text text-bg hover:bg-white`;
 
 function Section({
   title,
@@ -55,7 +55,7 @@ function Need({
   const a = card.approval;
   return (
     <li
-      className={`mb-3 list-none rounded-[10px] border bg-surface p-4 ${first ? 'border-stone' : 'border-line'}`}
+      className={`mb-3 list-none rounded-[10px] border bg-surface p-4 ${first ? 'border-edge-hi' : 'border-edge'}`}
     >
       <p className={`${mono} m-0 text-[12px] text-muted`}>
         {[card.kind, card.waiting].filter(Boolean).join(' · ')}
@@ -113,7 +113,7 @@ function Segments({ item }: { item: WorkItem }) {
 
 function Working({ item }: { item: WorkItem }) {
   return (
-    <li className="list-none border-b border-line py-4 first:pt-0 last:border-b-0">
+    <li className="list-none border-b border-edge py-4 first:pt-0 last:border-b-0">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h3 className={`${mono} m-0 text-[14px] font-bold`}>
           <a
@@ -133,7 +133,7 @@ function Working({ item }: { item: WorkItem }) {
 
 function Noticed({ n }: { n: Notice }) {
   return (
-    <li className="list-none border-b border-line py-3 first:pt-0">
+    <li className="list-none border-b border-edge py-3 first:pt-0">
       <time className={`${mono} text-[12px] text-muted`}>{n.at}</time>
       <p className="mt-1 mb-0 text-[15px] leading-snug">{n.text}</p>
     </li>
@@ -166,7 +166,7 @@ function CommandBar({
   return (
     <form
       onSubmit={send}
-      className="mt-6 flex items-center gap-3 rounded-[14px] border border-stone bg-surface py-3 pr-3 pl-5"
+      className="mt-6 flex items-center gap-3 rounded-[14px] border border-edge-hi bg-surface py-3 pr-3 pl-5"
     >
       <input
         ref={input}
@@ -185,7 +185,7 @@ function CommandBar({
         type="button"
         aria-label="Open the command palette (⌘K)"
         onClick={() => window.dispatchEvent(new CustomEvent('remy:palette'))}
-        className={`${mono} hidden cursor-pointer rounded border border-line bg-transparent px-2 py-1 text-[11px] text-muted hover:text-text sm:block`}
+        className={`${mono} hidden cursor-pointer rounded border border-edge bg-transparent px-2 py-1 text-[11px] text-muted hover:text-text sm:block`}
       >
         <kbd className="font-[inherit]">⌘K</kbd>
       </button>
@@ -238,7 +238,7 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
                     setDraft(q); // fill the box for the person to send or edit
                     input.current?.focus();
                   }}
-                  className={`${mono} cursor-pointer rounded-full border bg-transparent px-4 py-2 text-[13px] text-text hover:bg-raise ${i === 0 ? 'border-signal' : 'border-line'}`}
+                  className={`${mono} cursor-pointer rounded-full border bg-transparent px-4 py-2 text-[13px] text-text hover:bg-raise ${i === 0 ? 'border-text' : 'border-edge'}`}
                 >
                   {q}
                 </button>
@@ -262,7 +262,7 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
             ))}
           </ul>
           {alert && (
-            <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
+            <div className="flex items-center justify-between gap-3 border-t border-edge pt-4">
               <p className="m-0 text-[14px]">{alert.text}</p>
               <a className={`${quiet} shrink-0 no-underline`} href="#/connections">
                 {alert.action}
@@ -296,7 +296,7 @@ function Loaded({ data, reload }: { data: HomeData; reload: () => void }) {
       <div className="sticky bottom-0 -mx-5 bg-bg px-5 pb-5 sm:-mx-8 sm:px-8">
         {brain && (
           <div
-            className={`${mono} mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-line pt-5 text-[13px] text-muted`}
+            className={`${mono} mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-edge pt-5 text-[13px] text-muted`}
           >
             <span>
               <span className="text-signal">Second brain</span>{' '}

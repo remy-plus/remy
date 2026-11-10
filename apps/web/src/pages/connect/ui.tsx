@@ -14,11 +14,11 @@ import stripe from '../../assets/logos/stripe.svg';
 import zoom from '../../assets/logos/zoom.svg';
 
 export const mono = 'font-mono';
-const base = `${mono} cursor-pointer rounded-md border px-3 py-[7px] text-[12px] whitespace-nowrap no-underline disabled:cursor-default disabled:opacity-50`;
-export const quiet = `${base} inline-block border-stone bg-transparent text-text hover:bg-raise`;
-export const primary = `${base} inline-block border-signal bg-signal font-medium text-signal-ink hover:brightness-95`;
+const base = `cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50 no-underline`;
+export const quiet = `${base} inline-block border-edge-hi bg-transparent text-text hover:bg-raise`;
+export const primary = `${base} inline-block border-text bg-text text-bg hover:bg-white`;
 export const field =
-  'w-full rounded-[10px] border border-line bg-surface px-4 py-2.5 text-[15px] text-text placeholder:text-muted aria-[invalid=true]:border-[#d98b7a]';
+  'w-full rounded-[10px] border border-edge bg-surface px-4 py-2.5 text-[15px] text-text placeholder:text-muted aria-[invalid=true]:border-[#d98b7a]';
 
 /** Loads once from the adapter. A server that cannot answer yields a plain sentence in `error`. */
 export function useLoad<T>(load: (api: RemyApi) => Promise<T>) {
@@ -76,7 +76,7 @@ export function Page({
         {children}
       </div>
       {aside && (
-        <aside className="min-w-0 border-t border-line px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l">
+        <aside className="min-w-0 border-t border-edge px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l">
           {aside}
         </aside>
       )}
@@ -118,7 +118,7 @@ export function Switch({
       aria-checked={checked}
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="relative m-0 h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-stone bg-transparent transition-colors before:absolute before:top-[3px] before:left-[3px] before:size-4 before:rounded-full before:bg-text before:transition-transform checked:border-signal checked:bg-signal checked:before:translate-x-4 checked:before:bg-signal-ink"
+      className="relative m-0 h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-edge-hi bg-transparent transition-colors before:absolute before:top-[3px] before:left-[3px] before:size-4 before:rounded-full before:bg-text before:transition-transform checked:border-signal checked:bg-signal checked:before:translate-x-4 checked:before:bg-signal-ink"
     />
   );
 }
@@ -152,7 +152,7 @@ export function AppLogo({ id, size = 28 }: { id: string; size?: number }) {
     <span
       aria-hidden="true"
       style={{ width: size + 12, height: size + 12 }}
-      className={`grid shrink-0 place-items-center rounded-md border border-line ${logo?.light ? 'bg-[#edebe6]' : 'bg-raise'}`}
+      className={`grid shrink-0 place-items-center rounded-md border border-edge ${logo?.light ? 'bg-[#edebe6]' : 'bg-raise'}`}
     >
       {logo && <img src={logo.src} alt="" width={size - 8} height={size - 8} />}
     </span>

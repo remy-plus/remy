@@ -88,6 +88,6 @@ export function humanTool(tool: string): string {
 }
 
 export const quietButton =
-  'cursor-pointer rounded-md border border-stone bg-transparent px-3 py-[7px] font-mono text-[12px] whitespace-nowrap text-text no-underline hover:bg-raise disabled:cursor-default disabled:opacity-50';
+  'cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50 border-edge-hi bg-transparent text-text no-underline hover:bg-raise';
 export const primaryButton =
-  'cursor-pointer rounded-md border border-signal bg-signal px-3 py-[7px] font-mono text-[12px] font-medium whitespace-nowrap text-signal-ink no-underline hover:brightness-95 disabled:cursor-default disabled:opacity-50';
+  'cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50 border-text bg-text text-bg no-underline hover:bg-white';
