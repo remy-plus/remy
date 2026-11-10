@@ -339,7 +339,8 @@ h2 {
   font-weight: 500;
   line-height: 1.02;
   letter-spacing: -0.04em;
-  max-width: 12em;
+  max-width: 14em;
+  text-wrap: balance;
 }
 h3 {
   font-size: var(--t-h3);
