@@ -1,5 +1,6 @@
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
 import type { BrainData, BrainNote, NoteKind } from '../../api/index.tsx';
+import { BrainTabs } from '../../components/BrainTabs.tsx';
 import {
   Eyebrow,
   field,
@@ -132,6 +133,7 @@ export function Brain() {
     <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[minmax(0,1fr)_420px]">
       <div className="min-w-0 px-5 py-6 sm:px-8 lg:pl-14 lg:pr-8">
         <h1 className="sr-only">Brain</h1>
+        <BrainTabs current="notes" />
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <label htmlFor="brain-search" className="sr-only">
             Search notes

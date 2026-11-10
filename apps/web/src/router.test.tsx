@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from './App.tsx';
 import { ApiProvider } from './api/index.tsx';
@@ -76,7 +76,8 @@ describe('App routing', () => {
       if (heading)
         expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeTruthy();
       else await screen.findByRole('navigation', { name: 'Main' });
-      const marked = screen
+      // The dock marks where you are; a page may also mark its own tabs.
+      const marked = within(screen.getByRole('navigation', { name: 'Main' }))
         .getAllByRole('link')
         .filter((a) => a.getAttribute('aria-current') === 'page');
       expect(marked.map((a) => a.textContent)).toEqual(current ? [current] : []);
