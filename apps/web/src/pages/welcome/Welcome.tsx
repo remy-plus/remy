@@ -8,22 +8,19 @@ import { Orb } from '../../components/Orb.tsx';
 import { buttonPrimary, buttonQuiet, field } from '../../components/ui.ts';
 import { setSetting } from '../../settings.ts';
 
-const STEPS = ['Choose how Remy thinks', 'Connect what it can reach', 'Give it a first task'];
+const STEPS = ['Pick a model', 'Connect your apps', 'Ask for something'];
 const LABELS = [
   [{ label: 'you' }, { label: 'memory' }],
   [{ label: 'files' }, { label: 'calendar' }],
   [{ label: 'you' }, { label: 'web' }],
 ];
 const CAPTION: [string, string][] = [
-  [
-    'Your assistant, anywhere.',
-    'Remy asks before it sends anything as you or spends money. Always.',
-  ],
+  ["I'm your assistant.", 'I ask before I send anything as you or spend money. Always.'],
   [
     'You stay in charge.',
-    'Each app gets only the access you choose, and you can take it back in one click.',
+    'Each app gets only what you allow, and you can take it back in one click.',
   ],
-  ['Ready when you are.', 'Your assistant, anywhere.'],
+  ['Ready when you are.', 'Ask for anything you would do on a computer.'],
 ];
 
 const finish = () => setSetting('onboarded', true);
@@ -132,8 +129,8 @@ function StepOne() {
   return (
     <Frame
       at={0}
-      title="Choose how Remy thinks."
-      lead="Remy works with the model you pick. You can change it any time, and your key stays on your machine."
+      title="Hi, I'm Remy."
+      lead="First, pick the model I think with. You can change it any time. Your key is the password that lets me use it, and it stays on this computer."
     >
       <fieldset className="m-0 grid gap-2.5 border-0 p-0">
         <legend className="sr-only">How Remy thinks</legend>
@@ -161,7 +158,7 @@ function StepOne() {
       {way === 'own' && (
         <div className="mt-7">
           <label htmlFor={`${name}-key`} className="font-mono block text-[12px] text-muted">
-            API key for OpenRouter
+            Your OpenRouter key
           </label>
           <input
             id={`${name}-key`}
@@ -172,8 +169,7 @@ function StepOne() {
             className={`${field} mt-2 block w-full py-3`}
           />
           <p className="mt-2 mb-0 text-[13px] text-muted">
-            Remy saves a key in the system keychain of the machine that runs it. This page never
-            keeps it.
+            Your key stays on this computer. This page never keeps it.
           </p>
         </div>
       )}
@@ -217,7 +213,7 @@ function StepTwo() {
   return (
     <Frame
       at={1}
-      title="Connect what Remy can reach."
+      title="Connect the apps you use."
       lead="Start with what you use every day. You can add or remove any of these later. Skip this and Remy still works with files and the web."
     >
       <ul className="m-0 grid gap-2.5 p-0">
@@ -283,7 +279,7 @@ function StepThree() {
   return (
     <Frame
       at={2}
-      title="Tell Remy what you need done."
+      title="What do you need done?"
       lead="Anything you would do on a computer. Start small. Remy shows its work and asks before it sends or spends."
     >
       <div className="flex gap-3 rounded-[14px] border border-edge-hi bg-surface p-3.5 focus-within:border-text">
@@ -301,7 +297,7 @@ function StepThree() {
           disabled={!text.trim()}
           onClick={start}
         >
-          Start task
+          Start
         </button>
       </div>
       {error && (

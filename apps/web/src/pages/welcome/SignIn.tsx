@@ -141,7 +141,7 @@ export function SignIn({
             {health && health !== 'down' && (
               <>
                 Remy {health.version}
-                {running !== null && ` · ${running} ${running === 1 ? 'task' : 'tasks'} running`}
+                {running !== null && ` · ${running} ${running === 1 ? 'job' : 'jobs'} running`}
               </>
             )}
           </p>

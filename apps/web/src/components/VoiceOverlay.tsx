@@ -28,9 +28,8 @@ export function VoiceOverlay(props: {
   const { mode, listening, final, interim, problem, error, canListen } = props;
   const editing = mode === 'editing';
   const status = !canListen
-    ? 'This browser cannot listen. Type instead.'
-    : problem ||
-      (listening ? 'Listening' : editing ? 'Edit the words, then send' : 'Stopped listening');
+    ? "This browser can't listen. Type instead."
+    : problem || (listening ? 'Listening' : editing ? 'Edit, then send' : 'Stopped listening');
   return (
     <div className="grid min-h-full place-content-center justify-items-center px-5 py-10 text-center">
       <div className="h-[250px] w-[260px] max-w-full overflow-hidden">
@@ -94,11 +93,11 @@ export function VoiceOverlay(props: {
           </span>
         )}
         <span>
-          <Key>Esc</Key> cancel
+          <Key>Esc</Key> to cancel
         </span>
         {!editing && canListen && (
           <span>
-            <Key>E</Key> edit the words
+            <Key>E</Key> to edit
           </span>
         )}
       </p>
