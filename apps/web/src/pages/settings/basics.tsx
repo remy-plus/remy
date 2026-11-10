@@ -7,14 +7,17 @@ import { Money, money, Row, Segmented, Toggle } from './controls.tsx';
 import type { SectionProps } from './sections.ts';
 
 const TRUST: Record<TrustLevel, { label: string; text: string }> = {
-  ask: { label: 'Ask', text: 'Remy asks before it changes anything. This is the default.' },
+  ask: {
+    label: 'Check with me first',
+    text: 'Remy asks before it does anything, which is the default.',
+  },
   steady: {
-    label: 'Steady',
-    text: 'Remy reads, searches and edits files in its workspace without asking. It asks before anything that changes the outside world.',
+    label: 'Handle routine things',
+    text: 'Remy does short, low-risk, reversible work in its workspace, like reading and editing files, without asking; spending, sending, deleting and anything after untrusted content still wait for you.',
   },
   away: {
-    label: 'Away',
-    text: 'Everything Steady does, and it saves skills. Made for long runs while you are away. Cards wait for you.',
+    label: "Work on its own while I'm away",
+    text: 'Remy clears a little more for long runs while you are away, but spending, sending, deleting and anything after untrusted content still wait for you.',
   },
 };
 const TRUST_OPTIONS = (Object.keys(TRUST) as TrustLevel[]).map((value) => ({
@@ -26,8 +29,8 @@ export function TrustRow() {
   const [trust, setTrust] = useSetting('trust');
   return (
     <Row
-      title="How much Remy does alone"
-      help="Sending as you and spending money always ask, at every level."
+      title="How much Remy does on its own"
+      help="Sending as you and spending money always wait for you, at every level."
     >
       <Segmented label="Trust level" value={trust} options={TRUST_OPTIONS} onChange={setTrust} />
       <p
@@ -36,7 +39,7 @@ export function TrustRow() {
       >
         <strong className="font-medium text-text">{TRUST[trust].label}.</strong> {TRUST[trust].text}
       </p>
-      <p className="mt-2 mb-0 text-[13px] text-muted">A change applies to new tasks.</p>
+      <p className="mt-2 mb-0 text-[13px] text-muted">A change applies to new jobs.</p>
     </Row>
   );
 }
@@ -50,7 +53,7 @@ export function MonthlyBudgetRow({ data }: SectionProps) {
   const used = data?.budget.usedMonth;
   const share = used === undefined || cap <= 0 ? 0 : Math.min(1, used / cap);
   return (
-    <Row title="Monthly budget" help="Once the month's budget is used, Remy starts no new tasks.">
+    <Row title="Monthly budget" help="Once the month's budget is used, Remy starts no new jobs.">
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
         <Money
           key={`${code}${rate}`}
@@ -80,13 +83,13 @@ export function MonthlyBudgetRow({ data }: SectionProps) {
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Money
           key={`${code}${rate}`}
-          label="Stop one task at"
+          label="Stop a job at"
           symbol={symbol}
           value={shown(perTask, rate)}
           onChange={(v) => setPerTask(v / rate)}
         />
         <p className="m-0 text-[14px] text-muted">
-          Per task, Remy stops and asks at {money(symbol, perTask * rate)}.
+          Per job, Remy stops and asks at {money(symbol, perTask * rate)}.
         </p>
       </div>
     </Row>
@@ -190,7 +193,7 @@ export function QuietRow() {
     <Row title="Quiet mode" help="For focus and for nights.">
       <Toggle
         label="Only interrupt for approvals"
-        help="Remy keeps working and holds everything else until you open the app. The orb dims."
+        help="Remy keeps working and holds everything else until you open the app. Its mark dims."
         checked={quiet}
         onChange={setQuiet}
       />
@@ -240,15 +243,15 @@ export function Budget(props: SectionProps) {
   return (
     <>
       <p className="mt-0 mb-6 max-w-[560px] text-[16px] text-muted">
-        Remy stops a task at its limit and asks before going on. Once the month's budget is used, it
-        starts no new tasks.
+        Remy stops a job at its limit and asks before going on. Once the month's budget is used, it
+        starts no new jobs.
       </p>
       <MonthlyBudgetRow {...props} />
       <CurrencyRow />
       <Row title="When the stronger model is used" help="Set under Model and keys.">
         <p className="m-0 text-[14px] text-muted">
           {escalate
-            ? 'Remy may move a hard task to the stronger model. It stays inside the limits above.'
+            ? 'Remy may move a hard job to the stronger model. It stays inside the limits above.'
             : 'Remy stays on the everyday model, even for hard tasks.'}
         </p>
       </Row>

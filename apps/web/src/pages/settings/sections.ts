@@ -9,7 +9,7 @@ export interface SectionProps {
 export const SECTIONS = [
   { id: 'trust', label: 'Trust and approvals' },
   { id: 'model', label: 'Model and keys' },
-  { id: 'budget', label: 'Budget' },
+  { id: 'budget', label: 'Spending' },
   { id: 'memory', label: 'Memory and privacy' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'appearance', label: 'Appearance' },

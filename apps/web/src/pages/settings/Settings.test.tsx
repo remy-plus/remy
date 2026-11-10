@@ -54,12 +54,13 @@ describe('Settings', () => {
     const radios = within(group).getAllByRole('radio') as HTMLInputElement[];
     expect(radios.map((r) => r.value)).toEqual(['ask', 'steady', 'away']);
     expect(radios[0]?.checked).toBe(true);
-    fireEvent.click(within(group).getByRole('radio', { name: 'Steady' }));
-    expect((within(group).getByRole('radio', { name: 'Steady' }) as HTMLInputElement).checked).toBe(
-      true,
-    );
+    fireEvent.click(within(group).getByRole('radio', { name: 'Handle routine things' }));
+    expect(
+      (within(group).getByRole('radio', { name: 'Handle routine things' }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
     expect(stored('trust')).toBe('"steady"');
-    expect(screen.getByText(/edits files in its workspace/)).toBeTruthy();
+    expect(screen.getByText(/like reading and editing files/)).toBeTruthy();
   });
 
   it('toggles switches and stores them', async () => {
@@ -75,21 +76,21 @@ describe('Settings', () => {
   });
 
   it('edits the monthly cap and the per-task stop', async () => {
-    await open('budget', 'Budget');
+    await open('budget', 'Spending');
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly budget' }), {
       target: { value: '35' },
     });
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop one task at' }), {
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop a job at' }), {
       target: { value: '3.5' },
     });
     expect(stored('budget.month')).toBe('35');
     expect(stored('budget.task')).toBe('3.5');
-    expect(screen.getByText('Per task, Remy stops and asks at $3.50.')).toBeTruthy();
+    expect(screen.getByText('Per job, Remy stops and asks at $3.50.')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('19');
   });
 
   it('shows amounts in the chosen currency and keeps them in dollars underneath', async () => {
-    await open('budget', 'Budget');
+    await open('budget', 'Spending');
     fireEvent.change(screen.getByRole('textbox', { name: 'Currency code' }), {
       target: { value: 'GBP' },
     });
@@ -98,9 +99,9 @@ describe('Settings', () => {
     });
     expect(stored('currency.code')).toBe('"GBP"');
     expect(stored('currency.rate')).toBe('0.5');
-    // 2 USD per task at 0.5 GBP per dollar is 1.00 pound.
-    expect(screen.getByText('Per task, Remy stops and asks at £1.00.')).toBeTruthy();
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop one task at' }), {
+    // 2 USD per job at 0.5 GBP per dollar is 1.00 pound.
+    expect(screen.getByText('Per job, Remy stops and asks at £1.00.')).toBeTruthy();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop a job at' }), {
       target: { value: '3' },
     });
     expect(stored('budget.task')).toBe('6'); // 3 pounds is 6 dollars
@@ -203,7 +204,7 @@ describe('Settings', () => {
   for (const [section, heading] of [
     ['trust', 'Trust and approvals'],
     ['model', 'Model and keys'],
-    ['budget', 'Budget'],
+    ['budget', 'Spending'],
     ['memory', 'Memory and privacy'],
     ['notifications', 'Notifications'],
     ['appearance', 'Appearance'],
