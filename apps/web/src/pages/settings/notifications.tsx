@@ -9,20 +9,25 @@ const time =
 
 function Time({
   name,
+  text,
   label,
 }: {
   name: SettingKey & ('notify.review' | 'quiet.from' | 'quiet.to');
+  text: string;
   label: string;
 }) {
   const [value, set] = useSetting(name);
   return (
-    <input
-      type="time"
-      aria-label={label}
-      value={value}
-      onChange={(e) => e.target.value && set(e.target.value)}
-      className={time}
-    />
+    <label className="flex items-center gap-2 text-[14px] text-muted">
+      <span>{text}</span>
+      <input
+        type="time"
+        aria-label={label}
+        value={value}
+        onChange={(e) => e.target.value && set(e.target.value)}
+        className={time}
+      />
+    </label>
   );
 }
 
@@ -44,7 +49,7 @@ export function Notifications() {
       <p className="mt-0 mb-6 max-w-[620px] text-[16px] text-muted">
         Remy interrupts you for approvals and for nothing else, unless you say so.
       </p>
-      <Row title="Needs your OK" help="Sending, spending, anything it cannot undo.">
+      <Row title="Waiting for you" help="Sending, spending, anything it cannot undo.">
         <Toggle
           label="Phone and desktop push"
           help="Always on. Approvals are the one thing Remy will not hold back."
@@ -53,9 +58,9 @@ export function Notifications() {
           onChange={() => undefined}
         />
       </Row>
-      <Row title="Task finished" help="When something you asked for is done.">
+      <Row title="Job finished" help="When something you asked for is done.">
         <Toggle
-          label="Tell me when a task finishes"
+          label="Tell me when a job finishes"
           help="Quiet in the app, a push only if you are away."
           checked={finished}
           onChange={setFinished}
@@ -71,14 +76,14 @@ export function Notifications() {
       </Row>
       <Row title="Overnight review" help="A summary of what ran while you were away.">
         <div className="flex flex-wrap items-center gap-4">
-          <Time name="notify.review" label="Overnight review time" />
+          <Time name="notify.review" text="Send it at" label="Overnight review: send it at" />
           <span className="text-[14px] text-muted">every day · after quiet hours</span>
         </div>
       </Row>
       <Row title="Quiet hours" help="Only approvals get through.">
         <div className="flex flex-wrap items-center gap-4">
-          <Time name="quiet.from" label="Quiet hours start" />
-          <Time name="quiet.to" label="Quiet hours end" />
+          <Time name="quiet.from" text="From" label="Quiet hours from" />
+          <Time name="quiet.to" text="Until" label="Quiet hours until" />
           <span className="text-[14px] text-muted">turns quiet mode on and off by itself</span>
         </div>
       </Row>

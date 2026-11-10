@@ -143,7 +143,7 @@ describe('Settings', () => {
     }) as HTMLButtonElement;
     expect(push.disabled).toBe(true);
     expect(push.getAttribute('aria-checked')).toBe('true');
-    fireEvent.change(screen.getByLabelText('Quiet hours start'), { target: { value: '22:30' } });
+    fireEvent.change(screen.getByLabelText('Quiet hours from'), { target: { value: '22:30' } });
     expect(stored('quiet.from')).toBe('"22:30"');
     fireEvent.click(screen.getByRole('button', { name: 'Send a test notification' }));
     expect(await screen.findByText('A test notification was sent.')).toBeTruthy();
