@@ -18,6 +18,9 @@ export type RouteName =
   | 'welcome'
   | 'sign-in'
   | 'quiet'
+  | 'chat'
+  | 'activity'
+  | 'browser'
   | 'not-found';
 
 export interface Route {
@@ -27,6 +30,9 @@ export interface Route {
 
 const TABLE: [pattern: string, name: RouteName][] = [
   ['/', 'home'],
+  ['/chat/:id', 'chat'],
+  ['/activity', 'activity'],
+  ['/browser', 'browser'],
   ['/tasks', 'tasks'],
   ['/tasks/:id', 'task'],
   ['/brain', 'brain'],
