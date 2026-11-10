@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { TaskView } from '../api/index.tsx';
 import { humanTool } from '../pages/tasks/format.ts';
 
@@ -68,7 +68,7 @@ function Marker({ state }: { state: StepState }) {
     return (
       <span
         aria-hidden="true"
-        className={`${base} border border-signal bg-bg text-[10px] text-signal`}
+        className={`${base} pop border border-signal bg-bg text-[10px] text-signal`}
       >
         ✓
       </span>
@@ -111,7 +111,8 @@ export function Trace({
       {steps.map((s, i) => (
         <li
           key={s.id}
-          className={`relative min-w-0 pl-8 ${i < steps.length - 1 ? 'pb-4' : ''} ${
+          style={{ '--i': Math.min(i, 8) } as CSSProperties}
+          className={`rise relative min-w-0 pl-8 ${i < steps.length - 1 ? 'pb-4' : ''} ${
             i < steps.length - 1
               ? 'before:absolute before:top-[22px] before:bottom-[-3px] before:left-[7.5px] before:w-px before:bg-stone'
               : ''

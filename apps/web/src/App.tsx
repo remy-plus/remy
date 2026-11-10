@@ -119,7 +119,9 @@ export function App() {
         />
       )}
       <main id="main" ref={main} tabIndex={-1} className="outline-none">
-        <Page path={path} home={home} />
+        <div key={path} className="page-in">
+          <Page path={path} home={home} />
+        </div>
       </main>
       <CommandPalette />
       <PushToTalk />
