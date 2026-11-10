@@ -4,6 +4,13 @@ import { primaryButton, quietButton, RISK } from '../pages/tasks/format.ts';
 
 const mono = 'font-mono';
 
+/** Plain words for the trust level stored on the task (the stored values do not change). */
+const TRUST_WORDS: Record<string, string> = {
+  ask: 'You asked to be checked with first.',
+  steady: 'You let Remy handle routine things.',
+  away: 'You let Remy work on its own while you are away.',
+};
+
 /** The text with one phrase marked, for example the corrected figure. */
 function Marked({ text, mark }: { text: string; mark?: string }) {
   const at = mark ? text.indexOf(mark) : -1;
@@ -142,14 +149,14 @@ export function ApprovalDialog({
             <span aria-hidden="true" className="mr-2 text-text">
               ◆
             </span>
-            {risk.kind} · waiting for your OK
+            {risk.kind} · Waiting for you
           </p>
-          <h2
-            id={titleId}
-            className="mt-2 mb-5 text-[24px] leading-tight font-medium sm:text-[28px]"
-          >
-            {detail?.title ?? 'Approve this action?'}
+          <h2 className="mt-2 mb-5 text-[24px] leading-tight font-medium sm:text-[28px]">
+            Is this OK?
           </h2>
+          <p id={titleId} className="mt-0 mb-5 text-[16px] leading-snug text-muted">
+            {detail?.title ?? 'Remy wants to take one action for you.'}
+          </p>
 
           <div className="overflow-hidden rounded-[10px] border border-edge bg-bg">
             {detail?.headers && (
@@ -262,14 +269,9 @@ export function ApprovalDialog({
             Why Remy is asking
           </h3>
           <p className="m-0 text-[14px] leading-[1.6] text-muted">
-            {card?.reason}{' '}
+            {card?.reason ?? 'Remy needs your go-ahead before it goes further.'}{' '}
             <span className="whitespace-nowrap">
-              Trust level:{' '}
-              <span
-                className={`${mono} rounded-full border border-edge px-2 py-0.5 text-[12px] text-text`}
-              >
-                {task?.config.trust ?? 'ask'}
-              </span>
+              {TRUST_WORDS[task?.config.trust ?? 'ask'] ?? TRUST_WORDS.ask}
             </span>
           </p>
           <h3 className={`${mono} mt-6 mb-2 text-[12px] font-normal text-muted`}>This approval</h3>
