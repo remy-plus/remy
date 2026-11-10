@@ -4,6 +4,9 @@ import type {
   ApproveBody,
   BrainData,
   CatalogApp,
+  ChatSent,
+  ChatSummary,
+  ChatView,
   ConnectionsData,
   ExtendBody,
   Health,
@@ -143,6 +146,15 @@ export function createHttpApi(opts: {
     answer: (id, answer) => post(`${task(id)}/answer`, { answer }),
     cancel: (id) => post(`${task(id)}/cancel`),
     extend: (id, body: ExtendBody = {}) => post(`${task(id)}/extend`, body),
+    listChats: async () => (await json<{ chats: ChatSummary[] }>('/api/chats')).chats,
+    getChat: (id) => json<ChatView>(`/api/chats/${encodeURIComponent(id)}`),
+    sendMessage: (text, chatId, trust) =>
+      json<ChatSent>('/api/chats/messages', {
+        method: 'POST',
+        body: JSON.stringify({ text, ...(chatId && { chatId }), ...(trust && { trust }) }),
+      }),
+    renameChat: (id, title) => send('PUT', `/api/chats/${encodeURIComponent(id)}`, { title }),
+    deleteChat: (id) => send('DELETE', `/api/chats/${encodeURIComponent(id)}`),
     home: () => json<HomeData>('/api/home'),
     review(since) {
       const qs = since ? `?since=${encodeURIComponent(since)}` : '';
