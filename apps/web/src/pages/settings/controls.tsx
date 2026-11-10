@@ -13,7 +13,7 @@ export function Row({
   id?: string;
 }) {
   return (
-    <div className="grid gap-x-10 gap-y-3 border-t border-line py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]">
+    <div className="grid gap-x-10 gap-y-3 border-t border-edge py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]">
       <div>
         <h3 id={id} className="m-0 text-[15px] leading-snug font-medium">
           {title}
@@ -75,7 +75,7 @@ export function Switch({
       aria-labelledby={labelledBy}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative mt-0.5 h-[22px] w-[38px] shrink-0 cursor-pointer rounded-full border p-0 disabled:cursor-default disabled:opacity-60 ${checked ? 'border-signal bg-signal' : 'border-stone bg-transparent'}`}
+      className={`relative mt-0.5 h-[22px] w-[38px] shrink-0 cursor-pointer rounded-full border p-0 disabled:cursor-default disabled:opacity-60 ${checked ? 'border-signal bg-signal' : 'border-edge-hi bg-transparent'}`}
     >
       <span
         aria-hidden="true"
@@ -108,7 +108,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex max-w-full flex-wrap overflow-hidden rounded-md border border-stone"
+      className="inline-flex max-w-full flex-wrap overflow-hidden rounded-md border border-edge-hi"
     >
       {options.map((o, i) => (
         <label key={o.value} className={`relative flex ${i > 0 ? 'border-l border-l-stone' : ''}`}>
@@ -121,7 +121,7 @@ export function Segmented<T extends string>({
             onChange={() => onChange(o.value)}
             className="peer absolute inset-0 m-0 cursor-pointer opacity-0 disabled:cursor-default"
           />
-          <span className="font-mono bg-transparent px-4 py-[9px] text-[12px] text-muted peer-checked:bg-signal peer-checked:font-medium peer-checked:text-signal-ink peer-hover:text-text peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-text peer-disabled:text-muted peer-disabled:opacity-70">
+          <span className="font-mono bg-transparent px-4 py-[9px] text-[12px] text-muted peer-checked:bg-text peer-checked:font-medium peer-checked:text-bg peer-hover:text-text peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-text peer-disabled:text-muted peer-disabled:opacity-70">
             {o.label}
           </span>
         </label>
@@ -144,7 +144,7 @@ export function Money({
 }) {
   const [text, setText] = useState(String(value)); // free text while typing, so the box can be emptied
   return (
-    <label className="flex h-[38px] w-[140px] items-center gap-2 rounded-md border border-stone bg-surface px-3 font-mono text-[13px] text-text focus-within:border-text">
+    <label className="flex h-[38px] w-[140px] items-center gap-2 rounded-md border border-edge-hi bg-surface px-3 font-mono text-[13px] text-text focus-within:border-text">
       <span aria-hidden="true">{symbol}</span>
       <input
         type="number"
