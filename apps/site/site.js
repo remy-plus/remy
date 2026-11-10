@@ -226,7 +226,7 @@ const MARK = [
   const decline = d.getElementById('decline');
   const replay = d.getElementById('replay');
   const askText = ask.querySelector('.tx');
-  const clock = (s) => `09:14:${String(s).padStart(2, '0')}`;
+  const clock = () => 'just now';
   let run = 0;
   let decided = false;
   let extra = [];
@@ -278,14 +278,14 @@ const MARK = [
         '<span class="mk" aria-hidden="true"></span><span class="tx"><b>Finished</b></span>';
       trace.append(end);
       extra.push(end);
-      addLog(clock(31), 'you approved');
-      addLog(clock(33), 'finished');
+      addLog(clock(), 'you approved');
+      addLog(clock(), 'finished');
       result.textContent =
         'Draft saved to reply.md. Northwind is $1,240 cheaper over twelve months. Nothing has been sent.';
     } else {
       askText.innerHTML =
         '<b>Write file</b> <span class="dim">you declined, nothing was written</span>';
-      addLog(clock(31), 'you declined');
+      addLog(clock(), 'you declined');
       result.textContent = 'Understood. reply.md was not written. What should change?';
     }
     if (status) status.textContent = result.textContent;
