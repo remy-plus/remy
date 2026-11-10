@@ -124,7 +124,12 @@ export function App() {
         Skip to main content
       </a>
       {bare || <Dock path={path} />}
-      <main id="main" ref={main} tabIndex={-1} className={`outline-none ${bare ? '' : 'pt-20'}`}>
+      <main
+        id="main"
+        ref={main}
+        tabIndex={-1}
+        className={`outline-none pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] ${bare ? '' : 'pt-20'}`}
+      >
         <div key={path} className="page-in">
           <Page path={path} />
         </div>

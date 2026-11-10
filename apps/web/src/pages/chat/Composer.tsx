@@ -144,7 +144,7 @@ export function Composer({
   };
 
   const ghost =
-    'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 transition-[color,background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] disabled:cursor-default';
+    'flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full p-0 sm:size-8 transition-[color,background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] disabled:cursor-default';
 
   return (
     <form
@@ -154,7 +154,7 @@ export function Composer({
       }}
       className="w-full"
     >
-      <div className="flex items-end gap-1 rounded-[24px] border border-edge bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-edge-hi">
+      <div className="flex items-end gap-1 rounded-[24px] border border-edge bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-text/30 focus-within:bg-raise">
         <label htmlFor={id} className="sr-only">
           Ask Remy to do anything
         </label>
@@ -211,7 +211,7 @@ export function Composer({
               cancelSpeech();
               onStop?.();
             }}
-            className={`${ghost} border border-edge-hi text-text hover:bg-raise`}
+            className={`${ghost} ring-1 ring-edge-hi text-text hover:bg-raise`}
           >
             <Icon fill="currentColor" strokeWidth={0}>
               <rect x="7" y="7" width="10" height="10" rx="2" />

@@ -464,7 +464,7 @@ function Composer({
     }
   };
   return (
-    <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-5 sm:px-14">
+    <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] sm:px-14">
       <form
         onSubmit={submit}
         className="flex items-center gap-3 rounded-[14px] border border-edge-hi bg-surface py-2.5 pr-2.5 pl-5"
