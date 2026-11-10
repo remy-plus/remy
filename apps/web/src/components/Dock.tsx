@@ -98,7 +98,7 @@ function useChats(): ChatSummary[] {
 }
 
 const pill =
-  'cursor-pointer rounded-full border-0 px-3 py-1.5 text-[14px] font-medium whitespace-nowrap no-underline transition-[background-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]';
+  'cursor-pointer rounded-full border-0 px-3 py-1 text-[13px] leading-6 font-medium whitespace-nowrap no-underline transition-[background-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]';
 const idle = 'bg-transparent text-muted hover:text-text';
 const active = 'bg-text text-bg';
 
@@ -134,14 +134,14 @@ export function Dock({ path }: { path: string }) {
     <>
       <nav
         aria-label="Main"
-        className="fixed top-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-edge-hi bg-surface p-1 font-sans"
+        className="fixed top-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-edge bg-surface p-1 font-sans"
       >
-        <span className="flex pl-1">
-          <MindGlyph state={mind} size={36} />
+        <span className="flex pr-1 pl-0.5">
+          <MindGlyph state={mind} size={28} />
         </span>
         {compact ? (
           <>
-            <span className="px-2 text-[14px] font-medium text-text">
+            <span className="px-2 text-[13px] leading-6 font-medium text-text">
               {current?.label ?? 'Remy'}
             </span>
             <button
@@ -163,7 +163,7 @@ export function Dock({ path }: { path: string }) {
                   setMenu(false);
                 }
               }}
-              className="dock-sheet m-0 mx-auto mt-16 w-[min(360px,calc(100vw-32px))] rounded-[14px] border border-edge-hi bg-surface p-2 text-text backdrop:bg-black/60"
+              className="dock-sheet m-0 mx-auto mt-16 w-[min(360px,calc(100vw-32px))] rounded-[16px] border border-edge bg-surface p-2 text-text backdrop:bg-black/60"
             >
               {menu && (
                 <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
@@ -172,7 +172,7 @@ export function Dock({ path }: { path: string }) {
                       <a
                         href={item.href}
                         aria-current={item === current ? 'page' : undefined}
-                        className={`${pill} block px-4 py-3 text-[16px] ${item === current ? active : idle}`}
+                        className={`${pill} block px-4 py-2.5 text-[15px] ${item === current ? active : idle}`}
                       >
                         {item.label}
                       </a>
@@ -182,13 +182,13 @@ export function Dock({ path }: { path: string }) {
                     <button
                       type="button"
                       onClick={openHistory}
-                      className={`${pill} ${idle} block w-full px-4 py-3 text-left text-[16px]`}
+                      className={`${pill} ${idle} block w-full px-4 py-2.5 text-left text-[15px]`}
                     >
                       History
                     </button>
                   </li>
                   <li>
-                    <a href="#/" className={`${pill} ${idle} block px-4 py-3 text-[16px]`}>
+                    <a href="#/" className={`${pill} ${idle} block px-4 py-2.5 text-[15px]`}>
                       New chat
                     </a>
                   </li>
@@ -214,7 +214,7 @@ export function Dock({ path }: { path: string }) {
                 );
               })}
             </ul>
-            <span aria-hidden="true" className="mx-1 h-5 w-px bg-edge-hi" />
+            <span aria-hidden="true" className="mx-1 h-4 w-px bg-edge-hi" />
             <button type="button" onClick={openHistory} className={`${pill} ${idle}`}>
               History
             </button>
@@ -222,7 +222,7 @@ export function Dock({ path }: { path: string }) {
               href="#/"
               aria-label="New chat"
               title="New chat"
-              className={`${pill} ${idle} text-[18px] leading-none`}
+              className={`${pill} ${idle} text-[16px] leading-6`}
             >
               +
             </a>

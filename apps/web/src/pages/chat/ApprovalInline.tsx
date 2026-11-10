@@ -3,7 +3,7 @@ import { type ApprovalCard, useApi } from '../../api/index.tsx';
 import { approvalSentence } from '../../lib/feed.ts';
 
 const pill =
-  'cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50';
+  'cursor-pointer rounded-full border h-8 px-3.5 text-[13px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50';
 
 const editable = (t: EventTarget | null) =>
   t instanceof HTMLElement &&
@@ -54,14 +54,14 @@ export function ApprovalInline({
   return (
     <section
       aria-label="Is this OK?"
-      className="rise mt-3 rounded-[14px] border border-edge-hi bg-surface p-4"
+      className="rise mt-3 rounded-[16px] border border-edge bg-surface p-4"
     >
-      <h3 className="m-0 text-[15px] font-medium">Is this OK?</h3>
-      <p className="mt-2 mb-0 text-[15px] leading-[1.6] text-text">
+      <h3 className="m-0 text-[14px] font-medium text-muted">Is this OK?</h3>
+      <p className="mt-1 mb-0 text-[15px] leading-6 text-text">
         {approvalSentence(card.preview, card.risk)}
       </p>
       {card.reason && <p className="mt-1 mb-0 text-[13px] text-muted">{card.reason}</p>}
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={busy}
@@ -78,7 +78,7 @@ export function ApprovalInline({
         >
           Not now
         </button>
-        <span aria-hidden="true" className="font-mono text-[12px] text-muted">
+        <span aria-hidden="true" className="ml-1 hidden font-mono text-[12px] text-muted sm:inline">
           Enter to approve, Esc to decline
         </span>
       </div>
