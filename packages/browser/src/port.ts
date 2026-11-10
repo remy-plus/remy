@@ -43,6 +43,13 @@ export interface SearchHit {
   snippet: string;
 }
 
+/** Whether Remy's own browser has a page open, and which. `url` and `title` are empty when closed. */
+export interface BrowserState {
+  open: boolean;
+  url: string;
+  title: string;
+}
+
 /**
  * A browser on the user's machine. One page at a time; links that open a new tab move to it.
  * Every call that changes the page returns a fresh snapshot, and refs from older snapshots stop working.
@@ -57,6 +64,13 @@ export interface Browser {
   type(ref: number, text: string, submit: boolean): Promise<PageSnapshot>;
   /** Runs a search in its own tab, so the current page stays where it is. */
   search(query: string, count: number): Promise<SearchHit[]>;
+  /**
+   * Read-only view for mirroring: never starts the browser, navigates, clicks or types.
+   * `open` is false when no browser process or page exists.
+   */
+  state(): Promise<BrowserState>;
+  /** A JPEG of the page as it is now, or undefined when nothing is open. Read-only. */
+  screenshot(): Promise<Buffer | undefined>;
   /** Opens the window (same profile, same page) so the user can act in it. */
   show(): Promise<void>;
   hide(): Promise<void>;
