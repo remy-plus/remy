@@ -57,11 +57,14 @@ class FakePlayer implements PlayerLike {
   onended: ((e: Event) => void) | null = null;
   onerror: ((e: Event | string) => void) | null = null;
   paused = false;
-  constructor(
-    readonly url: string,
-    private readonly log: string[],
-    private readonly blocked: boolean,
-  ) {}
+  readonly url: string;
+  private readonly log: string[];
+  private readonly blocked: boolean;
+  constructor(url: string, log: string[], blocked: boolean) {
+    this.url = url;
+    this.log = log;
+    this.blocked = blocked;
+  }
   play() {
     this.log.push(`play ${this.url}`);
     return this.blocked
@@ -111,7 +114,10 @@ function rig(o: { fetch?: boolean; blocked?: boolean; synth?: boolean } = {}): R
     lang = '';
     onend: (() => void) | null = null;
     onerror: (() => void) | null = null;
-    constructor(readonly text: string) {}
+    readonly text: string;
+    constructor(text: string) {
+      this.text = text;
+    }
   }
   vi.stubGlobal('SpeechSynthesisUtterance', Utterance);
   const synth = {
