@@ -181,6 +181,7 @@ import {
 } from './serve-settings.ts';
 import { createSkillsMount } from './serve-skills.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
+import { createVoiceMount, openVoiceLedger, readFishKey } from './serve-voice.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
 import { fetchSkill } from './skills-web.ts';
@@ -2184,7 +2185,18 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             return undefined;
           }
         })();
-        const spend = createSpend(store);
+        const voiceLedger = openVoiceLedger(home);
+        const spend = createSpend(store, undefined, () => voiceLedger.monthUsd());
+        // Read on each use (a short while cached), so a key added later works without a restart.
+        let fish: { at: number; key: string | undefined } | undefined;
+        const fishKey = () => {
+          if (!fish || Date.now() - fish.at > 30_000)
+            fish = {
+              at: Date.now(),
+              key: readFishKey(env, process.platform),
+            };
+          return fish.key;
+        };
         const notesCount = () => {
           try {
             return memory().list().length;
@@ -2242,6 +2254,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   address: () => `${bind.host}:${bind.port}`,
                   notesCount,
                   needsKey: (p) => Boolean(PROFILES[p]?.keyEnv),
+                  voiceReady: () => Boolean(fishKey()),
                 },
                 spend,
               ),
@@ -2284,6 +2297,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               }),
               createSkillsMount({ skills: skills() }),
               createBrowserMount({ browser: () => browser, redact }),
+              createVoiceMount({
+                key: fishKey,
+                voiceId: () => webPrefs.get().voice.id,
+                ledger: voiceLedger,
+                onKey: (k) => addSecret('FISH_API_KEY', k),
+              }),
               createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
               createSchedulesMount({
                 schedules: openSchedules(home),

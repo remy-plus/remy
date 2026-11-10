@@ -232,8 +232,10 @@ describe('settings', () => {
       quiet: false,
       quietHours: { from: '23:00', to: '07:00' },
       notifications: { approvals: true, finished: true, noticed: false, reviewAt: '07:30' },
+      voice: { id: 'e13fa398a7f445a685316a3de6089ce7' },
       appearance: 'dark',
     });
+    expect(r.json.voice).toEqual({ ready: false });
     expect(r.json.notes).toBe(2);
     expect(r.json.about).toMatchObject({ version: '9.9.9', dataDir: home });
     expect(r.json.models.everyday).toBe('llama3');
@@ -271,6 +273,16 @@ describe('settings', () => {
     expect((await again.api('/api/settings')).json.prefs.trust).toBe('away');
   });
 
+  it('saves the voice id and keeps the default for the rest', async () => {
+    const { api } = await serve([]);
+    const put = await api('/api/settings', {
+      method: 'PUT',
+      body: { voice: { id: 'abcdef0123456789' } },
+    });
+    expect(put.status).toBe(200);
+    expect(put.json.prefs.voice).toEqual({ id: 'abcdef0123456789' });
+  });
+
   it('refuses bad values, unknown keys and other appearances, and saves nothing', async () => {
     const { api } = await serve([]);
     const bad: unknown[] = [
@@ -286,6 +298,9 @@ describe('settings', () => {
       { notifications: { push: true } },
       { remember: 'yes' },
       { appearance: 'light' },
+      { voice: { id: 'has space' } },
+      { voice: { id: 'x' } },
+      { voice: { key: 'abc' } },
       { token: 'x' },
       { apiKey: 'sk-1234' },
       [],
