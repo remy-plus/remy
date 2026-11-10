@@ -58,7 +58,7 @@ export function Composer({
       className="w-full"
     >
       <div
-        className={`flex items-end gap-2 rounded-[22px] border border-edge-hi bg-surface px-4 py-3 transition-colors focus-within:border-stone ${big ? 'min-h-[120px] sm:px-5 sm:py-4' : ''}`}
+        className={`flex items-end gap-2 rounded-[22px] border border-edge-hi bg-surface px-4 py-3 transition-[border-color,background-color] duration-300 focus-within:border-text/40 focus-within:bg-raise ${big ? 'min-h-[120px] sm:px-5 sm:py-4' : ''}`}
       >
         <label htmlFor={id} className="sr-only">
           Ask Remy to do anything
@@ -71,6 +71,7 @@ export function Composer({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKey}
           placeholder={placeholder}
+          style={{ outline: 'none' }}
           className={`max-h-60 min-w-0 flex-1 resize-none border-0 bg-transparent py-2 text-text outline-none placeholder:text-muted ${big ? 'text-[18px] leading-[1.5]' : 'text-[16px] leading-[1.5]'}`}
         />
         <button
