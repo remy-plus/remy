@@ -47,7 +47,7 @@ describe('Skills', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Turn on' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Run it now' }));
-    expect(await screen.findByRole('link', { name: 'Open the task' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'Open the job' })).toBeTruthy();
   });
 
   it('saves the suggestion as a skill', async () => {
