@@ -22,6 +22,8 @@ export interface SettingValues {
   onboarded: boolean;
   /** The dock's items, in order. Browser-local. */
   dock: string[];
+  /** How the app is laid out. Browser-local. */
+  layout: 'simple' | 'command';
 }
 
 export const DEFAULTS: SettingValues = {
@@ -40,6 +42,7 @@ export const DEFAULTS: SettingValues = {
   'quiet.to': '07:00',
   onboarded: false,
   dock: ['chat', 'activity', 'browser', 'brain', 'connections', 'settings'],
+  layout: 'simple',
 };
 
 export type SettingKey = keyof SettingValues;
@@ -113,7 +116,7 @@ const toPatch = (key: SettingKey, v: unknown): SettingsPatch | null => {
     case 'notify.review':
       return { notifications: { reviewAt: v as string } };
     default:
-      return null; // `escalate`, `onboarded` and `dock` stay in this browser
+      return null; // `escalate`, `onboarded`, `dock` and `layout` stay in this browser
   }
 };
 

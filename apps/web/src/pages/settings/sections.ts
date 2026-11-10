@@ -7,14 +7,20 @@ export interface SectionProps {
 }
 
 export const SECTIONS = [
-  { id: 'trust', label: 'Trust and approvals' },
-  { id: 'model', label: 'Model and keys' },
+  { id: 'dock', label: 'Your dock' },
+  { id: 'trust', label: 'How much Remy does on its own' },
   { id: 'budget', label: 'Spending' },
+  { id: 'model', label: 'Model and keys' },
   { id: 'memory', label: 'Memory and privacy' },
   { id: 'notifications', label: 'Notifications' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'server', label: 'Home server' },
-  { id: 'about', label: 'About' },
+  { id: 'computer', label: 'This computer' },
 ] as const;
 
 export type SectionId = (typeof SECTIONS)[number]['id'];
+
+/** Old section names that still open the right place. */
+export const SECTION_ALIASES: Record<string, SectionId> = {
+  server: 'computer',
+  about: 'computer',
+  appearance: 'dock',
+};

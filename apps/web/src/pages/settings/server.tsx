@@ -10,12 +10,12 @@ const gone = (what: string) => (
   <p className="m-0 text-[15px] text-muted">{what} is not available yet.</p>
 );
 
-export function Server({ data }: SectionProps) {
+function Server({ data }: SectionProps) {
   const api = useApi();
   const [asking, setAsking] = useState(false);
   const [fresh, setFresh] = useState<string | null>(null);
   const [error, setError] = useState('');
-  if (!data) return gone('The home server');
+  if (!data) return gone('This computer');
 
   const rotate = async () => {
     setAsking(false);
@@ -30,7 +30,7 @@ export function Server({ data }: SectionProps) {
   return (
     <>
       <Row title="Address" help="Where this browser reaches Remy.">
-        <p className="m-0 font-mono text-[14px]">{data.server.address}</p>
+        <p className="m-0 text-[15px]">{data.server.address}</p>
       </Row>
       <Row title="Access token" help="Anyone with the token can use your Remy.">
         <button type="button" className={buttonQuiet} onClick={() => setAsking(true)}>
@@ -80,7 +80,7 @@ export function Server({ data }: SectionProps) {
   );
 }
 
-export function About({ data }: SectionProps) {
+function About({ data }: SectionProps) {
   if (!data) return gone('The version information');
   const rows: [string, string][] = [
     ['Version', data.about.version],
@@ -95,9 +95,20 @@ export function About({ data }: SectionProps) {
           className="grid gap-x-10 gap-y-1 border-t border-edge py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]"
         >
           <dt className="text-[15px] font-medium">{k}</dt>
-          <dd className="m-0 font-mono text-[14px] break-words">{v}</dd>
+          <dd className="m-0 text-[15px] break-words">{v}</dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+/** This computer: where Remy is reached, the access token, and what is installed. */
+export function Computer(props: SectionProps) {
+  if (!props.data) return gone('This computer');
+  return (
+    <>
+      <Server {...props} />
+      <About {...props} />
+    </>
   );
 }
