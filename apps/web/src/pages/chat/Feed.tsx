@@ -107,7 +107,7 @@ function Answer({ text }: { text: string }) {
     }
   };
   return (
-    <div className="rise mt-2" style={rise(1)}>
+    <div className="rise answer-block mt-0.5" style={rise(1)}>
       {paragraphs.map((p) => (
         <p key={p} className="mt-0 mb-3 text-[15px] leading-[1.7] break-words text-text">
           {p}
@@ -116,7 +116,7 @@ function Answer({ text }: { text: string }) {
       <button
         type="button"
         onClick={copy}
-        className="-ml-2 h-7 cursor-pointer rounded-full border-0 bg-transparent px-2 text-[12px] text-muted transition-colors duration-300 hover:text-text"
+        className="copy-reveal -ml-2 h-7 cursor-pointer rounded-full border-0 bg-transparent px-2 text-[12px] text-muted transition-[color,opacity] duration-300 hover:text-text"
       >
         {copied ? 'Copied' : 'Copy'}
       </button>
@@ -206,10 +206,15 @@ function Failed({
   );
 }
 
-function Shell({ mind, children }: { mind: MindState; children: React.ReactNode }) {
+/**
+ * Remy's side of a turn. Only the live turn carries the Mind: under about 48 px ASCII reads as texture, so a
+ * finished turn is plain text and the feed stays calm.
+ */
+function Shell({ mind, children }: { mind?: MindState; children: React.ReactNode }) {
+  if (!mind) return <div className="mt-5 min-w-0">{children}</div>;
   return (
-    <div className="mt-4 flex gap-3">
-      <div className="mt-0.5 shrink-0">
+    <div className="mt-5 flex gap-3">
+      <div className="mt-px shrink-0">
         <MindGlyph state={mind} size={32} />
       </div>
       <div className="min-w-0 flex-1">{children}</div>
@@ -262,15 +267,7 @@ function LiveBlock({ turn, onChanged }: { turn: ChatTurn; onChanged: () => void 
 }
 
 /** A turn that has ended: the feed folds into one line, then the answer or the reason. */
-function EndedBlock({
-  turn,
-  mind,
-  onRetry,
-}: {
-  turn: ChatTurn;
-  mind: MindState;
-  onRetry: (prompt: string) => void;
-}) {
+function EndedBlock({ turn, onRetry }: { turn: ChatTurn; onRetry: (prompt: string) => void }) {
   const api = useApi();
   const [view, setView] = useState<TaskView | null>(null);
   const [shown, setShown] = useState(false);
@@ -291,7 +288,7 @@ function EndedBlock({
   const answer = turn.answer ?? view?.final?.answer;
   const failed = turn.state === 'failed' || turn.state === 'stopped';
   return (
-    <Shell mind={mind}>
+    <Shell>
       {lines.length > 0 && (
         <div>
           <button
@@ -322,17 +319,15 @@ function EndedBlock({
   );
 }
 
-/** One exchange: the person's message, then Remy's block. `mind` is the glyph's state once it has ended. */
+/** One exchange: the person's message, then Remy's block. */
 export function Turn({
   turn,
   index,
-  mind = 'rest',
   onChanged,
   onRetry,
 }: {
   turn: ChatTurn;
   index: number;
-  mind?: MindState;
   onChanged: () => void;
   onRetry: (prompt: string) => void;
 }) {
@@ -347,7 +342,7 @@ export function Turn({
       {live ? (
         <LiveBlock turn={turn} onChanged={onChanged} />
       ) : (
-        <EndedBlock turn={turn} mind={mind} onRetry={onRetry} />
+        <EndedBlock turn={turn} onRetry={onRetry} />
       )}
     </article>
   );

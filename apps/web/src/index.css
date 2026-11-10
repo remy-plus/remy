@@ -147,6 +147,17 @@ body {
   animation: rise 0.5s cubic-bezier(0.22, 0.7, 0.2, 1) both;
   animation-delay: calc(var(--i, 0) * 70ms);
 }
+/* Copy shows on hover or keyboard focus where there is a pointer, and always on touch. */
+@media (hover: hover) {
+  .copy-reveal {
+    opacity: 0;
+  }
+  .answer-block:hover .copy-reveal,
+  .answer-block:focus-within .copy-reveal,
+  .copy-reveal:focus-visible {
+    opacity: 1;
+  }
+}
 .pop {
   animation: pop 0.42s cubic-bezier(0.22, 0.7, 0.2, 1) both;
 }
