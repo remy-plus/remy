@@ -180,7 +180,7 @@ export function speakable(answer: string): string[] {
     onScreen = true;
     text = lines.filter((l) => !LIST_LINE.test(l)).join('\n');
   }
-  let spoken = plain(text.replace(/\n{2,}/g, '. ').replace(/\n/g, ' '));
+  let spoken = plain(text.replace(/([^.!?:;,\s])\s*\n{2,}/g, '$1. ').replace(/\n/g, ' '));
   if (spoken.length > SPOKEN_MAX) {
     onScreen = true;
     const cut = spoken.slice(0, SPOKEN_MAX);
