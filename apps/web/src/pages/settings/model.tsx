@@ -85,18 +85,18 @@ export function Model({ data }: SectionProps) {
 
       <h3 className={`${heading} mt-8`}>Which model does what</h3>
       <dl className="m-0 grid max-w-[620px] grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-3 sm:grid-cols-[192px_minmax(0,1fr)]">
-        <dt className="self-center text-[15px]">Everyday tasks</dt>
+        <dt className="self-center text-[15px]">Everyday jobs</dt>
         <dd className="m-0 rounded-md border border-edge-hi bg-surface px-3 py-[9px] font-mono text-[13px]">
           {data.models.everyday} · {data.models.everydayCost}
         </dd>
-        <dt className="self-center text-[15px]">Hard tasks</dt>
+        <dt className="self-center text-[15px]">Hard jobs</dt>
         <dd className="m-0 rounded-md border border-edge-hi bg-surface px-3 py-[9px] font-mono text-[13px]">
           {data.models.hard} · {data.models.hardCost}
         </dd>
       </dl>
       <div className="mt-5 max-w-[620px]">
         <Toggle
-          label="Move up to the stronger model when a task is hard"
+          label="Move up to the stronger model when a job is hard"
           help="Remy decides, and tells you when it does. It stays inside your budget."
           checked={escalate}
           onChange={setEscalate}

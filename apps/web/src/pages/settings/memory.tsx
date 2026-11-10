@@ -55,8 +55,8 @@ export function Memory({ data, reload }: SectionProps) {
       </Row>
       <Row title="Where your data goes">
         <p className="m-0 max-w-[560px] text-[14px] leading-relaxed text-muted">
-          Notes, tasks and keys stay on the machine that runs Remy. Remy sends text only to the
-          model you chose and to the apps you connected.
+          Notes, jobs and keys stay on the machine that runs Remy. Remy sends text only to the model
+          you chose and to the apps you connected.
         </p>
       </Row>
       <Confirm

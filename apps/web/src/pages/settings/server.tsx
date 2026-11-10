@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApi } from '../../api/index.tsx';
 import { Confirm } from '../../components/Confirm.tsx';
 import { buttonQuiet } from '../../components/ui.ts';
+import { ago } from '../../lib/when.ts';
 import { Row } from './controls.tsx';
 import type { SectionProps } from './sections.ts';
 
@@ -59,7 +60,7 @@ export function Server({ data }: SectionProps) {
               className="flex list-none justify-between gap-4 border-b border-edge py-2 text-[14px] first:pt-0 last:border-b-0"
             >
               <span>{s.where}</span>
-              <span className="font-mono text-[12px] text-muted">{s.at}</span>
+              <span className="text-[13px] text-muted">{ago(s.at) || s.at}</span>
             </li>
           ))}
         </ul>
