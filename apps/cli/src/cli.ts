@@ -181,7 +181,12 @@ import {
 } from './serve-settings.ts';
 import { createSkillsMount } from './serve-skills.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
-import { createVoiceMount, openVoiceLedger, readFishKey } from './serve-voice.ts';
+import {
+  createFishKeySource,
+  createVoiceMount,
+  openVoiceLedger,
+  readFishKeyAsync,
+} from './serve-voice.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
 import { fetchSkill } from './skills-web.ts';
@@ -2185,18 +2190,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             return undefined;
           }
         })();
-        const voiceLedger = openVoiceLedger(home);
-        const spend = createSpend(store, undefined, () => voiceLedger.monthUsd());
-        // Read on each use (a short while cached), so a key added later works without a restart.
-        let fish: { at: number; key: string | undefined } | undefined;
-        const fishKey = () => {
-          if (!fish || Date.now() - fish.at > 30_000)
-            fish = {
-              at: Date.now(),
-              key: readFishKey(env, process.platform),
-            };
-          return fish.key;
-        };
+        const voiceLedger = openVoiceLedger(home, undefined, (line) => out(st.dim(line)));
+        const spend = createSpend(store, undefined, (at) => voiceLedger.monthUsd(at));
+        // Read on each use (a short while cached, never blocking the server), so a key added later
+        // works without a restart. A slow or locked Keychain reads as "no key".
+        const fishKeys = createFishKeySource(() => readFishKeyAsync(env, process.platform));
+        const fishKey = fishKeys.get;
+        void fishKeys.get(); // warm the cache so Settings can say whether voice is ready
         const notesCount = () => {
           try {
             return memory().list().length;
@@ -2254,7 +2254,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   address: () => `${bind.host}:${bind.port}`,
                   notesCount,
                   needsKey: (p) => Boolean(PROFILES[p]?.keyEnv),
-                  voiceReady: () => Boolean(fishKey()),
+                  voiceReady: () => Boolean(fishKeys.peek()),
                 },
                 spend,
               ),
@@ -2301,6 +2301,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 key: fishKey,
                 voiceId: () => webPrefs.get().voice.id,
                 ledger: voiceLedger,
+                assertBudget: () => assertUnderMonthlyCap(webPrefs, spend),
                 onKey: (k) => addSecret('FISH_API_KEY', k),
               }),
               createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
