@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import { type ChatTurn, type TaskView, useApi } from '../../api/index.tsx';
+import { BrowserPane } from '../../components/BrowserPane.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
 import { type FeedLine, feedLines } from '../../lib/feed.ts';
 import type { MindState } from '../../lib/mind.ts';
@@ -242,6 +243,14 @@ function LiveBlock({ turn, onChanged }: { turn: ChatTurn; onChanged: () => void 
         <p role="status" className="m-0 py-0.5 text-[15px] leading-[1.6] text-muted">
           {phase === 'waiting' ? 'Waiting for you' : 'Thinking it through'}
         </p>
+      )}
+      {view?.calls.some((c) => c.inFlight && c.tool.startsWith('browser')) && (
+        <div className="mt-2">
+          <BrowserPane compact />
+          <a href="#/browser" className="mt-1 inline-block text-[13px] text-muted hover:text-text">
+            Open Browser
+          </a>
+        </div>
       )}
       {card && <ApprovalInline taskId={turn.taskId} card={card} onResolved={resolved} />}
       {question && !card && (

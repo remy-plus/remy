@@ -272,8 +272,19 @@ export interface SettingsData {
 }
 
 /** Everything the screens may ask of the server. Components use this and nothing else. */
+// ---- Browser ----
+/** Remy's own browser, from GET /api/browser/state. */
+export interface BrowserState {
+  open: boolean;
+  url?: string;
+  title?: string;
+}
+
 export interface RemyApi {
   readonly kind: 'mock' | 'http';
+  browserState(): Promise<BrowserState>;
+  /** An object URL for the current frame (the caller revokes it), or null when nothing is open. */
+  browserFrame(): Promise<string | null>;
   listTasks(q?: { status?: TaskStatus; limit?: number }): Promise<TaskListItem[]>;
   startTask(prompt: string, trust?: TrustLevel): Promise<{ taskId: string }>;
   getTask(id: string): Promise<TaskView>;
