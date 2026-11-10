@@ -112,7 +112,7 @@ export function Connections() {
                 aria-hidden="true"
                 className={`${mono} grid size-10 shrink-0 place-items-center rounded-md border border-edge-hi text-[11px]`}
               >
-                {'>_'}
+                ▭
               </span>
               <div className="min-w-[160px] flex-1">
                 <h3 className={`${mono} m-0 text-[15px] font-medium`}>{m.name}</h3>
@@ -215,8 +215,8 @@ function Panel({
         <Eyebrow>{machine.name} · how Remy behaves</Eyebrow>
         <p className="mt-4 mb-0 text-[14px] text-muted">{machine.detail}</p>
         <p className="mt-4 mb-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] text-muted">
-          Every command asks you first and is shown in full. Output from the machine is treated as
-          untrusted text, not orders.
+          Every command asks you first and is shown in full. Anything the machine sends back is
+          read as information, never as instructions.
         </p>
         <Notice>{said}</Notice>
       </div>
