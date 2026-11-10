@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MIND_STATES, type MindState, mindCell, mindLabel } from './mind.ts';
 
 const N = 15;
-const grid = (s: MindState, t = 1.3, level = 0.7) =>
+const grid = (s: MindState, t = 0.3, level = 0.7) =>
   Array.from({ length: N }, (_, r) =>
     Array.from({ length: N }, (_, c) => mindCell(s, t, c, r, N, N, level).ch).join(''),
   ).join('\n');
