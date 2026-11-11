@@ -329,6 +329,8 @@ export interface RemyApi {
   disconnectApp(appId: string): Promise<void>;
   signInApp(appId: string): Promise<void>;
   appCatalog(): Promise<CatalogApp[]>;
+  /** What the official registry has for these words. Read-only: it adds nothing. */
+  searchApps(query: string): Promise<RegistrySearch>;
   connectApp(appId: string, level: PermissionLevel): Promise<void>;
   testMachine(input: MachineInput): Promise<MachineTest>;
   addMachine(input: MachineInput): Promise<void>;
@@ -420,6 +422,25 @@ export interface CatalogApp {
   blurb: string;
   spendsMoney?: boolean;
   levels: { id: PermissionLevel; label: string; detail: string }[];
+}
+/** One app from the official registry, as the web app shows it. */
+export interface RegistryApp {
+  /** The registry's own name, e.g. `app.linear/linear`. */
+  name: string;
+  title: string;
+  description: string;
+  version: string;
+  /** `remote` is a hosted address; `package` is a program this machine runs. */
+  kind: 'remote' | 'package';
+  /** The address, or the command line, that would be added. */
+  where: string;
+  /** The exact command that adds it, for the person to run in their terminal. */
+  command: string;
+}
+export interface RegistrySearch {
+  apps: RegistryApp[];
+  /** Why adding one happens in the terminal, not here. */
+  note: string;
 }
 export interface MachineInput {
   name: string;

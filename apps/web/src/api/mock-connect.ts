@@ -10,6 +10,7 @@ import type {
   Machine,
   NewScheduleInput,
   PermissionLevel,
+  RegistryApp,
   RemyApi,
   ScheduleItem,
   SchedulesData,
@@ -464,6 +465,49 @@ const TIMELINE: SchedulesData['timeline'] = [
   { at: 'tomorrow 16:00', title: 'Weekly report from Notion' },
 ];
 
+/** A few real registry records, so the search box has something to show without a network. */
+const REGISTRY: RegistryApp[] = [
+  {
+    name: 'app.linear/linear',
+    title: 'Linear',
+    description: 'Issues, projects and cycles.',
+    version: '1.0.0',
+    kind: 'remote',
+    where: 'https://mcp.linear.app/mcp',
+    command: 'remy connect --registry app.linear/linear',
+  },
+  {
+    name: 'com.notion/mcp',
+    title: 'Notion',
+    description: 'Pages, databases and search.',
+    version: '2.1.0',
+    kind: 'remote',
+    where: 'https://mcp.notion.com/mcp',
+    command: 'remy connect --registry com.notion/mcp',
+  },
+  {
+    name: 'io.github.me/mcp-filesystem',
+    title: 'Filesystem',
+    description: 'Read and write files in one folder.',
+    version: '0.2.0',
+    kind: 'package',
+    where: 'npx -y @me/mcp-filesystem',
+    command: 'remy connect --registry io.github.me/mcp-filesystem',
+  },
+  {
+    name: 'ai.smithery/smithery-ai-slack',
+    title: 'Slack',
+    description: 'Channels, messages and search.',
+    version: '1.4.2',
+    kind: 'remote',
+    where: 'https://server.smithery.ai/@smithery-ai/slack/mcp',
+    command: 'remy connect --registry ai.smithery/smithery-ai-slack',
+  },
+];
+
+const REGISTRY_NOTE =
+  'These come from the official registry, not from Remy. Adding one runs a command or connects an address, so it is done in your terminal, where you see the exact command first.';
+
 const clone = <T>(x: T): T => structuredClone(x);
 const wait = <T>(v: T): Promise<T> => Promise.resolve(v);
 
@@ -475,6 +519,7 @@ export function createConnectMock(): Pick<
   | 'disconnectApp'
   | 'signInApp'
   | 'appCatalog'
+  | 'searchApps'
   | 'connectApp'
   | 'testMachine'
   | 'addMachine'
@@ -527,6 +572,16 @@ export function createConnectMock(): Pick<
       a.blurb = a.id === 'slack' ? 'Read channels, post with approval' : a.blurb;
     },
     appCatalog: () => wait(clone(CATALOG)),
+    searchApps: (query) => {
+      const q = query.trim().toLowerCase();
+      const apps = REGISTRY.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.title.toLowerCase().includes(q) ||
+          a.description.toLowerCase().includes(q),
+      );
+      return wait({ apps: clone(apps), note: REGISTRY_NOTE });
+    },
     async connectApp(appId, level) {
       const c = CATALOG.find((x) => x.id === appId);
       if (!c) throw new Error('There is no such app.');

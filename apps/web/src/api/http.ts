@@ -16,6 +16,7 @@ import type {
   HomeData,
   MachineInput,
   MachineTest,
+  RegistrySearch,
   RemyApi,
   ReviewData,
   SchedulesData,
@@ -174,6 +175,8 @@ export function createHttpApi(opts: {
       return (await json<{ apps: CatalogApp[] }>('/api/catalog')).apps;
     },
     connectApp: (catalogId, level) => post('/api/connections', { catalogId, level }),
+    searchApps: (query) =>
+      json<RegistrySearch>(`/api/connections/search?q=${encodeURIComponent(query)}`),
     // The key is never sent: the server uses the keys of the account Remy runs under.
     testMachine: (m) => json<MachineTest>('/api/machines/test', machineRequest(m)),
     addMachine: (m) => post('/api/machines', machineBody(m)),
