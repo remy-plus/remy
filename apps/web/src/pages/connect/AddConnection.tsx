@@ -1,6 +1,7 @@
 import { type FormEvent, useId, useState } from 'react';
 import type { CatalogApp, PermissionLevel } from '../../api/index.tsx';
 import { describeError } from '../../lib/errors.ts';
+import { FindApp } from './FindApp.tsx';
 import {
   AppLogo,
   field,
@@ -225,17 +226,14 @@ export function AddConnection() {
               </button>
             </div>
           )}
-          <div className="mt-5 rounded-[10px] border border-dashed border-edge-hi px-4 py-4">
-            <h2 className="m-0 text-[16px] font-medium">Something else?</h2>
-            <p className="m-0 mt-1 max-w-[560px] text-[14px] leading-relaxed text-muted">
-              Adding an app by its own address is not available in the app yet. Do it in the
-              terminal with{' '}
-              <code className={`${mono} text-[13px]`}>
-                remy connect add &lt;name&gt; --url &lt;address&gt;
-              </code>
-              , then reload this page.
-            </p>
-          </div>
+          <FindApp />
+          <p className="mt-4 mb-0 max-w-[560px] text-[13px] leading-relaxed text-muted">
+            Have a private server? Add it in the terminal with{' '}
+            <code className={`${mono} text-[12.5px]`}>
+              remy connect add &lt;name&gt; --url &lt;address&gt;
+            </code>
+            , then reload this page.
+          </p>
         </>
       )}
     </Page>
