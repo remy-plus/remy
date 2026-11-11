@@ -255,6 +255,11 @@ function OpenChat({ id }: { id: string }) {
         <div ref={end} />
       </div>
       <div className="sticky bottom-0 bg-bg px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))]">
+        {/* The feed fades under the composer instead of being sliced by its top edge. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-[linear-gradient(to_top,var(--bg),transparent)]"
+        />
         <div className="mx-auto max-w-[688px]">
           {problem && (
             <p role="alert" className="m-0 mb-2 px-4 text-[13px] text-muted">
