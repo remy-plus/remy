@@ -16,6 +16,15 @@ describe('provider errors in plain words', () => {
     expect(explainModelError(after)).toContain('17,786');
   });
 
+  it('says a request carries too many images, and does not blame the text', () => {
+    const raw =
+      'HTTP 400: {"error":{"code":3051,"message":"Total number of images exceeds the maximum allowed of 20."}}';
+    expect(explainModelError(raw)).toBe(
+      'This request carries more images than this model accepts (20 at most). Send fewer images, or switch models with /model.',
+    );
+    expect(explainModelError(raw)).not.toContain('shorter request');
+  });
+
   it('says a daily limit is used up, and when it lifts', () => {
     const raw =
       "The model failed: this model's daily limit is used up. HTTP 429: service tier `on_demand` on tokens per day (TPD): Limit 200000. Please try again in 7m44.4s.";

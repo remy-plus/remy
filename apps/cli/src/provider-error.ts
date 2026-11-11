@@ -33,9 +33,22 @@ export function providerName(raw: string): string {
 
 const num = (n: number) => n.toLocaleString('en-US');
 
+/**
+ * A request refused for carrying more images than the model takes (Mistral answers code 3051 with
+ * "Total number of images exceeds the maximum allowed of 20"). Shortening the text does not help,
+ * so this is answered before the size checks below.
+ */
+const IMAGE_LIMIT = /total number of images exceeds the maximum allowed of (\d+)/i;
+
 /** A request the provider refused for its size (HTTP 413, a token cap below the request, a context limit). */
 export function explainTooLarge(raw: string): string | undefined {
   const m = bodyMessage(raw);
+  const images = IMAGE_LIMIT.exec(m)?.[1];
+  if (images) {
+    const who = providerName(raw);
+    const owner = who === 'The provider' ? 'this model' : who;
+    return `This request carries more images than ${owner} accepts (${images} at most). Send fewer images, or switch models with /model.`;
+  }
   const limit = /\blimit\s+(\d[\d,]*)/i.exec(m)?.[1];
   const asked = /\brequested\s+(\d[\d,]*)/i.exec(m)?.[1];
   const over =
