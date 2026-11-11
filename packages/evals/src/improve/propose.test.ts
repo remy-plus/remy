@@ -6,8 +6,8 @@ import {
   caseScores,
   estimateUsd,
   groupFailures,
-  passingCases,
   PROPOSE_SYSTEM,
+  passingCases,
   propose,
   proposePrompt,
 } from './propose.ts';
