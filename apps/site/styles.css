@@ -1175,11 +1175,22 @@ html.js .hero .where {
 }
 html.js .app [data-seq]:not(.shown) {
   opacity: 0;
+  /* Invisible but still tabbable is a trap: the demo's Approve and Decline buttons would take
+     focus while nobody can see them. visibility takes them out of the tab order as well. */
+  visibility: hidden;
 }
 html.js .app [data-seq] {
   transition:
     opacity 0.4s var(--ease),
-    transform 0.4s var(--ease);
+    transform 0.4s var(--ease),
+    visibility 0s linear 0.4s;
+}
+html.js .app [data-seq].shown {
+  visibility: visible;
+  transition:
+    opacity 0.4s var(--ease),
+    transform 0.4s var(--ease),
+    visibility 0s;
 }
 html.js .modal[data-seq] {
   transform: translate(-50%, calc(-50% + 14px));
@@ -1192,10 +1203,14 @@ html.js .modal[data-seq].shown {
     scroll-behavior: auto;
   }
   html.js .rv,
-  html.js .app [data-seq] {
+  html.js .app [data-seq],
+  /* Named as well, because :not(.shown) outranks the plain selector above. */
+  html.js .app [data-seq]:not(.shown) {
     opacity: 1;
     transform: none;
     transition: none;
+    /* Without motion there is no reveal, so nothing may stay hidden. */
+    visibility: visible;
   }
   html.js .modal[data-seq] {
     transform: translate(-50%, -50%);
