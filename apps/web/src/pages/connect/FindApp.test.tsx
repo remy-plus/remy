@@ -80,6 +80,22 @@ describe('Find any app', () => {
     expect(await screen.findByText('Copied')).toBeTruthy();
   });
 
+  it('shows the command when the browser never answers the clipboard', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn(() => new Promise(() => {})) },
+      configurable: true,
+    });
+    open();
+    await screen.findByRole('heading', { level: 2, name: 'Find any app' });
+    type('linear');
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy the command to add Linear' }));
+    expect(
+      await screen.findByText('remy connect --registry app.linear/linear', undefined, {
+        timeout: 4000,
+      }),
+    ).toBeTruthy();
+  });
+
   it('shows the command when the browser will not let the page copy', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },

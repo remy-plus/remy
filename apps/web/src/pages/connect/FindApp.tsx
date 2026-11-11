@@ -1,6 +1,6 @@
 // The official registry, searched from the web app. Read-only: the answer names a command for the
 // person to run in their terminal, where they see the exact command before anything is added.
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { RegistryApp, RegistrySearch } from '../../api/index.tsx';
 import { useApi } from '../../api/index.tsx';
 import { describeError } from '../../lib/errors.ts';
@@ -12,9 +12,14 @@ const chip =
   'cursor-pointer rounded-full border border-edge bg-transparent px-3 py-1.5 text-[12px] whitespace-nowrap text-muted hover:text-text';
 const badge = `${mono} rounded-[4px] border border-edge bg-raise px-1.5 py-px text-[11px] text-muted`;
 
-/** Copies the command, or shows it when the browser will not let the page write to the clipboard. */
+/**
+ * Copies the command, or shows it when the browser will not let the page write to the clipboard.
+ * A browser that asks permission and never answers would leave the button looking dead, so the
+ * command is shown after a moment either way.
+ */
 function CopyCommand({ command, title }: { command: string; title: string }) {
   const [state, setState] = useState<'idle' | 'done' | 'failed'>('idle');
+  const settled = useRef(false);
   useEffect(() => {
     if (state !== 'done') return;
     const t = setTimeout(() => setState('idle'), 2000);
@@ -22,17 +27,31 @@ function CopyCommand({ command, title }: { command: string; title: string }) {
   }, [state]);
   if (state === 'failed')
     return <code className={`${mono} block text-[12px] break-all text-muted`}>{command}</code>;
+  const copy = () => {
+    settled.current = false;
+    const give = (next: 'done' | 'failed') => {
+      if (settled.current) return;
+      settled.current = true;
+      setState(next);
+    };
+    const slow = setTimeout(() => give('failed'), 3000);
+    navigator.clipboard.writeText(command).then(
+      () => {
+        clearTimeout(slow);
+        give('done');
+      },
+      () => {
+        clearTimeout(slow);
+        give('failed');
+      },
+    );
+  };
   return (
     <button
       type="button"
       className={chip}
       aria-label={`Copy the command to add ${title}`}
-      onClick={() => {
-        navigator.clipboard
-          .writeText(command)
-          .then(() => setState('done'))
-          .catch(() => setState('failed'));
-      }}
+      onClick={copy}
     >
       {state === 'done' ? 'Copied' : 'Copy command'}
     </button>
