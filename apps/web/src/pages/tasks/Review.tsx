@@ -80,7 +80,7 @@ export function Review() {
     .join(' to ');
   return (
     <div className="grid min-h-[calc(100dvh-66px)] lg:grid-cols-[minmax(0,1fr)_400px]">
-      <div className="min-w-0 px-5 pt-8 pb-12 sm:px-14">
+      <div className="min-w-0 px-5 pt-8 pb-12 sm:px-8 lg:pr-12 lg:pl-14">
         <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>While you were away · {span}</p>
         <h1 className="m-0 mb-6 max-w-[800px] text-[30px] leading-[1.15] font-medium tracking-tight sm:text-[40px]">
           {data.headline} <span className="text-muted">{data.rest}</span>
