@@ -52,6 +52,7 @@ export function Page({
   aside,
   children,
   asideWidth = 'lg:grid-cols-[minmax(0,1fr)_400px]',
+  tabs,
 }: {
   title: string;
   lead?: string;
@@ -59,10 +60,13 @@ export function Page({
   aside?: ReactNode;
   children: ReactNode;
   asideWidth?: string;
+  /** A section switcher above the title. It belongs inside the column, so it lines up with the title. */
+  tabs?: ReactNode;
 }) {
   return (
     <div className={`grid min-h-[calc(100vh-66px)] ${aside ? asideWidth : ''}`}>
       <div className="min-w-0 px-5 py-8 sm:px-8 lg:pr-12 lg:pl-14">
+        {tabs}
         {crumb && (
           <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>
             <a href="#/connections" className="text-text underline">
