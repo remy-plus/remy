@@ -18,11 +18,16 @@ export function BrainTabs({ current }: { current: BrainSection }) {
             key={t.id}
             href={t.href}
             aria-current={on ? 'page' : undefined}
-            className={`pb-1 no-underline border-b ${
-              on ? 'border-text text-text' : 'border-transparent text-muted hover:text-text'
-            }`}
+            className="inline-flex min-h-8 items-center no-underline"
           >
-            {t.label}
+            {/* The underline stays tight to the words; the link itself keeps a full-height hit area. */}
+            <span
+              className={`border-b pb-1 ${
+                on ? 'border-text text-text' : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              {t.label}
+            </span>
           </a>
         );
       })}
