@@ -41,7 +41,7 @@ function CopyCommand({ command, title }: { command: string; title: string }) {
 
 function Row({ app }: { app: RegistryApp }) {
   return (
-    <li className="flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-edge px-4 py-3.5 first:border-t-0">
+    <li className="flex flex-col gap-2 border-t border-edge px-4 py-3.5 first:border-t-0 sm:flex-row sm:items-start sm:gap-x-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-[15px] font-medium">{app.title}</span>
@@ -53,7 +53,9 @@ function Row({ app }: { app: RegistryApp }) {
         )}
         <p className={`${mono} m-0 mt-1.5 text-[12px] break-all text-muted`}>{app.where}</p>
       </div>
-      <CopyCommand command={app.command} title={app.title} />
+      <div className="shrink-0 self-start">
+        <CopyCommand command={app.command} title={app.title} />
+      </div>
     </li>
   );
 }
@@ -118,7 +120,7 @@ export function FindApp() {
           <input
             id={`${id}-search`}
             type="search"
-            className={`${field} min-w-[220px] flex-1`}
+            className={`${field} w-full max-w-[420px] min-w-[220px] flex-1`}
             placeholder="Notion, Postgres, Stripe…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

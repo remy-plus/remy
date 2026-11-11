@@ -21,7 +21,9 @@ const open = (api: RemyApi = createMockApi()) => {
 };
 
 const type = (text: string) =>
-  fireEvent.change(screen.getByLabelText('Search the official registry'), { target: { value: text } });
+  fireEvent.change(screen.getByLabelText('Search the official registry'), {
+    target: { value: text },
+  });
 
 describe('Find any app', () => {
   it('says what to do before anything is typed', async () => {
@@ -72,7 +74,9 @@ describe('Find any app', () => {
     await screen.findByRole('heading', { level: 2, name: 'Find any app' });
     type('linear');
     fireEvent.click(await screen.findByRole('button', { name: 'Copy the command to add Linear' }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('remy connect --registry app.linear/linear'));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith('remy connect --registry app.linear/linear'),
+    );
     expect(await screen.findByText('Copied')).toBeTruthy();
   });
 
