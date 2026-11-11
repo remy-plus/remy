@@ -100,7 +100,14 @@ import {
 } from './chat.ts';
 import { type FileConfig, loadConfig } from './config.ts';
 import { connectCommand } from './connect.ts';
-import { applyPlan, planCustom, planFromEntry, suggestName, takenNames } from './connect-plan.ts';
+import {
+  applyPlan,
+  planCustom,
+  planFromEntry,
+  planFromRegistry,
+  suggestName,
+  takenNames,
+} from './connect-plan.ts';
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
@@ -137,6 +144,7 @@ import { forBudget, forNotice, parseDuration } from './long-run.ts';
 import { CATALOG, findCatalog } from './mcp-catalog.ts';
 import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
+import { type RegistryApp, searchRegistry } from './mcp-registry.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { type MemoryStore, openMemory, personaliseOn, plainMemory } from './memory.ts';
 import { cardNotification, notificationFor, notify, type RunScript } from './notify.ts';
@@ -1524,7 +1532,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         }
       },
     };
+    /** The last registry answer, so a chosen name can be turned back into a plan. */
+    const found = new Map<string, RegistryApp>();
     const connectFlow: ConnectFlowApi = {
+      async search(query) {
+        const apps = await searchRegistry(query, {
+          limit: 20,
+          ...(deps.fetch && { fetch: deps.fetch }),
+        });
+        found.clear();
+        for (const a of apps) found.set(a.name, a);
+        return apps.map((a) => ({
+          id: a.name,
+          label: a.title,
+          blurb: a.kind === 'remote' ? (a.url ?? '') : [a.command, ...(a.args ?? [])].join(' '),
+        }));
+      },
       choices: () =>
         CATALOG.map((e) => ({
           id: e.id,
@@ -1535,6 +1558,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       prepare(a) {
         const taken = takenNames(home, file.mcpServers);
         if ('custom' in a) return planCustom(a.custom.input, a.custom.name, taken);
+        if ('registry' in a) {
+          const app = found.get(a.registry);
+          if (!app) throw new Error('That app is no longer in the list. Search again.');
+          return planFromRegistry(app, { taken });
+        }
         const entry = findCatalog(a.entryId);
         if (!entry) throw new Error('That is not on the list.');
         return planFromEntry(entry, {
