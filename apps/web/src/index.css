@@ -88,6 +88,16 @@ body {
   outline-offset: 2px;
 }
 
+/* A solid button: the text colour as the fill, the page as the ink. Hover mixes a little of the
+   page back in, so it reads as a press in either theme; a hardcoded white would invert on light. */
+.btn-solid {
+  background: var(--text);
+  color: var(--bg);
+}
+.btn-solid:hover {
+  background: color-mix(in oklab, var(--text) 90%, var(--bg));
+}
+
 .skip-link {
   position: absolute;
   left: 16px;
