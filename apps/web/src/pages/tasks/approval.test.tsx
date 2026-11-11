@@ -8,6 +8,9 @@ afterEach(() => {
   window.location.hash = '';
 });
 
+/** A failure the way the adapter sends one: a status, and no words of its own. */
+const status = (code: number) => Object.assign(new Error(''), { status: code });
+
 describe('Approval dialog', () => {
   const openFromTask = async (api: RemyApi) => {
     open('#/tasks/task_correction', api);
@@ -21,11 +24,20 @@ describe('Approval dialog', () => {
     for (const name of ['What this will do', 'Why Remy is asking', 'This approval']) {
       expect(within(dialog).getByRole('heading', { name })).toBeTruthy();
     }
-    for (const name of [/^Send as you/, /^Edit first/, /^Don't send/]) {
+    for (const name of [/^Send as you/, /^Edit first/, /^Not now/]) {
       expect(within(dialog).getByRole('button', { name })).toBeTruthy();
     }
     for (const b of within(dialog).getAllByRole('button'))
       expect(b.textContent?.trim()).toBeTruthy();
+  });
+
+  it('says what happens after the answer, before it is given', async () => {
+    const dialog = await openFromTask(createMockApi());
+    expect(
+      within(dialog).getByText(
+        'Approve: Remy sends this one message, then carries on. Not now: nothing happens and the job stops.',
+      ),
+    ).toBeTruthy();
   });
 
   it('passes the cards own argsHash to approve, never one of its own', async () => {
@@ -43,7 +55,7 @@ describe('Approval dialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
-  it('treats Esc as "Don\'t send"', async () => {
+  it('treats Esc as "Not now"', async () => {
     const api = createMockApi();
     const approve = vi.spyOn(api, 'approve');
     const dialog = await openFromTask(api);
@@ -76,6 +88,15 @@ describe('Approval dialog', () => {
     expect(within(dialog).getByRole('button', { name: /^Approve and pay/ })).toBeTruthy();
   });
 
+  it('opens at once and names what it is opening', async () => {
+    const api: RemyApi = { ...createMockApi(), getTask: () => new Promise<never>(() => {}) };
+    open('#/review', api);
+    fireEvent.click(await screen.findByRole('button', { name: 'Review and send' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Opening this approval' });
+    expect(within(dialog).getByRole('status').textContent).toBe('Opening this approval');
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeTruthy();
+  });
+
   it('shows an error and stays open when the server refuses', async () => {
     const api = createMockApi();
     vi.spyOn(api, 'approve').mockRejectedValue(new Error('approval is for different arguments'));
@@ -83,5 +104,16 @@ describe('Approval dialog', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /^Send as you/ }));
     expect(await within(dialog).findByRole('alert')).toBeTruthy();
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('says what changed when the card is out of date', async () => {
+    const api = createMockApi();
+    vi.spyOn(api, 'approve').mockRejectedValue(status(409));
+    const dialog = await openFromTask(api);
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Send as you/ }));
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Something changed while you were looking. Reload to see the latest.',
+    );
   });
 });

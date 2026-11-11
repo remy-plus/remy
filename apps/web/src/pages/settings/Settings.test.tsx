@@ -4,15 +4,18 @@ import { App } from '../../App.tsx';
 import { a11yProblems } from '../../a11y.testing.ts';
 import { ApiProvider } from '../../api/index.tsx';
 import { createMockApi } from '../../api/mock.ts';
+import type { RemyApi } from '../../api/types.ts';
+import { bindServerSettings } from '../../settings.ts';
 
 afterEach(() => {
   window.location.hash = '';
+  bindServerSettings(null); // a test that binds a server must not leak into the next one
 });
 
-const open = async (section: string, heading: string) => {
+const open = async (section: string, heading: string, api: RemyApi = createMockApi()) => {
   window.location.hash = `#/settings/${section}`;
   const view = render(
-    <ApiProvider api={createMockApi()}>
+    <ApiProvider api={api}>
       <App />
     </ApiProvider>,
   );
@@ -24,6 +27,40 @@ const stored = (key: string) => window.localStorage.getItem(`remy.${key}`);
 const order = () =>
   screen.getAllByRole('switch', { name: /^Show / }).map((s) => s.getAttribute('aria-label'));
 const savedDock = () => JSON.parse(stored('dock') ?? 'null');
+
+/** The error a real adapter throws: a status and no words of its own. */
+const failed = (status: number) => Object.assign(new Error(''), { status });
+
+/** A mock whose settings cannot be read, with the status the server would send. */
+const broken = (status: number): RemyApi => ({
+  ...createMockApi(),
+  settings: () => Promise.reject(failed(status)),
+});
+
+/** A mock that fails once, then answers: for the Try again button. */
+const onceBroken = (): RemyApi => {
+  const base = createMockApi();
+  let calls = 0;
+  return {
+    ...base,
+    settings: () => {
+      calls += 1;
+      return calls === 1 ? Promise.reject(failed(401)) : base.settings();
+    },
+  };
+};
+
+/** A mock whose settings never arrive, so the loading state stays on screen. */
+const neverAnswers = (): RemyApi => ({
+  ...createMockApi(),
+  settings: () => new Promise<never>(() => undefined),
+});
+
+/** A mock with one method replaced, for the failures a section has to describe. */
+const withMethod = <K extends keyof RemyApi>(key: K, value: RemyApi[K]): RemyApi => ({
+  ...createMockApi(),
+  [key]: value,
+});
 
 beforeEach(() => window.localStorage.clear());
 
@@ -84,7 +121,7 @@ describe('Settings', () => {
 
   it('edits the monthly cap and the per-task stop', async () => {
     await open('budget', 'Spending');
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly budget' }), {
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly cap' }), {
       target: { value: '35' },
     });
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop a job at' }), {
@@ -94,6 +131,14 @@ describe('Settings', () => {
     expect(stored('budget.task')).toBe('3.5');
     expect(screen.getByText('Per job, Remy stops and asks at $3.50.')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('19');
+  });
+
+  it('says what happens when the monthly cap is reached', async () => {
+    await open('budget', 'Spending');
+    // The cap stops new jobs; a job already running keeps its own stop.
+    expect(screen.getByText(/new jobs stop/)).toBeTruthy();
+    expect(screen.getByText(/keeps its own stop below/)).toBeTruthy();
+    expect(screen.getByText(/Remy pauses one job at this amount/)).toBeTruthy();
   });
 
   it('shows amounts in the chosen currency and keeps them in dollars underneath', async () => {
@@ -118,16 +163,69 @@ describe('Settings', () => {
     expect(stored('currency.code')).toBe('"GBP"'); // malformed, so nothing is saved
   });
 
+  it('says a budget change landed beside the box, not only at the top', async () => {
+    bindServerSettings(async () => undefined);
+    await open('budget', 'Spending');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly cap' }), {
+      target: { value: '30' },
+    });
+    expect(await screen.findByText('The monthly cap is saved.')).toBeTruthy();
+  });
+
+  it('says a budget change did not save, beside the box', async () => {
+    bindServerSettings(async () => {
+      throw new Error('the server said no');
+    });
+    await open('budget', 'Spending');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Stop a job at' }), {
+      target: { value: '4' },
+    });
+    expect(await screen.findByText(/The stop for a job did not save/)).toBeTruthy();
+  });
+
   it('shows providers and tests the models', async () => {
     await open('model', 'Model and keys');
-    expect(screen.getByRole('button', { name: 'Replace key' })).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'Add a key' })).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add a key' })[0] as HTMLElement);
-    expect(screen.getByText(/never holds your keys/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Use this instead' }));
-    expect(screen.getByText('Running · in use')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'How to replace the key' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'How to add a key' })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: 'How to add a key' })[0] as HTMLElement);
+    expect(screen.getByText(/never holds your keys|never holds it/)).toBeTruthy();
+    expect(screen.getByText('Key saved · in use')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Test both models' }));
     expect(await screen.findByText('Both models answered.')).toBeTruthy();
+  });
+
+  it('says where a key goes and that a saved key never comes back', async () => {
+    await open('model', 'Model and keys');
+    expect(screen.getByText(/never in this browser/)).toBeTruthy();
+    expect(screen.getByText(/never shows a saved key again/)).toBeTruthy();
+    // A provider with a key says so, instead of looking like nothing is set.
+    expect(screen.getByText('Key saved · in use')).toBeTruthy();
+    expect(screen.getAllByText('No key yet')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'How to replace the key' }));
+    expect(screen.getByText(/It never comes back to this browser/)).toBeTruthy();
+    // Nothing here pretends to switch the provider: that is done on the machine that runs Remy.
+    expect(screen.queryByRole('button', { name: 'Use this instead' })).toBeNull();
+  });
+
+  it('offers a way forward when no provider is set up yet', async () => {
+    const base = createMockApi();
+    await open('model', 'Model and keys', {
+      ...base,
+      settings: async () => ({ ...(await base.settings()), providers: [] }),
+    });
+    expect(await screen.findByText(/No provider is set up yet/)).toBeTruthy();
+  });
+
+  it('says what went wrong when the models cannot be tested', async () => {
+    await open(
+      'model',
+      'Model and keys',
+      withMethod('testModels', () => Promise.reject(failed(429))),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Test both models' }));
+    expect(
+      await screen.findByText('Too many requests just now. Wait a moment, then try again.'),
+    ).toBeTruthy();
   });
 
   it('picks the voice and says when there is no voice key', async () => {
@@ -148,6 +246,15 @@ describe('Settings', () => {
     );
   });
 
+  it('says a voice change landed beside the voice box', async () => {
+    bindServerSettings(async () => undefined);
+    await open('model', 'Model and keys');
+    const box = screen.getByRole('textbox', { name: 'Voice id' });
+    fireEvent.change(box, { target: { value: 'abcdef0123456789' } });
+    fireEvent.blur(box);
+    expect(await screen.findByText('The voice is saved.')).toBeTruthy();
+  });
+
   it('has quiet hours and an always-on approvals switch', async () => {
     await open('notifications', 'Notifications');
     const push = screen.getByRole('switch', {
@@ -158,7 +265,27 @@ describe('Settings', () => {
     fireEvent.change(screen.getByLabelText('Quiet hours from'), { target: { value: '22:30' } });
     expect(stored('quiet.from')).toBe('"22:30"');
     fireEvent.click(screen.getByRole('button', { name: 'Send a test notification' }));
-    expect(await screen.findByText('A test notification was sent.')).toBeTruthy();
+    expect(await screen.findByText(/A test notification was sent/)).toBeTruthy();
+  });
+
+  it('says quiet hours in plain words, never military time', async () => {
+    await open('notifications', 'Notifications');
+    expect(screen.getByText(/Quiet from 11:00\s?PM until 7:00\s?AM\./i)).toBeTruthy();
+    expect(screen.getByText(/Remy sends it at 7:30\s?AM/i)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Quiet hours from'), { target: { value: '22:30' } });
+    expect(screen.getByText(/Quiet from 10:30\s?PM until 7:00\s?AM\./i)).toBeTruthy();
+  });
+
+  it('says what went wrong when the test notification cannot be sent', async () => {
+    await open(
+      'notifications',
+      'Notifications',
+      withMethod('sendTestNotification', () => Promise.reject(failed(500))),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send a test notification' }));
+    expect(
+      await screen.findByText("Remy's server hit a problem. Try again in a moment."),
+    ).toBeTruthy();
   });
 
   it('asks before deleting notes and names how many', async () => {
@@ -174,15 +301,29 @@ describe('Settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete all notes' }));
     fireEvent.keyDown(await screen.findByRole('dialog'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    // Confirming deletes.
+    // Confirming deletes, and the empty state offers a way forward.
     fireEvent.click(screen.getByRole('button', { name: 'Delete all notes' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Delete 1,204 notes' }));
     expect(await screen.findByText('Deleted 1,204 notes.')).toBeTruthy();
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Delete all notes' }) as HTMLButtonElement).disabled,
-      ).toBe(true),
+    expect(await screen.findByText(/Remy has not saved a note yet/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'See what Remy knows' }).getAttribute('href')).toBe(
+      '#/brain',
     );
+  });
+
+  it('says what went wrong when the notes cannot be deleted', async () => {
+    await open(
+      'memory',
+      'Memory and privacy',
+      withMethod('deleteNotes', () => Promise.reject(failed(409))),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all notes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete 1,204 notes' }));
+    expect(
+      await screen.findByText(
+        'Something changed while you were looking. Reload to see the latest.',
+      ),
+    ).toBeTruthy();
   });
 
   it('confirms before making a new token and shows it once', async () => {
@@ -197,6 +338,25 @@ describe('Settings', () => {
     expect(await screen.findByText('mock-token-for-a-demo-only')).toBeTruthy();
   });
 
+  it('says where the token lives and what this browser keeps', async () => {
+    await open('computer', 'This computer');
+    expect(screen.getByText(/made on the machine that runs Remy/)).toBeTruthy();
+    expect(screen.getByText(/this browser keeps only the copy you signed in with/)).toBeTruthy();
+    expect(screen.getByText(/Where Remy keeps its files, notes and keys/)).toBeTruthy();
+  });
+
+  it('offers a way forward when nothing has signed in yet', async () => {
+    const base = createMockApi();
+    await open('computer', 'This computer', {
+      ...base,
+      settings: async () => {
+        const d = await base.settings();
+        return { ...d, server: { ...d.server, lastSignIns: [] } };
+      },
+    });
+    expect(await screen.findByText(/Nothing has signed in yet/)).toBeTruthy();
+  });
+
   it('shows the version, licences and data folder on the same page', async () => {
     await open('computer', 'This computer');
     expect(screen.getByText('~/.remy')).toBeTruthy();
@@ -207,7 +367,7 @@ describe('Settings', () => {
     await open('about', 'This computer');
   });
 
-  it('says so for a section that does not exist', async () => {
+  it('says so for a section that does not exist, and offers a way back', async () => {
     window.location.hash = '#/settings/nope';
     render(
       <ApiProvider api={createMockApi()}>
@@ -215,6 +375,54 @@ describe('Settings', () => {
       </ApiProvider>,
     );
     expect(await screen.findByText('There is no such section.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Open Your dock' }).getAttribute('href')).toBe(
+      '#/settings/dock',
+    );
+  });
+
+  describe('when the settings cannot be read', () => {
+    it('says what went wrong and offers to try again', async () => {
+      await open('model', 'Model and keys', broken(401));
+      expect(
+        await screen.findByText('Your sign-in has expired. Sign in again to carry on.'),
+      ).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    });
+
+    it('says the server is not answering when it cannot be reached', async () => {
+      await open(
+        'computer',
+        'This computer',
+        withMethod('settings', () => Promise.reject(new TypeError('Failed to fetch'))),
+      );
+      expect(
+        await screen.findByText(
+          "Remy's server is not answering. Check that it is running, then try again.",
+        ),
+      ).toBeTruthy();
+    });
+
+    it('loads the section when the person tries again', async () => {
+      await open('model', 'Model and keys', onceBroken());
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(await screen.findByText('Key saved · in use')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    });
+
+    it('names what is loading instead of showing a bare spinner', async () => {
+      await open('model', 'Model and keys', neverAnswers());
+      expect(screen.getByText('Loading your models and keys')).toBeTruthy();
+    });
+
+    it('keeps the spending boxes usable and says the month is missing', async () => {
+      await open('budget', 'Spending', broken(500));
+      expect(screen.getByRole('spinbutton', { name: 'Monthly cap' })).toBeTruthy();
+      expect(
+        await screen.findByText("Remy's server hit a problem. Try again in a moment."),
+      ).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    });
   });
 
   for (const [section, heading] of [
@@ -286,9 +494,20 @@ describe('Settings', () => {
       expect(within(dock).getByRole('link', { name: 'Browser' })).toBeTruthy();
     });
 
-    it('resets to the default order and shows everything', async () => {
+    it('names what is hidden, so it is obvious how to bring it back', async () => {
       await open('dock', 'Your dock');
-      const reset = screen.getByRole('button', { name: 'Reset to default' }) as HTMLButtonElement;
+      expect(screen.getByText('Every place is showing.')).toBeTruthy();
+      fireEvent.click(screen.getByRole('switch', { name: 'Show Brain' }));
+      expect(screen.getByText('1 place is hidden: Brain.')).toBeTruthy();
+      fireEvent.click(screen.getByRole('switch', { name: 'Show Browser' }));
+      expect(screen.getByText('2 places are hidden: Browser, Brain.')).toBeTruthy();
+    });
+
+    it('puts the dock back to the default order and shows everything', async () => {
+      await open('dock', 'Your dock');
+      const reset = screen.getByRole('button', {
+        name: 'Put the dock back to default',
+      }) as HTMLButtonElement;
       expect(reset.disabled).toBe(true);
       fireEvent.click(screen.getByRole('switch', { name: 'Show Brain' }));
       fireEvent.click(screen.getByRole('button', { name: 'Move Connections up' }));
@@ -310,7 +529,7 @@ describe('Settings', () => {
         (within(group).getByRole('radio', { name: 'Command center' }) as HTMLInputElement).disabled,
       ).toBe(true);
       expect(screen.getByText(/Command center: coming soon/)).toBeTruthy();
-      expect(screen.getByText('Dark only for now.')).toBeTruthy();
+      expect(screen.getByText('A light theme is not built yet.')).toBeTruthy();
     });
   });
 });

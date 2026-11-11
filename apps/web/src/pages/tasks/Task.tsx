@@ -10,14 +10,23 @@ import {
   useApi,
 } from '../../api/index.tsx';
 import { ApprovalDialog } from '../../components/ApprovalDialog.tsx';
+import { Icon } from '../../components/Icon.tsx';
+import { Skeleton } from '../../components/Skeleton.tsx';
 import { buildSteps, Trace } from '../../components/Trace.tsx';
-import { clockOf, money, primaryButton, quietButton, RISK } from './format.ts';
+import { describeError } from '../../lib/errors.ts';
+import { ago } from '../../lib/when.ts';
+import { money, plainTime, primaryButton, quietButton, RISK } from './format.ts';
 import { useTask } from './useTask.ts';
 
 const mono = 'font-mono';
 const OPEN = ['running', 'waiting_approval', 'waiting_user', 'paused'];
 
-const messageOf = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
+/** The pause limits, in words rather than the server's own names. */
+const LIMIT: Record<'steps' | 'cost' | 'time', string> = {
+  steps: 'step limit',
+  cost: 'spending limit',
+  time: 'time limit',
+};
 
 /** One line of the log, in plain words. Events the person need not see return null. */
 export function describe(e: StreamEvent['event']): string | null {
@@ -30,15 +39,19 @@ export function describe(e: StreamEvent['event']): string | null {
     case 'approval.requested':
       return 'asked you before going on';
     case 'approval.resolved':
-      return e.granted ? 'you approved' : 'you declined';
+      return e.granted ? 'you approved' : 'you said not now';
     case 'user.asked':
       return 'asked you a question';
     case 'user.answered':
       return 'you answered';
     case 'tool.failed':
-      return 'a step failed';
-    case 'task.finished':
-      return e.status === 'succeeded' ? 'finished' : `stopped. ${text('reason')}`.trim();
+      return 'a step did not work';
+    case 'task.finished': {
+      if (e.status === 'succeeded') return 'finished';
+      // A job that stopped did not finish. It did not "fail", and the reason is worth reading.
+      const reason = text('reason');
+      return reason ? `didn't finish. ${reason}` : "didn't finish";
+    }
     default:
       return null;
   }
@@ -46,19 +59,17 @@ export function describe(e: StreamEvent['event']): string | null {
 
 function Log({
   events,
-  utc,
   wide,
 }: {
   events: StreamEvent[];
-  utc: boolean;
   /** The wide form is for the main column: the time, then the sentence. */
   wide?: boolean;
 }) {
   const lines = events.flatMap((e) => {
     const t = describe(e.event);
-    return t ? [{ seq: e.seq, at: clockOf(e.at, utc, !wide), text: t }] : [];
+    return t ? [{ seq: e.seq, at: plainTime(e.at), text: t }] : [];
   });
-  if (!lines.length) return <p className="m-0 text-[14px] text-muted">Nothing yet.</p>;
+  if (!lines.length) return <p className="m-0 text-[14px] text-muted">Nothing has happened yet.</p>;
   return (
     <ul
       className={`${mono} m-0 p-0 text-[13px] leading-[1.7] ${wide ? '' : 'rounded-[10px] border border-edge bg-surface px-4 py-3'}`}
@@ -97,7 +108,11 @@ function WaitingCard({
   return (
     <div className="mt-3 rounded-[10px] border border-edge-hi bg-surface p-4">
       <p className={`${mono} m-0 text-[12px] text-muted`}>{risk.kind}</p>
-      <p className="mt-2 mb-3 text-[15px] leading-snug">{card.preview}</p>
+      {/* What will be sent, in full: it is the thing being decided. */}
+      <p className="mt-2 mb-1 text-[15px] leading-snug">{card.preview}</p>
+      <p className="mt-0 mb-3 text-[13px] leading-snug text-muted">
+        Nothing happens until you answer.
+      </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={primaryButton} onClick={onReview}>
           {risk.review}
@@ -115,11 +130,14 @@ function FailureCard({
   task,
   api,
   reload,
+  onSaid,
 }: {
   failure: TaskFailure;
   task: TaskView;
   api: RemyApi;
   reload: () => void;
+  /** Says what happened, on the screen that stays put. */
+  onSaid: (text: string) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -129,13 +147,15 @@ function FailureCard({
     try {
       if (kind === 'retry') {
         const { taskId } = await api.startTask(task.prompt);
+        onSaid('Started again. Opening the new job.');
         window.location.hash = `#/tasks/${encodeURIComponent(taskId)}`;
       } else {
         await api.markDone(task.taskId);
+        onSaid('Marked as done. Remy will not try this again.');
         reload();
       }
     } catch (e) {
-      setError(messageOf(e, 'Remy could not do that.'));
+      setError(describeError(e, 'Remy could not do that. Try again.'));
     } finally {
       setBusy(false);
     }
@@ -184,19 +204,19 @@ function FailureCard({
   );
 }
 
-/** What a failed task shows when the server gives no explanation of its own. */
+/** What a failed job shows when the server gives no explanation of its own. */
 const plainFailure = (reason?: string): TaskFailure => ({
-  title: 'Remy stopped this task',
+  title: "This job didn't finish",
   body:
     reason ??
-    'Remy stopped before finishing. The log shows its last step. Start the task again, or change it first.',
+    'Remy stopped before finishing. The log shows its last step. Try again, or change the request first.',
   notes: [],
   why: {
     lead: 'Remy stops instead of guessing.',
     strong:
       'It never repeats something that changes the outside world until it knows the first one failed.',
   },
-  actions: [{ label: 'Start again', kind: 'retry' }],
+  actions: [{ label: 'Try again', kind: 'retry' }],
 });
 
 function PlanBar({ plan }: { plan: NonNullable<TaskView['plan']> }) {
@@ -205,7 +225,7 @@ function PlanBar({ plan }: { plan: NonNullable<TaskView['plan']> }) {
       <div className={`${mono} mb-2 flex justify-between text-[12px] text-muted`}>
         <h2 className="m-0 text-[12px] font-normal">Plan</h2>
         <span>
-          step {plan.current + 1} of {plan.steps.length}
+          {plan.current + 1} of {plan.steps.length}
         </span>
       </div>
       <ol className="m-0 grid list-none grid-cols-5 gap-3 p-0">
@@ -215,8 +235,9 @@ function PlanBar({ plan }: { plan: NonNullable<TaskView['plan']> }) {
               aria-hidden="true"
               className={`mb-2 h-0.5 ${i < plan.current ? 'bg-signal' : i === plan.current ? 'bg-text' : 'bg-line'}`}
             />
+            {/* A plan step is a decision, so it wraps rather than being cut off. */}
             <span
-              className={`${mono} relative block truncate text-[12px] ${i <= plan.current ? 'text-text' : 'text-muted'}`}
+              className={`${mono} relative block text-[12px] break-words ${i <= plan.current ? 'text-text' : 'text-muted'}`}
             >
               {s}
               <span className="sr-only">
@@ -349,8 +370,9 @@ function BrainView({
         <h1 className="m-0 mb-8 max-w-[620px] rounded-[10px] border border-edge bg-surface px-5 py-4 text-[17px] leading-snug font-normal">
           {task.prompt}
         </h1>
-        <p className={`${mono} m-0 mb-3 text-[12px] text-signal`}>
-          <span aria-hidden="true">● </span>Remy · {brain.read}
+        <p className={`${mono} m-0 mb-3 flex items-center gap-2 text-[12px] text-signal`}>
+          <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-signal" />
+          Remy · {brain.read}
         </p>
         <h2 className="m-0 mb-6 max-w-[700px] text-[26px] leading-[1.25] font-medium sm:text-[28px]">
           {brain.headline}
@@ -380,9 +402,7 @@ function BrainView({
             aria-label="Contradiction"
             className="max-w-[760px] rounded-[10px] border border-edge-hi bg-surface p-5"
           >
-            <h3 className={`${mono} m-0 mb-3 text-[13px] font-normal`}>
-              <span aria-hidden="true">◆ </span>Contradiction
-            </h3>
+            <h3 className={`${mono} m-0 mb-3 text-[13px] font-normal`}>Contradiction</h3>
             <p className="m-0 mb-4 text-[15px] leading-[1.6]">{c.text}</p>
             <div className="mb-4 grid gap-3 sm:grid-cols-2">
               {[c.left, c.right].map((x) => (
@@ -460,7 +480,7 @@ function Composer({
       setText('');
       setError(null);
     } catch (err) {
-      setError(messageOf(err, 'Remy could not take that.'));
+      setError(describeError(err, 'Remy could not take that. Try again.'));
     }
   };
   return (
@@ -500,35 +520,35 @@ function TaskScreen({ id }: { id: string }) {
   const { view, events, error, reload } = useTask(id);
   const [reviewing, setReviewing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [said, setSaid] = useState<string | null>(null);
   const draft = useRef<HTMLElement>(null);
-  const utc = api.kind === 'mock';
-  const clock = (iso: string) => clockOf(iso, utc);
 
   if (error && !view)
     return (
       <div className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
-        <h1 className="m-0 text-[28px] font-medium">This task could not be opened</h1>
-        <p className="mt-3 text-muted">{error}</p>
-        <a href="#/tasks" className={`${quietButton} mt-4 inline-block`}>
-          Back to tasks
-        </a>
+        <h1 className="m-0 text-[28px] font-medium">This job could not be opened</h1>
+        <p className="mt-3 max-w-[560px] text-muted">{error}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={primaryButton} onClick={reload}>
+            Try again
+          </button>
+          <a href="#/activity" className={quietButton}>
+            See what Remy has done
+          </a>
+        </div>
       </div>
     );
-  if (!view)
-    return (
-      <p role="status" className={`${mono} px-5 py-12 text-[13px] text-muted sm:px-8`}>
-        Loading
-      </p>
-    );
+  if (!view) return <Skeleton label="Opening this job" lines={4} className="px-5 py-12 sm:px-8" />;
 
   const open = OPEN.includes(view.status);
-  const act = async (fn: () => Promise<void>) => {
+  const act = async (fn: () => Promise<void>, done?: string) => {
     setProblem(null);
     try {
       await fn();
+      if (done) setSaid(done);
       reload();
     } catch (e) {
-      setProblem(messageOf(e, 'Remy could not do that.'));
+      setProblem(describeError(e, 'Remy could not do that. Try again.'));
     }
   };
   const start = async (prompt: string) => {
@@ -538,17 +558,22 @@ function TaskScreen({ id }: { id: string }) {
   const card = view.pendingApproval;
   const decline = () =>
     card &&
-    act(() => api.approve(id, { callId: card.callId, argsHash: card.argsHash, granted: false }));
+    act(
+      () => api.approve(id, { callId: card.callId, argsHash: card.argsHash, granted: false }),
+      `Not now. ${RISK[card.risk].stopped}`,
+    );
   const focusComposer = () =>
     setTimeout(() => document.getElementById('task-composer')?.focus(), 0);
+  // A refresh that failed says so here rather than leaving the screen quietly out of date.
+  const trouble = problem ?? error;
 
   if (view.brain) {
     return (
       <div className="flex min-h-[calc(100dvh-66px)] flex-col">
         <BrainView task={view} brain={view.brain} onStart={(p) => act(() => start(p))} />
-        {problem && (
+        {trouble && (
           <p role="alert" className={`${mono} px-5 text-[12px] text-muted sm:px-14`}>
-            {problem}
+            {trouble}
           </p>
         )}
         <Composer
@@ -561,8 +586,9 @@ function TaskScreen({ id }: { id: string }) {
   }
 
   const failed = view.status === 'failed';
+  const stopped = view.status === 'cancelled';
   const failure = failed ? (view.failure ?? plainFailure(view.final?.reason)) : null;
-  const steps = buildSteps(view, clock);
+  const steps = buildSteps(view, plainTime);
   const failedStep = steps.find((s) => s.state === 'failed');
   const cards: Record<string, ReactNode> = {};
   if (card)
@@ -570,16 +596,24 @@ function TaskScreen({ id }: { id: string }) {
       <WaitingCard view={view} onReview={() => setReviewing(true)} onDecline={() => decline()} />
     );
   if (failure && failedStep)
-    cards[failedStep.id] = <FailureCard failure={failure} task={view} api={api} reload={reload} />;
+    cards[failedStep.id] = (
+      <FailureCard
+        failure={failure}
+        task={view}
+        api={api}
+        reload={reload}
+        onSaid={(text) => setSaid(text)}
+      />
+    );
 
   const lastAt = [...view.calls].reverse().find((c) => c.at)?.at;
   const helpers = view.helpers;
   const meta = [
-    `Started ${clock(view.createdAt)}`,
-    failed && lastAt && `Stopped ${lastAt.length > 5 ? clock(lastAt) : lastAt}`,
-    helpers && `${helpers.length} helpers`,
-    !helpers && view.step > 0 && open && `Step ${view.step}`,
-    `${money(view.costUsd)}${open ? ` of ${money(view.config.budget.maxCostUsd)} budget` : ''}`,
+    `Started ${ago(view.createdAt)}`,
+    (failed || stopped) && lastAt && `Stopped ${plainTime(lastAt)}`,
+    helpers && `${helpers.length} helpers working`,
+    !helpers && view.step > 0 && open && `${view.step} steps so far`,
+    `${money(view.costUsd)}${open ? ` of ${money(view.config.budget.maxCostUsd)} spending limit` : ''}`,
   ].filter(Boolean);
 
   const sideLog = (
@@ -588,7 +622,7 @@ function TaskScreen({ id }: { id: string }) {
       className="border-t border-edge px-5 py-8 lg:border-t-0 lg:border-l lg:px-8"
     >
       <SideTitle>What Remy did</SideTitle>
-      <Log events={events} utc={utc} />
+      <Log events={events} />
       {failure && (
         <>
           <div className={`${mono} mt-6 mb-2 text-[12px] text-muted`}>
@@ -616,16 +650,23 @@ function TaskScreen({ id }: { id: string }) {
               <button
                 type="button"
                 className={quietButton}
-                onClick={() => act(() => api.cancel(id))}
+                onClick={() => act(() => api.cancel(id), 'Stopped. Nothing else will happen.')}
               >
-                Stop task
+                Stop this job
               </button>
             )}
           </div>
 
-          {problem && (
+          {said && (
+            <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-text">
+              <Icon name="check" className="shrink-0 text-signal" />
+              {said}
+            </p>
+          )}
+
+          {trouble && (
             <p role="alert" className={`${mono} mb-4 text-[12px] text-text`}>
-              {problem}
+              {trouble}
             </p>
           )}
 
@@ -635,18 +676,18 @@ function TaskScreen({ id }: { id: string }) {
               className="mb-6 max-w-[680px] rounded-[10px] border border-edge-hi bg-surface p-4"
             >
               <p className="m-0 mb-1 text-[16px]">
-                Remy paused at the {view.pause.limit} limit: {view.pause.steps} steps,{' '}
+                Remy paused at the {LIMIT[view.pause.limit]}: {view.pause.steps} steps,{' '}
                 {money(view.pause.costUsd)}.
               </p>
               <p className="m-0 mb-3 text-[14px] text-muted">
-                Add to the budget to continue, or stop here.
+                Adding to the limit lets Remy carry on. Stopping here keeps what it has done so far.
               </p>
               <button
                 type="button"
                 className={primaryButton}
-                onClick={() => act(() => api.extend(id, {}))}
+                onClick={() => act(() => api.extend(id, {}), 'Carrying on.')}
               >
-                Continue task
+                Keep going
               </button>
             </section>
           )}
@@ -683,7 +724,6 @@ function TaskScreen({ id }: { id: string }) {
 
           {view.found && (
             <p className="mb-6 rounded-[10px] border border-edge-hi px-5 py-4 text-[15px] leading-snug">
-              <span aria-hidden="true">◆ </span>
               <strong className="font-semibold">Found something while working.</strong> {view.found}
             </p>
           )}
@@ -696,10 +736,52 @@ function TaskScreen({ id }: { id: string }) {
 
           {!helpers && <Trace steps={steps} cards={cards} />}
 
+          {!helpers && view.calls.length === 0 && !view.final && (
+            <section
+              aria-label="No steps yet"
+              className="mt-4 max-w-[680px] rounded-[10px] border border-edge bg-surface p-4"
+            >
+              <p className="m-0 text-[15px] leading-snug">Nothing has happened yet.</p>
+              <p className="mt-1 mb-3 text-[14px] leading-snug text-muted">
+                Remy starts as soon as it has a plan. You can add a note while you wait.
+              </p>
+              <button type="button" className={quietButton} onClick={focusComposer}>
+                Add a note for Remy
+              </button>
+            </section>
+          )}
+
+          {stopped && (
+            <section
+              aria-label="Didn't finish"
+              className="mt-4 max-w-[680px] rounded-[10px] border border-edge-hi bg-surface p-4"
+            >
+              <h2 className={`${mono} m-0 text-[12px] font-normal`}>Didn't finish</h2>
+              <p className="mt-1 mb-3 text-[16px] leading-snug">
+                {view.final?.reason ?? 'This job was stopped before it finished.'} You can start it
+                again, or leave it here.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={primaryButton}
+                  onClick={() =>
+                    act(() => start(view.prompt), 'Started again. Opening the new job.')
+                  }
+                >
+                  Try again
+                </button>
+                <a href="#/activity" className={quietButton}>
+                  See what Remy has done
+                </a>
+              </div>
+            </section>
+          )}
+
           {helpers && (
             <section aria-label="Activity">
               <SideTitle aside="everything Remy did, in order">Activity</SideTitle>
-              <Log events={events} utc={utc} wide />
+              <Log events={events} wide />
             </section>
           )}
         </div>
@@ -716,7 +798,7 @@ function TaskScreen({ id }: { id: string }) {
         )}
       </div>
 
-      {view.status !== 'cancelled' && !failed && (
+      {!stopped && !failed && (
         <Composer
           label={view.pendingQuestion ? 'Your answer' : 'Add a note for Remy'}
           placeholder={
@@ -739,7 +821,14 @@ function TaskScreen({ id }: { id: string }) {
           taskId={id}
           view={view}
           onClose={() => setReviewing(false)}
-          onResolved={reload}
+          onResolved={(granted) => {
+            setSaid(
+              granted
+                ? `Approved. ${RISK[card.risk].after}`
+                : `Not now. ${RISK[card.risk].stopped}`,
+            );
+            reload();
+          }}
           onEdit={focusComposer}
         />
       )}

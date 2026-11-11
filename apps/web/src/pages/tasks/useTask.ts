@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type StreamEvent, type TaskView, useApi } from '../../api/index.tsx';
+import { describeError } from '../../lib/errors.ts';
 
 const RECONNECT_MS = 3000;
 const REFRESH_MS = 120;
@@ -53,12 +54,7 @@ export function useTask(id: string): TaskState {
         setError(null);
       })
       .catch((e: unknown) => {
-        if (live)
-          setError(
-            e instanceof Error
-              ? e.message
-              : 'Remy could not be reached. Check that it is running, then reload.',
-          );
+        if (live) setError(describeError(e, 'Remy could not open this job. Try again.'));
       });
     return () => {
       live = false;

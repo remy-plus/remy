@@ -1,6 +1,7 @@
 import { type ComponentType, useCallback, useEffect, useState } from 'react';
 import { type SettingsData, useApi } from '../../api/index.tsx';
 import { Icon } from '../../components/Icon.tsx';
+import { describeError } from '../../lib/errors.ts';
 import { useSaveState } from '../../settings.ts';
 import { Budget, Trust } from './basics.tsx';
 import { DockSection } from './dock.tsx';
@@ -27,16 +28,31 @@ export function Settings({ section = 'dock' }: { section?: string }) {
   const api = useApi();
   const save = useSaveState();
   const [data, setData] = useState<SettingsData | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [n, setN] = useState(0);
   const reload = useCallback(() => setN((x) => x + 1), []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `n` is the reload counter
   useEffect(() => {
     let live = true;
-    api
-      .settings()
-      .then((d) => live && setData(d))
-      .catch(() => live && setData(null)); // the sections say what is missing
+    api.settings().then(
+      (d) => {
+        if (!live) return;
+        setData(d);
+        setError(null);
+      },
+      (e: unknown) => {
+        if (!live) return;
+        // A section that cannot read its values says so itself, in these words, with a way to retry.
+        setData(null);
+        setError(
+          describeError(
+            e,
+            'Remy could not read your settings. Check that it is running, then try again.',
+          ),
+        );
+      },
+    );
     return () => {
       live = false;
     };
@@ -82,17 +98,20 @@ export function Settings({ section = 'dock' }: { section?: string }) {
               className={`-mt-5 mb-6 flex items-center gap-2 text-[13px] ${save === 'failed' ? 'text-text' : 'text-muted'}`}
             >
               {save === 'saved' && <Icon name="check" className="shrink-0 text-signal" />}
-              {save === 'saving' && 'Saving'}
+              {save === 'saving' && 'Saving your change'}
               {save === 'saved' && 'Saved'}
               {save === 'failed' &&
                 'That did not save. Check that Remy is running, then try again.'}
             </p>
           )}
           {View ? (
-            <View data={data} reload={reload} />
+            <View data={data} error={error} reload={reload} />
           ) : (
-            <p className="m-0 text-[15px] text-muted">
-              {current ? 'This section is not built yet.' : 'There is no such section.'}
+            <p className="m-0 max-w-[560px] text-[15px] text-muted">
+              {current ? 'This section is not built yet.' : 'There is no such section.'}{' '}
+              <a href="#/settings/dock" className="text-text underline">
+                Open Your dock
+              </a>
             </p>
           )}
         </div>

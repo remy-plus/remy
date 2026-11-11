@@ -73,7 +73,12 @@ export function VoiceOverlay(props: {
               {final}
               {final && interim ? ' ' : ''}
               <span className="text-muted">{interim}</span>
-              <span aria-hidden="true">”|</span>
+              <span aria-hidden="true">”</span>
+              {/* The cursor is a drawn block, not a typed pipe. */}
+              <span
+                aria-hidden="true"
+                className="ml-0.5 inline-block h-[0.85em] w-[0.4em] translate-y-[0.06em] bg-text"
+              />
             </>
           ) : (
             <span className="text-muted">Say what you need done</span>
@@ -115,7 +120,8 @@ export function VoiceOverlay(props: {
         </button>
       </div>
       <p className="mt-8 mb-0 max-w-[460px] text-[12px] leading-relaxed text-muted">
-        Your browser turns speech into words. Remy never records audio or sends it anywhere.
+        Your browser turns speech into words. The audio never leaves this browser; only the words
+        you send go to Remy, on your own machine.
       </p>
     </div>
   );

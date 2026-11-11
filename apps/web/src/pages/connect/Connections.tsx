@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ConnectedApp, Machine } from '../../api/index.tsx';
+import { describeError } from '../../lib/errors.ts';
 import {
   AppLogo,
   Eyebrow,
@@ -16,18 +17,23 @@ import {
 
 type Selected = { kind: 'app'; id: string } | { kind: 'machine'; name: string };
 
+/** A change, said beside the thing it changed: the row that acted, or the panel that did. */
+type Said = { text: string; at: 'row' | 'panel'; id: string };
+
 const STATUS: Record<ConnectedApp['status'], string> = {
   connected: 'Connected',
   needs_signin: 'Needs sign-in',
   not_connected: 'Not connected',
 };
 
+const FALLBACK = 'That did not work. Check that Remy is still running, then try again.';
 const row = 'flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-edge py-4';
+const empty = 'rounded-[10px] border border-edge bg-surface px-4 py-5';
 
 export function Connections() {
   const { api, data, setData, error, reload } = useLoad((a) => a.connections());
   const [selected, setSelected] = useState<Selected | null>(null);
-  const [said, setSaid] = useState('');
+  const [said, setSaid] = useState<Said | null>(null);
   if (error) return <Unavailable message={error} onRetry={reload} />;
   if (!data) return <Loading label="Loading your connections" />;
 
@@ -38,19 +44,17 @@ export function Connections() {
     current?.kind === 'machine' ? data.machines.find((m) => m.name === current.name) : undefined;
 
   const refresh = async () => setData(await api.connections());
-  const act = async (fn: () => Promise<void>, line: string) => {
+  const act = async (fn: () => Promise<void>, line: string, at: Said['at'], id: string) => {
     try {
       await fn();
       await refresh();
-      setSaid(line);
+      setSaid({ text: line, at, id });
     } catch (e) {
-      setSaid(
-        e instanceof Error
-          ? e.message
-          : 'That did not work. Check that Remy is still running, then try again.',
-      );
+      setSaid({ text: describeError(e, FALLBACK), at, id });
     }
   };
+  const saidAt = (at: Said['at'], id: string | undefined) =>
+    said && said.at === at && said.id === id ? said.text : undefined;
   const connected = data.apps.filter((a) => a.status === 'connected').length;
 
   return (
@@ -61,91 +65,135 @@ export function Connections() {
         <Panel
           app={app}
           machine={machine}
-          said={said}
+          hasMachines={data.machines.length > 0}
+          said={saidAt('panel', app?.id ?? machine?.name)}
           onToggle={(permId, on) =>
             app &&
             act(
               () => api.setPermission(app.id, permId, on),
               `${app.name}: ${app.permissions.find((p) => p.id === permId)?.label} is ${on ? 'on' : 'off'}.`,
+              'panel',
+              app.id,
             )
           }
-          onDisconnect={() =>
-            app && act(() => api.disconnectApp(app.id), `${app.name} is disconnected.`)
-          }
+          onDisconnect={() => {
+            if (!app) return;
+            // Keep the panel on the app that changed, so the sentence lands where the button was.
+            setSelected({ kind: 'app', id: app.id });
+            void act(
+              () => api.disconnectApp(app.id),
+              `${app.name} is disconnected.`,
+              'panel',
+              app.id,
+            );
+          }}
         />
       }
     >
       <section aria-labelledby="apps-h" className="mb-10">
-        <div className="mb-3 flex items-baseline justify-between">
+        <div className="mb-3 flex items-baseline justify-between gap-4">
           <Eyebrow id="apps-h">Apps</Eyebrow>
-          <span className={`${mono} text-[12px] text-muted`}>
-            {connected} of {data.apps.length} connected
-          </span>
+          {data.apps.length > 0 && (
+            <span className={`${mono} text-[12px] text-muted`}>
+              {connected} of {data.apps.length} connected
+            </span>
+          )}
         </div>
-        <ul className="m-0 list-none border-t border-edge p-0">
-          {data.apps.map((a) => (
-            <AppRow
-              key={a.id}
-              app={a}
-              selected={current?.kind === 'app' && current.id === a.id}
-              onManage={() => setSelected({ kind: 'app', id: a.id })}
-              onSignIn={() => act(() => api.signInApp(a.id), `${a.name} is connected.`)}
-            />
-          ))}
-        </ul>
+        {data.apps.length === 0 ? (
+          <div className={empty}>
+            <p className="m-0 text-[15px]">No app is connected yet.</p>
+            <p className="mt-1 mb-4 max-w-[520px] text-[14px] leading-relaxed text-muted">
+              A connection lets Remy read, draft or act in an app for you. It asks before anything
+              is sent as you.
+            </p>
+            <a className={primary} href="#/connections/add">
+              Connect an app
+            </a>
+          </div>
+        ) : (
+          <ul className="m-0 list-none border-t border-edge p-0">
+            {data.apps.map((a) => (
+              <AppRow
+                key={a.id}
+                app={a}
+                selected={current?.kind === 'app' && current.id === a.id}
+                said={saidAt('row', a.id)}
+                onManage={() => setSelected({ kind: 'app', id: a.id })}
+                onSignIn={() =>
+                  act(() => api.signInApp(a.id), `${a.name} is connected.`, 'row', a.id)
+                }
+              />
+            ))}
+          </ul>
+        )}
       </section>
 
       <section aria-labelledby="machines-h" className="mb-8">
         <div className="mb-3 flex items-baseline justify-between gap-4">
           <Eyebrow id="machines-h">Machines</Eyebrow>
-          <span className={`${mono} text-right text-[12px] text-muted`}>
-            Remy asks before every command
-          </span>
+          {data.machines.length > 0 && (
+            <span className={`${mono} text-[12px] text-muted`}>{data.machines.length}</span>
+          )}
         </div>
-        <ul className="m-0 list-none border-t border-edge p-0">
-          {data.machines.map((m) => (
-            <li
-              key={m.name}
-              className={`${row} ${current?.kind === 'machine' && current.name === m.name ? '-mx-3 rounded-[10px] border-transparent bg-surface px-3' : ''}`}
-            >
-              <span
-                aria-hidden="true"
-                className={`${mono} grid size-10 shrink-0 place-items-center rounded-md border border-edge-hi text-[11px]`}
+        <p className="mt-0 mb-3 max-w-[560px] text-[14px] leading-relaxed text-muted">
+          A machine is a computer Remy can run commands on, with your key. It asks before each one.
+        </p>
+        {data.machines.length === 0 ? (
+          <div className={empty}>
+            <p className="m-0 text-[15px]">No machine is added yet.</p>
+            <p className="mt-1 mb-4 max-w-[520px] text-[14px] leading-relaxed text-muted">
+              Add a server or another computer and Remy can work there, asking before every command.
+            </p>
+            <a className={primary} href="#/connections/machine">
+              Add a machine
+            </a>
+          </div>
+        ) : (
+          <ul className="m-0 list-none border-t border-edge p-0">
+            {data.machines.map((m) => (
+              <li
+                key={m.name}
+                className={`${row} ${current?.kind === 'machine' && current.name === m.name ? '-mx-3 rounded-[10px] border-transparent bg-surface px-3' : ''}`}
               >
-                ▭
-              </span>
-              <div className="min-w-[160px] flex-1">
-                <h3 className={`${mono} m-0 text-[15px] font-medium`}>{m.name}</h3>
-                <p className="m-0 mt-1 text-[14px] text-muted">{m.detail}</p>
-              </div>
-              <span className={`${mono} text-[12px] text-muted`}>
-                {m.status === 'reachable'
-                  ? 'Reachable'
-                  : m.status === 'unchecked'
-                    ? 'Not checked'
-                    : 'Not reachable'}
-              </span>
-              <button
-                type="button"
-                className={quiet}
-                aria-pressed={current?.kind === 'machine' && current.name === m.name}
-                onClick={() => setSelected({ kind: 'machine', name: m.name })}
-              >
-                Manage {m.name}
-              </button>
-            </li>
-          ))}
-        </ul>
+                <div className="min-w-[160px] flex-1">
+                  <h3 className={`${mono} m-0 text-[15px] font-medium`}>{m.name}</h3>
+                  <p className="m-0 mt-1 text-[14px] break-words text-muted">{m.detail}</p>
+                </div>
+                <span className={`${mono} text-[12px] text-muted`}>
+                  {m.status === 'reachable'
+                    ? 'Reachable'
+                    : m.status === 'unchecked'
+                      ? 'Not checked'
+                      : 'Not reachable'}
+                </span>
+                <button
+                  type="button"
+                  className={quiet}
+                  aria-pressed={current?.kind === 'machine' && current.name === m.name}
+                  onClick={() => setSelected({ kind: 'machine', name: m.name })}
+                >
+                  Manage {m.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
-      <div className="flex flex-wrap gap-2">
-        <a className={primary} href="#/connections/add">
-          Add a connection
-        </a>
-        <a className={quiet} href="#/connections/machine">
-          Add a machine
-        </a>
-      </div>
+      {(data.apps.length > 0 || data.machines.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {data.apps.length > 0 && (
+            <a className={primary} href="#/connections/add">
+              Connect an app
+            </a>
+          )}
+          {data.machines.length > 0 && (
+            <a className={quiet} href="#/connections/machine">
+              Add a machine
+            </a>
+          )}
+        </div>
+      )}
     </Page>
   );
 }
@@ -153,11 +201,13 @@ export function Connections() {
 function AppRow({
   app,
   selected,
+  said,
   onManage,
   onSignIn,
 }: {
   app: ConnectedApp;
   selected: boolean;
+  said: string | undefined;
   onManage: () => void;
   onSignIn: () => void;
 }) {
@@ -173,6 +223,11 @@ function AppRow({
       <div className="min-w-[160px] flex-1">
         <h3 className="m-0 text-[16px] font-medium">{app.name}</h3>
         <p className="m-0 mt-1 text-[14px] text-muted">{app.blurb}</p>
+        {said && (
+          <p role="status" className="m-0 mt-1 text-[13px] text-text">
+            {said}
+          </p>
+        )}
       </div>
       <span
         className={`${mono} text-[12px] ${app.status === 'connected' ? 'text-muted' : 'text-text'}`}
@@ -199,13 +254,15 @@ function AppRow({
 function Panel({
   app,
   machine,
+  hasMachines,
   said,
   onToggle,
   onDisconnect,
 }: {
   app: ConnectedApp | undefined;
   machine: Machine | undefined;
-  said: string;
+  hasMachines: boolean;
+  said: string | undefined;
   onToggle: (permissionId: string, on: boolean) => void;
   onDisconnect: () => void;
 }) {
@@ -213,17 +270,25 @@ function Panel({
     return (
       <div>
         <Eyebrow>{machine.name} · how Remy behaves</Eyebrow>
-        <p className="mt-4 mb-0 text-[14px] text-muted">{machine.detail}</p>
-        <p className="mt-4 mb-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] text-muted">
+        <p className="mt-4 mb-0 text-[14px] break-words text-muted">{machine.detail}</p>
+        <p className="mt-4 mb-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-relaxed text-muted">
           Every command asks you first and is shown in full. Anything the machine sends back is read
           as information, never as instructions.
         </p>
-        <Notice>{said}</Notice>
+        <div className="mt-3">
+          <Notice>{said}</Notice>
+        </div>
       </div>
     );
   }
   if (!app)
-    return <p className="m-0 text-[14px] text-muted">Pick a connection to see its rules.</p>;
+    return (
+      <p className="m-0 text-[14px] text-muted">
+        {hasMachines
+          ? 'Pick a machine to see how Remy behaves there.'
+          : 'Nothing is connected yet. Connect an app and its rules appear here.'}
+      </p>
+    );
   if (app.status !== 'connected') {
     return (
       <div>

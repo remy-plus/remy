@@ -3,6 +3,8 @@ import type { SettingsData } from '../../api/index.tsx';
 /** What every section gets. `data` is null until the adapter answers, and stays null when it cannot. */
 export interface SectionProps {
   data: SettingsData | null;
+  /** Why the settings could not be read, in plain words; null while they are fine. */
+  error: string | null;
   reload: () => void;
 }
 

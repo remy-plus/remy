@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { TaskView } from '../api/index.tsx';
 import { humanTool } from '../pages/tasks/format.ts';
+import { Icon } from './Icon.tsx';
 
 export type StepState = 'done' | 'waiting' | 'working' | 'pending' | 'failed';
 
@@ -40,7 +41,7 @@ export function buildSteps(view: TaskView, clock: (iso: string) => string): Step
       id: c.callId,
       state,
       label: c.label ?? humanTool(c.tool),
-      ...(c.at && { time: c.at.length > 5 ? clock(c.at) : c.at }),
+      ...(c.at && { time: clock(c.at) }),
       ...(failed && { suffix: 'stopped' }),
       ...(waiting && { suffix: 'waiting for your OK' }),
     });
@@ -66,26 +67,20 @@ function Marker({ state }: { state: StepState }) {
   const base = 'absolute top-[3px] left-0 flex size-4 items-center justify-center rounded-full';
   if (state === 'done')
     return (
-      <span
-        aria-hidden="true"
-        className={`${base} pop border border-signal bg-bg text-[10px] text-signal`}
-      >
-        ✓
+      <span aria-hidden="true" className={`${base} pop border border-signal bg-bg text-signal`}>
+        <Icon name="check" size={9} />
       </span>
     );
   if (state === 'failed')
     return (
-      <span
-        aria-hidden="true"
-        className={`${base} bg-text font-mono text-[11px] font-bold text-bg`}
-      >
-        !
+      <span aria-hidden="true" className={`${base} bg-text text-bg`}>
+        <Icon name="close" size={9} />
       </span>
     );
   if (state === 'pending')
     return (
-      <span aria-hidden="true" className={`${base} bg-bg font-mono text-[13px] text-muted`}>
-        :
+      <span aria-hidden="true" className={base}>
+        <span className="size-1.5 rounded-full border border-stone" />
       </span>
     );
   return (

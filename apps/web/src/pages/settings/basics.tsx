@@ -1,8 +1,18 @@
 // Trust, spending and the small rows other sections reuse. All values live in the settings store.
 import { useState } from 'react';
 import type { TrustLevel } from '../../api/index.tsx';
+import { Skeleton } from '../../components/Skeleton.tsx';
 import { useSetting } from '../../settings.ts';
-import { Money, money, Row, Segmented, Toggle } from './controls.tsx';
+import {
+  Money,
+  money,
+  Row,
+  RowError,
+  SaveNote,
+  Segmented,
+  Toggle,
+  useOwnSave,
+} from './controls.tsx';
 import type { SectionProps } from './sections.ts';
 
 const TRUST: Record<TrustLevel, { label: string; text: string }> = {
@@ -29,7 +39,7 @@ export function TrustRow() {
   return (
     <Row
       title="Choose a level"
-      help="Sending as you and spending money always wait for you, at every level."
+      help="How much Remy does without asking. Sending as you, spending money and deleting always wait for you, at every level."
     >
       <Segmented label="Trust level" value={trust} options={TRUST_OPTIONS} onChange={setTrust} />
       <p
@@ -43,7 +53,7 @@ export function TrustRow() {
   );
 }
 
-export function MonthlyBudgetRow({ data }: SectionProps) {
+export function MonthlyBudgetRow({ data, error, reload }: SectionProps) {
   const [cap, setCap] = useSetting('budget.month');
   const [perTask, setPerTask] = useSetting('budget.task');
   const [code] = useSetting('currency.code');
@@ -51,47 +61,78 @@ export function MonthlyBudgetRow({ data }: SectionProps) {
   const symbol = symbolFor(code);
   const used = data?.budget.usedMonth;
   const share = used === undefined || cap <= 0 ? 0 : Math.min(1, used / cap);
+  const capSave = useOwnSave();
+  const stopSave = useOwnSave();
   return (
-    <Row title="Monthly budget" help="Once the month's budget is used, Remy starts no new jobs.">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <Money
-          key={`${code}${rate}`}
-          label="Monthly budget"
-          symbol={symbol}
-          value={shown(cap, rate)}
-          onChange={(v) => setCap(v / rate)}
-        />
-        {data && (
-          <p className="m-0 text-[13px] text-muted">
-            {money(symbol, data.budget.usedMonth * rate)} used, {data.budget.daysLeft} days left
-          </p>
-        )}
-      </div>
-      {data && (
-        <div
-          role="progressbar"
-          aria-label="Share of the monthly budget used"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(share * 100)}
-          className="mt-4 h-1 max-w-[420px] rounded-full bg-line"
-        >
-          <div className="h-full rounded-full bg-stone" style={{ width: `${share * 100}%` }} />
+    <>
+      <Row
+        title="Monthly cap"
+        help="The most Remy may spend in a month. When the cap is reached, new jobs stop; a job already running keeps its own stop below."
+      >
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <Money
+            key={`${code}${rate}`}
+            label="Monthly cap"
+            symbol={symbol}
+            value={shown(cap, rate)}
+            onChange={(v) => {
+              capSave.touch();
+              setCap(v / rate);
+            }}
+          />
+          {data && (
+            <p className="m-0 text-[13px] text-muted">
+              {money(symbol, data.budget.usedMonth * rate)} used, {data.budget.daysLeft} days left
+              this month
+            </p>
+          )}
         </div>
-      )}
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Money
-          key={`${code}${rate}`}
-          label="Stop a job at"
-          symbol={symbol}
-          value={shown(perTask, rate)}
-          onChange={(v) => setPerTask(v / rate)}
-        />
-        <p className="m-0 text-[14px] text-muted">
-          Per job, Remy stops and asks at {money(symbol, perTask * rate)}.
-        </p>
-      </div>
-    </Row>
+        {data ? (
+          <div
+            role="progressbar"
+            aria-label="Share of the monthly cap used"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(share * 100)}
+            className="mt-4 h-1 max-w-[420px] rounded-full bg-line"
+          >
+            <div className="h-full rounded-full bg-stone" style={{ width: `${share * 100}%` }} />
+          </div>
+        ) : error ? (
+          <div className="mt-4">
+            <RowError message={error} onRetry={reload} />
+          </div>
+        ) : (
+          <Skeleton
+            label="Loading what you have spent this month"
+            lines={1}
+            className="mt-4 max-w-[420px]"
+          />
+        )}
+        <SaveNote state={capSave.state} what="monthly cap" />
+      </Row>
+      <Row
+        title="Stop a job at"
+        help="Remy pauses one job at this amount and asks before it spends more. It does not touch the monthly cap."
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Money
+            key={`${code}${rate}`}
+            label="Stop a job at"
+            symbol={symbol}
+            value={shown(perTask, rate)}
+            onChange={(v) => {
+              stopSave.touch();
+              setPerTask(v / rate);
+            }}
+          />
+          <p className="m-0 text-[14px] text-muted">
+            Per job, Remy stops and asks at {money(symbol, perTask * rate)}.
+          </p>
+        </div>
+        <SaveNote state={stopSave.state} what="stop for a job" />
+      </Row>
+    </>
   );
 }
 
@@ -126,9 +167,13 @@ export function CurrencyRow() {
   const [rate, setRate] = useSetting('currency.rate');
   const [codeText, setCodeText] = useState(code);
   const [rateText, setRateText] = useState(String(rate));
+  const save = useOwnSave();
   const bad = codeText !== code && !validCode(codeText.toUpperCase());
   return (
-    <Row title="Currency" help="Only how amounts are shown. Remy is billed in US dollars.">
+    <Row
+      title="Currency"
+      help="Only how amounts are shown to you. Remy is billed in US dollars, and the numbers it stores stay in dollars."
+    >
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1 text-[13px] text-muted">
           Code
@@ -140,7 +185,10 @@ export function CurrencyRow() {
             onChange={(e) => {
               const v = e.target.value.toUpperCase();
               setCodeText(v);
-              if (validCode(v)) setCode(v);
+              if (validCode(v)) {
+                save.touch();
+                setCode(v);
+              }
             }}
             className="h-[38px] w-[88px] rounded-md border border-edge-hi bg-surface px-3 text-[13px] text-text outline-none focus:border-text"
           />
@@ -157,7 +205,10 @@ export function CurrencyRow() {
             onChange={(e) => {
               setRateText(e.target.value);
               const n = Number.parseFloat(e.target.value);
-              if (Number.isFinite(n) && n > 0) setRate(n);
+              if (Number.isFinite(n) && n > 0) {
+                save.touch();
+                setRate(n);
+              }
             }}
             className="h-[38px] w-[120px] rounded-md border border-edge-hi bg-surface px-3 text-[13px] text-text outline-none focus:border-text"
           />
@@ -168,6 +219,7 @@ export function CurrencyRow() {
           ? 'Use a three-letter code such as USD, GBP or INR.'
           : 'You set the rate; Remy does not look it up.'}
       </p>
+      <SaveNote state={save.state} what="currency" />
     </Row>
   );
 }
@@ -175,7 +227,10 @@ export function CurrencyRow() {
 export function RememberRow() {
   const [memory, setMemory] = useSetting('memory');
   return (
-    <Row title="Remember things about me" help="Notes stay on this machine.">
+    <Row
+      title="Remember things about me"
+      help="Notes stay on this machine and are never sent anywhere but the model you chose."
+    >
       <Toggle
         label="Learn from corrections and routines"
         help="Turn off to stop saving notes. Existing notes stay until you delete them."
@@ -189,7 +244,7 @@ export function RememberRow() {
 export function QuietRow() {
   const [quiet, setQuiet] = useSetting('quiet');
   return (
-    <Row title="Quiet mode" help="For focus and for nights.">
+    <Row title="Quiet mode" help="Remy keeps working; it just stops interrupting you.">
       <Toggle
         label="Only interrupt for approvals"
         help="Remy keeps working and holds everything else until you open the app. Its mark dims."
@@ -216,16 +271,27 @@ export function Budget(props: SectionProps) {
   return (
     <>
       <p className="mt-0 mb-6 max-w-[560px] text-[16px] text-muted">
-        Remy stops a job at its limit and asks before going on. Once the month's budget is used, it
-        starts no new jobs.
+        Remy stops a job at its own limit and asks before going on. Once the month's cap is reached,
+        it starts no new jobs.
       </p>
       <MonthlyBudgetRow {...props} />
       <CurrencyRow />
-      <Row title="When the stronger model is used" help="Set under Model and keys.">
-        <p className="m-0 text-[14px] text-muted">
+      <Row
+        title="When the stronger model is used"
+        help={
+          <>
+            Set under{' '}
+            <a href="#/settings/model" className="text-text underline">
+              Model and keys
+            </a>
+            .
+          </>
+        }
+      >
+        <p className="m-0 max-w-[520px] text-[14px] text-muted">
           {escalate
             ? 'Remy may move a hard job to the stronger model. It stays inside the limits above.'
-            : 'Remy stays on the everyday model, even for hard tasks.'}
+            : 'Remy stays on the everyday model, even for hard jobs.'}
         </p>
       </Row>
     </>

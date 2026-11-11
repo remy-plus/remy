@@ -40,7 +40,10 @@ export function DockSection() {
 
   return (
     <>
-      <Row title="Places in the dock" help="Choose what shows at the top and in what order.">
+      <Row
+        title="Places in the dock"
+        help="Choose what shows at the top and in what order. A place you turn off stays in this list, so you can turn it back on."
+      >
         <ul className="m-0 max-w-[520px] p-0">
           {rows.map((item) => {
             const on = shown.includes(item.id);
@@ -89,6 +92,13 @@ export function DockSection() {
             );
           })}
         </ul>
+        <p className="mt-3 mb-0 max-w-[520px] text-[13px] text-muted">
+          {hidden.length === 0
+            ? 'Every place is showing.'
+            : `${hidden.length} ${hidden.length === 1 ? 'place is' : 'places are'} hidden: ${hidden
+                .map((d) => d.label)
+                .join(', ')}.`}
+        </p>
         <div className="mt-4">
           <button
             type="button"
@@ -96,7 +106,7 @@ export function DockSection() {
             onClick={() => resetSetting('dock')}
             className={`${buttonQuiet} disabled:cursor-default disabled:opacity-40`}
           >
-            Reset to default
+            Put the dock back to default
           </button>
         </div>
       </Row>
@@ -112,8 +122,8 @@ export function DockSection() {
           Command center: coming soon.
         </p>
       </Row>
-      <Row title="Colours">
-        <p className="m-0 text-[15px] text-muted">Dark only for now.</p>
+      <Row title="Colours" help="Remy is dark only for now.">
+        <p className="m-0 text-[15px] text-muted">A light theme is not built yet.</p>
       </Row>
     </>
   );

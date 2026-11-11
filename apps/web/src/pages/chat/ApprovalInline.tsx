@@ -31,7 +31,7 @@ export function ApprovalInline({
   const [answered, setAnswered] = useState<'yes' | 'no' | null>(null);
   const answer = useRef<(granted: boolean) => void>(() => {});
   answer.current = async (granted) => {
-    if (busy) return;
+    if (busy || answered) return; // one answer per card, even if Enter is pressed again
     setBusy(true);
     setProblem(null);
     try {

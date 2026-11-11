@@ -1,17 +1,20 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../App.tsx';
-import { ApiProvider } from '../../api/index.tsx';
+import { ApiError } from '../../api/http.ts';
+import { ApiProvider, type RemyApi } from '../../api/index.tsx';
 import { createMockApi } from '../../api/mock.ts';
 
 afterEach(() => {
   window.location.hash = '';
 });
 
-const open = (hash: string) => {
+const apiWith = (patch: Partial<RemyApi>): RemyApi => ({ ...createMockApi(), ...patch });
+
+const open = (hash = '#/connections', api: RemyApi = createMockApi()) => {
   window.location.hash = hash;
   return render(
-    <ApiProvider api={createMockApi()}>
+    <ApiProvider api={api}>
       <App />
     </ApiProvider>,
   );
@@ -19,7 +22,7 @@ const open = (hash: string) => {
 
 describe('Connections', () => {
   it('lists apps and machines, with statuses as text', async () => {
-    open('#/connections');
+    open();
     expect(await screen.findByRole('heading', { level: 1, name: 'Connections' })).toBeTruthy();
     const apps = screen.getByRole('region', { name: 'Apps' });
     expect(within(apps).getAllByRole('heading', { level: 3 })).toHaveLength(5);
@@ -28,7 +31,7 @@ describe('Connections', () => {
     expect(within(apps).getByRole('button', { name: 'Connect GitHub' })).toBeTruthy();
     const machines = screen.getByRole('region', { name: 'Machines' });
     expect(within(machines).getByRole('button', { name: 'Manage home-server' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Add a connection' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Connect an app' }).getAttribute('href')).toBe(
       '#/connections/add',
     );
     expect(screen.getByRole('link', { name: 'Add a machine' }).getAttribute('href')).toBe(
@@ -36,8 +39,18 @@ describe('Connections', () => {
     );
   });
 
+  it('says what a machine is for, in one line', async () => {
+    open();
+    const machines = await screen.findByRole('region', { name: 'Machines' });
+    expect(
+      within(machines).getByText(
+        'A machine is a computer Remy can run commands on, with your key. It asks before each one.',
+      ),
+    ).toBeTruthy();
+  });
+
   it('toggles a permission with a real, keyboard-operable switch', async () => {
-    open('#/connections');
+    open();
     const sw = await screen.findByRole('switch', { name: 'Delete mail' });
     expect((sw as HTMLInputElement).checked).toBe(false);
     fireEvent.click(sw);
@@ -53,24 +66,63 @@ describe('Connections', () => {
   });
 
   it('shows the permissions of the app being managed', async () => {
-    open('#/connections');
+    open();
     await screen.findByRole('switch', { name: 'Read mail' });
     fireEvent.click(screen.getByRole('button', { name: 'Manage Notion' }));
     expect(await screen.findByRole('switch', { name: 'Edit pages' })).toBeTruthy();
     expect(screen.queryByRole('switch', { name: 'Read mail' })).toBeNull();
   });
 
-  it('disconnects and signs in', async () => {
-    open('#/connections');
+  it('disconnects and signs in, saying so beside the app it changed', async () => {
+    open();
     fireEvent.click(await screen.findByRole('button', { name: 'Disconnect Gmail' }));
     expect(await screen.findByText('Gmail is disconnected.')).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Connect Gmail' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sign in to Slack' }));
     expect(await screen.findByRole('button', { name: 'Manage Slack' })).toBeTruthy();
+    // The success line sits in the Slack row, not in the panel about another app.
+    const apps = screen.getByRole('region', { name: 'Apps' });
+    expect(within(apps).getByText('Slack is connected.')).toBeTruthy();
+  });
+
+  it('says which status stopped a change, in the server’s own words', async () => {
+    open('#/connections', apiWith({ setPermission: () => Promise.reject(new ApiError(403, '')) }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Delete mail' }));
+    expect(
+      await screen.findByText(
+        "Remy is not allowed to do that. Check the app's permissions in Connections.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it('offers a way forward when nothing is connected and no machine is added', async () => {
+    open('#/connections', apiWith({ connections: async () => ({ apps: [], machines: [] }) }));
+    expect(await screen.findByText('No app is connected yet.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Connect an app' }).getAttribute('href')).toBe(
+      '#/connections/add',
+    );
+    expect(screen.getByText('No machine is added yet.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Add a machine' }).getAttribute('href')).toBe(
+      '#/connections/machine',
+    );
+    expect(screen.getByText(/Nothing is connected yet/)).toBeTruthy();
+  });
+
+  it('points at the machines when no app is connected but a machine is added', async () => {
+    open(
+      '#/connections',
+      apiWith({
+        connections: async () => ({
+          apps: [],
+          machines: [{ name: 'home-server', detail: 'ssh remy@10.0.0.5', status: 'reachable' }],
+        }),
+      }),
+    );
+    expect(await screen.findByText('Pick a machine to see how Remy behaves there.')).toBeTruthy();
   });
 
   it('has landmarks and no unnamed button', async () => {
-    open('#/connections');
+    open();
     await screen.findByRole('switch', { name: 'Read mail' });
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy();

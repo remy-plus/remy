@@ -4,15 +4,19 @@ import { App } from '../App.tsx';
 import { a11yProblems } from '../a11y.testing.ts';
 import { ApiProvider } from '../api/index.tsx';
 import { createMockApi } from '../api/mock.ts';
+import type { RemyApi } from '../api/types.ts';
 
 afterEach(() => {
   window.location.hash = '';
 });
 
-const app = () => {
+/** A failure the way the adapter sends one: a status, and no words of its own. */
+const status = (code: number) => Object.assign(new Error(''), { status: code });
+
+const app = (api: RemyApi = createMockApi()) => {
   window.location.hash = '#/tasks';
   return render(
-    <ApiProvider api={createMockApi()}>
+    <ApiProvider api={api}>
       <App />
     </ApiProvider>,
   );
@@ -59,8 +63,31 @@ describe('CommandPalette', () => {
     expect(has("Book Dana's flights")).toBe(true);
     expect(has('dana?')).toBe(true);
     expect(has('Rename invoices')).toBe(false);
+  });
+
+  it('offers a way out when nothing matches: ask anyway, or clear the search', async () => {
+    app();
+    ctrlK();
+    const input = await box();
     fireEvent.change(input, { target: { value: 'zzzz' } });
-    expect(screen.getByRole('option', { name: /zzzz\?/ })).toBeTruthy();
+    expect(screen.getByText(/Nothing matches/)).toBeTruthy();
+    expect(screen.getByRole('option', { name: /Ask Remy to do “zzzz”/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('option', { name: /Clear the search/ }));
+    expect((input as HTMLInputElement).value).toBe('');
+    expect(screen.getByRole('option', { name: /Turn on quiet mode/ })).toBeTruthy();
+    expect(screen.queryByText(/Nothing matches/)).toBeNull();
+  });
+
+  it('has a Clear control whenever the search is narrowed', async () => {
+    app();
+    ctrlK();
+    const input = await box();
+    expect(screen.queryByRole('button', { name: 'Clear the search' })).toBeNull();
+    fireEvent.change(input, { target: { value: 'dana' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the search' }));
+    expect((input as HTMLInputElement).value).toBe('');
+    expect(screen.queryByRole('button', { name: 'Clear the search' })).toBeNull();
+    expect(screen.getByRole('option', { name: /Turn on quiet mode/ })).toBeTruthy();
   });
 
   it('moves with the arrow keys, names the active row, and wraps', async () => {
@@ -109,6 +136,29 @@ describe('CommandPalette', () => {
     fireEvent.change(input, { target: { value: 'tidy my downloads' } });
     fireEvent.keyDown(input, { key: 'Tab' });
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/tasks\/task_mock2/));
+  });
+
+  it('says why a job did not start', async () => {
+    app({ ...createMockApi(), startTask: () => Promise.reject(status(402)) });
+    ctrlK();
+    const input = await box();
+    fireEvent.change(input, { target: { value: 'tidy my downloads' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      "This month's spending limit is reached. Raise it in Settings, under Spending, or wait until next month.",
+    );
+  });
+
+  it('says when your jobs could not be loaded', async () => {
+    app({ ...createMockApi(), listTasks: () => Promise.reject(status(500)) });
+    ctrlK();
+    await box();
+    const dialog = screen.getByRole('dialog', { name: 'Command palette' });
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      "Remy's server hit a problem. Try again in a moment.",
+    );
   });
 
   it('Esc closes it', async () => {

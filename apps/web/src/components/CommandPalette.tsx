@@ -2,7 +2,9 @@
 // holding a combobox and a listbox. Enter opens the chosen row; Tab tells Remy to do what was typed.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { type TaskListItem, type TaskStatus, useApi } from '../api/index.tsx';
+import { describeError } from '../lib/errors.ts';
 import { setSetting } from '../settings.ts';
+import { Icon } from './Icon.tsx';
 
 interface Item {
   id: string;
@@ -12,6 +14,8 @@ interface Item {
   run: () => void | Promise<void>;
   /** True when the row starts a task: it closes the palette itself once the task exists. */
   starts?: boolean;
+  /** True when the row changes the palette itself, so it stays open. */
+  stay?: boolean;
 }
 
 const GROUPS: Item['group'][] = ['Ask your brain', 'Jobs', 'Do something'];
@@ -21,7 +25,7 @@ const STATUS: Record<TaskStatus, string> = {
   waiting_user: 'waiting for you',
   paused: 'paused',
   succeeded: 'done',
-  failed: 'failed',
+  failed: "didn't finish",
   cancelled: "didn't finish",
 };
 const SUGGESTIONS = ['What do I still owe anyone?', 'What changed since Friday?'];
@@ -49,6 +53,12 @@ export function CommandPalette() {
   const [error, setError] = useState('');
 
   const close = useCallback(() => setOpen(false), []);
+  /** Back to the full list: the way out of a search that found nothing. */
+  const clear = useCallback(() => {
+    setQuery('');
+    setActive(0);
+    setError('');
+  }, []);
 
   // Open from the keyboard or from a button anywhere in the app.
   useEffect(() => {
@@ -86,7 +96,10 @@ export function CommandPalette() {
     api
       .listTasks({ limit: 30 })
       .then((t) => live && setTasks(t))
-      .catch(() => live && setTasks([]));
+      .catch(
+        (e: unknown) =>
+          live && setError(describeError(e, 'Your jobs could not be loaded just now.')),
+      );
     return () => {
       live = false;
     };
@@ -100,26 +113,25 @@ export function CommandPalette() {
         close();
         go(`#/tasks/${encodeURIComponent(taskId)}`);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Remy could not start that.');
+        setError(describeError(e, 'Remy could not start that. Try again.'));
       }
     },
     [api, close],
   );
 
-  const items: Item[] = [];
-  const add = (
+  // Everything that matches the words typed, before the two catch-all rows.
+  const rows: Omit<Item, 'id'>[] = [];
+  const push = (
     group: Item['group'],
     label: string,
     hint: string,
     run: Item['run'],
-    starts = false,
-  ) => items.push({ id: `${base}-o${items.length}`, group, label, hint, run, starts });
-  if (q) add('Ask your brain', `${q}?`, 'Enter to ask', () => start(q), true);
+    extra: { starts?: boolean; stay?: boolean } = {},
+  ) => rows.push({ group, label, hint, run, ...extra });
   for (const s of SUGGESTIONS)
-    if (matches(s, q) && s !== q) add('Ask your brain', s, '', () => start(s), true);
+    if (matches(s, q) && s !== q) push('Ask your brain', s, '', () => start(s), { starts: true });
   for (const t of tasks.filter((t) => matches(t.prompt, q)).slice(0, 4))
-    add('Jobs', t.prompt, STATUS[t.status], () => go(`#/tasks/${encodeURIComponent(t.id)}`));
-  if (q) add('Do something', q, 'asks before sending', () => start(q), true);
+    push('Jobs', t.prompt, STATUS[t.status], () => go(`#/tasks/${encodeURIComponent(t.id)}`));
   const actions: [string, string, () => void][] = [
     [
       'Turn on quiet mode',
@@ -136,7 +148,30 @@ export function CommandPalette() {
     ['Go to Home', '', () => go('#/')],
   ];
   for (const [label, hint, run] of actions)
-    if (matches(label, q)) add('Do something', label, hint, run);
+    if (matches(label, q)) push('Do something', label, hint, run);
+
+  // Nothing matched: the way out is to ask Remy anyway, or to start the search again.
+  const nothing = Boolean(q) && rows.length === 0;
+  if (nothing) {
+    push('Do something', `Ask Remy to do “${q}”`, 'Enter to ask', () => start(q), { starts: true });
+    push('Do something', 'Clear the search', 'start again', () => clear(), { stay: true });
+  } else if (q) {
+    rows.unshift({
+      group: 'Ask your brain',
+      label: `${q}?`,
+      hint: 'Enter to ask',
+      run: () => start(q),
+      starts: true,
+    });
+    rows.push({
+      group: 'Do something',
+      label: q,
+      hint: 'Remy asks first',
+      run: () => start(q),
+      starts: true,
+    });
+  }
+  const items: Item[] = rows.map((r, i) => ({ ...r, id: `${base}-o${i}` }));
 
   const at = Math.min(active, Math.max(0, items.length - 1));
   const current = items[at];
@@ -148,7 +183,7 @@ export function CommandPalette() {
 
   const choose = async (item: Item | undefined) => {
     if (!item) return;
-    if (!item.starts) close();
+    if (!item.starts && !item.stay) close();
     await item.run();
   };
 
@@ -216,50 +251,61 @@ export function CommandPalette() {
               }}
               className="min-w-0 flex-1 border-0 bg-transparent text-[18px] text-text outline-none placeholder:text-muted focus-visible:outline-none"
             />
-          </div>
-          <div
-            id={listId}
-            role="listbox"
-            aria-label="Results"
-            className="max-h-[min(470px,60vh)] overflow-y-auto p-2"
-          >
-            {shown.length === 0 && (
-              <p className="m-0 px-3 py-4 text-[14px] text-muted">Nothing matches.</p>
+            {q && (
+              <button
+                type="button"
+                aria-label="Clear the search"
+                onClick={() => clear()}
+                className="cursor-pointer rounded-full border border-edge p-1.5 text-muted transition-colors duration-300 hover:text-text"
+              >
+                <Icon name="close" />
+              </button>
             )}
-            {shown.map(({ g, rows }) => (
-              // biome-ignore lint/a11y/useSemanticElements: a listbox may only hold option groups, not a fieldset
-              <div key={g} role="group" aria-labelledby={`${base}-${g}`} className="mb-2">
-                <div
-                  id={`${base}-${g}`}
-                  className="font-mono px-3 pt-2 pb-1.5 text-[12px] text-muted"
-                >
-                  {g}
+          </div>
+          <div className="max-h-[min(470px,60vh)] overflow-y-auto p-2">
+            {nothing && (
+              <p className="m-0 px-3 pt-2 pb-1 text-[14px] leading-snug text-muted">
+                Nothing matches “{q}”. Remy can still try it, or you can start the search again.
+              </p>
+            )}
+            <div id={listId} role="listbox" aria-label="Results">
+              {shown.map(({ g, rows: groupRows }) => (
+                // biome-ignore lint/a11y/useSemanticElements: a listbox may only hold option groups, not a fieldset
+                <div key={g} role="group" aria-labelledby={`${base}-${g}`} className="mb-2">
+                  <div
+                    id={`${base}-${g}`}
+                    className="font-mono px-3 pt-2 pb-1.5 text-[12px] text-muted"
+                  >
+                    {g}
+                  </div>
+                  {groupRows.map((it) => {
+                    const on = it === current;
+                    return (
+                      // biome-ignore lint/a11y/useKeyWithClickEvents: the combobox input owns the keyboard
+                      <div
+                        key={it.id}
+                        id={it.id}
+                        role="option"
+                        aria-selected={on}
+                        tabIndex={-1}
+                        onMouseMove={() => setActive(items.indexOf(it))}
+                        onClick={() => void choose(it)}
+                        className={`flex cursor-pointer items-baseline justify-between gap-4 rounded-md px-3 py-2.5 ${on ? 'bg-raise' : ''}`}
+                      >
+                        <span
+                          className={`min-w-0 text-[16px] ${on ? 'text-text' : 'text-text/85'}`}
+                        >
+                          {it.label}
+                        </span>
+                        <span className="font-mono shrink-0 text-[12px] text-muted">
+                          {on && it.group === 'Ask your brain' ? 'Enter to ask' : it.hint}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-                {rows.map((it) => {
-                  const on = it === current;
-                  return (
-                    // biome-ignore lint/a11y/useKeyWithClickEvents: the combobox input owns the keyboard
-                    <div
-                      key={it.id}
-                      id={it.id}
-                      role="option"
-                      aria-selected={on}
-                      tabIndex={-1}
-                      onMouseMove={() => setActive(items.indexOf(it))}
-                      onClick={() => void choose(it)}
-                      className={`flex cursor-pointer items-baseline justify-between gap-4 rounded-md px-3 py-2.5 ${on ? 'bg-raise' : ''}`}
-                    >
-                      <span className={`min-w-0 text-[16px] ${on ? 'text-text' : 'text-text/85'}`}>
-                        {it.label}
-                      </span>
-                      <span className="font-mono shrink-0 text-[12px] text-muted">
-                        {on && it.group === 'Ask your brain' ? 'Enter to ask' : it.hint}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           {error && (
             <p

@@ -1,4 +1,7 @@
 import { type ReactNode, useId, useState } from 'react';
+import { Icon } from '../../components/Icon.tsx';
+import { buttonQuiet } from '../../components/ui.ts';
+import { type SaveState, useSaveState } from '../../settings.ts';
 
 /** One labelled row: the name and a line of help on the left, the control on the right. */
 export function Row({
@@ -165,3 +168,41 @@ export function Money({
 }
 
 export const money = (symbol: string, n: number) => `${symbol}${n.toFixed(2)}`;
+
+/**
+ * The outcome of this section's own last write. The page already says Saved at the top, but a person
+ * who just changed a number is looking at the number, so the section says it there too. `touch` marks
+ * that this section made a change; until then the note stays quiet, so a save from another section
+ * never shows up here as if it were this one's.
+ */
+export function useOwnSave(): { state: SaveState; touch: () => void } {
+  const save = useSaveState();
+  const [touched, setTouched] = useState(false);
+  return { state: touched ? save : 'idle', touch: () => setTouched(true) };
+}
+
+/** One line under a control that writes to the server: saving, saved, or what to do about a failure. */
+export function SaveNote({ state, what }: { state: SaveState; what: string }) {
+  if (state === 'idle') return null;
+  return (
+    <p role="status" className="mt-3 mb-0 flex items-center gap-2 text-[13px] text-muted">
+      {state === 'saved' && <Icon name="check" className="shrink-0 text-signal" />}
+      {state === 'saving' && `Saving the ${what}`}
+      {state === 'saved' && `The ${what} is saved.`}
+      {state === 'failed' &&
+        `The ${what} did not save. Check that Remy is running, then try again.`}
+    </p>
+  );
+}
+
+/** A failure inside one row: what went wrong, and a way to try again. */
+export function RowError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="status" className="max-w-[520px]">
+      <p className="m-0 text-[14px] leading-relaxed">{message}</p>
+      <button type="button" onClick={onRetry} className={`${buttonQuiet} mt-3`}>
+        Try again
+      </button>
+    </div>
+  );
+}

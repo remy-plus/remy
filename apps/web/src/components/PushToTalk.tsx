@@ -3,6 +3,7 @@
 // audio itself. Without that API the overlay says so and lets the person type instead.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApi } from '../api/index.tsx';
+import { describeError } from '../lib/errors.ts';
 import { voiceClaim } from '../lib/voice.ts';
 import { type VoiceMode, VoiceOverlay } from './VoiceOverlay.tsx';
 
@@ -143,7 +144,7 @@ export function PushToTalk() {
         close();
         window.location.hash = `#/tasks/${encodeURIComponent(taskId)}`;
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Remy could not start that.');
+        setError(describeError(e, 'Remy could not start that. Try again.'));
       }
     },
     [api, close],

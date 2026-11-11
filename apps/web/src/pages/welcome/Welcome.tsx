@@ -43,7 +43,7 @@ function Trace({ at }: { at: number }) {
               aria-hidden="true"
               className={`relative z-10 grid size-4 place-items-center rounded-full border text-[9px] leading-none ${current ? 'border-signal bg-signal text-signal-ink' : 'border-edge-hi bg-bg'}`}
             >
-              {done ? '✓' : i + 1}
+              {done ? <Icon name="check" size={9} /> : i + 1}
             </span>
             {label}
             {done && <span className="sr-only"> (done)</span>}

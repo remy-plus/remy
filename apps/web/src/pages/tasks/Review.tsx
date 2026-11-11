@@ -1,9 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { type ReviewData, useApi } from '../../api/index.tsx';
 import { ApprovalDialog } from '../../components/ApprovalDialog.tsx';
-import { primaryButton, quietButton } from './format.ts';
+import { Icon } from '../../components/Icon.tsx';
+import { Skeleton } from '../../components/Skeleton.tsx';
+import { describeError } from '../../lib/errors.ts';
+import { plainTime, primaryButton, quietButton, trustWords } from './format.ts';
 
 const mono = 'font-mono';
+
+/** What the answer means, in the words of the kind of thing being approved. */
+const approvedSaid = (kind: string) =>
+  /spend|pay/i.test(kind)
+    ? 'Approved. Remy is paying it.'
+    : /send/i.test(kind)
+      ? 'Approved. Remy is sending it.'
+      : 'Approved. Remy is carrying on.';
+
+const declinedSaid = (kind: string) =>
+  /spend|pay/i.test(kind)
+    ? 'Not now. Nothing was paid.'
+    : /send/i.test(kind)
+      ? 'Not now. Nothing was sent.'
+      : 'Not now. Nothing was changed.';
 
 export function Review() {
   const api = useApi();
@@ -11,42 +29,59 @@ export function Review() {
   const [error, setError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [skipped, setSkipped] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const [n, setN] = useState(0);
+  const reload = useCallback(() => setN((x) => x + 1), []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `n` is the reload counter
   useEffect(() => {
     let live = true;
     api
       .review()
-      .then((r) => live && setData(r))
-      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : 'Could not load.'));
+      .then((r) => {
+        if (!live) return;
+        setData(r);
+        setError(null);
+      })
+      .catch(
+        (e: unknown) =>
+          live && setError(describeError(e, 'Remy could not load the overnight review.')),
+      );
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, n]);
 
   if (error)
     return (
       <div className="mx-auto max-w-5xl px-5 py-12 sm:px-8">
         <h1 className="m-0 text-[28px] font-medium">Overnight review</h1>
-        <p className="mt-3 text-muted">{error}</p>
-        <a href="#/tasks" className={`${quietButton} mt-4 inline-block`}>
-          Back to tasks
-        </a>
+        <p className="mt-3 max-w-[560px] text-muted">{error}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={primaryButton} onClick={reload}>
+            Try again
+          </button>
+          <a href="#/activity" className={quietButton}>
+            See what Remy has done
+          </a>
+        </div>
       </div>
     );
   if (!data)
     return (
-      <p role="status" className={`${mono} px-5 py-12 text-[13px] text-muted sm:px-8`}>
-        Loading
-      </p>
+      <Skeleton label="Loading what needs your look" lines={4} className="px-5 py-12 sm:px-8" />
     );
 
   const needs = skipped ? null : data.needs;
+  // The server sends times like "23:10 to 07:40"; both ends are said in 12-hour words.
+  const span = data.span
+    .split(/\s+to\s+/)
+    .map((t) => plainTime(t))
+    .join(' to ');
   return (
     <div className="grid min-h-[calc(100dvh-66px)] lg:grid-cols-[minmax(0,1fr)_400px]">
       <div className="min-w-0 px-5 pt-8 pb-12 sm:px-14">
-        <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>
-          While you were away · {data.span}
-        </p>
+        <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>While you were away · {span}</p>
         <h1 className="m-0 mb-6 max-w-[800px] text-[30px] leading-[1.15] font-medium tracking-tight sm:text-[40px]">
           {data.headline} <span className="text-muted">{data.rest}</span>
         </h1>
@@ -69,9 +104,12 @@ export function Review() {
             {data.timeline.map((e, i) => (
               <li
                 key={e.at + e.title}
-                className="grid grid-cols-[48px_28px_minmax(0,1fr)] gap-x-1 sm:grid-cols-[60px_28px_minmax(0,1fr)]"
+                // Wide enough for a 12-hour time ("11:10 PM") on one line.
+                className="grid grid-cols-[64px_28px_minmax(0,1fr)] gap-x-1 sm:grid-cols-[76px_28px_minmax(0,1fr)]"
               >
-                <time className={`${mono} pt-0.5 text-right text-[12px] text-muted`}>{e.at}</time>
+                <time className={`${mono} pt-0.5 text-right text-[12px] text-muted`}>
+                  {plainTime(e.at)}
+                </time>
                 <span className="relative flex justify-center">
                   <span
                     aria-hidden="true"
@@ -111,27 +149,57 @@ export function Review() {
           <h2 className="m-0 text-[12px] font-normal">Needs you</h2>
           <span>{needs ? 1 : 0}</span>
         </div>
+        {said && (
+          <p
+            role="status"
+            className="mb-3 flex items-start gap-2 text-[14px] leading-snug text-text"
+          >
+            <Icon name="check" className="mt-0.5 shrink-0 text-signal" />
+            {said}
+          </p>
+        )}
         {needs ? (
           <div className="mb-4 rounded-[10px] border border-edge-hi bg-surface p-4">
             <p className={`${mono} m-0 text-[12px] text-muted`}>{needs.kind}</p>
             <h3 className="mt-1 mb-2 text-[17px] font-semibold">{needs.title}</h3>
+            {/* The draft itself, in full: it is the thing being decided. */}
             <p className="m-0 mb-3 text-[14px] leading-snug text-muted">{needs.quote}</p>
             <div className="flex flex-wrap gap-2">
               <button type="button" className={primaryButton} onClick={() => setReviewing(true)}>
                 Review and send
               </button>
-              <button type="button" className={quietButton} onClick={() => setSkipped(true)}>
-                Skip
+              <button
+                type="button"
+                className={quietButton}
+                onClick={() => {
+                  setSkipped(true);
+                  setSaid(declinedSaid(needs.kind));
+                }}
+              >
+                Not now
               </button>
             </div>
           </div>
         ) : (
-          <p className="mb-4 text-[14px] text-muted">Nothing is waiting for you.</p>
+          <div className="mb-4 rounded-[10px] border border-edge bg-surface p-4">
+            <p className="m-0 text-[15px] leading-snug">Nothing is waiting for you.</p>
+            <p className="mt-1 mb-3 text-[14px] leading-snug text-muted">
+              Remy did everything it was allowed to do on its own. Anything it did is in Activity.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <a href="#/activity" className={quietButton}>
+                See what Remy did
+              </a>
+              <a href="#/" className={quietButton}>
+                Ask Remy for something
+              </a>
+            </div>
+          </div>
         )}
         {data.awayNote && (
           <p className="m-0 rounded-[10px] border border-edge px-4 py-3 text-[14px] leading-[1.6] text-muted">
-            Trust was set to{' '}
-            <strong className="font-medium text-text">{data.awayNote.trust}</strong> for the night.{' '}
+            How much Remy does on its own:{' '}
+            <strong className="font-medium text-text">{trustWords[data.awayNote.trust]}</strong>.{' '}
             {data.awayNote.text}
           </p>
         )}
@@ -141,7 +209,12 @@ export function Review() {
         <ApprovalDialog
           taskId={data.needs.taskId}
           onClose={() => setReviewing(false)}
-          onResolved={() => setSkipped(true)}
+          onResolved={(granted) => {
+            setSaid(
+              granted ? approvedSaid(data.needs?.kind ?? '') : declinedSaid(data.needs?.kind ?? ''),
+            );
+            setSkipped(true);
+          }}
         />
       )}
     </div>

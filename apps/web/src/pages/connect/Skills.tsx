@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { SkillItem } from '../../api/index.tsx';
 import { BrainTabs } from '../../components/BrainTabs.tsx';
+import { describeError } from '../../lib/errors.ts';
 import { Eyebrow, Loading, mono, Notice, primary, quiet, Unavailable, useLoad } from './ui.tsx';
 
 const TAG: Record<SkillItem['source'], string> = {
@@ -9,10 +10,15 @@ const TAG: Record<SkillItem['source'], string> = {
   builtin: 'Built in',
 };
 
+const FALLBACK = 'That did not work. Check that Remy is still running, then try again.';
+
+/** A change, said where it happened: beside the skill's buttons, or where the suggestion was. */
+type Said = { text: string; taskId?: string; where: 'skill' | 'suggestion' };
+
 export function Skills() {
   const { api, data, setData, error, reload } = useLoad((a) => a.skills());
   const [name, setName] = useState<string | null>(null);
-  const [said, setSaid] = useState<{ text: string; taskId?: string } | null>(null);
+  const [said, setSaid] = useState<Said | null>(null);
   if (error) return <Unavailable message={error} onRetry={reload} />;
   if (!data) return <Loading label="Loading your skills" />;
 
@@ -20,13 +26,46 @@ export function Skills() {
   const builtin = data.skills.filter((s) => s.source === 'builtin');
   const skill = data.skills.find((s) => s.name === name) ?? data.skills[0];
   const refresh = async () => setData(await api.skills());
-  const fail = (e: unknown) =>
-    setSaid({
-      text:
-        e instanceof Error
-          ? e.message
-          : 'That did not work. Check that Remy is still running, then try again.',
-    });
+  const fail = (e: unknown, where: Said['where']) =>
+    setSaid({ text: describeError(e, FALLBACK), where });
+
+  const toggle = async (s: SkillItem) => {
+    const on = !s.enabled;
+    try {
+      await api.setSkillEnabled(s.name, on);
+      await refresh();
+      setSaid({
+        where: 'skill',
+        text: on
+          ? `${s.name} is on. Remy will use it again.`
+          : `${s.name} is off. Remy will not use it.`,
+      });
+    } catch (e) {
+      fail(e, 'skill');
+    }
+  };
+  const run = async (s: SkillItem) => {
+    try {
+      const r = await api.runSkill(s.name);
+      setSaid({ where: 'skill', text: `Started ${s.name}.`, taskId: r.taskId });
+    } catch (e) {
+      fail(e, 'skill');
+    }
+  };
+  const resolve = async (accept: boolean) => {
+    try {
+      await api.resolveSuggestion(accept);
+      await refresh();
+      setSaid({
+        where: 'suggestion',
+        text: accept
+          ? 'Saved as a skill. Remy will follow it from now on.'
+          : 'Not saved. Remy keeps doing it the way it did before.',
+      });
+    } catch (e) {
+      fail(e, 'suggestion');
+    }
+  };
 
   return (
     <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">
@@ -36,6 +75,9 @@ export function Skills() {
         <p className="mt-3 mb-6 text-base text-muted">
           How you like things done, saved so Remy does them the same way every time.
         </p>
+        {data.skills.length === 0 && (
+          <p className="m-0 text-[14px] text-muted">Nothing is saved yet.</p>
+        )}
         <SkillGroup title="Yours" skills={mine} current={skill?.name} onPick={setName} />
         <SkillGroup title="Built in" skills={builtin} current={skill?.name} onPick={setName} />
         {data.suggestion && (
@@ -50,22 +92,19 @@ export function Skills() {
               {data.suggestion.text}
             </p>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={primary}
-                onClick={() => api.resolveSuggestion(true).then(refresh, fail)}
-              >
+              <button type="button" className={primary} onClick={() => resolve(true)}>
                 Save as a skill
               </button>
-              <button
-                type="button"
-                className={quiet}
-                onClick={() => api.resolveSuggestion(false).then(refresh, fail)}
-              >
+              <button type="button" className={quiet} onClick={() => resolve(false)}>
                 Not now
               </button>
             </div>
           </section>
+        )}
+        {said?.where === 'suggestion' && (
+          <div className="mt-3">
+            <Notice>{said.text}</Notice>
+          </div>
         )}
       </div>
 
@@ -119,36 +158,23 @@ export function Skills() {
                 type="button"
                 className={primary}
                 disabled={!skill.enabled}
-                onClick={() =>
-                  api
-                    .runSkill(skill.name)
-                    .then(
-                      (r) => setSaid({ text: `Started ${skill.name}.`, taskId: r.taskId }),
-                      fail,
-                    )
-                }
+                onClick={() => run(skill)}
               >
                 Run it now
               </button>
-              <button
-                type="button"
-                className={quiet}
-                onClick={() => setSaid({ text: 'Editing steps is not available here yet.' })}
-              >
-                Edit steps
-              </button>
-              <button
-                type="button"
-                className={quiet}
-                onClick={() => api.setSkillEnabled(skill.name, !skill.enabled).then(refresh, fail)}
-              >
+              <button type="button" className={quiet} onClick={() => toggle(skill)}>
                 {skill.enabled ? 'Turn off' : 'Turn on'}
               </button>
             </div>
+            <p className="mt-3 mb-0 max-w-[560px] text-[13px] leading-relaxed text-muted">
+              {skill.enabled
+                ? 'Steps come from your corrections. Editing them by hand is not available yet.'
+                : 'Turn it on to run it.'}
+            </p>
             <div className="mt-3">
               <Notice>
-                {said?.text}{' '}
-                {said?.taskId && (
+                {said?.where === 'skill' && said.text}{' '}
+                {said?.where === 'skill' && said.taskId && (
                   <a className="text-text underline" href={`#/tasks/${said.taskId}`}>
                     Open the job
                   </a>
@@ -157,9 +183,16 @@ export function Skills() {
             </div>
           </article>
         ) : (
-          <p className="m-0 text-base text-muted">
-            No skills yet. Correct Remy once and it keeps the rule.
-          </p>
+          <div className="max-w-[560px]">
+            <p className="m-0 text-[16px]">No skill yet.</p>
+            <p className="mt-1 mb-4 text-[15px] leading-relaxed text-muted">
+              A skill is how you like something done, saved so Remy does it the same way next time.
+              Correct Remy once in a chat and it keeps the rule.
+            </p>
+            <a className={primary} href="#/">
+              Start a chat with Remy
+            </a>
+          </div>
         )}
       </div>
     </div>
@@ -195,10 +228,12 @@ function SkillGroup({
                 onClick={() => onPick(s.name)}
                 className={`block w-full cursor-pointer rounded-[10px] border bg-transparent px-3.5 py-3 text-left text-text hover:bg-surface ${on ? 'border-edge bg-surface' : 'border-transparent'}`}
               >
-                <span className="flex items-center justify-between gap-3">
-                  <span className={`${mono} text-[14px] font-medium`}>{s.name}</span>
+                <span className="flex flex-wrap items-center justify-between gap-3">
+                  <span className={`${mono} min-w-0 text-[14px] font-medium break-words`}>
+                    {s.name}
+                  </span>
                   <span
-                    className={`${mono} rounded-[4px] border px-1.5 py-px text-[12px] ${s.source === 'learned' ? 'border-signal text-signal' : 'border-edge-hi text-muted'}`}
+                    className={`${mono} shrink-0 rounded-[4px] border px-1.5 py-px text-[12px] ${s.source === 'learned' ? 'border-signal text-signal' : 'border-edge-hi text-muted'}`}
                   >
                     {TAG[s.source]}
                   </span>

@@ -1,10 +1,14 @@
 import { type FormEvent, useId, useState } from 'react';
+import { describeError } from '../../lib/errors.ts';
+import { clock } from '../../lib/when.ts';
 import { field, Loading, mono, Notice, primary, quiet, Unavailable, useLoad } from './ui.tsx';
 
 const HOW_OFTEN = ['Hourly', 'Daily', 'Weekly', 'Monthly', 'Custom'] as const;
 type Often = (typeof HOW_OFTEN)[number];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+// Both parts are captured: the same pattern checks the value and reads the hour and minute back.
+const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const FALLBACK = 'That did not work. Check that Remy is still running, then try again.';
 // Plain wording for the trust levels the server stores as ask / steady / away.
 const TRUST_WORDS: Record<string, string> = {
   ask: 'Check with me first',
@@ -16,6 +20,15 @@ const ordinal = (n: number) => {
   const suffix = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
   return `${n}${suffix[(v - 20) % 10] ?? suffix[v] ?? 'th'}`;
+};
+
+/** "08:30" said the way a person reads a clock: "8:30 AM". Never military time. */
+const atWords = (time: string): string => {
+  const m = TIME.exec(time);
+  if (!m) return time;
+  const d = new Date();
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  return clock(d);
 };
 
 /** The phrase the scheduler reads, like "every Monday at 08:30". */
@@ -40,6 +53,28 @@ export function whenPhrase(o: {
   }
 }
 
+/** The same phrase said back to the person, with a 12-hour clock. */
+export function whenWords(o: {
+  often: Often;
+  day: string;
+  monthDay: number;
+  time: string;
+  custom: string;
+}): string {
+  switch (o.often) {
+    case 'Hourly':
+      return 'every hour';
+    case 'Daily':
+      return `every day at ${atWords(o.time)}`;
+    case 'Weekly':
+      return `every ${o.day} at ${atWords(o.time)}`;
+    case 'Monthly':
+      return `on the ${ordinal(o.monthDay)} of every month at ${atWords(o.time)}`;
+    default:
+      return o.custom.trim();
+  }
+}
+
 export function NewSchedule() {
   const { api, data, error, reload } = useLoad((a) => a.schedules());
   const uid = useId();
@@ -59,14 +94,16 @@ export function NewSchedule() {
   const [runsOn, setRunsOn] = useState('this machine');
   const [errors, setErrors] = useState<Partial<Record<'prompt' | 'time' | 'custom', string>>>({});
   const [problem, setProblem] = useState('');
+  const [created, setCreated] = useState<{ prompt: string; words: string; zone: string } | null>(
+    null,
+  );
   if (error) return <Unavailable message={error} onRetry={reload} />;
-  if (!data) return <Loading label="Loading your connections" />;
+  if (!data) return <Loading label="Loading your schedules" />;
 
   const check = () => {
     const e: typeof errors = {};
     if (!prompt.trim()) e.prompt = 'Say what Remy should do.';
-    if (often !== 'Hourly' && often !== 'Custom' && !TIME.test(time))
-      e.time = 'Use a time like 08:30.';
+    if (often !== 'Hourly' && often !== 'Custom' && !TIME.test(time)) e.time = 'Pick a time.';
     if (often === 'Custom' && !custom.trim()) e.custom = 'Say when, for example “every 2 hours”.';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -75,6 +112,7 @@ export function NewSchedule() {
     ev.preventDefault();
     setProblem('');
     if (!check()) return;
+    const words = whenWords({ often, day, monthDay, time, custom });
     try {
       await api.createSchedule({
         prompt: prompt.trim(),
@@ -82,13 +120,9 @@ export function NewSchedule() {
         timezone: zone,
         runsOn,
       });
-      window.location.hash = '#/schedules';
+      setCreated({ prompt: prompt.trim(), words, zone });
     } catch (e) {
-      setProblem(
-        e instanceof Error
-          ? e.message
-          : 'That did not work. Check that Remy is still running, then try again.',
-      );
+      setProblem(describeError(e, FALLBACK));
     }
   };
   const once = async () => {
@@ -101,11 +135,7 @@ export function NewSchedule() {
       const { taskId } = await api.startTask(prompt.trim());
       window.location.hash = `#/tasks/${taskId}`;
     } catch (e) {
-      setProblem(
-        e instanceof Error
-          ? e.message
-          : 'That did not work. Check that Remy is still running, then try again.',
-      );
+      setProblem(describeError(e, FALLBACK));
     }
   };
   const bad = (k: keyof typeof errors) => ({
@@ -120,6 +150,40 @@ export function NewSchedule() {
     );
   const label = `${mono} mb-2 block text-[12px] text-muted`;
   const small = `${mono} rounded-[10px] border border-edge bg-bg px-3.5 py-2 text-[14px] text-text aria-[invalid=true]:border-[#d98b7a]`;
+  const words = whenWords({ often, day, monthDay, time, custom });
+
+  if (created)
+    return (
+      <div className="px-5 py-10 sm:px-8">
+        <div
+          role="status"
+          className="mx-auto max-w-[680px] rounded-[14px] border border-edge bg-surface p-5 sm:p-8"
+        >
+          <h1 className="m-0 text-[26px] font-normal leading-tight">The schedule is created.</h1>
+          <p className="mt-2 mb-6 text-[15px] leading-relaxed text-muted">
+            Remy runs “{created.prompt}” {created.words}, in {created.zone}. Anything that sends or
+            spends still waits for you.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a className={primary} href="#/schedules">
+              See your schedules
+            </a>
+            <button
+              type="button"
+              className={quiet}
+              onClick={() => {
+                setCreated(null);
+                setPrompt('');
+                setCustom('');
+                setErrors({});
+              }}
+            >
+              Create another schedule
+            </button>
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div className="px-5 py-10 sm:px-8">
@@ -158,7 +222,7 @@ export function NewSchedule() {
             {HOW_OFTEN.map((o) => (
               <label
                 key={o}
-                className={`${mono} cursor-pointer border-r border-edge-hi px-4 py-2 text-[13px] last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text ${often === o ? 'bg-signal font-medium text-signal-ink' : 'text-muted hover:text-text'}`}
+                className={`${mono} cursor-pointer border-r border-edge-hi px-4 py-2 text-[13px] last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text ${often === o ? 'bg-raise font-medium text-text' : 'text-muted hover:text-text'}`}
               >
                 <input
                   type="radio"
@@ -236,9 +300,9 @@ export function NewSchedule() {
               </label>
               <input
                 id={`${uid}-time`}
-                className={`${small} w-[110px]`}
+                type="time"
+                className={`${small} w-[130px]`}
                 value={time}
-                inputMode="numeric"
                 onChange={(e) => setTime(e.target.value)}
                 {...bad('time')}
               />
@@ -254,6 +318,12 @@ export function NewSchedule() {
             </div>
           )}
           {often !== 'Custom' && msg('time')}
+          {words && (
+            <p className="mt-3 mb-0 text-[14px] text-muted">
+              Remy runs this {words}
+              {often === 'Hourly' ? '.' : `, in ${zone}.`}
+            </p>
+          )}
         </div>
 
         <div className="mt-6">
@@ -286,7 +356,7 @@ export function NewSchedule() {
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="submit" className={primary}>
-            Save schedule
+            Create the schedule
           </button>
           <button type="button" className={quiet} onClick={once}>
             Run it once now

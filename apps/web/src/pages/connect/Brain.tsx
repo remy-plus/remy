@@ -249,13 +249,25 @@ export function Brain() {
             </div>
           )}
           <p
-            className={`${mono} pointer-events-none absolute bottom-3 left-4 m-0 flex max-sm:bottom-9 flex-wrap gap-x-4 text-[12px] text-muted`}
+            className={`${mono} pointer-events-none absolute bottom-3 left-4 m-0 flex max-sm:bottom-9 flex-wrap items-center gap-x-4 text-[12px] text-muted`}
             aria-hidden="true"
           >
-            <span>● person</span>
-            <span>○ project</span>
-            <span>◇ how-to</span>
-            <span>· fact</span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-full bg-text" />
+              person
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-full border-2 border-text bg-bg" />
+              project
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rotate-45 border border-text bg-bg" />
+              how-to
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-stone" />
+              fact
+            </span>
           </p>
           <p
             className={`${mono} pointer-events-none absolute right-4 bottom-3 m-0 text-[12px] text-muted`}

@@ -211,6 +211,14 @@ describe('waiting for approval', () => {
     expect(await screen.findByText('Approved. Remy is carrying on.')).toBeTruthy();
   });
 
+  it('answers once, even if Enter is pressed again', async () => {
+    const approve = await setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await screen.findByText('Approved. Remy is carrying on.');
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(approve).toHaveBeenCalledTimes(1);
+  });
+
   it('Not now declines with the same hash', async () => {
     const approve = await setup();
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));

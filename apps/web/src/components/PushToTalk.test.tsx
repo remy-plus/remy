@@ -4,11 +4,12 @@ import { App } from '../App.tsx';
 import { a11yProblems } from '../a11y.testing.ts';
 import { ApiProvider } from '../api/index.tsx';
 import { createMockApi } from '../api/mock.ts';
+import type { RemyApi } from '../api/types.ts';
 
-const app = () => {
+const app = (api: RemyApi = createMockApi()) => {
   window.location.hash = '#/activity';
   return render(
-    <ApiProvider api={createMockApi()}>
+    <ApiProvider api={api}>
       <App />
     </ApiProvider>,
   );
@@ -58,6 +59,23 @@ describe('PushToTalk without speech recognition', () => {
     talk();
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('says why a job did not start', async () => {
+    const api: RemyApi = {
+      ...createMockApi(),
+      startTask: () => Promise.reject(Object.assign(new Error(''), { status: 402 })),
+    };
+    app(api);
+    talk();
+    const box = await screen.findByRole('textbox', { name: 'What you need done' });
+    fireEvent.change(box, { target: { value: 'Move the Lisbon flight to Wednesday' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      "This month's spending limit is reached. Raise it in Settings, under Spending, or wait until next month.",
+    );
+    expect(screen.getByRole('dialog', { name: 'Push to talk' })).toBeTruthy();
   });
 
   it('has no basic accessibility problems', async () => {
