@@ -66,9 +66,9 @@ export function AddConnection() {
               </h2>
             </div>
             <p className="mt-0 mb-5 text-[14px] leading-relaxed text-muted">
-              What Remy may do there:{' '}
-              <strong className="font-semibold text-text">{connected.level}</strong>. You can change
-              that, or disconnect, at any time.
+              Remy can use it the next time it starts. What it may do there:{' '}
+              <strong className="font-semibold text-text">{connected.level}</strong> — you can
+              change that, or disconnect, at any time.
             </p>
             <div className="flex flex-wrap gap-2">
               <a className={primary} href="#/connections">

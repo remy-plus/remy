@@ -51,6 +51,7 @@ describe('Add a connection', () => {
       await screen.findByRole('heading', { level: 2, name: 'Stripe is connected.' }),
     ).toBeTruthy();
     expect(screen.getByText('Read only')).toBeTruthy();
+    expect(screen.getByText(/Remy can use it the next time it starts/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'See your connections' }).getAttribute('href')).toBe(
       '#/connections',
     );
