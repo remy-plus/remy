@@ -143,7 +143,9 @@ export function proposePrompt(
     .join('\n\n');
   const list = editable.map((e) => `[${e.id}]\n${e.text}`).join('\n\n');
   const passing = passingCases(scores);
-  const keep = passing ? `\n\nCases that already pass (an edit must not break these):\n\n${passing}` : '';
+  const keep = passing
+    ? `\n\nCases that already pass (an edit must not break these):\n\n${passing}`
+    : '';
   return `Failed cases:\n\n${failed}${keep}\n\nPrompt texts you may edit:\n\n${list}`;
 }
 
