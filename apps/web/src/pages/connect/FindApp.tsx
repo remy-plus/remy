@@ -3,8 +3,8 @@
 import { useEffect, useId, useState } from 'react';
 import type { RegistryApp, RegistrySearch } from '../../api/index.tsx';
 import { useApi } from '../../api/index.tsx';
-import { describeError } from '../../lib/errors.ts';
 import { CopyCommand } from '../../components/CopyCommand.tsx';
+import { describeError } from '../../lib/errors.ts';
 import { field, mono, Notice } from './ui.tsx';
 
 const FALLBACK = 'That did not work. Check that Remy is still running, then try again.';
