@@ -1202,14 +1202,14 @@ html.js .modal[data-seq].shown {
   html {
     scroll-behavior: auto;
   }
+  /* :not(.shown) is named as well, because it outranks the plain selector above. Without motion
+     there is no reveal, so nothing may stay hidden. */
   html.js .rv,
   html.js .app [data-seq],
-  /* Named as well, because :not(.shown) outranks the plain selector above. */
   html.js .app [data-seq]:not(.shown) {
     opacity: 1;
     transform: none;
     transition: none;
-    /* Without motion there is no reveal, so nothing may stay hidden. */
     visibility: visible;
   }
   html.js .modal[data-seq] {
