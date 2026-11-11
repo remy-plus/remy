@@ -114,7 +114,7 @@ export function AddConnection() {
                         value={l.id}
                         checked={level === l.id}
                         onChange={() => setLevel(l.id)}
-                        className="mt-1 size-4 shrink-0 accent-[#a8c49a]"
+                        className="mt-1 size-4 shrink-0 accent-signal"
                       />
                       <span>
                         <span className="block text-[15px] font-medium">{l.label}</span>

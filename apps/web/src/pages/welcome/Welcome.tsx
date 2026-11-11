@@ -148,7 +148,7 @@ function StepOne() {
               value={w.id}
               checked={way === w.id}
               onChange={() => setWay(w.id)}
-              className="mt-1.5 size-4 shrink-0 accent-[#a8c49a]"
+              className="mt-1.5 size-4 shrink-0 accent-signal"
             />
             <span>
               <span className="block text-[16px] font-medium">{w.title}</span>
