@@ -2,7 +2,14 @@ import type { ModelCaps } from '@remy/core';
 import { DEFAULT_CAPS, ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
 import type { RunRecord } from '../types.ts';
-import { estimateUsd, groupFailures, propose } from './propose.ts';
+import {
+  caseScores,
+  estimateUsd,
+  groupFailures,
+  passingCases,
+  propose,
+  proposePrompt,
+} from './propose.ts';
 
 const fail = (caseId: string, suite: RunRecord['suite'], bad = 'answerContains'): RunRecord =>
   ({
@@ -55,6 +62,49 @@ describe('groupFailures', () => {
     ]);
     expect(g[0]?.checks).toEqual(['answerContains']);
     expect(g[0]?.details[0]).toContain('a: answerContains: missing 1974');
+  });
+});
+
+describe('caseScores', () => {
+  it('counts passes per case, skips lost runs, and sorts by suite then case', () => {
+    const scores = caseScores([...runs, fail('d', 'research')]);
+    expect(scores.map((s) => [s.suite, s.caseId, s.passes, s.total])).toEqual([
+      ['files', 'c', 0, 1],
+      ['research', 'a', 0, 1],
+      ['research', 'b', 0, 1],
+      ['research', 'd', 1, 2],
+    ]);
+  });
+});
+
+describe('passingCases', () => {
+  it('lists only the cases that pass, one line per suite', () => {
+    expect(passingCases(caseScores(runs))).toBe('research: d 1/1');
+  });
+
+  it('stops at the budget and says there is more', () => {
+    const many = Array.from({ length: 200 }, (_, i) => ({
+      caseId: `case-${String(i).padStart(3, '0')}`,
+      suite: 'research' as const,
+      passes: 1,
+      total: 1,
+    }));
+    const text = passingCases(many);
+    expect(text.length).toBeLessThan(1700);
+    expect(text).toContain(', and more');
+  });
+});
+
+describe('proposePrompt', () => {
+  it('carries the passing cases so an edit cannot quietly cost them', () => {
+    const prompt = proposePrompt(groupFailures(runs), [], caseScores(runs));
+    expect(prompt).toContain('Cases that already pass (an edit must not break these):');
+    expect(prompt).toContain('research: d 1/1');
+  });
+
+  it('leaves the section out when nothing passes', () => {
+    const prompt = proposePrompt(groupFailures(runs), [], caseScores([fail('a', 'research')]));
+    expect(prompt).not.toContain('Cases that already pass');
   });
 });
 
