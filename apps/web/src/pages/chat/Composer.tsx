@@ -197,7 +197,7 @@ export function Composer({
           type="submit"
           aria-label="Send"
           disabled={!value.trim()}
-          className={`${ghost} ${value.trim() ? 'bg-text text-bg hover:bg-white' : 'bg-raise text-muted'}`}
+          className={`${ghost} ${value.trim() ? 'btn-solid' : 'bg-raise text-muted'}`}
         >
           <Icon name="send" />
         </button>

@@ -79,7 +79,7 @@ export function ApprovalInline({
               type="button"
               disabled={busy}
               onClick={() => answer.current(true)}
-              className={`${pill} border-text bg-text text-bg hover:bg-white`}
+              className={`${pill} border-text btn-solid`}
             >
               Approve
             </button>

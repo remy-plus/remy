@@ -18,7 +18,7 @@ import { describeError } from '../../lib/errors.ts';
 export const mono = 'font-mono';
 const base = `cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50 no-underline`;
 export const quiet = `${base} inline-block border-edge-hi bg-transparent text-text hover:bg-raise`;
-export const primary = `${base} inline-block border-text bg-text text-bg hover:bg-white`;
+export const primary = `${base} inline-block border-text btn-solid`;
 export const field =
   'w-full rounded-[10px] border border-edge bg-surface px-4 py-2.5 text-[15px] text-text placeholder:text-muted aria-[invalid=true]:border-[#d98b7a]';
 

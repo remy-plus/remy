@@ -83,7 +83,7 @@ export function Activity() {
           </p>
           <a
             href="#/"
-            className="mt-4 inline-block rounded-full border border-text bg-text px-4 py-2 text-[14px] font-medium text-bg no-underline transition-colors duration-300 hover:bg-white"
+            className="mt-4 inline-block rounded-full border border-text btn-solid px-4 py-2 text-[14px] font-medium no-underline transition-colors duration-300"
           >
             Ask Remy for something
           </a>

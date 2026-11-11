@@ -162,11 +162,7 @@ function Question({
           placeholder="Type your answer"
           className="min-w-0 flex-1 h-9 rounded-full border border-edge bg-transparent px-4 text-[15px] text-text outline-none placeholder:text-muted focus:border-edge-hi"
         />
-        <button
-          type="submit"
-          disabled={!text.trim()}
-          className={`${pill} border-text bg-text text-bg hover:bg-white`}
-        >
+        <button type="submit" disabled={!text.trim()} className={`${pill} border-text btn-solid`}>
           Answer
         </button>
       </form>
