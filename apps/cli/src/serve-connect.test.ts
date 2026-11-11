@@ -22,6 +22,7 @@ interface Setup {
   machines?: SshConfig[];
   exec?: Exec;
   resolve?: (host: string) => Promise<string[]>;
+  registryFetch?: typeof fetch;
 }
 
 async function start(s: Setup = {}) {
@@ -54,6 +55,7 @@ async function start(s: Setup = {}) {
           return { exitCode: 0, stdout: '', stderr: '' };
         }),
       resolve: s.resolve ?? (async () => ['93.184.216.34']),
+      ...(s.registryFetch && { registryFetch: s.registryFetch }),
     }),
   ]);
   return { kit, calls };
@@ -479,5 +481,90 @@ describe('writeComputers', () => {
       model: 'x',
       computers: [{ name: 'b', host: 'h', user: 'u' }],
     });
+  });
+});
+
+describe('GET /api/connections/search', () => {
+  const record = (name: string, title: string, url: string) => ({
+    server: {
+      name,
+      title,
+      description: `${title} things.`,
+      version: '1.0.0',
+      remotes: [{ type: 'streamable-http', url }],
+    },
+    _meta: { 'io.modelcontextprotocol/registry/official': { isLatest: true } },
+  });
+
+  const registry = (servers: unknown[], seen: string[] = []) => {
+    const fetch = async (url: string) => {
+      seen.push(url);
+      return new Response(JSON.stringify({ servers }), { status: 200 });
+    };
+    return { registryFetch: fetch as unknown as typeof globalThis.fetch, seen };
+  };
+
+  it('lists what the registry has, with the exact command that adds it', async () => {
+    const { registryFetch, seen } = registry([
+      record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),
+    ]);
+    const { kit } = await start({ registryFetch });
+    const r = await kit.api('/api/connections/search?q=linear');
+    expect(r.status).toBe(200);
+    const body = r.json as { apps: Record<string, unknown>[]; note: string };
+    expect(body.apps).toEqual([
+      {
+        name: 'app.linear/linear',
+        title: 'Linear',
+        description: 'Linear things.',
+        version: '1.0.0',
+        kind: 'remote',
+        where: 'https://mcp.linear.app/mcp',
+        command: 'remy connect --registry app.linear/linear',
+      },
+    ]);
+    expect(body.note).toMatch(/official registry, not from Remy/);
+    expect(seen[0]).toContain('search=linear');
+  });
+
+  it('adds nothing, and leaves the saved servers alone', async () => {
+    const { registryFetch } = registry([
+      record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),
+    ]);
+    const { kit } = await start({ registryFetch });
+    await kit.api('/api/connections/search?q=linear');
+    expect(loadSaved(kit.home).mcpServers).toEqual({});
+  });
+
+  it('asks for words when the query is empty', async () => {
+    const { kit } = await start();
+    const r = await kit.api('/api/connections/search?q=');
+    expect(r.status).toBe(400);
+    expect(r.json.error).toMatch(/Type what to look for/);
+  });
+
+  it('answers a wrong method with 405', async () => {
+    const { kit } = await start();
+    expect((await kit.api('/api/connections/search?q=x', { method: 'DELETE' })).status).toBe(405);
+  });
+
+  it('says the registry could not be reached, rather than an empty list', async () => {
+    const registryFetch = (async () => {
+      throw new Error('offline');
+    }) as unknown as typeof globalThis.fetch;
+    const { kit } = await start({ registryFetch });
+    const r = await kit.api('/api/connections/search?q=linear');
+    expect(r.status).toBe(502);
+    expect(r.json.error).toMatch(/could not be reached/);
+  });
+
+  it('reuses an answer for the same words instead of asking again', async () => {
+    const { registryFetch, seen } = registry([
+      record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),
+    ]);
+    const { kit } = await start({ registryFetch });
+    await kit.api('/api/connections/search?q=linear');
+    await kit.api('/api/connections/search?q=LINEAR');
+    expect(seen).toHaveLength(1);
   });
 });

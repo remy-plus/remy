@@ -2,6 +2,7 @@
 // Add connection and Add machine screens call.
 //
 //   GET    /api/connections                 apps and machines, with status as text
+//   GET    /api/connections/search?q=       what the official registry has, read-only
 //   POST   /api/connections                 connect a catalog entry, or a URL server by address
 //   DELETE /api/connections/:id             disconnect (forget) a saved server
 //   POST   /api/connections/:id/permissions {permissionId, on}
@@ -29,6 +30,7 @@ import type { ConnectionRow } from './connections-view.ts';
 import { CATALOG, type CatalogEntry, findCatalog } from './mcp-catalog.ts';
 import { loadSaved, mergeServers, removeSaved, saveSaved } from './mcp-config.ts';
 import type { McpHost } from './mcp-host.ts';
+import { type RegistryApp, searchRegistry } from './mcp-registry.ts';
 import type { SecretStore } from './mcp-secrets.ts';
 import {
   guard,
@@ -58,6 +60,8 @@ export interface ConnectMountDeps {
   exec?: Exec;
   /** Addresses a host name points to (tests replace it). */
   resolve?(host: string): Promise<string[]>;
+  /** How the app registry is read (tests replace it). */
+  registryFetch?: typeof fetch;
 }
 
 const FORBIDDEN = [
@@ -78,6 +82,14 @@ export const STDIO_REFUSAL =
   'Remy will not add a command, a file path or a secret from the web app. Run remy connect in your terminal to add that, where you see the exact command first.';
 
 const MACHINES_MAX = 20;
+/** How long a registry answer is reused, so typing in the search box does not ask on every key. */
+const SEARCH_TTL_MS = 60_000;
+const SEARCH_MAX = 25;
+/** A word for a command line the person will copy: bare when it is plain, quoted otherwise. */
+const shellWord = (word: string) =>
+  /^[A-Za-z0-9._/-]+$/.test(word) ? word : `'${word.replace(/'/g, "'\\''")}'`;
+const SEARCH_NOTE =
+  'These come from the official registry, not from Remy. Adding one runs a command or connects an address, so it is done in your terminal, where you see the exact command first.';
 const PERMISSIONS_MAX = 200;
 const LEVEL_ACT = {
   id: 'act' as const,
@@ -380,6 +392,48 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
     return ok({ name: cfg.name, note: 'Remy can use it the next time it starts.' }, 201);
   }
 
+  /** Answers already fetched, so typing in the search box does not ask the registry each key. */
+  const searched = new Map<string, { at: number; apps: RegistryApp[] }>();
+
+  /** A registry record as the web app shows it: what it is, and the exact command that adds it. */
+  const searchRow = (a: RegistryApp) => ({
+    name: a.name,
+    title: a.title,
+    description: a.description,
+    version: a.version,
+    kind: a.kind,
+    where: a.kind === 'remote' ? (a.url ?? '') : [a.command, ...(a.args ?? [])].join(' '),
+    command: `remy connect --registry ${shellWord(a.name)}`,
+  });
+
+  /**
+   * GET /api/connections/search?q= — what the official registry has. Read-only: it never adds
+   * anything, and the answer only ever names a command for the person to run themselves.
+   */
+  async function searchApps(url: URL) {
+    const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
+    if (!q) throw new HttpFail(400, 'Type what to look for.');
+    const key = q.toLowerCase();
+    const hit = searched.get(key);
+    if (hit && Date.now() - hit.at < SEARCH_TTL_MS)
+      return ok({ apps: hit.apps.map(searchRow), note: SEARCH_NOTE });
+    let apps: RegistryApp[];
+    try {
+      apps = await searchRegistry(q, {
+        limit: SEARCH_MAX,
+        ...(deps.registryFetch && { fetch: deps.registryFetch }),
+      });
+    } catch (e) {
+      throw new HttpFail(
+        502,
+        e instanceof Error ? e.message : 'The app registry could not be reached.',
+      );
+    }
+    searched.set(key, { at: Date.now(), apps });
+    if (searched.size > 50) searched.delete(searched.keys().next().value as string);
+    return ok({ apps: apps.map(searchRow), note: SEARCH_NOTE });
+  }
+
   function removeMachine(name: string) {
     const list = machinesOf();
     if (!list.some((c) => c.name === name)) throw new HttpFail(404, 'There is no such machine.');
@@ -387,7 +441,7 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
     return ok();
   }
 
-  return guard(async ({ req, method, parts }) => {
+  return guard(async ({ req, method, parts, url }) => {
     const [head, id, action] = parts;
     if (head === 'catalog' && parts.length === 1) {
       if (method !== 'GET') return methodNotAllowed('GET');
@@ -405,6 +459,10 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
         if (method === 'GET') return ok(listConnections());
         if (method === 'POST') return await connect(req);
         return methodNotAllowed('GET', 'POST');
+      }
+      if (parts.length === 2 && id === 'search') {
+        if (method !== 'GET') return methodNotAllowed('GET');
+        return await searchApps(url);
       }
       if (parts.length === 2) {
         if (method !== 'DELETE') return methodNotAllowed('DELETE');
