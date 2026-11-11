@@ -161,15 +161,17 @@ export function BrowserPane({ compact = false }: { compact?: boolean }) {
       aria-label="Remy's browser"
       className={compact ? 'w-full max-w-[320px]' : 'w-full'}
     >
-      {open && (
-        <div className="mb-2 flex min-w-0 items-center gap-3 rounded-full border border-edge bg-surface px-4 py-1.5 text-[13px]">
-          <span className="min-w-0 truncate text-text">{state?.title || host(state?.url)}</span>
-          <span className="min-w-0 flex-1 truncate text-right font-mono text-[12px] text-muted">
-            {state?.url}
-          </span>
-        </div>
-      )}
       <div className="overflow-hidden rounded-[14px] bg-surface ring-1 ring-edge-hi">
+        {/* The address bar is the top of the window, not a pill floating above it: a wide, faint
+            outline with a gap under it reads as a stray rule rather than as chrome. */}
+        {open && (
+          <div className="flex min-w-0 items-center gap-3 border-b border-edge px-4 py-2 text-[13px]">
+            <span className="min-w-0 truncate text-text">{state?.title || host(state?.url)}</span>
+            <span className="min-w-0 flex-1 truncate text-right font-mono text-[12px] text-muted">
+              {state?.url}
+            </span>
+          </div>
+        )}
         {open && frame ? (
           <img
             src={frame}
