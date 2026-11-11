@@ -373,7 +373,7 @@ function SkipSetup() {
           finish();
           window.location.hash = '#/';
         }}
-        className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-muted underline hover:text-text"
+        className="cursor-pointer border-0 bg-transparent px-0 py-1.5 text-[13px] text-muted underline hover:text-text"
       >
         Skip setup and open Remy
       </button>
