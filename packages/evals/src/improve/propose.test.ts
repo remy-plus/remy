@@ -7,6 +7,7 @@ import {
   estimateUsd,
   groupFailures,
   passingCases,
+  PROPOSE_SYSTEM,
   propose,
   proposePrompt,
 } from './propose.ts';
@@ -92,6 +93,12 @@ describe('passingCases', () => {
     const text = passingCases(many);
     expect(text.length).toBeLessThan(1700);
     expect(text).toContain(', and more');
+  });
+});
+
+describe('PROPOSE_SYSTEM', () => {
+  it('tells the model that an edit must not break a case that already passes', () => {
+    expect(PROPOSE_SYSTEM).toContain('must not break a case that already passes');
   });
 });
 
