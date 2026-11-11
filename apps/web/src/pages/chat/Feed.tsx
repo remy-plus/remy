@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useState } from 'react';
 import { type ChatTurn, type TaskView, useApi } from '../../api/index.tsx';
+import { AnswerText } from '../../components/AnswerText.tsx';
 import { BrowserPane } from '../../components/BrowserPane.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
@@ -95,10 +96,6 @@ export function FeedList({ lines }: { lines: FeedLine[] }) {
 
 function Answer({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  const paragraphs = text
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
@@ -110,14 +107,7 @@ function Answer({ text }: { text: string }) {
   };
   return (
     <div className="rise answer-block mt-0.5" style={rise(1)}>
-      {paragraphs.map((p) => (
-        <p
-          key={p}
-          className="mt-0 mb-3 max-w-[68ch] text-[15px] leading-[1.7] break-words text-text last:mb-1"
-        >
-          {p}
-        </p>
-      ))}
+      <AnswerText text={text} />
       <button
         type="button"
         onClick={copy}
