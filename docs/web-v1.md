@@ -70,3 +70,27 @@ A chat is an ordered list of jobs (tasks) with a title. Storage: `REMY_HOME/chat
 | 9   | Command center layout with the stage                                                                                                     | later              |
 
 Gates for every package: `pnpm check` green, replay unchanged, brand rules kept, reduced-motion fallback, 320 px and 1440 px checked in a real browser. Commit small and often.
+
+## The twelve things that make an app feel cheap (2026-11-10)
+
+The owner's note: the app still felt cheap, and it was not only about design. This is the checklist every
+screen is held to from now on, taken from the twelve mistakes in the reference video. The shared pieces
+that make it cheap to follow live in `apps/web/src`:
+
+| #   | Rule                                                           | Where it lives in code                                                                 |
+| --- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | Say where a person's data goes, where they hand something over | `pages/welcome/SignIn.tsx` (chats, keys and files stay on your server)                 |
+| 2   | No dead ends: every empty state has a way forward              | `pages/activity/Activity.tsx`, `components/BrowserPane.tsx`, `pages/connect/Brain.tsx` |
+| 3   | Helper text on any control whose effect is not obvious         | `pages/settings/controls.tsx` (`Row`), the composer's trust line                       |
+| 4   | A success state after anything that can fail                   | `pages/chat/ApprovalInline.tsx`, `pages/settings/Settings.tsx` (`useSaveState`)        |
+| 5   | Specific errors, never "something went wrong"                  | `lib/errors.ts` (`describeError`, `statusMessage`), used by the http adapter           |
+| 6   | Loading that names the thing                                   | `components/Skeleton.tsx` (`label`), `pages/connect/ui.tsx` (`Loading`)                |
+| 7   | Never ask for what the app already knows                       | the front door offers the newest chat (`pages/chat/Chat.tsx`)                          |
+| 8   | One icon set                                                   | `components/Icon.tsx` (16 px, 1.6 stroke, round caps)                                  |
+| 9   | Buttons say what happens                                       | "Save and continue", "Check the model", "Ask Remy", "Create the schedule"              |
+| 10  | No permission prompt before value                              | the microphone is asked for on the talk button, never on load                          |
+| 11  | Filters and searches reset in one click                        | `pages/connect/Brain.tsx` (Clear, and Clear the search in the empty state)             |
+| 12  | Never truncate text that matters for a decision                | suggestions wrap; approval text and failure reasons wrap                               |
+
+Rules for new screens: import `describeError` for every catch, `Skeleton` with a label for every wait,
+`Icon` for every mark, and give every empty state one sentence and one button.
