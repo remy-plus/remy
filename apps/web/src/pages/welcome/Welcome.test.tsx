@@ -30,22 +30,26 @@ describe('Welcome', () => {
         .map((li) => li.getAttribute('aria-current')),
     ).toEqual(['step', null, null]);
     expect(screen.getAllByRole('radio')).toHaveLength(3);
-    expect(screen.getByRole('link', { name: 'Save and continue' }).getAttribute('href')).toBe(
-      '#/welcome/2',
-    );
+    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
     // No bar across the top on a full-page screen.
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
 
-  it('keeps no key: the field is a password box and testing clears it', async () => {
+  it('never asks for a key in the browser: it names the command that stores one', async () => {
     open('#/welcome/1');
-    const box = (await screen.findByLabelText('Your OpenRouter key')) as HTMLInputElement;
-    expect(box.type).toBe('password');
-    fireEvent.change(box, { target: { value: 'sk-not-a-real-key' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Check the model' }));
+    expect(await screen.findByText('remy login')).toBeTruthy();
+    // A key typed into this page could not be stored, so there is no field to type one into.
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copy the command to run sign in' })).toBeTruthy();
+    // The button moves to the next step. It does not save anything, so it does not say it does.
+    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
+    expect(screen.queryByText(/Save and continue/)).toBeNull();
+  });
+
+  it('checks the model Remy is already set up with', async () => {
+    open('#/welcome/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Check the model' }));
     expect(await screen.findByText('Both models answered.')).toBeTruthy();
-    expect(box.value).toBe('');
-    expect(JSON.stringify({ ...window.localStorage })).not.toContain('sk-not-a-real-key');
   });
 
   it('shows other ways in step 1', async () => {
@@ -54,7 +58,7 @@ describe('Welcome', () => {
     expect(
       screen.getByRole('link', { name: 'Sign in to a home server' }).getAttribute('href'),
     ).toBe('#/sign-in');
-    expect(screen.queryByLabelText('Your OpenRouter key')).toBeNull();
+    expect(screen.queryByText('Your OpenRouter key')).toBeNull();
   });
 
   it('step 2 lists apps and can be skipped', async () => {

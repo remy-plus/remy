@@ -1,12 +1,14 @@
 // First run: three steps, each with the orb on the right. Nothing is stored except `remy.onboarded`;
-// keys never go through the browser, and the list of apps in step 2 is sample data for now.
+// keys never go through the browser, so step 1 names the terminal command that stores one, and the
+// list of apps in step 2 is sample data for now.
 import { type ReactNode, useId, useState } from 'react';
 import { useApi } from '../../api/index.tsx';
 import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { Logo } from '../../components/Logo.tsx';
 import { Orb } from '../../components/Orb.tsx';
-import { buttonPrimary, buttonQuiet, field } from '../../components/ui.ts';
+import { CopyCommand } from '../../components/CopyCommand.tsx';
+import { buttonPrimary, buttonQuiet } from '../../components/ui.ts';
 import { describeError } from '../../lib/errors.ts';
 import { setSetting } from '../../settings.ts';
 
@@ -118,12 +120,10 @@ function StepOne() {
   const api = useApi();
   const name = useId();
   const [way, setWay] = useState<(typeof WAYS)[number]['id']>('own');
-  const [key, setKey] = useState('');
   const [note, setNote] = useState<{ text: string; ok: boolean } | null>(null);
   const test = async () => {
     try {
       const { detail } = await api.testModels();
-      setKey(''); // the browser never keeps a key, and the check is done with it
       setNote({ text: detail, ok: true });
     } catch (e) {
       setNote({ text: describeError(e, 'The check did not run. Try again.'), ok: false });
@@ -133,7 +133,7 @@ function StepOne() {
     <Frame
       at={0}
       title="Hi, I'm Remy."
-      lead="First, pick the model I think with. You can change it any time. Your key is the password that lets me use it, and it stays on this computer."
+      lead="First, pick the model I think with. You can change it any time. Your key is the password that lets me use it, and it goes in the Keychain on this computer."
     >
       <fieldset className="m-0 grid gap-2.5 border-0 p-0">
         <legend className="sr-only">How Remy thinks</legend>
@@ -160,19 +160,16 @@ function StepOne() {
 
       {way === 'own' && (
         <div className="mt-7">
-          <label htmlFor={`${name}-key`} className="font-mono block text-[12px] text-muted">
-            Your OpenRouter key
-          </label>
-          <input
-            id={`${name}-key`}
-            type="password"
-            autoComplete="off"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            className={`${field} mt-2 block w-full py-3`}
-          />
+          <p className="font-mono m-0 text-[12px] text-muted">Your OpenRouter key</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <code className="font-mono rounded-[6px] border border-edge bg-raise px-3 py-2 text-[13px]">
+              remy login
+            </code>
+            <CopyCommand command="remy login" title="sign in" what="run" label="Copy" />
+          </div>
           <p className="mt-2 mb-0 text-[13px] text-muted">
-            Your key stays on this computer. This page never keeps it.
+            Run that in your terminal. The key goes in the Keychain on this computer, and this page
+            never sees it.
           </p>
         </div>
       )}
@@ -192,7 +189,7 @@ function StepOne() {
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/2">
-          Save and continue
+          Continue
         </a>
         <button type="button" className={`${buttonQuiet} px-5 py-3`} onClick={test}>
           Check the model
