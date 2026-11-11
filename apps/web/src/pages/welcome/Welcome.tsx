@@ -1,7 +1,8 @@
 // First run: three steps, each with the orb on the right. Nothing is stored except `remy.onboarded`;
 // keys never go through the browser, so step 1 names the terminal command that stores one, and the
 // list of apps in step 2 is sample data for now.
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
+import type { ConnectedApp } from '../../api/index.tsx';
 import { useApi } from '../../api/index.tsx';
 import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
 import { Icon } from '../../components/Icon.tsx';
@@ -11,6 +12,7 @@ import { CopyCommand } from '../../components/CopyCommand.tsx';
 import { buttonPrimary, buttonQuiet } from '../../components/ui.ts';
 import { describeError } from '../../lib/errors.ts';
 import { setSetting } from '../../settings.ts';
+import { hasToken } from './useFirstRun.ts';
 
 const STEPS = ['Pick a model', 'Connect your apps', 'Ask for something'];
 const LABELS = [
@@ -212,13 +214,36 @@ function StepOne() {
   );
 }
 
+// Suggestions, not claims: whether one is connected comes from the server, never from this list.
 const APPS = [
-  { name: 'Gmail', text: 'Read, draft, send with approval', connected: true },
+  { name: 'Gmail', text: 'Read, draft, send with approval', action: 'Connect Gmail' },
   { name: 'Google Calendar', text: 'See your day, hold time', action: 'Connect Calendar' },
   { name: 'Notion', text: 'Read your pages', action: 'Connect Notion' },
 ];
 
 function StepTwo() {
+  const api = useApi();
+  const [apps, setApps] = useState<ConnectedApp[] | null>(null);
+  useEffect(() => {
+    // Onboarding is reachable without a session, and a 401 here would send the person to sign-in
+    // mid-setup. So ask only when there is a session to ask with; otherwise claim nothing.
+    if (!hasToken()) return;
+    let live = true;
+    api.connections().then(
+      (d) => {
+        if (live) setApps(d.apps);
+      },
+      () => {
+        // A server that cannot answer is not evidence that anything is connected.
+        if (live) setApps([]);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [api]);
+  const state = (name: string) =>
+    apps?.find((a) => a.name.toLowerCase() === name.toLowerCase())?.status;
   return (
     <Frame
       at={1}
@@ -241,8 +266,12 @@ function StepTwo() {
               <span className="block text-[16px] font-medium">{a.name}</span>
               <span className="mt-0.5 block text-[14px] text-muted">{a.text}</span>
             </span>
-            {a.connected ? (
+            {state(a.name) === 'connected' ? (
               <span className="font-mono text-[13px] text-muted">Connected</span>
+            ) : state(a.name) === 'needs_signin' ? (
+              <a className={`${buttonQuiet} px-4 py-2.5 no-underline`} href="#/connections">
+                Needs a sign-in
+              </a>
             ) : (
               <a className={`${buttonQuiet} px-4 py-2.5 no-underline`} href="#/connections/add">
                 {a.action}

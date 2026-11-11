@@ -7,16 +7,22 @@ import { createMockApi } from '../../api/mock.ts';
 
 afterEach(() => {
   window.location.hash = '';
+  window.localStorage.removeItem('remy.token');
 });
 
-const open = (hash: string) => {
+/** Onboarding is reachable without a session; these tests say which case they mean. */
+const signedIn = () => window.localStorage.setItem('remy.token', 'a-token');
+
+const openWith = (api: ReturnType<typeof createMockApi>, hash: string) => {
   window.location.hash = hash;
   return render(
-    <ApiProvider api={createMockApi()}>
+    <ApiProvider api={api}>
       <App />
     </ApiProvider>,
   );
 };
+
+const open = (hash: string) => openWith(createMockApi(), hash);
 
 describe('Welcome', () => {
   it('step 1 offers three ways to think, marks the step and goes on', async () => {
@@ -61,16 +67,53 @@ describe('Welcome', () => {
     expect(screen.queryByText('Your OpenRouter key')).toBeNull();
   });
 
+  it('step 2 claims nothing is connected when the server says nothing is', async () => {
+    signedIn();
+    const api = createMockApi();
+    openWith({ ...api, connections: async () => ({ apps: [], machines: [] }) }, '#/welcome/2');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
+    ).toBeTruthy();
+    // A suggestion is not a connection: the list must not say otherwise.
+    expect(screen.queryByText('Connected')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Connect Gmail' })).toBeTruthy();
+  });
+
   it('step 2 lists apps and can be skipped', async () => {
+    signedIn();
     open('#/welcome/2');
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
     ).toBeTruthy();
-    expect(screen.getByText('Connected')).toBeTruthy();
+    // The mock server reports all three as connected, so all three say so.
+    expect(screen.getAllByText('Connected')).toHaveLength(3);
     expect(screen.getByRole('link', { name: 'Skip for now' }).getAttribute('href')).toBe(
       '#/welcome/3',
     );
-    expect(screen.getByRole('link', { name: 'Connect Notion' })).toBeTruthy();
+    // Nothing is left to connect, so no row offers to.
+    expect(screen.queryByRole('link', { name: 'Connect Notion' })).toBeNull();
+  });
+
+  it('step 2 asks the server nothing without a session, and claims nothing', async () => {
+    let asked = false;
+    const api = createMockApi();
+    openWith(
+      {
+        ...api,
+        connections: async () => {
+          asked = true;
+          return { apps: [], machines: [] };
+        },
+      },
+      '#/welcome/2',
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
+    ).toBeTruthy();
+    // A 401 here would send the person to sign-in mid-setup, so the call is never made.
+    expect(asked).toBe(false);
+    expect(screen.queryByText('Connected')).toBeNull();
+    expect(window.location.hash).toBe('#/welcome/2');
   });
 
   it('step 3 starts a task and opens it', async () => {

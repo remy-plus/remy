@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { matchRoute } from '../../router.ts';
 
-const hasToken = () => {
+/** Whether this browser holds a session. Onboarding is reachable without one. */
+export const hasToken = () => {
   try {
     return Boolean(window.localStorage.getItem('remy.token'));
   } catch {
