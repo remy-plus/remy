@@ -78,11 +78,11 @@ export function Switch({
       aria-labelledby={labelledBy}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative mt-0.5 h-[22px] w-[38px] shrink-0 cursor-pointer rounded-full border p-0 disabled:cursor-default disabled:opacity-60 ${checked ? 'border-signal bg-signal' : 'border-edge-hi bg-transparent'}`}
+      className={`relative mt-0.5 h-6 w-10 shrink-0 cursor-pointer rounded-full border p-0 disabled:cursor-default disabled:opacity-60 ${checked ? 'border-signal bg-signal' : 'border-edge-hi bg-transparent'}`}
     >
       <span
         aria-hidden="true"
-        className={`absolute top-[2px] size-4 rounded-full transition-[left] ${checked ? 'left-[18px] bg-signal-ink' : 'left-[2px] bg-text'}`}
+        className={`absolute top-[3px] size-4 rounded-full transition-[left] ${checked ? 'left-[19px] bg-signal-ink' : 'left-[3px] bg-text'}`}
       />
     </button>
   );
