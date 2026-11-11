@@ -59,7 +59,9 @@ describe('Connections', () => {
         (screen.getByRole('switch', { name: 'Delete mail' }) as HTMLInputElement).checked,
       ).toBe(true),
     );
-    expect(screen.getByText('Gmail: Delete mail is on.')).toBeTruthy();
+    expect(
+      screen.getByText('Gmail: Delete mail is on. It applies the next time Remy starts.'),
+    ).toBeTruthy();
     // A native checkbox is focusable and toggles with Space, so there is no custom key code to test.
     expect(sw.tagName).toBe('INPUT');
     expect(sw.getAttribute('tabindex')).toBeNull();

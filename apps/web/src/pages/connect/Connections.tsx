@@ -71,7 +71,8 @@ export function Connections() {
             app &&
             act(
               () => api.setPermission(app.id, permId, on),
-              `${app.name}: ${app.permissions.find((p) => p.id === permId)?.label} is ${on ? 'on' : 'off'}.`,
+              // The server writes the change to the config; the running app keeps its old tools.
+              `${app.name}: ${app.permissions.find((p) => p.id === permId)?.label} is ${on ? 'on' : 'off'}. It applies the next time Remy starts.`,
               'panel',
               app.id,
             )
