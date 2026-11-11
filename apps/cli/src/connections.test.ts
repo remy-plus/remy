@@ -209,6 +209,7 @@ describe('/connections and /connect in the chat', () => {
       prepare: () => {
         throw new Error('no');
       },
+      search: async () => [],
       suggestName: () => 'x',
       defaultFolder: () => '/w',
       add,
