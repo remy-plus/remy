@@ -51,6 +51,23 @@ export function weakens(text: string): string | undefined {
 /** Characters the source file could not hold safely inside its string. */
 const UNSAFE_CHARS = /[`\\]|\$\{/;
 
+/**
+ * The entry an id names. Models often answer with the bare part (`finish`) instead of the full id
+ * (`system:finish`), so a bare name is accepted when exactly one entry ends with it. Two matches are
+ * ambiguous and dropped: guessing which prompt to rewrite is not a guess worth making.
+ */
+function findEntry(
+  registry: readonly PromptEntry[],
+  id: string,
+): { entry?: PromptEntry; ambiguous?: boolean } {
+  const exact = registry.find((r) => r.id === id);
+  if (exact) return { entry: exact };
+  if (id.includes(':')) return {};
+  const bare = registry.filter((r) => r.id.endsWith(`:${id}`));
+  if (bare.length === 1) return { entry: bare[0] };
+  return bare.length > 1 ? { ambiguous: true } : {};
+}
+
 /** Checks the model's edits against what may change. Returns the ones that pass and why the others did not. */
 export function validateEdits(
   raw: unknown,
@@ -65,9 +82,10 @@ export function validateEdits(
     const e = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
     const id = typeof e.id === 'string' ? e.id : '(no id)';
     const drop = (why: string) => dropped.push({ id, why });
-    const entry = registry.find((r) => r.id === id);
+    const found = findEntry(registry, id);
+    const entry = found.entry;
     if (!entry) {
-      drop('not a known prompt id');
+      drop(found.ambiguous ? 'more than one prompt has that name' : 'not a known prompt id');
       continue;
     }
     if (!entry.editable) {
@@ -125,8 +143,8 @@ export function validateEdits(
       drop('names no failed case');
       continue;
     }
-    seen.add(id);
-    kept.push({ id, from: entry.text, to, reason, cases: real });
+    seen.add(entry.id);
+    kept.push({ id: entry.id, from: entry.text, to, reason, cases: real });
   }
   return { kept, dropped };
 }

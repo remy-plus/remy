@@ -30,6 +30,24 @@ describe('validateEdits', () => {
     expect(run({ ...good, id: 'policy:approvals' }).dropped[0]?.why).toBe('not a known prompt id');
   });
 
+  it('accepts the bare name a model usually answers with, and keeps the full id', () => {
+    const { kept, dropped } = run({ ...good, id: 'work-steps' });
+    expect(dropped).toEqual([]);
+    expect(kept[0]?.id).toBe('system:work-steps');
+  });
+
+  it('drops a bare name that two prompts share, rather than guessing', () => {
+    const shared = registry.filter((r) => r.id.endsWith(':finish'));
+    expect(shared.length).toBeGreaterThan(1); // a system part and the finish tool
+    expect(run({ ...good, id: 'finish' }).dropped[0]?.why).toBe(
+      'more than one prompt has that name',
+    );
+  });
+
+  it('still drops a bare name that matches nothing', () => {
+    expect(run({ ...good, id: 'no-such-part' }).dropped[0]?.why).toBe('not a known prompt id');
+  });
+
   it('drops text that is too long', () => {
     const r = run({ ...good, to: `Work in small steps. ${'x '.repeat(MAX_EDIT_CHARS)}` });
     expect(r.kept).toEqual([]);
