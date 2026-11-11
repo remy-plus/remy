@@ -2,9 +2,16 @@
 import { render } from 'ink-testing-library';
 import { createElement as h } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { type ConnectPlan, planCustom, planFromEntry, suggestName } from './connect-plan.ts';
+import {
+  type ConnectPlan,
+  planCustom,
+  planFromEntry,
+  planFromRegistry,
+  suggestName,
+} from './connect-plan.ts';
 import { ConnectFlow, type ConnectFlowApi } from './connect-ui.ts';
 import { CATALOG, findCatalog } from './mcp-catalog.ts';
+import type { RegistryApp } from './mcp-registry.ts';
 import { createTheme } from './theme.ts';
 
 const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
@@ -12,10 +19,46 @@ const until = async (ok: () => boolean) => {
   for (let i = 0; i < 200 && !ok(); i++) await tick(10);
 };
 
-function fakeApi() {
+const REGISTRY: RegistryApp[] = [
+  {
+    name: 'app.linear/linear',
+    title: 'Linear',
+    description: 'Issues and projects.',
+    version: '1.0.0',
+    kind: 'remote',
+    url: 'https://mcp.linear.app/mcp',
+    secrets: [],
+  },
+  {
+    name: 'io.github.me/mcp-filesystem',
+    title: 'Filesystem',
+    description: 'Read and write files.',
+    version: '0.2.0',
+    kind: 'package',
+    command: 'npx',
+    args: ['-y', '@me/mcp-filesystem'],
+    secrets: [],
+  },
+];
+
+function fakeApi(o: { registry?: RegistryApp[]; searchFails?: boolean } = {}) {
   const added: { plan: ConnectPlan; values: Record<string, string> }[] = [];
+  const searched: string[] = [];
   let release: (() => void) | undefined;
   const api: ConnectFlowApi = {
+    async search(query) {
+      searched.push(query);
+      if (o.searchFails) throw new Error('The app registry could not be reached.');
+      const q = query.toLowerCase();
+      const apps = (o.registry ?? REGISTRY).filter(
+        (a) => a.name.toLowerCase().includes(q) || a.title.toLowerCase().includes(q),
+      );
+      return apps.map((a) => ({
+        id: a.name,
+        label: a.title,
+        blurb: a.kind === 'remote' ? (a.url ?? '') : [a.command, ...(a.args ?? [])].join(' '),
+      }));
+    },
     choices: () =>
       CATALOG.map((e) => ({
         id: e.id,
@@ -26,6 +69,11 @@ function fakeApi() {
     prepare(a) {
       const taken = new Set(['linear']);
       if ('custom' in a) return planCustom(a.custom.input, a.custom.name, taken);
+      if ('registry' in a) {
+        const app = (o.registry ?? REGISTRY).find((x) => x.name === a.registry);
+        if (!app) throw new Error('That app is no longer in the list. Search again.');
+        return planFromRegistry(app, { taken });
+      }
       return planFromEntry(findCatalog(a.entryId) as (typeof CATALOG)[number], {
         taken,
         cwd: '/work',
@@ -45,7 +93,7 @@ function fakeApi() {
       return `Added ${plan.name}.`;
     },
   };
-  return { api, added, finish: () => release?.() };
+  return { api, added, searched, finish: () => release?.() };
 }
 
 const mount = (api: ConnectFlowApi, dialog = false) => {
@@ -190,5 +238,118 @@ describe('connect flow (dialog)', () => {
     app.stdin.write('\r');
     await until(() => added.length > 0);
     expect(added[0]?.plan.name).toBe('notion');
+  });
+
+  // The dialog draws nothing in this harness, so this one is driven blind and judged by what
+  // was added: the filter narrows to "Find any app", then the search, then the one result.
+  it('finds an app in the registry and picks it from the list', async () => {
+    const { api, added } = fakeApi();
+    const { app } = mount(api, true);
+    await tick();
+    for (const step of ['find any', '\r', 'linear', '\r', '\r']) {
+      app.stdin.write(step);
+      await tick();
+    }
+    await until(() => added.length > 0);
+    expect(added[0]?.plan.config).toEqual({ url: 'https://mcp.linear.app/mcp' });
+  });
+});
+
+describe('connect flow: the official registry', () => {
+  /** Down to the last row of the pick list, which is "Find any app". */
+  const openFind = async (app: ReturnType<typeof render>) => {
+    for (let i = 0; i < CATALOG.length + 1; i++) {
+      app.stdin.write('\x1b[B');
+      await tick();
+    }
+    app.stdin.write('\r');
+    await tick();
+  };
+
+  it('offers a way to search the registry from the list', () => {
+    const { app } = mount(fakeApi().api);
+    expect(app.lastFrame()).toContain('Find any app');
+    expect(app.lastFrame()).toContain('search the official registry');
+  });
+
+  it('searches what was typed and lists the results with their address', async () => {
+    const { api, searched } = fakeApi();
+    const { app } = mount(api);
+    await openFind(app);
+    expect(app.lastFrame()).toContain('Search the official registry');
+    app.stdin.write('linear');
+    await tick();
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('https://mcp.linear.app/mcp'));
+    expect(searched).toEqual(['linear']);
+    expect(app.lastFrame()).toContain('Linear');
+  });
+
+  it('adds the one that was chosen', async () => {
+    const { api, added } = fakeApi();
+    const { app, onDone } = mount(api);
+    await openFind(app);
+    app.stdin.write('linear');
+    await tick();
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('Linear'));
+    app.stdin.write('\r');
+    await until(() => onDone.mock.calls.length > 0);
+    // The fixture already has a server called linear, so the registry one gets a number.
+    expect(added[0]?.plan.name).toBe('linear-2');
+    expect(added[0]?.plan.config).toEqual({ url: 'https://mcp.linear.app/mcp' });
+  });
+
+  it('shows the exact command for a package before it is added', async () => {
+    const { api, added } = fakeApi();
+    const { app } = mount(api);
+    await openFind(app);
+    app.stdin.write('filesystem');
+    await tick();
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('Filesystem'));
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('each time it starts'));
+    expect(app.lastFrame()).toContain('npx -y @me/mcp-filesystem');
+    // The default is No, so nothing is added.
+    app.stdin.write('\r');
+    await tick();
+    expect(added).toHaveLength(0);
+  });
+
+  it('says so when nothing matches', async () => {
+    const { api } = fakeApi({ registry: [] });
+    const { app } = mount(api);
+    await openFind(app);
+    app.stdin.write('zzz');
+    await tick();
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('Nothing in the official registry matches'));
+    expect(app.lastFrame()).toContain('zzz');
+  });
+
+  it('keeps the words and says why when the registry cannot be reached', async () => {
+    const { api } = fakeApi({ searchFails: true });
+    const { app } = mount(api);
+    await openFind(app);
+    app.stdin.write('linear');
+    await tick();
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('could not be reached'));
+    expect(app.lastFrame()).toContain('linear');
+  });
+
+  it('Esc goes back to the words, not out of the flow', async () => {
+    const { api } = fakeApi();
+    const { app, onCancel } = mount(api);
+    await openFind(app);
+    app.stdin.write('linear');
+    await tick();
+    app.stdin.write('\r');
+    await until(() => (app.lastFrame() ?? '').includes('Linear'));
+    app.stdin.write('\x1b');
+    await until(() => (app.lastFrame() ?? '').includes('Search the official registry'));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(app.lastFrame()).toContain('linear');
   });
 });

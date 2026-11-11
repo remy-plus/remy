@@ -28,8 +28,13 @@ export interface CatalogChoice {
 /** What the chat needs to add a connection. `prepare` throws an Error whose message is a sentence for the user. */
 export interface ConnectFlowApi {
   choices(): CatalogChoice[];
+  /** What the official registry has for these words. Read-only; it adds nothing. */
+  search(query: string): Promise<CatalogChoice[]>;
   prepare(
-    a: { entryId: string; folder?: string } | { custom: { input: string; name: string } },
+    a:
+      | { entryId: string; folder?: string }
+      | { custom: { input: string; name: string } }
+      | { registry: string },
   ): ConnectPlan;
   suggestName(input: string): string;
   /** Saves and starts (or signs in). Resolves with the line for the transcript. */
@@ -39,10 +44,18 @@ export interface ConnectFlowApi {
 }
 
 const CUSTOM = '#custom';
+const FIND = '#find';
+
+/** Registry results as rows for the full-screen list. */
+const foundItems = (results: CatalogChoice[]): DialogItem[] =>
+  results.map((c) => ({ id: c.id, title: c.label, detail: c.blurb }));
 
 type Step =
   | { kind: 'pick' }
   | { kind: 'folder'; entry: CatalogChoice }
+  | { kind: 'find' }
+  | { kind: 'searching'; query: string }
+  | { kind: 'found'; query: string; results: CatalogChoice[] }
   | { kind: 'address' }
   | { kind: 'name'; address: string }
   | { kind: 'secret'; plan: ConnectPlan; at: number; values: Record<string, string> }
@@ -70,6 +83,7 @@ export function ConnectFlow(p: {
   const items: DialogItem[] = [
     ...choices.map((c) => ({ id: c.id, title: c.label, detail: c.blurb })),
     { id: CUSTOM, title: 'Custom server', detail: 'a web address or a command you have' },
+    { id: FIND, title: 'Find any app', detail: 'search the official registry' },
   ];
 
   const fail = (e: unknown) => setNote(e instanceof Error ? e.message : String(e));
@@ -102,6 +116,11 @@ export function ConnectFlow(p: {
     setNote(undefined);
     setText('');
     if (id === CUSTOM) return setStep({ kind: 'address' });
+    if (id === FIND) {
+      // The list's own filter would otherwise carry over and hide the results.
+      setDlg(initialDialogState);
+      return setStep({ kind: 'find' });
+    }
     const entry = choices.find((c) => c.id === id);
     if (!entry) return;
     if (entry.folderLabel) {
@@ -115,9 +134,42 @@ export function ConnectFlow(p: {
     }
   };
 
+  const backToFind = (query: string) => {
+    setNote(undefined);
+    setText(query);
+    setDlg(initialDialogState);
+    setStep({ kind: 'find' });
+  };
+
+  const pickFound = (results: CatalogChoice[], id: string) => {
+    const r = results.find((c) => c.id === id);
+    if (!r) return;
+    try {
+      afterPlan(api.prepare({ registry: r.id }));
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const submit = (value: string) => {
     try {
-      if (step.kind === 'folder') {
+      if (step.kind === 'find') {
+        if (!value) return;
+        setNote(undefined);
+        setStep({ kind: 'searching', query: value });
+        api
+          .search(value)
+          .then((results) => {
+            setAt(0);
+            setDlg(initialDialogState);
+            setStep({ kind: 'found', query: value, results });
+          })
+          .catch((e: unknown) => {
+            setText(value);
+            setStep({ kind: 'find' });
+            fail(e);
+          });
+      } else if (step.kind === 'folder') {
         afterPlan(api.prepare({ entryId: step.entry.id, folder: value }));
       } else if (step.kind === 'address') {
         if (!value) return;
@@ -165,14 +217,36 @@ export function ConnectFlow(p: {
       if (k.return) choose((items[at] as DialogItem).id);
       return;
     }
+    if (step.kind === 'searching') return;
+    if (step.kind === 'found') {
+      const found = step.results;
+      if (p.dialog) {
+        const r = dialogKey(dlg, input, k, { items: foundItems(found) });
+        setDlg(r.state);
+        if (r.action?.type === 'close') return backToFind(step.query);
+        if (r.action?.type === 'pick') return pickFound(found, r.action.item.id);
+        return;
+      }
+      if (k.escape) return backToFind(step.query);
+      if (k.upArrow) return setAt((i) => moveSelection(i, -1, found.length));
+      if (k.downArrow) return setAt((i) => moveSelection(i, 1, found.length));
+      if (k.return) {
+        const r = found[at];
+        if (r) pickFound(found, r.id);
+      }
+      return;
+    }
     if (k.escape) {
       setNote(undefined);
       setText('');
-      return step.kind === 'name' || step.kind === 'confirm' || step.kind === 'secret'
+      return step.kind === 'name' ||
+        step.kind === 'confirm' ||
+        step.kind === 'secret' ||
+        step.kind === 'address' ||
+        step.kind === 'folder' ||
+        step.kind === 'find'
         ? setStep({ kind: 'pick' })
-        : step.kind === 'address' || step.kind === 'folder'
-          ? setStep({ kind: 'pick' })
-          : p.onCancel();
+        : p.onCancel();
     }
     if (step.kind === 'confirm') {
       if (k.upArrow || k.downArrow) return setYes((v) => !v);
@@ -239,6 +313,52 @@ export function ConnectFlow(p: {
       }
       rows.push(hint('↑↓ choose · Enter select · Esc cancel'));
     }
+  } else if (step.kind === 'find') {
+    rows.push(
+      h(Text, { key: 'q' }, 'Search the official registry'),
+      h(Box, { key: 'f' }, field(false)),
+      hint('Enter search · Esc back'),
+    );
+  } else if (step.kind === 'searching') {
+    rows.push(h(Text, { key: 'w', ...muted }, `Looking for ${step.query}…`));
+  } else if (step.kind === 'found') {
+    if (p.dialog) {
+      const g = dialogSize(p.dialog.columns, p.dialog.rows, 'medium');
+      rows.push(
+        h(DialogList, {
+          key: 'list',
+          items: foundItems(step.results),
+          state: dlg,
+          theme,
+          width: g.inner,
+          rows: Math.min(g.listRows, step.results.length + 1),
+          placeholder: 'Search the official registry',
+        }),
+      );
+    } else if (step.results.length === 0) {
+      rows.push(
+        h(Text, { key: 'q' }, `Nothing in the official registry matches “${step.query}”.`),
+        hint('Esc back'),
+      );
+    } else {
+      for (const [i, c] of step.results.entries()) {
+        const on = i === at;
+        rows.push(
+          h(
+            Box,
+            { key: c.id },
+            h(
+              Box,
+              { width: theme.space.lead, flexShrink: 0 },
+              h(Text, on ? accentProps : muted, on ? theme.symbols.prompt : ' '),
+            ),
+            h(Text, on ? { bold: true } : {}, c.label),
+            h(Text, muted, `  ${c.blurb}`),
+          ),
+        );
+      }
+      rows.push(hint('↑↓ choose · Enter select · Esc back'));
+    }
   } else if (step.kind === 'folder') {
     rows.push(
       h(Text, { key: 'q' }, `${step.entry.folderLabel}. Remy can reach nothing outside it.`),
@@ -290,7 +410,7 @@ export function ConnectFlow(p: {
       ),
       hint('↑↓ choose · Enter confirm · Esc back'),
     );
-  } else {
+  } else if (step.kind === 'working') {
     rows.push(
       h(
         Text,
