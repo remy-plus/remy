@@ -223,7 +223,7 @@ export function Dock({ path }: { path: string }) {
               href="#/"
               aria-label="New chat"
               title="New chat"
-              className={`${pill} ${idle} flex items-center`}
+              className="flex size-8 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted no-underline transition-[background-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:text-text"
             >
               <Icon name="plus" />
             </a>
