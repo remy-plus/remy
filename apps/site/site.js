@@ -161,6 +161,13 @@ const MARK = [
       { threshold: 0.01, rootMargin: '0px 0px -4% 0px' },
     );
     for (const e of rv) io.observe(e);
+    // A section that has not scrolled in yet is still tabbable, so a keyboard user could land on
+    // links nobody can see. Revealing on focus fixes that without hiding anything from a screen
+    // reader, which never scrolls and would otherwise lose the section entirely.
+    d.addEventListener('focusin', (e) => {
+      const part = e.target.closest ? e.target.closest('.rv') : null;
+      if (part && !part.classList.contains('in')) part.classList.add('in');
+    });
   }
 
   // ---- The nav logo appears once the big wordmark has left the screen.
