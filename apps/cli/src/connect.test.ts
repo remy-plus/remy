@@ -294,3 +294,105 @@ describe('remy connect', () => {
     expect(Object.keys(loadSaved(join(home, 'h')).mcpServers)).toEqual(['b']);
   });
 });
+
+describe('remy connect --search and --registry', () => {
+  const run = async (argv: string[], extra: Partial<Parameters<typeof cli>[1]> = {}) => {
+    const o = { out: '', err: '' };
+    const code = await cli(argv, {
+      env: { REMY_HOME: join(home, 'h') },
+      cwd: '/work/proj',
+      out: (s) => {
+        o.out += s;
+      },
+      err: (s) => {
+        o.err += s;
+      },
+      isTTY: false,
+      secrets: openSecretStore({ home: join(home, 'h'), platform: 'linux' }),
+      homeDir: '/Users/me',
+      readText: () => undefined,
+      ...extra,
+    });
+    return { code, ...o };
+  };
+
+  const record = (name: string, title: string, url: string) => ({
+    server: {
+      name,
+      title,
+      description: `${title} things.`,
+      version: '1.0.0',
+      remotes: [{ type: 'streamable-http', url }],
+    },
+    _meta: { 'io.modelcontextprotocol/registry/official': { isLatest: true } },
+  });
+
+  const registry = (servers: unknown[], seen: string[] = []) => {
+    const fetch = async (url: string) => {
+      seen.push(url);
+      return new Response(JSON.stringify({ servers }), { status: 200 });
+    };
+    return { fetch: fetch as unknown as typeof globalThis.fetch, seen };
+  };
+
+  it('lists what the registry has, and adds nothing', async () => {
+    const { fetch, seen } = registry([
+      record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),
+    ]);
+    const r = await run(['connect', '--search', 'linear'], { fetch });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('app.linear/linear');
+    expect(r.out).toContain('Linear');
+    expect(r.out).toContain('remy connect --registry');
+    expect(seen[0]).toContain('search=linear');
+    expect(loadSaved(join(home, 'h')).mcpServers).toEqual({});
+  });
+
+  it('says so when nothing matches', async () => {
+    const { fetch } = registry([]);
+    const r = await run(['connect', '--search', 'zzz'], { fetch });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/Nothing in the official registry matches "zzz"/);
+  });
+
+  it('adds the one app asked for, after showing its address', async () => {
+    const { fetch } = registry([
+      record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),
+    ]);
+    const r = await run(['connect', '--registry', 'app.linear/linear', '--yes'], { fetch });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('https://mcp.linear.app/mcp');
+    expect(loadSaved(join(home, 'h')).mcpServers).toEqual({
+      linear: { url: 'https://mcp.linear.app/mcp' },
+    });
+  });
+
+  it('will not add one without a yes', async () => {
+    const { fetch } = registry([
+      record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),
+    ]);
+    const r = await run(['connect', '--registry', 'app.linear/linear'], { fetch });
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/official registry, not from Remy/);
+    expect(loadSaved(join(home, 'h')).mcpServers).toEqual({});
+  });
+
+  it('asks for the full name when a word matches more than one app', async () => {
+    const { fetch } = registry([
+      record('a.example/linear', 'Linear A', 'https://a.example/mcp'),
+      record('b.example/linear', 'Linear B', 'https://b.example/mcp'),
+    ]);
+    const r = await run(['connect', '--registry', 'linear', '--yes'], { fetch });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/matches more than one app/);
+    expect(r.out).toContain('a.example/linear');
+    expect(loadSaved(join(home, 'h')).mcpServers).toEqual({});
+  });
+
+  it('points at --search when the name is unknown', async () => {
+    const { fetch } = registry([]);
+    const r = await run(['connect', '--registry', 'nope', '--yes'], { fetch });
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/nothing called "nope".*--search nope/s);
+  });
+});

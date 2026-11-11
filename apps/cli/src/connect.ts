@@ -6,6 +6,7 @@ import {
   type ConnectPlan,
   planCustom,
   planFromEntry,
+  planFromRegistry,
   suggestName,
   takenNames,
 } from './connect-plan.ts';
@@ -27,6 +28,7 @@ import {
   secretize,
 } from './mcp-import.ts';
 import { hasOAuthTokens, signIn } from './mcp-oauth.ts';
+import { searchRegistry } from './mcp-registry.ts';
 import { SECRET_NAME, type SecretStore } from './mcp-secrets.ts';
 
 export const CONNECT_USAGE = `Usage
@@ -40,7 +42,9 @@ export const CONNECT_USAGE = `Usage
   remy connect auth <name> [--no-browser] [--force] Sign in to a remote server in your browser
   remy connect list                                 Show what is connected
   remy connect remove <name>                        Forget a server and its saved secrets
-  remy connect --import [name...] [--yes]           Bring in servers from Claude Desktop or Claude Code`;
+  remy connect --import [name...] [--yes]           Bring in servers from Claude Desktop or Claude Code
+  remy connect --search <words>                     Find an app in the official registry (thousands of them)
+  remy connect --registry <name>                    Add one of them (shows the exact command or address first)`;
 
 export interface ConnectFlags {
   url?: string | undefined;
@@ -53,6 +57,8 @@ export interface ConnectFlags {
   'no-browser'?: boolean | undefined;
   force?: boolean | undefined;
   import?: boolean | undefined;
+  search?: string | undefined;
+  registry?: string | undefined;
 }
 
 export interface ConnectCtx {
@@ -443,8 +449,81 @@ async function importServers(ctx: ConnectCtx): Promise<number> {
   return 0;
 }
 
+/** `remy connect --search <words>`: what the official registry has. Read-only; adds nothing. */
+async function searchApps(ctx: ConnectCtx): Promise<number> {
+  const query = (ctx.flags.search ?? '').trim();
+  if (!query) throw new Error('Say what to look for: remy connect --search notion');
+  const apps = await searchRegistry(query, { limit: 20, ...(ctx.fetch && { fetch: ctx.fetch }) });
+  if (!apps.length) {
+    ctx.out(`Nothing in the official registry matches "${query}".`);
+    return 1;
+  }
+  ctx.out(`${apps.length} ${apps.length === 1 ? 'app' : 'apps'} in the official registry:`);
+  for (const a of apps) {
+    const kind = a.kind === 'remote' ? 'hosted' : 'runs here';
+    const title = a.title === a.name ? '' : ` ${a.title}`;
+    const blurb = a.description ? ` — ${a.description}` : '';
+    ctx.out(`  ${a.name}${title} (${kind})${blurb}`.slice(0, 160));
+  }
+  ctx.out('\nAdd one with: remy connect --registry <name>');
+  return 0;
+}
+
+/**
+ * `remy connect --registry <name>`: one record from the official registry. The record is not
+ * trusted, so the exact command or address is shown and the person says yes before it is saved.
+ */
+async function addFromRegistry(ctx: ConnectCtx): Promise<number> {
+  const wanted = (ctx.flags.registry ?? '').trim();
+  if (!wanted)
+    throw new Error(
+      'Say which app: remy connect --registry <name>. Find one with remy connect --search <words>.',
+    );
+  const apps = await searchRegistry(wanted, { limit: 50, ...(ctx.fetch && { fetch: ctx.fetch }) });
+  const app = apps.find((a) => a.name === wanted) ?? (apps.length === 1 ? apps[0] : undefined);
+  if (!app) {
+    if (!apps.length)
+      throw new Error(
+        `The official registry has nothing called "${wanted}". Try remy connect --search ${wanted}.`,
+      );
+    ctx.out(`"${wanted}" matches more than one app. Use the full name:`);
+    for (const a of apps) ctx.out(`  ${a.name}  ${a.title}`);
+    return 1;
+  }
+  const plan = planFromRegistry(app, { taken: takenNames(ctx.home, ctx.fromConfig) });
+  ctx.out(`${plan.label} (${app.name}${app.version ? ` ${app.version}` : ''})`);
+  if (app.description) ctx.out(`  ${app.description}`);
+  if (plan.command) {
+    ctx.out('Remy will run this on your computer, with your permissions, each time it starts:');
+    ctx.out(`  ${plan.command}`);
+  } else ctx.out(`Remy will connect to ${(plan.config as { url: string }).url}.`);
+  if (
+    !(await confirm(
+      ctx,
+      'Add this server?',
+      'This comes from the official registry, not from Remy.',
+    ))
+  ) {
+    ctx.out('Nothing was added.');
+    return 1;
+  }
+  const values: Record<string, string> = {};
+  for (const s of plan.secrets) {
+    ctx.out(`${s.label}: ${s.where}`);
+    const v = ctx.askSecret ? await ctx.askSecret(`${s.label} (hidden): `) : null;
+    if (!v?.trim()) throw new Error(`No ${s.label} was given. Nothing was added.`);
+    values[s.key] = v;
+  }
+  const stored = applyPlan(plan, { home: ctx.home, secrets: ctx.secrets, values });
+  ctx.out(`Added ${plan.name}${stored.length ? `. Saved ${stored.join(', ')}` : ''}.`);
+  ctx.out('Remy connects to it the next time it starts. Check with remy connect list.');
+  return 0;
+}
+
 export async function connectCommand(ctx: ConnectCtx): Promise<number> {
   if (ctx.flags.import) return importServers(ctx);
+  if (ctx.flags.search !== undefined) return searchApps(ctx);
+  if (ctx.flags.registry !== undefined) return addFromRegistry(ctx);
   switch (ctx.rest[0]) {
     case 'add':
       return add(ctx);

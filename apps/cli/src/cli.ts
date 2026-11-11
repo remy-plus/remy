@@ -343,7 +343,7 @@ Options for every command
 
 Options for connect
   --url <url>  --header K=V  --env K=V  --secret KEY  --secret-stdin  --yes  --import
-  --oauth  --no-browser  --force
+  --search <words>  --registry <name>  --oauth  --no-browser  --force
   Run remy connect for the full usage.
 
 Chat
@@ -409,6 +409,8 @@ const OPTIONS = {
   'secret-stdin': { type: 'boolean' },
   yes: { type: 'boolean', short: 'y' },
   import: { type: 'boolean' },
+  search: { type: 'string' },
+  registry: { type: 'string' },
   oauth: { type: 'boolean' },
   'no-browser': { type: 'boolean' },
   force: { type: 'boolean' },
