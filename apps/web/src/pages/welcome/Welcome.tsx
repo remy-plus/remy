@@ -1,6 +1,6 @@
 // First run: three steps, each with the orb on the right. Nothing is stored except `remy.onboarded`;
-// keys never go through the browser, so step 1 names the terminal command that stores one, and the
-// list of apps in step 2 is sample data for now.
+// keys never go through the browser, so step 1 names the terminal command that stores one, and step
+// 2 suggests apps while the server decides which are actually connected.
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import type { ConnectedApp } from '../../api/index.tsx';
 import { useApi } from '../../api/index.tsx';
