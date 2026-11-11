@@ -137,7 +137,7 @@ export function Brain() {
 
   return (
     <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[minmax(0,1fr)_420px]">
-      <div className="min-w-0 px-5 py-6 sm:px-8 lg:pl-14 lg:pr-8">
+      <div className="min-w-0 px-5 py-8 sm:px-8 lg:pl-14 lg:pr-12">
         <h1 className="sr-only">Brain</h1>
         <BrainTabs current="notes" />
         <div className="mb-4 flex flex-wrap items-center gap-3">
