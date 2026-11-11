@@ -4,7 +4,8 @@
 import { isStdio, type McpServerConfig } from '@remy/mcp';
 import { absoluteFolder, type CatalogEntry, type CatalogSecret } from './mcp-catalog.ts';
 import { commandLine, loadSaved, mergeServers, saveSaved } from './mcp-config.ts';
-import type { SecretStore } from './mcp-secrets.ts';
+import { headerValue, type RegistryApp } from './mcp-registry.ts';
+import { SECRET_NAME, type SecretStore } from './mcp-secrets.ts';
 
 export const SERVER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
 
@@ -89,6 +90,76 @@ export function planFromEntry(
 }
 
 const isLocalHost = (u: URL) => ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+
+/** Registry names are reverse-DNS paths (`ac.inference.sh/mcp`); a server name cannot hold a slash. */
+const GENERIC = new Set(['mcp', 'sse', 'server', 'http', 'stdio']);
+
+/**
+ * A usable server name from a registry name: the last path segment, or the one before it when that
+ * segment is just `mcp`. `ac.inference.sh/mcp` becomes `ac.inference.sh`; `io.github.me/thing`
+ * becomes `thing`. A name already in use gets a number, so two apps never collide.
+ */
+export function registryName(registry: string, taken: Set<string>): string {
+  const parts = registry
+    .split('/')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  let base = parts.at(-1) ?? 'server';
+  if (GENERIC.has(base.toLowerCase()) && parts.length > 1) base = parts.at(-2) as string;
+  base = base
+    .replace(/[^A-Za-z0-9_.-]+/g, '-')
+    .replace(/^[^A-Za-z0-9]+/, '')
+    .slice(0, 36)
+    .replace(/[-_.]+$/, '');
+  if (!base) base = 'server';
+  if (!taken.has(base)) return base;
+  for (let n = 2; n < 100; n++) {
+    const next = `${base}-${n}`;
+    if (!taken.has(next)) return next;
+  }
+  throw new Error(`There are already too many servers named like ${base}.`);
+}
+
+/**
+ * A registry record as a plan. The record is not trusted, so the caller still shows the exact
+ * command or address and asks before anything is saved.
+ */
+export function planFromRegistry(
+  app: RegistryApp,
+  o: { taken: Set<string>; name?: string },
+): ConnectPlan {
+  const name = checkName(o.name ?? registryName(app.name, o.taken), o.taken);
+  const secrets: CatalogSecret[] = app.secrets.map((s) => ({
+    key: s.key,
+    label: s.label,
+    where: s.where,
+  }));
+  for (const s of secrets)
+    if (!SECRET_NAME.test(`${name}.${s.key}`))
+      throw new Error(
+        `${app.title} asks for "${s.key}", which cannot be kept as a secret name. Nothing was added.`,
+      );
+  const ref = (key: string) => `\${secret:${name}.${key}}`;
+  if (app.kind === 'remote') {
+    if (!app.url) throw new Error(`${app.title} does not say where it is hosted.`);
+    const headers = Object.fromEntries(
+      app.secrets.map((s) => [s.key, headerValue(s.template || `{${s.key}}`, name, s.key)]),
+    );
+    const config: McpServerConfig = {
+      url: app.url,
+      ...(Object.keys(headers).length && { headers }),
+    };
+    return { name, config, secrets, oauth: false, label: app.title };
+  }
+  if (!app.command) throw new Error(`${app.title} does not say what to run.`);
+  const env = Object.fromEntries(app.secrets.map((s) => [s.key, ref(s.key)]));
+  const config: McpServerConfig = {
+    command: app.command,
+    ...(app.args?.length && { args: app.args }),
+    ...(Object.keys(env).length && { env }),
+  };
+  return { name, config, secrets, command: commandLine(config), oauth: false, label: app.title };
+}
 
 /** What a custom server's first line means: a web address is remote, anything else is a command. */
 export function planCustom(input: string, name: string, taken: Set<string>): ConnectPlan {

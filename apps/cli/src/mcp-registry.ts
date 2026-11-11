@@ -15,6 +15,11 @@ export interface RegistrySecret {
   key: string;
   label: string;
   where: string;
+  /**
+   * For a header: the record's own value with a `{placeholder}` where the secret goes, e.g.
+   * `Bearer {token}`. Undefined for an environment variable, which is just the value.
+   */
+  template?: string;
 }
 
 /** A registry record, flattened to what a connection needs. */
@@ -120,18 +125,26 @@ function packageOf(
     const args = arr(p.runtimeArguments)
       .map((a) => str((a as { value?: unknown })?.value))
       .filter(Boolean);
-    return { command: hint, args: [...args, id], env: arr(p.environmentVariables) as RawEnv[] };
+    // `npx` stops to ask before it installs anything, which would hang a server that is started
+    // without a terminal. Records that already say `-y` keep their own order.
+    const quiet = hint === 'npx' && !args.some((a) => a === '-y' || a === '--yes');
+    return {
+      command: hint,
+      args: [...(quiet ? ['-y'] : []), ...args, id],
+      env: arr(p.environmentVariables) as RawEnv[],
+    };
   }
   return undefined;
 }
 
-const secretOf = (raw: RawEnv | RawHeader, fallback: string): RegistrySecret => {
+const secretOf = (raw: RawEnv | RawHeader, fallback: string, template?: string): RegistrySecret => {
   const key = str(raw.name) || fallback;
   const description = str(raw.description);
   return {
     key,
     label: description || key,
     where: description || `the value ${key} for this server`,
+    ...(template !== undefined && { template }),
   };
 };
 
@@ -150,7 +163,7 @@ export function toApp(record: RawRecord): RegistryApp | undefined {
   if (remote) {
     const secrets = remote.headers
       .filter((h) => str(h.name) && (h.isRequired === true || h.isSecret === true))
-      .map((h) => secretOf(h, 'Authorization'));
+      .map((h) => secretOf(h, 'Authorization', str(h.value)));
     return {
       name,
       title,

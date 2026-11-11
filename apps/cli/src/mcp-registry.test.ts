@@ -82,6 +82,7 @@ describe('toApp', () => {
         key: 'Authorization',
         label: 'Bearer token for Smithery authentication',
         where: 'Bearer token for Smithery authentication',
+        template: 'Bearer {smithery_api_key}',
       },
     ]);
   });
@@ -95,6 +96,21 @@ describe('toApp', () => {
 
   it('asks only for the environment a package requires', () => {
     expect(toApp(withPackage)?.secrets.map((s) => s.key)).toEqual(['GCS_BUCKET']);
+  });
+
+  it('adds -y when a package record leaves it out, so npx does not stop to ask', () => {
+    const quiet = {
+      ...withPackage,
+      server: {
+        ...withPackage.server,
+        packages: [{ ...withPackage.server.packages[0], runtimeArguments: [] }],
+      },
+    };
+    expect(toApp(quiet)?.args).toEqual(['-y', 'remote-filesystem-mcp-server']);
+  });
+
+  it('keeps the record order when it already says -y', () => {
+    expect(toApp(withPackage)?.args).toEqual(['-y', 'remote-filesystem-mcp-server']);
   });
 
   it('skips a record with no way to reach it', () => {
