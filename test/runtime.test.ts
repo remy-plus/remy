@@ -260,7 +260,8 @@ describe('runtime', () => {
     const msgs = model.requests[1]?.messages ?? [];
     expect(msgs.at(-1)).toMatchObject({
       role: 'tool',
-      content: 'Error: The user declined this action.',
+      content:
+        "Error: The user declined this action. Do not try it again or another way. If the user's own request already said what to do in that case, do that; otherwise say it was declined and finish.",
     });
   });
 
