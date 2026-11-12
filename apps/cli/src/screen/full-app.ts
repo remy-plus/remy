@@ -196,24 +196,49 @@ export function FullApp(props: ChatAppProps): ReactElement {
       const t = tourRef.current;
       if (t.task && t.ob) {
         const phase = chat.getState().phase;
-        if (key.escape && phase !== 'waiting_approval') return (t.ob.skip(), true);
-        if (key.return && !input.text && (phase === 'idle' || phase === 'waiting_user'))
-          return (t.ob.next(), true);
+        if (key.escape && phase !== 'waiting_approval') {
+          t.ob.skip();
+          return true;
+        }
+        if (key.return && !input.text && (phase === 'idle' || phase === 'waiting_user')) {
+          t.ob.next();
+          return true;
+        }
       }
       const { total, height } = geometry.current;
-      if (key.pageUp) return (setScroll((s) => pageUp(s, total, height)), true);
-      if (key.pageDown) return (setScroll((s) => pageDown(s, total, height)), true);
-      if (!input.text && key.ctrl && ch === 'u')
-        return (setScroll((s) => halfUp(s, total, height)), true);
-      if (!input.text && key.home) return (setScroll(toTop(total, height)), true);
-      if (!input.text && key.end) return (setScroll(toBottom()), true);
+      if (key.pageUp) {
+        setScroll((s) => pageUp(s, total, height));
+        return true;
+      }
+      if (key.pageDown) {
+        setScroll((s) => pageDown(s, total, height));
+        return true;
+      }
+      if (!input.text && key.ctrl && ch === 'u') {
+        setScroll((s) => halfUp(s, total, height));
+        return true;
+      }
+      if (!input.text && key.home) {
+        setScroll(toTop(total, height));
+        return true;
+      }
+      if (!input.text && key.end) {
+        setScroll(toBottom());
+        return true;
+      }
       if (key.ctrl && ch === 'b') {
         if (columnsRef.current > SIDEBAR_MIN_COLUMNS) setSidebarOn((on) => !on);
         else setOverlayOn((on) => !on);
         return true;
       }
-      if (key.escape && overlayRef.current) return (setOverlayOn(false), true);
-      if (key.escape && chat.getState().phase === 'running') return (void chat.interrupt(), true);
+      if (key.escape && overlayRef.current) {
+        setOverlayOn(false);
+        return true;
+      }
+      if (key.escape && chat.getState().phase === 'running') {
+        void chat.interrupt();
+        return true;
+      }
       return false;
     },
     [chat],

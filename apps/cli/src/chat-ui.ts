@@ -709,9 +709,14 @@ export function ChatApp(props: ChatAppProps): ReactElement {
       const t = tourRef.current;
       if (!t.task || !t.ob) return false;
       const phase = chat.getState().phase;
-      if (key.escape && phase !== 'waiting_approval') return (t.ob.skip(), true);
-      if (key.return && !input.text && (phase === 'idle' || phase === 'waiting_user'))
-        return (t.ob.next(), true);
+      if (key.escape && phase !== 'waiting_approval') {
+        t.ob.skip();
+        return true;
+      }
+      if (key.return && !input.text && (phase === 'idle' || phase === 'waiting_user')) {
+        t.ob.next();
+        return true;
+      }
       return false;
     },
     [chat],
