@@ -1,5 +1,6 @@
 // nextAction(state) decides the runner's next move from persisted state alone, so a crash
 // anywhere is recovered by re-reading the events and asking again. Pure.
+import { helperActionsOf } from './helper-actions.ts';
 import { openPlanSteps, planGateUsed, UPDATE_PLAN } from './plan.ts';
 import { sourceGateMessage, sourceGateUsed, sourceProblems } from './sources.ts';
 import { type CallState, isTerminal, type TaskState, waitingCards } from './state.ts';
@@ -136,11 +137,13 @@ const ranNoTools = (s: TaskState) =>
  * reads, so this alone is never grounds to fail a task: it earns one push back, no more.
  */
 const changedNothing = (s: TaskState) =>
-  !Object.values(s.calls).some((c) => !NOT_WORK.has(c.tool) && c.result?.ok && c.risk !== 'read');
+  !Object.values(s.calls).some((c) => !NOT_WORK.has(c.tool) && c.result?.ok && c.risk !== 'read') &&
+  !helperActionsOf(s.calls).some((a) => a.outcome === 'done');
 
 /** An action was tried and stopped: the call failed, so whether it took effect is not known. */
 const triedAndFailed = (s: TaskState) =>
-  Object.values(s.calls).some((c) => c.risk && c.risk !== 'read' && c.result && !c.result.ok);
+  Object.values(s.calls).some((c) => c.risk && c.risk !== 'read' && c.result && !c.result.ok) ||
+  helperActionsOf(s.calls).some((a) => a.outcome === 'unknown');
 
 /** The reply says it cannot tell whether the action happened. That is a report, not a claim. */
 const UNCERTAIN =
@@ -153,9 +156,7 @@ const unbackedClaim = (s: TaskState, text: string) => {
 };
 
 /** Nothing ran at all, or an action was tried and stopped: the claim cannot be true. */
-const provablyFalse = (s: TaskState) =>
-  ranNoTools(s) ||
-  Object.values(s.calls).some((c) => c.risk && c.risk !== 'read' && c.result && !c.result.ok);
+const provablyFalse = (s: TaskState) => ranNoTools(s) || triedAndFailed(s);
 
 const finishAnswer = (c: CallState) => String((c.args as { answer?: unknown })?.answer ?? '');
 

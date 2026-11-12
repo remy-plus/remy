@@ -6,6 +6,7 @@ import {
   BUILTIN_ROLES,
   DELEGATE,
   defineTool,
+  describeAction,
   HELPERS_AT_ONCE,
   type HelperRequest,
   type HelperResult,
@@ -42,7 +43,7 @@ const argsFor = (roles: HelperRole[]) =>
   });
 
 const report = (r: HelperResult, q: HelperRequest, i: number) =>
-  `Helper ${i + 1}${q.role ? ` (${q.role})` : ''}, ${r.steps} steps:\n${r.answer}`;
+  `Helper ${i + 1}${q.role ? ` (${q.role})` : ''}, ${r.steps} steps:\n${r.answer}${(r.actions ?? []).map((a) => `\n${describeAction(a)}`).join('')}`;
 
 export interface DelegateOptions {
   /** The host lets helpers whose role says `act` ask to change things. */
@@ -79,7 +80,10 @@ async function run(
     content: results.map((r, i) => report(r, requests[i] as HelperRequest, i)).join('\n\n'),
     trust: results.some((r) => r.tainted) ? 'untrusted' : 'trusted',
     spentUsd: results.reduce((sum, r) => sum + r.costUsd, 0),
-    data: { helpers: results.map((r) => r.taskId) },
+    data: {
+      helpers: results.map((r) => r.taskId),
+      actions: results.flatMap((r) => r.actions ?? []),
+    },
   };
 }
 

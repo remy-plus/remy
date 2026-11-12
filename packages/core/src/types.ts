@@ -441,6 +441,19 @@ export interface HelperRequest {
   context?: string;
 }
 
+/**
+ * A change a helper made, or may have made. The parent cannot see the helper's own calls, so this
+ * is how it learns that something already happened: "done", or "unknown" when the helper was
+ * interrupted mid-call and could not confirm.
+ */
+export interface HelperAction {
+  tool: string;
+  /** What the call would show a person, e.g. `Send an email to me@example.test with subject "X"`. */
+  preview: string;
+  argsHash: string;
+  outcome: 'done' | 'unknown';
+}
+
 export interface HelperResult {
   taskId: string;
   /** False when it stopped without an answer; `answer` then says why. */
@@ -452,6 +465,8 @@ export interface HelperResult {
   steps: number;
   /** It stopped to ask the user to approve a call. The parent task carries the card. */
   waiting?: ApprovalRequest;
+  /** Every call it made that changes something, and whether it happened. */
+  actions?: HelperAction[];
 }
 
 /** Name of the built-in tool that searches selectable tools. Its results feed `TaskState.discovered`. */

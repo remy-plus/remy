@@ -1,5 +1,6 @@
 // The source check: a web answer is tested before the task finishes. Pure, and derived from
 // events alone (tool results list the pages they read), so a crash re-derives it.
+import { helperActionsOf } from './helper-actions.ts';
 import { UPDATE_PLAN } from './plan.ts';
 import type { TaskState } from './state.ts';
 
@@ -88,7 +89,7 @@ const NOT_WORK = new Set(['finish', 'ask_user', UPDATE_PLAN]);
 const acted = (s: TaskState) =>
   Object.values(s.calls).some(
     (c) => !NOT_WORK.has(c.tool) && c.result?.ok && c.risk && c.risk !== 'read',
-  );
+  ) || helperActionsOf(s.calls).some((a) => a.outcome === 'done');
 
 /** Search showed links but no page was opened, and the answer leans on them. */
 function unopened(s: TaskState, answer: string): string[] {

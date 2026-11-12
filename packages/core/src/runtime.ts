@@ -48,6 +48,7 @@ import {
   type Event,
   type EventStore,
   FIND_TOOLS,
+  type HelperAction,
   type HelperRequest,
   type HelperResult,
   type IdGen,
@@ -254,9 +255,30 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             preview: `Helper${request.role ? ` (${request.role})` : ''} asks: ${done.request.preview}`,
           }
         : undefined;
+    const actions: HelperAction[] = [];
+    for (const call of Object.values(h.calls)) {
+      if (!call.risk || call.risk === 'read' || call.tool === 'finish') continue;
+      const outcome = call.result
+        ? call.result.ok
+          ? 'done'
+          : call.result.phase === 'before_effect'
+            ? undefined
+            : 'unknown'
+        : call.attempts > 0
+          ? 'unknown'
+          : undefined;
+      if (!outcome) continue;
+      let preview = call.tool;
+      try {
+        const tool = tools.get(call.tool);
+        if (tool) preview = tool.preview(call.args as never);
+      } catch {}
+      actions.push({ tool: call.tool, preview, argsHash: call.argsHash, outcome });
+    }
     return {
       taskId,
       ...(waiting && { waiting }),
+      ...(actions.length && { actions }),
       ok: done.status === 'succeeded',
       answer,
       tainted: h.tainted,
