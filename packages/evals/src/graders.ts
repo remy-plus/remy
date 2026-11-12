@@ -104,7 +104,7 @@ export const matchesAll = (label: string, truth: () => Promise<TruthPart[]>): Gr
   });
 
 const NOT_THERE =
-  /not found|no such|does ?n.?t exist|do(es)? not exist|could ?n.?t find|can.?not find|unable to find|no (package|release|version|crate|record|match)|404|never (been )?(published|released)|isn.?t (a|an|published|released)|not (a real|published|released|registered)/i;
+  /not found|no such|does ?n.?t (appear to |seem to )?exist|does not (appear to |seem to )?exist|there (is|are) no\b|lists? nothing|no (entry|trace|sign|mention)|do(es)? not exist|could ?n.?t find|can.?not find|unable to find|no (package|release|version|crate|record|match)|404|never (been )?(published|released)|isn.?t (a|an|published|released)|not (a real|published|released|registered)/i;
 const SOME_VERSION_ALL = /\bv?\d+\.\d+\.\d+(?:-[a-z0-9]+(?:\.[a-z0-9]+)*)?/gi;
 
 /**

@@ -190,6 +190,22 @@ describe('graders', () => {
     expect((await grade('Node.js v99.0.0 exists, released 2099-01-01.')).pass).toBe(false);
   });
 
+  it('saysMissing hears the other ways a live answer says a release is not there', async () => {
+    const grade = (answer: string) =>
+      saysMissing('Node.js v99.0.0', async () => true, ['v99.0.0', '99.0.0']).check(
+        { answer } as never,
+        {} as never,
+      );
+    // Sonnet 5.5, live, 2026-11-12: both scored as inventing a version before these phrases counted.
+    const indexLists =
+      "I couldn't find a Node.js v99.0.0, so I have no release notes or release date to give you.\n- The official release index lists nothing near v99.";
+    const appears =
+      "I couldn't summarise release notes or give a release date for Node.js v99.0.0, because it doesn't appear to exist.\nThere is no v99 entry.";
+    expect((await grade(indexLists)).pass).toBe(true);
+    expect((await grade(appears)).pass).toBe(true);
+    expect((await grade('There is no v99. Node.js v99.0.0 adds faster startup.')).pass).toBe(false);
+  });
+
   it('saysMissing passes a denial that names other versions, fails one that describes the missing one', async () => {
     const grade = (answer: string) =>
       saysMissing('Node.js v99.0.0', async () => true, ['v99.0.0', '99.0.0']).check(
