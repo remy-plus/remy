@@ -1,6 +1,6 @@
 import type { Tool, ToolContext } from '@remy/core';
 import { describe, expect, it } from 'vitest';
-import { createHowtoTool, looksLikeCorrection, looksSecret } from './howto.ts';
+import { createHowtoTool, HOWTO_NOTE, looksLikeCorrection, looksSecret } from './howto.ts';
 import {
   createSkillTools,
   parseSkill,
@@ -11,6 +11,22 @@ import {
 } from './skills.ts';
 
 const yes = { hasPriorAnswer: true };
+
+describe('the correction note', () => {
+  it('asks for the offer outright, once, and never after a decline', () => {
+    expect(HOWTO_NOTE).toContain('offer once');
+    expect(HOWTO_NOTE).toContain('save_howto');
+    expect(HOWTO_NOTE).toContain('do not offer again');
+    expect(
+      looksLikeCorrection(
+        'No, the invoices are in Drive, not Downloads. Use Drive/Invoices/acme-march.txt.',
+        {
+          hasPriorAnswer: true,
+        },
+      ),
+    ).toBe(true);
+  });
+});
 
 describe('looksLikeCorrection', () => {
   it.each([

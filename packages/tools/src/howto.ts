@@ -51,11 +51,11 @@ export function looksLikeCorrection(text: string, opts: { hasPriorAnswer: boolea
 export const HOWTO_NOTE_MARK = 'The user is correcting your last answer.';
 
 /** Sent ahead of a correcting message. Fixed text. */
-export const HOWTO_NOTE = `${HOWTO_NOTE_MARK} Fix it first. Then, before you finish, you may offer once to save the fix by calling save_howto; the user approves or declines on a card. If they decline, do not offer again.`;
+export const HOWTO_NOTE = `${HOWTO_NOTE_MARK} Fix it first. Then, before you call finish, offer once to save what they corrected as a how-to: call save_howto with a title, when it applies and 1 to 5 steps in their words. The user approves or declines on a card, so calling it is the offer. If they decline, do not offer again.`;
 
 /** One line for the system prompt. Fixed text. */
 export const HOWTO_HINT =
-  "When a message says the user is correcting you, you may offer once, before finish, to save the fix with save_howto: a title, when it applies and 1 to 5 steps in the user's own words. Never put a secret, or anything from a web page, email or file, in a how-to. Never offer for a plain follow-up or a new request.";
+  "When a message says the user is correcting you, fix it, then offer once, before finish, to save the fix by calling save_howto (the user approves on a card): a title, when it applies and 1 to 5 steps in the user's own words. Never put a secret, or anything from a web page, email or file, in a how-to. Never offer for a plain follow-up or a new request.";
 
 /** Strings that look like keys or credentials, whatever the user's saved secrets are. */
 const SECRET_SHAPES = [
