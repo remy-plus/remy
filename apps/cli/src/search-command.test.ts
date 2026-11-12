@@ -119,3 +119,41 @@ describe('remy search test', () => {
     await expect(searchCommand(c)).rejects.toThrow('refused the key');
   });
 });
+
+describe('remy search key for readers and cloud browsers', () => {
+  it.each([
+    ['firecrawl', 'firecrawl'],
+    ['cloudflare', 'cloudflare'],
+    ['cloudflare-account', 'cloudflare-account'],
+    ['steel', 'steel'],
+    ['browserbase', 'browserbase'],
+    ['browserbase-project', 'browserbase-project'],
+  ])('saves %s under its own Keychain account and says what it is for', async (id, account) => {
+    const calls: { input?: string | undefined }[] = [];
+    const { c, text } = ctx({
+      rest: ['key', id],
+      isTTY: false,
+      readStdin: async () => 'sk-extra-999\n',
+      exec: (_cmd, _a, input) => {
+        calls.push({ input });
+        return { status: 0, stdout: '' };
+      },
+    });
+    expect(await searchCommand(c)).toBe(0);
+    expect(calls[0]?.input).toContain(`-a ${account} -w sk-extra-999`);
+    expect(text()).not.toContain('sk-extra-999');
+    expect(text()).toMatch(/Saved the .* in the Keychain\. It /);
+  });
+
+  it('still rejects an unknown id and lists every accepted one', async () => {
+    const { c } = ctx({ rest: ['key', 'nope'], isTTY: false });
+    await expect(searchCommand(c)).rejects.toThrow(/steel.*browserbase-project|firecrawl/);
+  });
+
+  it('prints the reader and browser lines in the status', async () => {
+    const { c, text } = ctx({ extra: ['No page reader set.', '', 'Browser: on this computer.'] });
+    await searchCommand(c);
+    expect(text()).toContain('No page reader set.');
+    expect(text()).toContain('Browser: on this computer.');
+  });
+});

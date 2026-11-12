@@ -72,6 +72,15 @@ export function keychainSet(exec: Exec, account: string, value: string): boolean
   return r.status === 0;
 }
 
+/**
+ * True when the Keychain must not be used: REMY_KEYCHAIN=off in the given environment or in the
+ * process environment (the global kill switch, set for every test run). A caller that injected its
+ * own `exec` passes `injected` so a stub, which never touches the real Keychain, still runs.
+ */
+export function keychainOff(env: Record<string, string | undefined>, injected = false): boolean {
+  return env.REMY_KEYCHAIN === 'off' || (!injected && process.env.REMY_KEYCHAIN === 'off');
+}
+
 export function keychainGet(exec: Exec, account: string): string | undefined {
   const r = exec('security', [
     'find-generic-password',

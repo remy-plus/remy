@@ -1,6 +1,6 @@
 // `remy search`: which route answers web search and why, `remy search key <service>` to save a
 // key in the Keychain, `remy search test [<service>]` to run one real search. A key is never printed.
-import { type Exec, keychainSet, realExec } from './credentials.ts';
+import { type Exec, keychainOff, keychainSet, realExec } from './credentials.ts';
 import {
   describeOrder,
   type KeyRoute,
@@ -11,6 +11,7 @@ import {
   SERVICES,
   type SearchPlan,
 } from './search.ts';
+import { EXTRA_KEYS, isExtraKey } from './service-keys.ts';
 
 export const TEST_QUERY = 'current Node.js LTS release';
 
@@ -23,6 +24,8 @@ export interface SearchCommandContext {
   out: (text: string) => void;
   plan: SearchPlan;
   sources: Record<KeyRoute, KeySource>;
+  /** Extra lines for the status: page readers and the cloud browser. */
+  extra?: string[];
   readStdin?: (() => Promise<string>) | undefined;
   askSecret?: ((question: string) => Promise<string | null>) | undefined;
   exec?: Exec;
@@ -46,9 +49,11 @@ function status(c: SearchCommandContext): string[] {
   } else {
     const why = p.override
       ? 'REMY_SEARCH or remy.config.json picked it'
-      : p.chosen in SERVICES
-        ? 'the first service with a key'
-        : 'no service key is set';
+      : p.preferred
+        ? 'your saved choice in Settings'
+        : p.chosen in SERVICES
+          ? 'the first service with a key'
+          : 'no service key is set';
     lines.push(`Web search uses ${routeLabel(p.chosen)}: ${why}.`);
     if (p.order.length > 1) lines.push(`Order: ${describeOrder(p.order)}.`);
     if (p.step) lines.push(`Next step: ${p.step}`);
@@ -56,36 +61,39 @@ function status(c: SearchCommandContext): string[] {
   lines.push('', 'Services, in the order they are tried:');
   for (const r of ids)
     lines.push(`  ${r.padEnd(11)} ${SERVICES[r].label.padEnd(12)} key: ${where(r, c.sources[r])}`);
+  if (c.extra?.length) lines.push('', 'Page readers and cloud browser:', ...c.extra);
   lines.push(
     '',
-    'Save a key with remy search key <service>. Check one with remy search test <service>.',
+    'Save a key with remy search key <id> (a service above, or firecrawl, cloudflare, cloudflare-account, steel, browserbase, browserbase-project). Check a search service with remy search test <service>.',
   );
   return lines;
 }
 
 async function saveKey(c: SearchCommandContext, id: string | undefined): Promise<number> {
-  if (!isService(id) || id === 'searxng')
+  const extra = isExtraKey(id) ? EXTRA_KEYS[id] : undefined;
+  if (!extra && (!isService(id) || id === 'searxng'))
     throw new Error(
-      `Usage: remy search key <service>. Services: ${ids.filter((i) => i !== 'searxng').join(', ')}.`,
+      `Usage: remy search key <id>. Search services: ${ids.filter((i) => i !== 'searxng').join(', ')}. Page readers and browsers: ${Object.keys(EXTRA_KEYS).join(', ')}.`,
     );
+  const target = extra ?? SERVICES[id as KeyRoute];
   const platform = c.platform ?? process.platform;
-  if (platform !== 'darwin' || c.env.REMY_KEYCHAIN === 'off') {
-    c.out(`The Keychain is not used here. Set ${SERVICES[id].env} in the environment instead.\n`);
+  if (platform !== 'darwin' || keychainOff(c.env, Boolean(c.exec))) {
+    c.out(`The Keychain is not used here. Set ${target.env} in the environment instead.\n`);
     return 1;
   }
   let value: string | null | undefined;
   if (c.keyStdin || !c.isTTY) value = (await c.readStdin?.()) ?? '';
-  else if (c.askSecret) value = await c.askSecret(`${SERVICES[id].label} key (hidden): `);
+  else if (c.askSecret) value = await c.askSecret(`${target.label} (hidden): `);
   else
-    throw new Error(
-      'Run this in a terminal, or pipe the key: remy search key <service> --key-stdin.',
-    );
+    throw new Error('Run this in a terminal, or pipe the key: remy search key <id> --key-stdin.');
   value = value?.trim();
   if (!value) throw new Error('No key was given. Nothing was saved.');
-  if (!keychainSet(c.exec ?? realExec, id, value))
+  if (!keychainSet(c.exec ?? realExec, id as string, value))
     throw new Error('The Keychain would not take that key. Set the environment variable instead.');
   c.out(
-    `Saved the ${SERVICES[id].label} key in the Keychain. Check it with remy search test ${id}.\n`,
+    extra
+      ? `Saved the ${extra.label} in the Keychain. It ${extra.use}. Check it with remy search.\n`
+      : `Saved the ${target.label} key in the Keychain. Check it with remy search test ${id}.\n`,
   );
   return 0;
 }
@@ -130,5 +138,5 @@ export async function searchCommand(c: SearchCommandContext): Promise<number> {
   }
   if (sub === 'key') return saveKey(c, id);
   if (sub === 'test') return test(c, id);
-  throw new Error('Use remy search, remy search key <service> or remy search test [<service>].');
+  throw new Error('Use remy search, remy search key <id> or remy search test [<service>].');
 }

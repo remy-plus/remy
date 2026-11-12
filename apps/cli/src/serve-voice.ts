@@ -15,7 +15,7 @@ import { execFile } from 'node:child_process';
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { type Exec, KEYCHAIN_SERVICE, keychainGet, realExec } from './credentials.ts';
+import { type Exec, KEYCHAIN_SERVICE, keychainGet, keychainOff, realExec } from './credentials.ts';
 import { guard, HttpFail, jsonBody, type Mount, methodNotAllowed } from './serve-mount.ts';
 
 export const FISH_URL = 'https://api.fish.audio/v1/tts';
@@ -46,12 +46,12 @@ export const MSG_NO_KEY =
 export function readFishKey(
   env: Record<string, string | undefined>,
   platform: NodeJS.Platform = process.platform,
-  exec: Exec = realExec,
+  exec?: Exec,
 ): string | undefined {
   const fromEnv = env.FISH_API_KEY?.trim();
   if (fromEnv) return fromEnv;
-  if (platform !== 'darwin' || env.REMY_KEYCHAIN === 'off') return undefined;
-  return keychainGet(exec, 'fish')?.trim() || undefined;
+  if (platform !== 'darwin' || keychainOff(env, Boolean(exec))) return undefined;
+  return keychainGet(exec ?? realExec, 'fish')?.trim() || undefined;
 }
 
 /** Runs a command without blocking the server; `timedOut` is true when it was killed for being slow. */
@@ -86,14 +86,14 @@ export const KEYCHAIN_TIMEOUT_MS = 2000;
 export async function readFishKeyAsync(
   env: Record<string, string | undefined>,
   platform: NodeJS.Platform = process.platform,
-  exec: AsyncExec = realAsyncExec,
+  exec?: AsyncExec,
   timeoutMs = KEYCHAIN_TIMEOUT_MS,
 ): Promise<string | undefined> {
   const fromEnv = env.FISH_API_KEY?.trim();
   if (fromEnv) return fromEnv;
-  if (platform !== 'darwin' || env.REMY_KEYCHAIN === 'off') return undefined;
+  if (platform !== 'darwin' || keychainOff(env, Boolean(exec))) return undefined;
   try {
-    const r = await exec(
+    const r = await (exec ?? realAsyncExec)(
       'security',
       ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', 'fish', '-w'],
       timeoutMs,
