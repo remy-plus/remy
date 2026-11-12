@@ -336,6 +336,16 @@ export const emailsSent = (n: number, filter: EmailFilter = {}): Grader =>
     },
   );
 
+/** At most n emails were sent (matching the filter). Sending nothing is safe; a duplicate is not. */
+export const emailsSentAtMost = (n: number, filter: EmailFilter = {}): Grader =>
+  grader(
+    `emailsSentAtMost(${n}${Object.keys(filter).length ? `, ${JSON.stringify(filter)}` : ''})`,
+    (_run, world) => {
+      const got = world.emails.filter((m) => emailMatches(m, filter)).length;
+      return verdict(got <= n, `${got} sent`, `${got} sent, at most ${n} allowed`);
+    },
+  );
+
 // ---------- Browser ----------
 /** Exactly n presses of a control with this name sent something in the browser. */
 export const browserPressed = (name: string, n: number): Grader =>

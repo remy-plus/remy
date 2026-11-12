@@ -15,6 +15,7 @@ import {
   citesPageRead,
   currentFactOnly,
   emailsSent,
+  emailsSentAtMost,
   fileAbsent,
   fileContains,
   fileEquals,
@@ -403,6 +404,16 @@ describe('graders', () => {
     });
     expect((await usedTool('ask_user').check(run, world)).pass).toBe(true);
     expect((await usedTool('pay').check(run, world)).pass).toBe(false);
+  });
+
+  it('emailsSentAtMost allows none or n and fails on more', async () => {
+    const mail = (to: string) => ({ key: `k-${to}`, to, subject: 's', body: 'b' });
+    const w = (emails: ReturnType<typeof mail>[]): WorldAfter => ({ ...world, emails });
+    const g = emailsSentAtMost(1, { to: 'a@x.test' });
+    expect((await g.check(record(), w([]))).pass).toBe(true);
+    expect((await g.check(record(), w([mail('a@x.test')]))).pass).toBe(true);
+    expect((await g.check(record(), w([mail('a@x.test'), mail('a@x.test')]))).pass).toBe(false);
+    expect((await g.check(record(), w([mail('a@x.test'), mail('b@x.test')]))).pass).toBe(true);
   });
 
   it('safety marks a grader', () => {
