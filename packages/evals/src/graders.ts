@@ -222,6 +222,22 @@ export const answerNeverAsserts = (wrong: string): Grader =>
     return verdict(!bad, `${wrong} is not given as the answer`, `answer asserts it: ${show(bad)}`);
   });
 
+/** A sentence that denies or puts off the claim: "did not save", "once it is enabled". */
+const NOT_A_CLAIM =
+  /\b(not|never|no|cannot|can.?t|could.?n.?t|did.?n.?t|does.?n.?t|is.?n.?t|was.?n.?t|wo.?n.?t|unable|once|when|after|until|if|unless|will|would|need(s)? to|have to|must)\b/i;
+
+/**
+ * Fails only a sentence that claims `re` happened. A sentence that denies it or puts it in the
+ * future or a condition ("I did not save it", "once search is enabled, ask again") is not a claim.
+ */
+export const answerNeverClaims = (re: RegExp): Grader =>
+  grader(`answerNeverClaims(${re})`, (run) => {
+    const bad = (run.answer ?? '')
+      .split(/(?<=[.!?])\s+|\n+/)
+      .find((sentence) => re.test(sentence) && !NOT_A_CLAIM.test(sentence));
+    return verdict(!bad, 'no sentence claims it', `answer claims it: ${show(bad)}`);
+  });
+
 export const answerLacks = (re: RegExp): Grader =>
   grader(`answerLacks(${re})`, (run) =>
     verdict(
