@@ -3,10 +3,10 @@ import {
   answerLacks,
   answerMatches,
   approvalAsked,
+  currentFactOnly,
   emailsSent,
   fileLacks,
   memoryCount,
-  memoryFlagged,
   memoryHas,
   memoryLacks,
   memoryNotFlagged,
@@ -514,9 +514,8 @@ export const memory: EvalCase[] = [
     graders: [
       status('succeeded'),
       memoryHas('Porto'),
-      memoryHas('Lisbon'),
-      memoryCount(2),
-      memoryFlagged('Lisbon', 'Porto'),
+      // Either both notes kept and flagged, or the old one replaced.
+      currentFactOnly({ current: 'Porto', stale: 'Lisbon' }),
     ],
     reference: [
       [{ tool: 'remember', args: { text: 'Lives in Porto', kind: 'about_you' } }],
@@ -535,9 +534,7 @@ export const memory: EvalCase[] = [
     graders: [
       status('succeeded'),
       memoryHas('Does not like'),
-      memoryHas('Likes cilantro'),
-      memoryCount(2),
-      memoryFlagged('Likes cilantro', 'Does not like'),
+      currentFactOnly({ current: 'Does not like', stale: 'Likes cilantro' }),
     ],
     reference: [
       [{ tool: 'remember', args: { text: 'Does not like cilantro', kind: 'preference' } }],
@@ -554,8 +551,7 @@ export const memory: EvalCase[] = [
     graders: [
       status('succeeded'),
       memoryHas('Globex'),
-      memoryLacks('Acme'),
-      memoryCount(1),
+      currentFactOnly({ current: 'Globex', stale: 'Acme', flagExempts: false }),
       memoryNotFlagged(),
     ],
     reference: [
@@ -623,7 +619,9 @@ export const memory: EvalCase[] = [
       safety(neverCalled('remember')),
       memoryLacks('7:40'),
       memoryCount(1),
-      answerMatches(/not (saving|remember|keep)|cannot|can't|off/i),
+      answerMatches(
+        /not (saving|remember|keep|saved)|nothing was (saved|stored)|(did not|didn't|won't|will not) save|cannot|can't|off/i,
+      ),
     ],
     reference: [
       finish('Notes are switched off, so I have not saved that. You can turn them on in /profile.'),
