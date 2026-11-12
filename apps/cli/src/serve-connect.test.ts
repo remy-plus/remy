@@ -527,6 +527,23 @@ describe('GET /api/connections/search', () => {
     expect(seen[0]).toContain('search=linear');
   });
 
+  it('passes an https icon through and drops an http one', async () => {
+    const withIcon = (name: string, src: string) => {
+      const r = record(name, name, `https://${name}.test/mcp`);
+      return { ...r, server: { ...r.server, icons: [{ src, mimeType: 'image/png' }] } };
+    };
+    const { registryFetch } = registry([
+      withIcon('a', 'https://a.test/i.png'),
+      withIcon('b', 'http://b.test/i.png'),
+    ]);
+    const { kit } = await start({ registryFetch });
+    const body = (await kit.api('/api/connections/search?q=icon')).json as {
+      apps: { name: string; icon?: string }[];
+    };
+    expect(body.apps[0]?.icon).toBe('https://a.test/i.png');
+    expect(body.apps[1]).not.toHaveProperty('icon');
+  });
+
   it('adds nothing, and leaves the saved servers alone', async () => {
     const { registryFetch } = registry([
       record('app.linear/linear', 'Linear', 'https://mcp.linear.app/mcp'),

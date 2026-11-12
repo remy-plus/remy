@@ -59,6 +59,44 @@ const withPackage = {
   _meta: { 'io.modelcontextprotocol.registry/official': { isLatest: true } },
 };
 
+describe('icons', () => {
+  const withIcons = (icons: unknown) => ({
+    server: { ...remote.server, icons },
+  });
+  const png = { src: 'https://x.test/a.png', mimeType: 'image/png', sizes: ['48x48'] };
+
+  it('passes on an https icon of an allowed type', () => {
+    expect(toApp(withIcons([png]))?.icon).toBe('https://x.test/a.png');
+    for (const mimeType of ['image/svg+xml', 'image/webp', 'image/jpeg'])
+      expect(toApp(withIcons([{ src: 'https://x.test/i', mimeType }]))?.icon).toBe(
+        'https://x.test/i',
+      );
+  });
+
+  it('skips http, other types and junk, then takes the next good one', () => {
+    expect(
+      toApp(withIcons([{ src: 'http://x.test/a.png', mimeType: 'image/png' }]))?.icon,
+    ).toBeUndefined();
+    expect(
+      toApp(withIcons([{ src: 'https://x.test/a.gif', mimeType: 'image/gif' }]))?.icon,
+    ).toBeUndefined();
+    expect(
+      toApp(withIcons([{ src: 'data:image/png;base64,AA', mimeType: 'image/png' }]))?.icon,
+    ).toBeUndefined();
+    expect(
+      toApp(withIcons([{ src: 'javascript:1', mimeType: 'image/png' }]))?.icon,
+    ).toBeUndefined();
+    expect(toApp(withIcons('nope'))?.icon).toBeUndefined();
+    expect(
+      toApp(withIcons([null, { src: 'http://x.test/a.png', mimeType: 'image/png' }, png]))?.icon,
+    ).toBe('https://x.test/a.png');
+  });
+
+  it('leaves icon out when the record has none', () => {
+    expect(toApp(remote)).not.toHaveProperty('icon');
+  });
+});
+
 describe('toApp', () => {
   it('reads a hosted server as a remote app', () => {
     expect(toApp(remote)).toEqual({

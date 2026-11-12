@@ -255,7 +255,20 @@ export type SettingsPatch = {
   [K in keyof ServerPrefs]?: ServerPrefs[K] extends object
     ? Partial<ServerPrefs[K]>
     : ServerPrefs[K];
+} & {
+  /** The folder every task may use (an absolute path, or ~/...); null goes back to an empty folder per task. */
+  workspace?: string | null;
 };
+
+/** Which folder tasks work in and why (GET /api/settings). */
+export interface WorkspaceInfo {
+  /** The folder in use; null when each task gets its own new empty folder. */
+  path: string | null;
+  /** `flag`: the server was started with --workspace, so the setting cannot change it. */
+  source: 'flag' | 'setting' | 'task';
+  /** What is saved in Settings, even when the flag is in use. */
+  saved: string | null;
+}
 
 /** GET /api/settings: what Settings shows and the person cannot change here, and the saved values
  * in `prefs` (the browser keeps a copy in the settings store and writes changes back). */
@@ -268,6 +281,8 @@ export interface SettingsData {
   notes: number;
   /** Whether the server has a voice key. Without one, spoken replies use the browser's voice. */
   voice?: { ready: boolean };
+  /** The folder Remy may use. Absent on an older server. */
+  workspace?: WorkspaceInfo;
   server: {
     address: string;
     lastSignIns: { at: string; where: string }[];
@@ -439,6 +454,8 @@ export interface RegistryApp {
   where: string;
   /** The exact command that adds it, for the person to run in their terminal. */
   command: string;
+  /** An https image the server already vetted, when the record has one. */
+  icon?: string;
 }
 export interface RegistrySearch {
   apps: RegistryApp[];

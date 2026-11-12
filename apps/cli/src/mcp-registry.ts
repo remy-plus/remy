@@ -38,6 +38,8 @@ export interface RegistryApp {
   secrets: RegistrySecret[];
   /** Where the server's own code lives, when the record says. */
   repository?: string;
+  /** An https image the record names for the server, when it has one of the usual image types. */
+  icon?: string;
 }
 
 interface RawHeader {
@@ -80,6 +82,7 @@ interface RawServer {
   repository?: unknown;
   remotes?: unknown;
   packages?: unknown;
+  icons?: unknown;
 }
 
 interface RawRecord {
@@ -101,6 +104,22 @@ const isLatest = (r: RawRecord): boolean => {
 export function headerValue(raw: string, server: string, key: string): string {
   const ref = `\${secret:${server}.${key}}`;
   return raw.replace(/\{[^}]*\}/g, ref);
+}
+
+const ICON_TYPES = new Set(['image/png', 'image/svg+xml', 'image/webp', 'image/jpeg']);
+
+/** The first icon that is an https address of a usual image type; nothing else is passed on. */
+export function iconOf(server: RawServer): string | undefined {
+  for (const i of arr(server.icons) as { src?: unknown; mimeType?: unknown }[]) {
+    if (!i || typeof i !== 'object') continue;
+    const src = str(i.src);
+    const type = str(i.mimeType).toLowerCase();
+    if (!ICON_TYPES.has(type)) continue;
+    try {
+      if (new URL(src).protocol === 'https:') return src;
+    } catch {}
+  }
+  return undefined;
 }
 
 /** The first hosted address, or undefined when the record only ships a program. */
@@ -198,6 +217,7 @@ export function toApp(record: RawRecord): RegistryApp | undefined {
   const description = str(server.description);
   const version = str(server.version);
   const repo = str((server.repository as { url?: unknown } | undefined)?.url);
+  const icon = iconOf(server);
 
   const remote = remoteOf(server);
   if (remote) {
@@ -213,6 +233,7 @@ export function toApp(record: RawRecord): RegistryApp | undefined {
       url: remote.url,
       secrets,
       ...(repo && { repository: repo }),
+      ...(icon && { icon }),
     };
   }
 
@@ -231,6 +252,7 @@ export function toApp(record: RawRecord): RegistryApp | undefined {
       args: pkg.args,
       secrets,
       ...(repo && { repository: repo }),
+      ...(icon && { icon }),
     };
   }
   return undefined;

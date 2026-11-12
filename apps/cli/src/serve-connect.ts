@@ -404,6 +404,7 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
     kind: a.kind,
     where: a.kind === 'remote' ? (a.url ?? '') : [a.command, ...(a.args ?? [])].join(' '),
     command: `remy connect --registry ${shellWord(a.name)}`,
+    ...(a.icon && { icon: a.icon }),
   });
 
   /**
