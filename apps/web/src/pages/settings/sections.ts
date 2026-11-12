@@ -26,3 +26,12 @@ export const SECTION_ALIASES: Record<string, SectionId> = {
   about: 'computer',
   appearance: 'dock',
 };
+
+/**
+ * Rows that have an address of their own: `#/settings/folder` opens the section that holds that row
+ * and scrolls to it. The row's container carries the same id.
+ */
+export const ROW_SECTIONS: ReadonlyMap<string, SectionId> = new Map<string, SectionId>([
+  ['folder', 'trust'],
+  ['voice', 'model'],
+]);

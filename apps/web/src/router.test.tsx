@@ -115,6 +115,32 @@ describe('App routing', () => {
     expect(window.location.hash).toBe('#/activity');
   });
 
+  it('opens the section that holds a row and finds the row, not the fallback', async () => {
+    window.location.hash = '#/settings/folder';
+    render(app());
+    const row = await screen.findByRole('heading', { level: 3, name: 'Folder Remy may use' });
+    expect(document.getElementById('folder')?.contains(row)).toBe(true);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'How much Remy does on its own' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('There is no such section.')).toBeNull();
+  });
+
+  it('opens Model and keys at the voice row, not the fallback', async () => {
+    window.location.hash = '#/settings/voice';
+    render(app());
+    const box = await screen.findByRole('textbox', { name: 'Voice id' });
+    expect(document.getElementById('voice')?.contains(box)).toBe(true);
+    expect(screen.getByRole('heading', { level: 2, name: 'Model and keys' })).toBeTruthy();
+    expect(screen.queryByText('There is no such section.')).toBeNull();
+  });
+
+  it('still says so for an unknown settings section', async () => {
+    window.location.hash = '#/settings/nope';
+    render(app());
+    expect(await screen.findByText('There is no such section.')).toBeTruthy();
+  });
+
   it('shows the dock on app pages and not on the full-page screens', async () => {
     window.location.hash = '#/brain';
     const { unmount } = render(app());

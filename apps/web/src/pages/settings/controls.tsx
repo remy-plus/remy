@@ -3,7 +3,10 @@ import { Icon } from '../../components/Icon.tsx';
 import { buttonQuiet } from '../../components/ui.ts';
 import { type SaveState, useSaveState } from '../../settings.ts';
 
-/** One labelled row: the name and a line of help on the left, the control on the right. */
+/**
+ * One labelled row: the name and a line of help on the left, the control on the right. `id` goes on the
+ * row's container, so an address like `#/settings/voice` can scroll to it (the top offset clears the dock).
+ */
 export function Row({
   title,
   help,
@@ -16,11 +19,12 @@ export function Row({
   id?: string;
 }) {
   return (
-    <div className="grid gap-x-10 gap-y-3 border-t border-edge py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]">
+    <div
+      id={id}
+      className="scroll-mt-24 grid gap-x-10 gap-y-3 border-t border-edge py-5 md:grid-cols-[minmax(0,284px)_minmax(0,1fr)]"
+    >
       <div>
-        <h3 id={id} className="m-0 text-[15px] leading-snug font-medium">
-          {title}
-        </h3>
+        <h3 className="m-0 text-[15px] leading-snug font-medium">{title}</h3>
         {help && <p className="mt-1 mb-0 text-[13px] leading-snug text-muted">{help}</p>}
       </div>
       <div className="min-w-0">{children}</div>

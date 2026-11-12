@@ -37,6 +37,7 @@ export function VoiceRow({ data }: Pick<SectionProps, 'data'>) {
 
   return (
     <Row
+      id="voice"
       title="Voice"
       help="Which voice Remy speaks with. Turn spoken replies on with the speaker button in the chat box."
     >

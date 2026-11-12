@@ -1,4 +1,4 @@
-import { type ComponentType, useCallback, useEffect, useState } from 'react';
+import { type ComponentType, useCallback, useEffect, useRef, useState } from 'react';
 import { type SettingsData, useApi } from '../../api/index.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { describeError } from '../../lib/errors.ts';
@@ -8,7 +8,13 @@ import { DockSection } from './dock.tsx';
 import { Memory } from './memory.tsx';
 import { Model } from './model.tsx';
 import { Notifications } from './notifications.tsx';
-import { SECTION_ALIASES, SECTIONS, type SectionId, type SectionProps } from './sections.ts';
+import {
+  ROW_SECTIONS,
+  SECTION_ALIASES,
+  SECTIONS,
+  type SectionId,
+  type SectionProps,
+} from './sections.ts';
 import { Computer } from './server.tsx';
 
 const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
@@ -58,10 +64,24 @@ export function Settings({ section = 'dock' }: { section?: string }) {
     };
   }, [api, n]);
 
-  const wanted = SECTION_ALIASES[section] ?? section;
+  // `folder` and `voice` name a row: the row opens its section and is scrolled to.
+  const rowSection = ROW_SECTIONS.get(section);
+  const wanted = SECTION_ALIASES[section] ?? rowSection ?? section;
   const current = isSection(wanted) ? wanted : null;
   const View = current ? VIEWS[current] : undefined;
   const label = SECTIONS.find((s) => s.id === current)?.label;
+
+  // Some rows appear only after the settings load, so this runs after each render until the row is on
+  // the page. It scrolls once per visit, so a later reload does not jump the page again.
+  const landed = useRef(false);
+  useEffect(() => {
+    if (!rowSection || landed.current) return;
+    const row = document.getElementById(section);
+    if (!row) return;
+    landed.current = true;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    row.scrollIntoView?.({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+  });
 
   return (
     <div className="mx-auto max-w-[1440px] md:grid md:min-h-[calc(100vh-66px)] md:grid-cols-[260px_minmax(0,1fr)]">

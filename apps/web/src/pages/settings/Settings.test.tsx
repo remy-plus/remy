@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../App.tsx';
 import { a11yProblems } from '../../a11y.testing.ts';
 import { ApiProvider } from '../../api/index.tsx';
@@ -454,6 +454,48 @@ describe('Settings', () => {
     );
   });
 
+  describe('rows with their own address', () => {
+    // jsdom has no scrollIntoView, so the test records which element the page asks to scroll to.
+    let scrolled: { id: string; options: unknown }[] = [];
+    beforeEach(() => {
+      scrolled = [];
+      Object.defineProperty(Element.prototype, 'scrollIntoView', {
+        configurable: true,
+        value(this: Element, options: unknown) {
+          scrolled.push({ id: this.id, options });
+        },
+      });
+    });
+    afterEach(() => {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+      vi.unstubAllGlobals();
+    });
+
+    it('scrolls the folder row into view with its section open', async () => {
+      await open('folder', 'How much Remy does on its own');
+      await waitFor(() => expect(scrolled).toHaveLength(1));
+      expect(scrolled).toEqual([{ id: 'folder', options: { block: 'start', behavior: 'smooth' } }]);
+    });
+
+    it('waits for the voice row, which appears once the settings load, then scrolls to it', async () => {
+      await open('voice', 'Model and keys');
+      await waitFor(() => expect(scrolled).toHaveLength(1));
+      expect(scrolled).toEqual([{ id: 'voice', options: { block: 'start', behavior: 'smooth' } }]);
+    });
+
+    it('does not animate the scroll for someone who asks for reduced motion', async () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce') }));
+      await open('voice', 'Model and keys');
+      await waitFor(() => expect(scrolled).toHaveLength(1));
+      expect(scrolled[0]?.options).toEqual({ block: 'start', behavior: 'auto' });
+    });
+
+    it('does not scroll for a section that has no row address', async () => {
+      await open('model', 'Model and keys');
+      expect(scrolled).toEqual([]);
+    });
+  });
+
   describe('when the settings cannot be read', () => {
     it('says what went wrong and offers to try again', async () => {
       await open('model', 'Model and keys', broken(401));
@@ -605,5 +647,18 @@ describe('Settings', () => {
       expect(screen.getByText(/Command center: coming soon/)).toBeTruthy();
       expect(screen.getByText('A light theme is not built yet.')).toBeTruthy();
     });
+  });
+});
+
+describe('Folder Remy may use while settings load', () => {
+  it('says it is checking, not that the server lacks the setting', async () => {
+    const { FolderRow } = await import('./folder.tsx');
+    render(
+      <ApiProvider api={createMockApi()}>
+        <FolderRow data={null} reload={async () => {}} />
+      </ApiProvider>,
+    );
+    expect(screen.getByText('Checking which folder Remy may use.')).toBeTruthy();
+    expect(screen.queryByText(/does not offer a folder setting/)).toBeNull();
   });
 });

@@ -58,8 +58,12 @@ export function FolderRow({ data, reload }: Pick<SectionProps, 'data' | 'reload'
               : '';
 
   return (
-    <Row title="Folder Remy may use" help={FOLDER_HELP}>
-      {!info ? (
+    <Row id="folder" title="Folder Remy may use" help={FOLDER_HELP}>
+      {!data ? (
+        <p className="m-0 max-w-[520px] text-[14px] leading-relaxed text-muted">
+          Checking which folder Remy may use.
+        </p>
+      ) : !info ? (
         <p className="m-0 max-w-[520px] text-[14px] leading-relaxed text-muted">
           This server does not offer a folder setting yet.
         </p>
