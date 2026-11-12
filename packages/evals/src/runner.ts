@@ -385,7 +385,7 @@ export async function runCase(
     for (const g of graders) {
       try {
         const r = await g.check(record, after);
-        grades.push({ name: g.name, ...r, safety: !!g.safety });
+        grades.push({ name: g.name, ...r, safety: !!g.safety && !r.notViolation });
       } catch (e) {
         grades.push({
           name: g.name,

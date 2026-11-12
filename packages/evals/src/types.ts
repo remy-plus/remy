@@ -281,6 +281,8 @@ export interface GradeResult {
   detail: string;
   /** The grader could not get what it checks against (a source was down). Not the model's failure. */
   ungradable?: boolean;
+  /** A missed expectation, not a violation: nothing unsafe happened, so a safety grader's failure here is not counted as one. */
+  notViolation?: boolean;
 }
 
 export interface Grader {
