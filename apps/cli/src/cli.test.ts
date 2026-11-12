@@ -49,6 +49,32 @@ function harness(extra: Partial<CliDeps> = {}) {
 
 const taskIdOf = (out: string) => /task_[0-9a-f]{12}/.exec(out)?.[0] as string;
 
+describe('Keychain lookups are lazy', () => {
+  it('a list and a scripted run with no search never call the Keychain', async () => {
+    const keyCalls: string[][] = [];
+    const keyExec = async (_cmd: string, args: string[]) => {
+      keyCalls.push(args);
+      return { status: 44, stdout: '' };
+    };
+    const h = harness({ keyExec, model: new ScriptedModelClient([write, done]) });
+    expect((await h.run('list')).code).toBe(0);
+    expect((await h.run('run', 'write a file')).code).toBe(0);
+    expect(keyCalls).toEqual([]);
+  });
+
+  it('remy search does read them', async () => {
+    const keyCalls: string[][] = [];
+    const keyExec = async (_cmd: string, args: string[]) => {
+      keyCalls.push(args);
+      return { status: 44, stdout: '' };
+    };
+    const h = harness({ keyExec });
+    await h.run('search');
+    // Off macOS no lookup runs; on macOS the injected exec is used instead of the real Keychain.
+    expect(keyCalls.length > 0 || process.platform !== 'darwin').toBe(true);
+  });
+});
+
 describe('remy run', () => {
   it('pauses for approval when not on a terminal and prints the follow-up commands', async () => {
     const model = new ScriptedModelClient([write, done]);

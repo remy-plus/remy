@@ -11,6 +11,7 @@ import {
   createBrowserTools,
   createLocalBrowser,
   profileInUse,
+  remoteNotice,
 } from '@remy/browser';
 import {
   type ApprovalRequest,
@@ -50,6 +51,7 @@ import {
   calculate,
   createComputerTools,
   createDelegate,
+  createFetchUrl,
   createHowtoTool,
   createMemoryTools,
   createRecallTool,
@@ -62,7 +64,6 @@ import {
   deleteFile,
   type Episode,
   editFile,
-  fetchUrl,
   finish,
   HOWTO_HINT,
   listFiles,
@@ -71,6 +72,7 @@ import {
   readFile,
   runCommand,
   SAVE_SKILL_HINT,
+  type SearchProvider,
   SKILLS_HINT,
   skillsBlock,
   sshComputer,
@@ -91,6 +93,7 @@ import {
   startedLine,
   writeMarker,
 } from './background.ts';
+import { makeKeyReader, remoteBrowserStatus, resolveRemoteBrowser } from './browser-remote.ts';
 import {
   type ConnectApi,
   createChat,
@@ -111,6 +114,7 @@ import {
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
+import { type ReaderSetup, resolveReader } from './readers.ts';
 import {
   gatherSearchPlan,
   type KeyRoute,
@@ -118,15 +122,17 @@ import {
   makeService,
   resolveSearchKeys,
   routedSearch,
+  SERVICES,
 } from './search.ts';
-import { searchCommand } from './search-command.ts';
+import { searchCommand, TEST_QUERY } from './search-command.ts';
+import { createSearchMount, type SearchStatusView } from './serve-search.ts';
 import { installerFor } from './service.ts';
 
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
 
 import { capabilitiesBlock, onceCapabilities } from './capabilities.ts';
-import { type Credentials, openCredentials } from './credentials.ts';
+import { type Credentials, keychainOff, openCredentials } from './credentials.ts';
 import { TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
@@ -201,6 +207,7 @@ import {
 import { createSkillsMount } from './serve-skills.ts';
 import { announceFirstRunToken, makeServeToken, serveTokenHash } from './serve-token.ts';
 import {
+  type AsyncExec,
   createFishKeySource,
   createVoiceMount,
   openVoiceLedger,
@@ -241,6 +248,8 @@ export interface CliDeps {
   /** Reads all of stdin (for `remy login <provider> --key-stdin`). */
   readStdin?: () => Promise<string>;
   fetch?: typeof fetch;
+  /** Runs the Keychain lookups for search, reader and cloud-browser keys (tests replace it). */
+  keyExec?: AsyncExec;
   /** Secrets for connected servers; default is the Keychain or REMY_HOME. */
   secrets?: SecretStore;
   /** Asks for a value without echoing it (`remy connect add --secret`). */
@@ -316,10 +325,12 @@ Usage
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
   remy show <id> [--json]         Show what a task did (--json prints raw events)
-  remy search [key <service> [--key-stdin]|test [<service>]]
+  remy search [key <id> [--key-stdin]|test [<service>]]
                                   Which search route answers and why, and which services have a key
                                   (environment or Keychain); key saves one in the Keychain without
-                                  showing it; test runs one real search on a service and times it
+                                  showing it (a search service, or firecrawl, cloudflare,
+                                  cloudflare-account, steel, browserbase, browserbase-project);
+                                  test runs one real search on a service and times it
   remy login [<provider> --key-stdin [--model <id>] [--base-url <url>]]
                                   Connect a provider: pick one, paste the key, done
   remy login --list               Show saved logins (never the keys)
@@ -406,23 +417,13 @@ Setup
   (remy browser vm start, with Docker running), then the hidden browser. A route that stops working
   is skipped and the next answers; remy doctor shows the order and the step to improve it.
   REMY_SEARCH (or "search" in remy.config.json) forces one: browser, vm, exa, tinyfish,
-  perplexity, tavily, linkup, serper, brave, context, searxng or off.
+  perplexity, tavily, linkup, serper, brave, context, searxng or off. A choice saved in the web
+  app's Settings is used when none of these is set and its service has a key.
+  Pages Remy cannot read directly can go to Firecrawl (FIRECRAWL_API_KEY) or Cloudflare Browser
+  Rendering (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN); REMY_READER=firecrawl|cloudflare|
+  always|off overrides. REMY_BROWSER=steel|browserbase uses a cloud browser (STEEL_API_KEY, or
+  BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID); save any of these keys with remy search key <id>.
 `;
-
-const SEARCHLESS = new Set([
-  'login',
-  'logout',
-  'connect',
-  'list',
-  'show',
-  'cancel',
-  'memory',
-  'skills',
-  'trust',
-  'approvals',
-  'review',
-  'browser',
-]);
 
 const OPTIONS = {
   profile: { type: 'string' },
@@ -587,7 +588,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const credentials = () => {
     creds ??=
       deps.credentials ??
-      openCredentials({ home, ...(env.REMY_KEYCHAIN === 'off' && { platform: 'linux' as const }) });
+      openCredentials({ home, ...(keychainOff(env) && { platform: 'linux' as const }) });
     return creds;
   };
 
@@ -634,7 +635,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       deps.secrets ??
       openSecretStore({
         home,
-        ...(env.REMY_KEYCHAIN === 'off' && { platform: 'linux' as const }),
+        ...(keychainOff(env) && { platform: 'linux' as const }),
       });
     return secretStore;
   };
@@ -910,26 +911,56 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
         existsSync(p),
       ));
-  // Search keys: the environment, plus any found in the Keychain once `prepareSearch` has run.
+  // Search keys: the environment, plus any found in the Keychain once `prepareSearch` has run. That
+  // runs only when a search is first needed (the first web_search call, `remy search`, `remy
+  // doctor`, the search status route), so commands that never search never touch the Keychain.
+  const keyOpts = deps.keyExec ? { exec: deps.keyExec } : {};
   let searchEnv = env;
   let searchSources: Record<KeyRoute, KeySource> | undefined;
   let searchPrepared: Promise<void> | undefined;
   const prepareSearch = () =>
-    (searchPrepared ??= resolveSearchKeys(env).then((r) => {
+    (searchPrepared ??= resolveSearchKeys(env, keyOpts).then((r) => {
       searchEnv = r.env;
       searchSources = r.sources;
+      searchPlanMemo = undefined;
       for (const k of r.found) addSecret(k.name, k.value);
     }));
-  let searchPlanMemo: ReturnType<typeof gatherSearchPlan> | undefined;
-  /** The search route order, worked out once per process; Docker is asked only when no pick or key settles it. */
-  const searchPlan = (file: FileConfig) =>
-    (searchPlanMemo ??= gatherSearchPlan({
-      env: searchEnv,
+  // Page readers (Firecrawl, Cloudflare) and cloud browser keys, found the same way.
+  let readerSetup: ReaderSetup | undefined;
+  let browserKeyLines: string[] = [];
+  let readerPrepared: Promise<void> | undefined;
+  const prepareReader = () =>
+    (readerPrepared ??= Promise.all([
+      resolveReader(env, keyOpts),
+      remoteBrowserStatus(env, keyOpts),
+    ]).then(([r, b]) => {
+      readerSetup = r;
+      browserKeyLines = b.lines;
+      for (const k of [...r.found, ...b.found]) addSecret(k.name, k.value);
+    }));
+  /** The search service saved in the web app's Settings, if any (env and config beat it). */
+  const preferredSearch = () => openWebPrefs(home).chosen().searchPrefer ?? undefined;
+  let dockerUp: boolean | undefined;
+  const hasDocker = () => (dockerUp ??= spawnSync('docker', ['info']).status === 0);
+  const planFor = (file: FileConfig, keyEnv: Record<string, string | undefined>) =>
+    gatherSearchPlan({
+      env: keyEnv,
       override: env.REMY_SEARCH ?? file.search,
+      prefer: preferredSearch(),
       vmSetUp: existsSync(vmFile()),
       browser: machineHasBrowser(),
-      hasDocker: () => spawnSync('docker', ['info']).status === 0,
-    }));
+      hasDocker,
+    });
+  let searchPlanMemo:
+    | { prefer: string | undefined; plan: ReturnType<typeof gatherSearchPlan> }
+    | undefined;
+  /** The search route order, worked out once per process (again if the saved choice changes); Docker is asked only when no pick or key settles it. */
+  const searchPlan = (file: FileConfig) => {
+    const prefer = preferredSearch();
+    if (!searchPlanMemo || searchPlanMemo.prefer !== prefer)
+      searchPlanMemo = { prefer, plan: planFor(file, searchEnv) };
+    return searchPlanMemo.plan;
+  };
   const daemonInstaller = () =>
     installerFor(process.platform, {
       entry: deps.entry ?? currentEntry(),
@@ -949,7 +980,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       },
     });
   /** What this machine has set up; shared by `remy doctor` and the capabilities block. */
-  const machineFacts = (): Facts => {
+  const machineFacts = (lazySearch = false): Facts => {
     const file = cfg();
     return gatherFacts({
       node: process.version,
@@ -965,7 +996,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         return s && { label: s.label, enableStep: s.enableStep, unavailable: s.unavailable() };
       },
       schedules: () => openSchedules(home).list().length,
-      search: searchPlan(file),
+      search: lazySearch ? { order: [], override: false, off: false } : searchPlan(file),
+      remoteBrowser: () => {
+        const c = resolveRemoteBrowser(env, makeKeyReader(env));
+        return c.kind === 'remote'
+          ? { ok: true, detail: remoteNotice(c.provider.label) }
+          : c.kind === 'error'
+            ? { ok: false, detail: c.message }
+            : undefined;
+      },
       helperProblems: () => loadHelperRoles(home, process.cwd()).problems,
       embeddings: () =>
         readEmbeddingStatus(home, env.REMY_EMBEDDINGS === 'on', personaliseOn(home)),
@@ -996,7 +1035,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   };
   function browserFor(file: FileConfig): Browser {
     const allow = list(flags['net-allow']) ?? file.netAllow;
+    // REMY_BROWSER=steel|browserbase: a cloud browser. A missing key is an error, never a quiet
+    // switch back to this computer.
+    const choice = resolveRemoteBrowser(env, makeKeyReader(env));
+    if (choice.kind === 'error') throw new Error(choice.message);
+    if (choice.kind === 'remote')
+      for (const v of choice.secrets) addSecret('REMOTE_BROWSER_KEY', v);
     browser ??= createLocalBrowser({
+      ...(choice.kind === 'remote' && { remote: choice.provider }),
       profileDir: browserDir(),
       allowLocal: env.REMY_BROWSER_LOCAL === 'on',
       ...(allow && { allow }),
@@ -1032,7 +1078,15 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       runCommand,
       calculate,
       updatePlan,
-      fetchUrl,
+      createFetchUrl({
+        // Reader keys are looked up the first time a page needs a reader.
+        reader: async () => {
+          if (env.REMY_READER?.trim().toLowerCase() === 'off') return undefined;
+          await prepareReader();
+          return readerSetup?.reader;
+        },
+        mode: () => (env.REMY_READER?.trim().toLowerCase() === 'always' ? 'always' : 'auto'),
+      }),
       askUser,
       finish,
     ]);
@@ -1065,7 +1119,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     // Probes can be slow, so the block is built once per process, at the first message.
     const capabilities = onceCapabilities(() =>
       capabilitiesBlock({
-        facts: machineFacts(),
+        // Before the first search the Keychain has not been read, so the block does not guess a route.
+        facts: machineFacts(!searchPrepared),
+        searchKnown: Boolean(searchPrepared),
         helpers: helpersOn,
         skills: skills().list().length,
         trust: loadPrefs(home).trust ?? 'ask',
@@ -1090,23 +1146,36 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           capabilities: capabilities(),
         }),
     });
-    const plan = searchPlan(file);
-    if (!plan.off) {
-      const { provider } = routedSearch(plan, (route) =>
-        route === 'browser'
-          ? browserSearch(browserFor(file))
-          : route === 'vm'
-            ? vmSearch(vmConnection, fetch, () =>
-                startVmSearch().then(
-                  () => true,
-                  () => false,
-                ),
-              )
-            : makeService(route, searchEnv),
-      );
+    // web_search exists unless search is switched off; its keys and route are worked out at the first call.
+    const searchOverride = (env.REMY_SEARCH ?? file.search)?.trim().toLowerCase();
+    if (searchOverride !== 'off') {
+      let routed: { plan: ReturnType<typeof searchPlan>; provider: SearchProvider } | undefined;
+      const provider: SearchProvider = {
+        async search(query, count) {
+          await prepareSearch();
+          const plan = searchPlan(file);
+          if (routed?.plan !== plan)
+            routed = {
+              plan,
+              provider: routedSearch(plan, (route) =>
+                route === 'browser'
+                  ? browserSearch(browserFor(file))
+                  : route === 'vm'
+                    ? vmSearch(vmConnection, fetch, () =>
+                        startVmSearch().then(
+                          () => true,
+                          () => false,
+                        ),
+                      )
+                    : makeService(route, searchEnv),
+              ).provider,
+            };
+          return routed.provider.search(query, count);
+        },
+      };
       tools.add(
         createWebSearch(provider, {
-          timeoutMs: plan.order.some((r) => r === 'vm') ? VM_TIMEOUT_MS : 45_000,
+          timeoutMs: existsSync(vmFile()) ? VM_TIMEOUT_MS : 45_000,
         }),
       );
     }
@@ -1797,7 +1866,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   try {
     if (chatMode) return await chatFlow();
-    if (command && !SEARCHLESS.has(command)) await prepareSearch();
+    // Keys in the Keychain are read here only for the commands that show search status.
+    if (command === 'search') await Promise.all([prepareSearch(), prepareReader()]);
+    else if (command === 'doctor') await prepareSearch();
     switch (command) {
       case 'search':
         return await searchCommand({
@@ -1808,6 +1879,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out: deps.out,
           plan: searchPlan(cfg()),
           sources: searchSources as Record<KeyRoute, KeySource>,
+          extra: [...(readerSetup?.lines ?? []), '', ...browserKeyLines],
           readStdin: deps.readStdin,
           askSecret: deps.askSecret,
         });
@@ -2440,6 +2512,81 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               }),
               createSkillsMount({ skills: skills(), ...(deps.fetch && { fetch: deps.fetch }) }),
               createBrowserMount({ browser: () => browser, redact }),
+              createSearchMount({
+                prefs: webPrefs,
+                redact,
+                searchStatus: async (): Promise<SearchStatusView> => {
+                  const f = cfg();
+                  const [keys, rd, bs] = await Promise.all([
+                    resolveSearchKeys(env, keyOpts),
+                    resolveReader(env, keyOpts),
+                    remoteBrowserStatus(env, keyOpts),
+                  ]);
+                  for (const k of [...keys.found, ...rd.found, ...bs.found])
+                    addSecret(k.name, k.value);
+                  const plan = planFor(f, keys.env);
+                  const reader = (id: 'firecrawl' | 'cloudflare') =>
+                    id === 'firecrawl'
+                      ? rd.sources.firecrawl
+                      : rd.sources.cloudflare !== 'none' &&
+                          rd.sources['cloudflare-account'] !== 'none'
+                        ? rd.sources.cloudflare
+                        : 'none';
+                  return {
+                    chosen: plan.chosen ?? null,
+                    ...(plan.why && { why: plan.why }),
+                    ...(plan.step && { step: plan.step }),
+                    order: plan.order,
+                    override: plan.override ? (env.REMY_SEARCH ?? f.search ?? null) : null,
+                    services: [
+                      ...(Object.keys(SERVICES) as KeyRoute[]).map((id) => ({
+                        id,
+                        label: SERVICES[id].label,
+                        key: keys.sources[id],
+                        kind: 'search' as const,
+                      })),
+                      {
+                        id: 'firecrawl',
+                        label: 'Firecrawl',
+                        key: reader('firecrawl'),
+                        kind: 'reader' as const,
+                        note: 'Reads pages Remy cannot read directly.',
+                      },
+                      {
+                        id: 'cloudflare',
+                        label: 'Cloudflare Browser Rendering',
+                        key: reader('cloudflare'),
+                        kind: 'reader' as const,
+                        note: 'Reads pages Remy cannot read directly. Needs an account id and a token.',
+                      },
+                      {
+                        id: 'steel',
+                        label: 'Steel',
+                        key: bs.sources.steel,
+                        kind: 'browser' as const,
+                        note: 'A cloud browser, used when REMY_BROWSER=steel.',
+                      },
+                      {
+                        id: 'browserbase',
+                        label: 'Browserbase',
+                        key:
+                          bs.sources['browserbase-project'] === 'none'
+                            ? 'none'
+                            : bs.sources.browserbase,
+                        kind: 'browser' as const,
+                        note: 'A cloud browser, used when REMY_BROWSER=browserbase. Needs a project id.',
+                      },
+                    ],
+                  };
+                },
+                testSearch: async (id) => {
+                  if (!Object.hasOwn(SERVICES, id))
+                    throw new Error('That is not a search service.');
+                  const keys = await resolveSearchKeys(env, keyOpts);
+                  for (const k of keys.found) addSecret(k.name, k.value);
+                  return makeService(id as KeyRoute, keys.env).search(TEST_QUERY, 3);
+                },
+              }),
               createVoiceMount({
                 key: fishKey,
                 voiceId: () => webPrefs.get().voice.id,

@@ -21,5 +21,7 @@ export default defineConfig({
     // apps/web has its own config (jsdom, React) and runs through `pnpm --filter @remy/web test`.
     exclude: ['apps/web/**', '**/node_modules/**'],
     passWithNoTests: true,
+    // Tests never read the developer's real Keychain; tests of that path inject their own exec.
+    env: { REMY_KEYCHAIN: 'off' },
   },
 });

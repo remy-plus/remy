@@ -11,6 +11,8 @@ export interface Facts {
   daemon: boolean;
   schedules: number;
   search: SearchPlan;
+  /** REMY_BROWSER picked a cloud browser: its notice, or why it cannot be used. */
+  remoteBrowser?: { ok: boolean; detail: string };
   /** Problems found in the helper roles files, one line each. */
   helperProblems?: string[];
   /** Embeddings for recall; absent where the check does not apply. */
@@ -43,6 +45,7 @@ export interface Probes {
   schedules: () => number;
   /** The search route plan, already worked out from the keys and, only when needed, Docker. */
   search: SearchPlan;
+  remoteBrowser?: () => { ok: boolean; detail: string } | undefined;
   helperProblems?: () => string[];
   embeddings?: () => NonNullable<Facts['embeddings']>;
   service?: () => ServiceInfo | undefined;
@@ -51,6 +54,7 @@ export interface Probes {
 /** Facts for the checks. */
 export function gatherFacts(p: Probes): Facts {
   const svc = p.service?.();
+  const remote = p.remoteBrowser?.();
   return {
     node: p.node,
     ...(p.model !== undefined && { model: p.model }),
@@ -59,6 +63,7 @@ export function gatherFacts(p: Probes): Facts {
     daemon: (p.platform === 'darwin' || p.service !== undefined) && p.daemonOn(),
     schedules: p.schedules(),
     search: p.search,
+    ...(remote && { remoteBrowser: remote }),
     ...(p.helperProblems && { helperProblems: p.helperProblems() }),
     ...(p.embeddings && { embeddings: p.embeddings() }),
     ...(svc && { service: svc }),
@@ -137,14 +142,21 @@ export function runChecks(f: Facts): Check[] {
     f.model
       ? { name: 'Model', status: 'ok', detail: f.model }
       : { name: 'Model', status: 'problem', detail: 'none connected', fix: 'Run remy login.' },
-    f.browser
-      ? { name: 'Browser', status: 'ok', detail: 'Chrome, Edge or Chromium found' }
-      : {
+    f.remoteBrowser
+      ? {
           name: 'Browser',
-          status: 'warning',
-          detail: 'none found',
-          fix: 'Install Chrome, or run remy browser install.',
-        },
+          status: f.remoteBrowser.ok ? 'ok' : 'problem',
+          detail: f.remoteBrowser.ok ? f.remoteBrowser.detail : 'cloud browser not usable',
+          ...(!f.remoteBrowser.ok && { fix: f.remoteBrowser.detail }),
+        }
+      : f.browser
+        ? { name: 'Browser', status: 'ok', detail: 'Chrome, Edge or Chromium found' }
+        : {
+            name: 'Browser',
+            status: 'warning',
+            detail: 'none found',
+            fix: 'Install Chrome, or run remy browser install.',
+          },
     search(),
     f.schedules > 0 && !f.daemon
       ? {

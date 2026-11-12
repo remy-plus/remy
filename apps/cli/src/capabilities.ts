@@ -11,6 +11,8 @@ export interface CapabilityInput {
   facts: Facts;
   helpers: boolean;
   skills: number;
+  /** False before the Keychain has been read for search keys: the block then names no route. */
+  searchKnown?: boolean;
   trust?: TrustLevel;
 }
 
@@ -23,7 +25,9 @@ export function capabilitiesBlock(i: CapabilityInput): string {
   const checks = new Map(runChecks(i.facts).map((c) => [c.name, c]));
   const lines: string[] = ['Capabilities on this machine (from Remy):'];
   const search = checks.get('Search');
-  if (search)
+  if (i.searchKnown === false)
+    lines.push('- Web search: use the web_search tool; it says what to set up if no route works.');
+  else if (search)
     lines.push(
       search.status === 'ok'
         ? `- Web search: ${search.detail}.`
