@@ -69,6 +69,35 @@ describe('checkWorkspace', () => {
     }
   });
 
+  it('refuses keys, system settings and anything outside home', () => {
+    for (const d of ['.ssh', '.aws', '.gnupg', '.config', '.kube', '.password-store', 'Library']) {
+      mkdirSync(join(userHome, d, 'sub'), { recursive: true });
+      for (const p of [join(userHome, d), join(userHome, d, 'sub')]) {
+        const e = refusal(p);
+        expect(e.status, p).toBe(400);
+        expect(e.message, p).toMatch(/keys or system settings/);
+      }
+    }
+    mkdirSync(join(userHome, 'Library', 'Keychains'), { recursive: true });
+    expect(refusal('~/LIBRARY/Keychains').message).toMatch(
+      /keys or system settings|does not exist/,
+    );
+    mkdirSync(join(userHome, '.local', 'share', 'keyrings'), { recursive: true });
+    expect(refusal(join(userHome, '.local', 'share', 'keyrings')).message).toMatch(/keys or/);
+    expect(refusal(join(base)).message).toMatch(/own data|inside your home/);
+    expect(refusal('/etc').message).toMatch(/inside your home folder/);
+    const link = join(userHome, 'sneak');
+    symlinkSync(join(userHome, '.ssh'), link);
+    expect(refusal(link).message).toMatch(/keys or system settings/);
+  });
+
+  it('accepts ordinary folders under home', () => {
+    mkdirSync(join(userHome, 'Documents', 'x'), { recursive: true });
+    mkdirSync(join(userHome, 'Projects', 'x'), { recursive: true });
+    expect(checkWorkspace('~/Documents/x', home, userHome)).toBe(join(userHome, 'Documents', 'x'));
+    expect(checkWorkspace('~/Projects/x', home, userHome)).toBe(join(userHome, 'Projects', 'x'));
+  });
+
   it('refuses a folder inside Remy data, and a link into it', () => {
     mkdirSync(join(home, 'workspaces', 't1'), { recursive: true });
     expect(refusal(join(home, 'workspaces', 't1')).message).toMatch(/own data/);

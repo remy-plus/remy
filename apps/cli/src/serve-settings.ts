@@ -151,6 +151,9 @@ const real = (p: string): string | undefined => {
   }
 };
 
+const SENSITIVE_FOLDER =
+  'That folder holds keys or system settings. Pick a folder of your own work, such as one in Documents.';
+
 /**
  * Checks a folder the person typed and returns the real path to store. Throws an HttpError 400
  * with a plain sentence when the folder is not one Remy should be given: it must be an absolute
@@ -186,6 +189,12 @@ export function checkWorkspace(input: string, home: string, userHome: string = h
       400,
       "That folder holds Remy's own data and keys. Pick a different folder, such as one in Documents.",
     );
+  const fold = (x: string) => (process.platform === 'darwin' ? x.toLowerCase() : x);
+  if (!inside(fold(hereHome), fold(path)))
+    throw new HttpError(400, 'Pick a folder inside your home folder, such as one in Documents.');
+  const top = fold(relative(hereHome, path)).split(sep)[0] ?? '';
+  const sensitive = top.startsWith('.') || top === 'library';
+  if (sensitive) throw new HttpError(400, SENSITIVE_FOLDER);
   return path;
 }
 
