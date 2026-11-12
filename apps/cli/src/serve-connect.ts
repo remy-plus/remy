@@ -21,6 +21,7 @@
 // no switches, and a change applies the next time Remy starts, like every other connection change.
 import { lookup } from 'node:dns/promises';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { dirname } from 'node:path';
 import { isStdio, type McpServerConfig } from '@remy/mcp';
 import { type Exec, isPrivateAddress, type SshConfig, sshComputer } from '@remy/tools';
@@ -109,7 +110,6 @@ const urlBody = z
   .object({
     url: z.string().min(1).max(2000),
     name: z.string().min(1).max(40),
-    allowPrivate: z.boolean().optional(),
   })
   .strict();
 const machineBody = z
@@ -122,7 +122,27 @@ const machineBody = z
   .strict();
 
 /** The same rule `sshComputer` applies: no leading "-", no spaces, letters digits . _ - only. */
+const THIS_COMPUTER =
+  'That is this computer. Remy already works here; a machine is another computer.';
+
+/** True for a host that points back at the computer Remy runs on. */
+export function isThisComputer(host: string): boolean {
+  const h = host
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '');
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  const own = hostname().toLowerCase();
+  if (h === own || h === own.replace(/\.local$/, '') || `${h}.local` === own) return true;
+  if (/^(0x[\da-f]+|\d+)$/.test(h)) return true; // a single-number address such as 2130706433
+  const v4 = h.replace(/^::ffff:/, '');
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(v4)) return v4.startsWith('127.') || v4.startsWith('0.');
+  return /^(::1?|0:0:0:0:0:0:0:[01])$/.test(h);
+}
+
 function checkedMachine(m: z.infer<typeof machineBody>, connectTimeoutSec?: number, exec?: Exec) {
+  if (isThisComputer(m.host)) throw new HttpFail(400, THIS_COMPUTER);
   const cfg: SshConfig = {
     name: m.name,
     host: m.host,
@@ -300,7 +320,7 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
         400,
         'Give a catalogId and level, or a name and an https address. Anything else is added in the terminal with remy connect.',
       );
-    const { url: text, name, allowPrivate } = parsed.data;
+    const { url: text, name } = parsed.data;
     if (!SERVER_NAME.test(name))
       throw new HttpFail(
         400,
@@ -318,12 +338,12 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
         400,
         'Leave passwords, keys and other extras out of the address. A server that needs a key is added in the terminal with remy connect.',
       );
-    if (allowPrivate !== true) {
+    {
       const host = url.hostname.replace(/^\[|\]$/g, '');
       const refuse = () =>
         new HttpFail(
           400,
-          'That address is on a private network or this computer. Confirm it is yours to add it anyway.',
+          'That address is on a private network or this computer. Add it in the terminal with remy connect add.',
         );
       if (looksPrivateName(host)) throw refuse();
       // A name is checked by what it points to now. A later change of address is not caught here.

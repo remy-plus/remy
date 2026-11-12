@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import type { McpServerConfig } from '@remy/mcp';
 import type { Exec, SshConfig } from '@remy/tools';
@@ -308,17 +309,13 @@ describe('adding by address and the stdio refusal', () => {
     expect((await add('a b', 'https://example.com/mcp')).status).toBe(400);
   });
 
-  it('refuses private addresses unless the person confirms', async () => {
+  it('refuses private addresses and does not accept allowPrivate', async () => {
     const { kit } = await start({
       resolve: async (h) => (h === 'sneaky.example.com' ? ['10.0.0.9'] : ['93.184.216.34']),
     });
-    const add = (url: string, allowPrivate?: boolean) =>
+    const add = (url: string, extra: object = {}) =>
       kit.api('/api/connections', {
-        body: {
-          name: `n${Math.random().toString(36).slice(2, 8)}`,
-          url,
-          ...(allowPrivate && { allowPrivate }),
-        },
+        body: { name: `n${Math.random().toString(36).slice(2, 8)}`, url, ...extra },
       });
     for (const url of [
       'https://127.0.0.1/mcp',
@@ -331,7 +328,9 @@ describe('adding by address and the stdio refusal', () => {
       'https://sneaky.example.com/mcp',
     ])
       expect((await add(url)).status, url).toBe(400);
-    expect((await add('https://192.168.1.4/mcp', true)).status).toBe(201);
+    expect((await add('https://192.168.1.4/mcp', { allowPrivate: true })).status).toBe(400);
+    const r = await add('https://192.168.1.4/mcp');
+    expect(r.json.error).toContain('remy connect add');
   });
 
   it('keeps the person-facing message plain for an address that does not resolve', async () => {
@@ -378,6 +377,31 @@ describe('DELETE /api/connections/:id', () => {
 });
 
 describe('machines', () => {
+  it('refuses this computer, in every spelling', async () => {
+    const { kit } = await start();
+    for (const host of [
+      'localhost',
+      'LOCALHOST',
+      'a.localhost',
+      '127.0.0.1',
+      '127.1.2.3',
+      '0.0.0.0',
+      '::1',
+      '[::1]',
+      '::',
+      '::ffff:127.0.0.1',
+      '2130706433',
+      hostname(),
+    ]) {
+      const body = { name: 'me', host, user: 'remy' };
+      for (const path of ['/api/machines', '/api/machines/test']) {
+        const r = await kit.api(path, { body });
+        expect(r.status, host).toBe(400);
+        expect(r.json.error, host).toMatch(/this computer/);
+      }
+    }
+  });
+
   const m = { name: 'home-server', host: 'home.example.com', user: 'remy' };
 
   it('tests with ssh through sshComputer: batch mode, strict host keys, 10 s, "true"', async () => {
