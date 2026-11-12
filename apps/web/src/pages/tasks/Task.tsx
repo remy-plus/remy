@@ -806,7 +806,7 @@ function TaskScreen({ id }: { id: string }) {
               ? 'Type your answer'
               : view.final
                 ? 'Ask a follow-up'
-                : 'Tell Remy something while it works'
+                : 'Add a note while it works'
           }
           onSend={async (t) => {
             if (view.final) return start(t);
