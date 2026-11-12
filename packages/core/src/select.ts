@@ -92,7 +92,7 @@ const selectableTools = (tools: ToolRegistry) => tools.list().filter((t) => t.se
 
 /** Added to the system prompt when a step is offered a subset of the connected tools. */
 export const FIND_TOOLS_HINT =
-  'Only some of the connected tools are listed. If none of them fits the task, call find_tools with a few words about what you want to do; the tools it finds become available on your next step.';
+  'Only some of the connected tools are listed here; the rest are hidden until you search. Before you tell the user that you cannot do something or have no tool for it, call find_tools with a few words about what you want to do (describe the action, not the app or file names); the tools it finds become available on your next step.';
 
 /** True when selection is active: more selectable tools than the threshold. */
 export const needsSelection = (tools: ToolRegistry): boolean =>
@@ -151,7 +151,7 @@ export function createFindTools(tools: ToolRegistry): Tool {
   return defineTool({
     name: FIND_TOOLS,
     description:
-      'Search the connected tools (from connected apps such as GitHub, Slack, Notion, calendars) by what you want to do. Returns matching tool names with a short description; the tools become available on your next step.',
+      'Search the connected tools (from connected apps such as GitHub, Slack, Notion, calendars) by what you want to do. Returns matching tool names with a short description; the tools become available on your next step. Most connected tools are not listed until you search, so call this before saying that no tool can do something.',
     args: z.object({ query: z.string().min(1).describe('What you want to do, in a few words') }),
     risk: 'read',
     effect: 'none',

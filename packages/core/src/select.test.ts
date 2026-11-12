@@ -5,6 +5,7 @@ import { builtins, fake, sixtyTools, stateFor } from './select.fixtures.ts';
 import {
   bm25,
   createFindTools,
+  FIND_TOOLS_HINT,
   needsSelection,
   rank,
   SELECT_THRESHOLD,
@@ -134,6 +135,11 @@ describe('find_tools', () => {
 
   it('is a trusted read tool with no effect', () => {
     expect([find.risk, find.effect, find.outputTrust]).toEqual(['read', 'none', 'trusted']);
+  });
+
+  it('is told to be tried before the model says a tool is missing', () => {
+    expect(find.description).toContain('before saying that no tool');
+    expect(FIND_TOOLS_HINT).toContain('Before you tell the user that you cannot');
   });
 
   it('lists names with one-line descriptions, only for selectable tools', async () => {
