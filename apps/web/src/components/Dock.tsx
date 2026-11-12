@@ -24,15 +24,16 @@ export const DOCK_ITEMS: DockItem[] = [
     id: 'activity',
     label: 'Activity',
     href: '#/activity',
-    match: (p) =>
-      p === '/activity' ||
-      p === '/tasks' ||
-      p.startsWith('/tasks/') ||
-      p === '/review' ||
-      p.startsWith('/schedules'),
+    match: (p) => p === '/activity' || p === '/tasks' || p.startsWith('/tasks/') || p === '/review',
   },
   { id: 'browser', label: 'Browser', href: '#/browser', match: (p) => p === '/browser' },
-  { id: 'brain', label: 'Brain', href: '#/brain', match: (p) => p === '/brain' || p === '/skills' },
+  {
+    id: 'brain',
+    label: 'Brain',
+    href: '#/brain',
+    // Scheduled jobs live under Brain, next to Notes and Skills (see BrainTabs).
+    match: (p) => p === '/brain' || p === '/skills' || p === '/schedules' || p === '/schedules/new',
+  },
   {
     id: 'connections',
     label: 'Connections',

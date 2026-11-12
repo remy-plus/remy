@@ -57,6 +57,12 @@ const clip = (t: string, max: number) => {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 };
 
+/** A clipped prompt quoted in a sentence: a prompt that already ends with . ! ? or … gets no full stop. */
+const sentence = (t: string, max: number) => {
+  const line = clip(t, max);
+  return !line || /[.!?…]$/.test(line) ? line : `${line}.`;
+};
+
 const stamp = (iso: string) =>
   new Date(iso).toLocaleString('en-GB', {
     day: 'numeric',
@@ -91,7 +97,7 @@ export function createSchedulesMount(deps: SchedulesMountDeps): Mount {
     id: h.name,
     name: h.name,
     url: `POST http://127.0.0.1:${deps.webhookPort}/hook/${h.name}`,
-    detail: `Runs "${clip(h.prompt, 80)}". Payloads are treated as untrusted, and the run is marked as having read untrusted content. ${h.tokenHash ? 'It has its own token.' : 'It uses the shared token.'}`,
+    detail: `Runs "${sentence(h.prompt, 80)}" Payloads are treated as untrusted, and the run is marked as having read untrusted content. ${h.tokenHash ? 'It has its own token.' : 'It uses the shared token.'}`,
     enabled: hooks.enabled(),
   });
   const webhooks = () => hooks.list().map(hookItem);

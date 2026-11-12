@@ -84,8 +84,11 @@ function NewWebhook({
             ' Webhooks are off for now, so calls do nothing until you turn them on with the switch below.'}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <CopyCommand command={curlFor(made)} title={made.name} what="call" />
-          <button type="button" className={quiet} onClick={onClose}>
+          {/* CopyCommand takes no size, so its button is set to Done's height and padding here. */}
+          <span className="inline-flex [&>button]:min-h-10 [&>button]:px-4 [&>button]:text-[14px]">
+            <CopyCommand command={curlFor(made)} title={made.name} what="call" />
+          </span>
+          <button type="button" className={`${quiet} min-h-10`} onClick={onClose}>
             Done
           </button>
         </div>
@@ -317,19 +320,18 @@ export function Schedules() {
           <span className={`${mono} text-[12px] text-muted`}>{data.webhooksNote}</span>
         </div>
         {adding && <NewWebhook onCreated={refresh} onClose={() => setAdding(false)} />}
-        {data.webhooks.length === 0 ? (
+        {data.webhooks.length === 0 && !adding && (
           <div className={empty}>
             <p className="m-0 text-[15px]">No webhook yet.</p>
             <p className="mt-1 mb-4 max-w-[560px] text-[14px] leading-relaxed text-muted">
               A webhook lets an outside service start a job.
             </p>
-            {!adding && (
-              <button type="button" className={primary} onClick={() => setAdding(true)}>
-                New webhook
-              </button>
-            )}
+            <button type="button" className={primary} onClick={() => setAdding(true)}>
+              New webhook
+            </button>
           </div>
-        ) : (
+        )}
+        {data.webhooks.length > 0 && (
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {data.webhooks.map((w) => (
               <li key={w.id} className="rounded-[10px] border border-edge bg-surface p-4">

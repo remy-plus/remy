@@ -183,6 +183,33 @@ describe('webhook routes', () => {
     expect(hooks.enabled()).toBe(true);
   });
 
+  it('says what a hook runs with one full stop, never two', async () => {
+    const { kit, hooks } = await start();
+    hooks.add(
+      'deploys',
+      'Check the deploy result and tell me in one line if anything failed.',
+      NOW,
+    );
+    hooks.add('passed', 'Did the deploy pass?', NOW);
+    hooks.add('plain', 'Check it', NOW);
+    hooks.add('long', 'x'.repeat(100), NOW);
+    const details = Object.fromEntries(
+      (await kit.api('/api/webhooks')).json.webhooks.map((w: { id: string; detail: string }) => [
+        w.id,
+        w.detail,
+      ]),
+    );
+    const tail =
+      ' Payloads are treated as untrusted, and the run is marked as having read untrusted content. It uses the shared token.';
+    expect(details.deploys).toBe(
+      `Runs "Check the deploy result and tell me in one line if anything failed."${tail}`,
+    );
+    expect(details.passed).toBe(`Runs "Did the deploy pass?"${tail}`);
+    expect(details.plain).toBe(`Runs "Check it."${tail}`);
+    expect(details.long).toBe(`Runs "${'x'.repeat(79)}…"${tail}`);
+    expect(Object.values(details).join('\n')).not.toMatch(/[.!?]"\./);
+  });
+
   it('creates a hook, refuses a duplicate and a bad name, and never returns a token', async () => {
     const { kit, hooks } = await start();
     const made = await kit.api('/api/webhooks', {

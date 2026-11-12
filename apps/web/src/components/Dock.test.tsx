@@ -122,6 +122,25 @@ describe('Dock', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull());
   });
 
+  it.each(['/brain', '/skills', '/schedules', '/schedules/new'])(
+    'marks Brain, not Activity, on %s',
+    (path) => {
+      show(path);
+      expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBe('page');
+      expect(
+        screen.getByRole('link', { name: 'Activity' }).getAttribute('aria-current'),
+      ).toBeNull();
+    },
+  );
+
+  it('keeps the overnight review under Activity', () => {
+    show('/review');
+    expect(screen.getByRole('link', { name: 'Activity' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBeNull();
+  });
+
   it('closes the menu sheet on Escape', async () => {
     phone(true);
     show('/');

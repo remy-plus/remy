@@ -120,9 +120,8 @@ describe('Schedules', () => {
     expect(screen.getByRole('main')).toBeTruthy();
     expect(screen.getByRole('complementary')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: 'Schedules' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Activity' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Brain' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Activity' }).getAttribute('aria-current')).toBeNull();
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
     for (const s of screen.getAllByRole('switch'))
       expect(s.getAttribute('aria-label')).toBeTruthy();
@@ -177,6 +176,40 @@ describe('Webhooks', () => {
     expect(curl).not.toContain('POST POST');
     expect(screen.getByRole('button', { name: 'Copy the command to call deploys' })).toBeTruthy();
     expect(screen.getByText(/Webhooks are off for now/)).toBeTruthy();
+  });
+
+  it('hides the no-webhook note while the form and its success panel are up', async () => {
+    const base = createMockApi();
+    const api = apiWith({
+      // No webhook before or after the create, so the note shows unless it is hidden.
+      schedules: async () => ({ ...(await base.schedules()), webhooks: [] }),
+      addWebhook: async ({ name }) => ({
+        id: name,
+        name,
+        url: `POST http://127.0.0.1:7788/hook/${name}`,
+        detail: '',
+        enabled: false,
+      }),
+    });
+    open('#/schedules', api);
+    await screen.findByRole('region', { name: 'Webhooks' });
+    expect(screen.getByText('No webhook yet.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'New webhook' }));
+    const form = screen.getByRole('form', { name: 'New webhook' });
+    expect(screen.queryByText('No webhook yet.')).toBeNull();
+    expect(screen.queryByText('A webhook lets an outside service start a job.')).toBeNull();
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByText('No webhook yet.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'New webhook' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'deploys' } });
+    fireEvent.change(screen.getByLabelText('What should Remy do with each call?'), {
+      target: { value: 'Check it' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create the webhook' }));
+    expect(await screen.findByText('The webhook deploys is created.')).toBeTruthy();
+    expect(screen.queryByText('No webhook yet.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(await screen.findByText('No webhook yet.')).toBeTruthy();
   });
 
   it('asks before removing a webhook, and removes it on yes', async () => {

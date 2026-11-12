@@ -455,7 +455,7 @@ const WEBHOOKS: Webhook[] = [
     name: 'new-invoice',
     url: 'POST http://127.0.0.1:7788/hook/new-invoice',
     detail:
-      'Runs “check it against the bank export”. Payloads are treated as untrusted, and the run starts at trust level ask. Last call 2 days ago.',
+      'Runs “check it against the bank export.” Payloads are treated as untrusted, and the run starts at trust level ask. Last call 2 days ago.',
     enabled: true,
   },
 ];
@@ -682,11 +682,13 @@ export function createConnectMock(): Pick<
       if (!prompt.trim()) throw new ApiError(400, 'A hook needs a prompt.');
       if (webhooks.some((w) => w.name === name))
         throw new ApiError(409, `There is already a hook ${name}.`);
+      const text = prompt.trim();
+      const quoted = /[.!?]$/.test(text) ? text : `${text}.`;
       const hook: Webhook = {
         id: name,
         name,
         url: `POST http://127.0.0.1:7788/hook/${name}`,
-        detail: `Runs “${prompt.trim()}”. Payloads are treated as untrusted.`,
+        detail: `Runs “${quoted}” Payloads are treated as untrusted.`,
         enabled: webhooks.some((w) => w.enabled),
       };
       webhooks.push(hook);
