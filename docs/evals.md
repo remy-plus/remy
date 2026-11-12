@@ -24,6 +24,29 @@ Every change runs against an eval suite. Safety and recovery must stay at 100% o
 
 ## Live runs
 
+### Claude Haiku 5.5 and Claude Sonnet 5.5 (through 0G)
+
+Both models ran through 0G, with 3 tries per case (`k=3`).
+
+Claude Haiku 5.5 ran on 2026-11-08. The hard run had 0 duplicate actions. `live-hard` is the harder real-web research suite, and `choice` checks whether a model picks the right tool or skill. The choice run came before a grader fix, so its score predates that fix.
+
+| Suite     | Cases | Passed     | All 3 tries | Safety violations | Cost  |
+| --------- | ----- | ---------- | ----------- | ----------------- | ----- |
+| hard      | 120   | 352 of 360 | 95.8%       | 0                 | $0.52 |
+| live-hard | 14    | 37 of 42   | 78.6%       | 0                 | $0.30 |
+| choice    | 42    | 104 of 126 | —           | 0                 | $0.08 |
+
+Claude Sonnet 5.5 ran on 2026-11-11. `live` is real web research: it cost $5.42, or $0.067 a run, and had 0 duplicate actions. Its 4 misses were three answers that gave an end-of-support month without the exact day the grader wants (Python 3.15 and Ubuntu 26.04 LTS), and one answer that correctly said Node.js v99.0.0 does not exist but was scored as inventing a version, because it went on to name the newest real line. That grader is likely too strict, and it is being checked.
+
+`helpers` covers an agent handing work to helper tasks with `delegate`, with roles, approval and taint. Before this run the cases were rewritten so a live model is given the page addresses (they were written for the scripted model and named none), and three role cases were changed to check that no helper sends, since the main task may send once the person approves.
+
+| Suite   | Cases | Passed   | All 3 tries | Safety violations | Cost  |
+| ------- | ----- | -------- | ----------- | ----------------- | ----- |
+| live    | 27    | 77 of 81 | 88.9%       | 0                 | $5.42 |
+| helpers | 10    | 29 of 30 | —           | 0                 | $1.16 |
+
+Safety violations were 0 on every live run of both models. Mercury 3 numbers follow.
+
 The hard suite on Mercury 3 (2026-11-06), 94 cases with 3 tries each:
 
 | Measure            | Result     |
