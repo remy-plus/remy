@@ -104,6 +104,80 @@ describe('Settings', () => {
     expect(screen.getByText(/like reading and editing files/)).toBeTruthy();
   });
 
+  describe('folder Remy may use', () => {
+    const FOLDER = '/Users/you/Documents/Projects';
+    const withWorkspace = (info: unknown, sent: unknown[] = []): RemyApi => {
+      const base = createMockApi();
+      return {
+        ...base,
+        settings: async () => ({ ...(await base.settings()), workspace: info as never }),
+        updateSettings: async (p) => {
+          sent.push(p);
+        },
+      };
+    };
+
+    it('saves a typed path and says so', async () => {
+      const sent: unknown[] = [];
+      await open(
+        'trust',
+        'How much Remy does on its own',
+        withWorkspace({ path: null, source: 'task', saved: null }, sent),
+      );
+      expect(screen.getByText(/Leave empty to give each task its own empty folder/)).toBeTruthy();
+      const box = screen.getByRole('textbox', { name: 'Folder path' }) as HTMLInputElement;
+      expect(box.placeholder).toBe(FOLDER);
+      const save = screen.getByRole('button', { name: 'Save the folder' }) as HTMLButtonElement;
+      expect(save.disabled).toBe(true);
+      fireEvent.change(box, { target: { value: FOLDER } });
+      fireEvent.click(save);
+      expect(await screen.findByText('The folder is saved. New tasks use it.')).toBeTruthy();
+      expect(sent).toEqual([{ workspace: FOLDER }]);
+    });
+
+    it('clears a saved folder', async () => {
+      const sent: unknown[] = [];
+      await open(
+        'trust',
+        'How much Remy does on its own',
+        withWorkspace({ path: FOLDER, source: 'setting', saved: FOLDER }, sent),
+      );
+      const box = screen.getByRole('textbox', { name: 'Folder path' }) as HTMLInputElement;
+      expect(box.value).toBe(FOLDER);
+      fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+      expect(await screen.findByText(/The folder is cleared/)).toBeTruthy();
+      expect(sent).toEqual([{ workspace: null }]);
+    });
+
+    it('shows the server refusal in its own words', async () => {
+      const base = withWorkspace({ path: null, source: 'task', saved: null });
+      await open('trust', 'How much Remy does on its own', {
+        ...base,
+        updateSettings: () =>
+          Promise.reject(Object.assign(new Error('That folder does not exist.'), { status: 400 })),
+      });
+      fireEvent.change(screen.getByRole('textbox', { name: 'Folder path' }), {
+        target: { value: '/nope' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save the folder' }));
+      expect(await screen.findByText('That folder does not exist.')).toBeTruthy();
+    });
+
+    it('is read-only when the server was started with --workspace', async () => {
+      await open(
+        'trust',
+        'How much Remy does on its own',
+        withWorkspace({ path: '/flag/dir', source: 'flag', saved: null }),
+      );
+      const box = screen.getByRole('textbox', { name: 'Folder path' }) as HTMLInputElement;
+      expect(box.readOnly).toBe(true);
+      expect(box.value).toBe('/flag/dir');
+      expect(screen.getByText(/started with --workspace/)).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Save the folder' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
+    });
+  });
+
   it('toggles switches and stores them', async () => {
     await open('memory', 'Memory and privacy');
     const remember = screen.getByRole('switch', { name: 'Learn from corrections and routines' });

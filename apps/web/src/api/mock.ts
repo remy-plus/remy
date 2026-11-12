@@ -16,6 +16,7 @@ import type {
   TaskStatus,
   TaskView,
   WorkItem,
+  WorkspaceInfo,
 } from './types.ts';
 
 interface Seed {
@@ -619,6 +620,7 @@ export function createMockApi(): RemyApi {
   const meta = new Map(SEEDS.map((s) => [s.id, s]));
   let counter = 0;
   let notes = SETTINGS.notes;
+  let workspace: WorkspaceInfo = { path: null, source: 'task', saved: null };
   const get = (id: string) => {
     const v = tasks.get(id);
     if (!v) throw new Error('There is no such task.');
@@ -765,7 +767,7 @@ export function createMockApi(): RemyApi {
       };
     },
     async settings() {
-      return { ...SETTINGS, notes };
+      return { ...SETTINGS, notes, workspace };
     },
     async browserState() {
       return { open: true, url: MOCK_BROWSER.url, title: MOCK_BROWSER.title };
@@ -780,7 +782,12 @@ export function createMockApi(): RemyApi {
       if (token.trim().length < 8) throw new Error('That token was not accepted.');
       return { running: 4 };
     },
-    async updateSettings() {},
+    async updateSettings(patch) {
+      if (patch.workspace !== undefined) {
+        const path = patch.workspace;
+        workspace = { path, source: path ? 'setting' : 'task', saved: path };
+      }
+    },
     async deleteNotes(confirm) {
       if (confirm !== notes)
         throw new Error(`There are ${notes} notes, not ${confirm}. Nothing was deleted.`);

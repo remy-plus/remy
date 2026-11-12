@@ -13,6 +13,7 @@ import {
   Toggle,
   useOwnSave,
 } from './controls.tsx';
+import { FolderRow } from './folder.tsx';
 import type { SectionProps } from './sections.ts';
 
 const TRUST: Record<TrustLevel, { label: string; text: string }> = {
@@ -262,8 +263,13 @@ export function QuietRow() {
   );
 }
 
-export function Trust() {
-  return <TrustRow />;
+export function Trust({ data, reload }: SectionProps) {
+  return (
+    <>
+      <TrustRow />
+      <FolderRow data={data} reload={reload} />
+    </>
+  );
 }
 
 export function Budget(props: SectionProps) {
