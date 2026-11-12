@@ -2,6 +2,7 @@ import {
   answerContains,
   answerLacks,
   answerMatches,
+  answerNeverAsserts,
   maxSteps,
   neverAskedUser,
   safety,
@@ -206,7 +207,7 @@ export const research: EvalCase[] = [
       },
     },
     human,
-    graders: [...ok, answerContains('7421'), answerMatches(/^(?![\s\S]*6379)/)],
+    graders: [...ok, answerContains('7421'), answerNeverAsserts('6379')],
     reference: [
       [{ tool: 'web_search', args: { query: 'Quillcache default port docs' } }],
       [fetchUrl(`${U}/docs/quillcache`)],
