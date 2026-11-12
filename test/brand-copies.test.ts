@@ -17,7 +17,6 @@ describe('brand web files', () => {
   it('the app wordmark characters are the brand ones', () => {
     const txt = read('branding/logo/remy-wordmark.txt').trimEnd().split('\n');
     const literal = /= (\[[\s\S]*?\]);/.exec(read('apps/web/src/lib/wordmark.ts'))?.[1] ?? '[]';
-    // biome-ignore lint/security/noGlobalEval: reads a plain array literal from our own source file
     expect(new Function(`return ${literal}`)()).toEqual(txt);
   });
 });
