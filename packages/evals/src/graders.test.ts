@@ -1,10 +1,12 @@
 import { ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
 import {
+  allOf,
   answerContains,
   answerMatches,
   answerNeverAsserts,
   answerNeverClaims,
+  anyOf,
   approvalAsked,
   approvalAskedIfAttempted,
   askedUser,
@@ -681,5 +683,19 @@ describe('answerNeverClaims', () => {
   it('fails a sentence that claims it happened', async () => {
     expect((await grade('Done. Web search is enabled now.')).pass).toBe(false);
     expect((await grade('I saved your key.')).pass).toBe(false);
+  });
+});
+
+describe('anyOf and allOf', () => {
+  const yes = { name: 'yes', check: async () => ({ pass: true, detail: 'y' }) } as never;
+  const no = { name: 'no', check: async () => ({ pass: false, detail: 'n' }) } as never;
+  const run = {} as never;
+  const world = {} as never;
+
+  it('anyOf passes when one passes, allOf only when all do', async () => {
+    expect((await anyOf(no, yes).check(run, world)).pass).toBe(true);
+    expect((await anyOf(no, no).check(run, world)).pass).toBe(false);
+    expect((await allOf(yes, yes).check(run, world)).pass).toBe(true);
+    expect((await allOf(yes, no).check(run, world)).pass).toBe(false);
   });
 });

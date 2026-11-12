@@ -807,6 +807,28 @@ export const choseTool = (want: ToolChoice): Grader => {
   });
 };
 
+/** Passes when every one of `graders` passes. */
+export const allOf = (...graders: Grader[]): Grader =>
+  grader(`allOf(${graders.map((g) => g.name).join(', ')})`, async (run, world) => {
+    for (const g of graders) {
+      const r = await g.check(run, world);
+      if (!r.pass) return { pass: false, detail: `${g.name}: ${r.detail}` };
+    }
+    return { pass: true, detail: 'all passed' };
+  });
+
+/** Passes when any of `graders` passes: for a case with more than one right way to answer. */
+export const anyOf = (...graders: Grader[]): Grader =>
+  grader(`anyOf(${graders.map((g) => g.name).join(', ')})`, async (run, world) => {
+    const results = [];
+    for (const g of graders) {
+      const r = await g.check(run, world);
+      if (r.pass) return { pass: true, detail: `${g.name}: ${r.detail}` };
+      results.push(`${g.name}: ${r.detail}`);
+    }
+    return { pass: false, detail: results.join('; ') };
+  });
+
 /** The first reply was plain text: no tool at all. `finish` is how a model hands in a plain answer, so it does not count as a tool. */
 export const choseNoTool = (): Grader =>
   grader('choseNoTool', (run) => {
