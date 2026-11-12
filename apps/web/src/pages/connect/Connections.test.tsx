@@ -75,9 +75,54 @@ describe('Connections', () => {
     expect(screen.queryByRole('switch', { name: 'Read mail' })).toBeNull();
   });
 
+  it('asks before disconnecting, and Keep it calls nothing', async () => {
+    let calls = 0;
+    open('#/connections', apiWith({ disconnectApp: async () => void calls++ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Disconnect Gmail' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Disconnect Gmail?' });
+    expect(
+      within(dialog).getByText(
+        'Remy will stop using Gmail right away. You can connect it again later.',
+      ),
+    ).toBeTruthy();
+    expect(calls).toBe(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep it' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Disconnect Gmail?' })).toBeNull(),
+    );
+    expect(calls).toBe(0);
+    expect(screen.queryByText('Gmail is disconnected.')).toBeNull();
+  });
+
+  it('asks before removing a machine, then removes it by name', async () => {
+    const removed: string[] = [];
+    open(
+      '#/connections',
+      apiWith({
+        removeMachine: async (n) => void removed.push(n),
+      }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage home-server' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove this machine' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove home-server?' });
+    expect(
+      within(dialog).getByText(
+        'Remy will stop using this machine. Its settings on that machine are not touched.',
+      ),
+    ).toBeTruthy();
+    expect(removed).toEqual([]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep it' }));
+    expect(removed).toEqual([]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove this machine' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+    expect(await screen.findByText('home-server is removed.')).toBeTruthy();
+    expect(removed).toEqual(['home-server']);
+  });
+
   it('disconnects and signs in, saying so beside the app it changed', async () => {
     open();
     fireEvent.click(await screen.findByRole('button', { name: 'Disconnect Gmail' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
     expect(await screen.findByText('Gmail is disconnected.')).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Connect Gmail' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sign in to Slack' }));

@@ -327,6 +327,7 @@ export interface RemyApi {
   connections(): Promise<ConnectionsData>;
   setPermission(appId: string, permissionId: string, on: boolean): Promise<void>;
   disconnectApp(appId: string): Promise<void>;
+  removeMachine(name: string): Promise<void>;
   signInApp(appId: string): Promise<void>;
   appCatalog(): Promise<CatalogApp[]>;
   /** What the official registry has for these words. Read-only: it adds nothing. */

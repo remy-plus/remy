@@ -179,6 +179,7 @@ export function createHttpApi(opts: {
       json<RegistrySearch>(`/api/connections/search?q=${encodeURIComponent(query)}`),
     // The key is never sent: the server uses the keys of the account Remy runs under.
     testMachine: (m) => json<MachineTest>('/api/machines/test', machineRequest(m)),
+    removeMachine: (name) => send('DELETE', `/api/machines/${encodeURIComponent(name)}`),
     addMachine: (m) => post('/api/machines', machineBody(m)),
     skills: () => json<SkillsData>('/api/skills'),
     setSkillEnabled: (name, enabled) =>

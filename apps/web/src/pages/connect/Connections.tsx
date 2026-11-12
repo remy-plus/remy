@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ConnectedApp, Machine } from '../../api/index.tsx';
+import { Confirm } from '../../components/Confirm.tsx';
 import { describeError } from '../../lib/errors.ts';
 import {
   AppLogo,
@@ -18,7 +19,7 @@ import {
 type Selected = { kind: 'app'; id: string } | { kind: 'machine'; name: string };
 
 /** A change, said beside the thing it changed: the row that acted, or the panel that did. */
-type Said = { text: string; at: 'row' | 'panel'; id: string };
+type Said = { text: string; at: 'row' | 'panel' | 'machines'; id: string };
 
 const STATUS: Record<ConnectedApp['status'], string> = {
   connected: 'Connected',
@@ -34,6 +35,7 @@ export function Connections() {
   const { api, data, setData, error, reload } = useLoad((a) => a.connections());
   const [selected, setSelected] = useState<Selected | null>(null);
   const [said, setSaid] = useState<Said | null>(null);
+  const [asking, setAsking] = useState<Selected | null>(null);
   if (error) return <Unavailable message={error} onRetry={reload} />;
   if (!data) return <Loading label="Loading your connections" />;
 
@@ -55,6 +57,11 @@ export function Connections() {
   };
   const saidAt = (at: Said['at'], id: string | undefined) =>
     said && said.at === at && said.id === id ? said.text : undefined;
+  const askedApp = asking?.kind === 'app' ? data.apps.find((a) => a.id === asking.id) : undefined;
+  const askTitle =
+    asking?.kind === 'machine'
+      ? `Remove ${asking.name}?`
+      : `Disconnect ${askedApp?.name ?? 'this app'}?`;
   const connected = data.apps.filter((a) => a.status === 'connected').length;
 
   return (
@@ -77,20 +84,41 @@ export function Connections() {
               app.id,
             )
           }
-          onDisconnect={() => {
-            if (!app) return;
-            // Keep the panel on the app that changed, so the sentence lands where the button was.
-            setSelected({ kind: 'app', id: app.id });
-            void act(
-              () => api.disconnectApp(app.id),
-              `${app.name} is disconnected.`,
-              'panel',
-              app.id,
-            );
-          }}
+          onDisconnect={() => app && setAsking({ kind: 'app', id: app.id })}
+          onRemove={() => machine && setAsking({ kind: 'machine', name: machine.name })}
         />
       }
     >
+      <Confirm
+        open={asking !== null}
+        title={askTitle}
+        confirmLabel={asking?.kind === 'machine' ? 'Remove' : 'Disconnect'}
+        cancelLabel="Keep it"
+        onConfirm={async () => {
+          if (!asking) return;
+          if (asking.kind === 'app' && askedApp) {
+            // Keep the panel on the app that changed, so the sentence lands where the button was.
+            setSelected({ kind: 'app', id: askedApp.id });
+            await act(
+              () => api.disconnectApp(askedApp.id),
+              `${askedApp.name} is disconnected.`,
+              'panel',
+              askedApp.id,
+            );
+          } else if (asking.kind === 'machine') {
+            const name = asking.name;
+            setSelected(null);
+            await act(() => api.removeMachine(name), `${name} is removed.`, 'machines', '');
+          }
+          setAsking(null);
+        }}
+        onCancel={() => setAsking(null)}
+      >
+        {asking?.kind === 'machine'
+          ? 'Remy will stop using this machine. Its settings on that machine are not touched.'
+          : `Remy will stop using ${askedApp?.name ?? 'this app'} right away. You can connect it again later.`}
+      </Confirm>
+
       <section aria-labelledby="apps-h" className="mb-10">
         <div className="mb-3 flex items-baseline justify-between gap-4">
           <Eyebrow id="apps-h">Apps</Eyebrow>
@@ -139,6 +167,11 @@ export function Connections() {
         <p className="mt-0 mb-3 max-w-[560px] text-[14px] leading-relaxed text-muted">
           A machine is a computer Remy can run commands on, with your key. It asks before each one.
         </p>
+        {saidAt('machines', '') && (
+          <p role="status" className="mt-0 mb-3 text-[13px] text-text">
+            {saidAt('machines', '')}
+          </p>
+        )}
         {data.machines.length === 0 ? (
           <div className={empty}>
             <p className="m-0 text-[15px]">No machine is added yet.</p>
@@ -259,6 +292,7 @@ function Panel({
   said,
   onToggle,
   onDisconnect,
+  onRemove,
 }: {
   app: ConnectedApp | undefined;
   machine: Machine | undefined;
@@ -266,6 +300,7 @@ function Panel({
   said: string | undefined;
   onToggle: (permissionId: string, on: boolean) => void;
   onDisconnect: () => void;
+  onRemove: () => void;
 }) {
   if (machine) {
     return (
@@ -276,6 +311,11 @@ function Panel({
           Every command asks you first and is shown in full. Anything the machine sends back is read
           as information, never as instructions.
         </p>
+        <div className="mt-4">
+          <button type="button" className={quiet} onClick={onRemove}>
+            Remove this machine
+          </button>
+        </div>
         <div className="mt-3">
           <Notice>{said}</Notice>
         </div>

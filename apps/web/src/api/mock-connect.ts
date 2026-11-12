@@ -523,6 +523,7 @@ export function createConnectMock(): Pick<
   | 'connectApp'
   | 'testMachine'
   | 'addMachine'
+  | 'removeMachine'
   | 'skills'
   | 'setSkillEnabled'
   | 'runSkill'
@@ -606,6 +607,11 @@ export function createConnectMock(): Pick<
           'Host key checked and saved.',
         ],
       };
+    },
+    async removeMachine(name) {
+      const i = machines.findIndex((m) => m.name === name);
+      if (i === -1) throw new Error('There is no such machine.');
+      machines.splice(i, 1);
     },
     async addMachine(input) {
       machines.push({

@@ -194,6 +194,8 @@ describe('http adapter', () => {
         body: { name: 'home', host: 'h.example.com', user: 'remy', port: 22 },
       });
       expect(JSON.stringify(last().body)).not.toContain('/k/id');
+      await api.removeMachine('home server/1');
+      expect(last()).toMatchObject({ url: '/api/machines/home%20server%2F1', method: 'DELETE' });
       await api.addMachine({ ...m, port: 0 });
       expect(last()).toMatchObject({ url: '/api/machines', method: 'POST' });
       expect(last().body).toEqual({ name: 'home', host: 'h.example.com', user: 'remy' });
