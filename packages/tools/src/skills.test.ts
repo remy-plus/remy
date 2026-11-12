@@ -239,6 +239,15 @@ describe('use_skill', () => {
     expect(r?.ok && r.content).toContain('/connect');
   });
 
+  it('names the app and the way to connect it, even where connections are not known', async () => {
+    const r = await useSkill()?.execute({ name: 'triage' }, {} as ToolContext);
+    const text = r?.ok ? r.content : '';
+    expect(text).toContain('needs github');
+    expect(text).toContain('it is not connected');
+    expect(text).toContain('/connect');
+    expect(text).toContain('remy connect');
+  });
+
   it('includes the description', async () => {
     const r = await useSkill()?.execute({ name: 'triage' }, {} as ToolContext);
     expect(r?.ok && r.content).toContain('Skill triage: Triage issues');

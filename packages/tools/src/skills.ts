@@ -278,10 +278,16 @@ export function createSkillTools(port: SkillsPort): Tool[] {
       port.used?.(hit.name);
       const head = `Skill ${hit.name}${isReviewed(hit) ? '' : ` (${FROM[hit.source]}, not reviewed by the user)`}: ${hit.description}`;
       const tools = hit.tools.length ? `\nTools it expects: ${hit.tools.join(', ')}.` : '';
-      const missing = (hit.connections ?? []).filter((c) => port.connected && !port.connected(c));
+      const wants = hit.connections ?? [];
+      const missing = wants.filter((c) => port.connected && !port.connected(c));
+      const how =
+        'Say so plainly in your answer and tell the user to connect it: run /connect in the chat (or `remy connect` in a terminal) and pick it. Do not ask for details the connection would give you, and do not try to connect it yourself.';
+      // Where the port cannot say what is connected, the model checks against the tools it has.
       const needs = missing.length
-        ? `\nThis skill needs ${missing.join(' and ')}, which is not connected. Tell the user to run /connect; do not try to connect it yourself.`
-        : '';
+        ? `\nThis skill needs ${missing.join(' and ')}, which is not connected. ${how}`
+        : !port.connected && wants.length
+          ? `\nThis skill needs ${wants.join(' and ')}. If you have no ${wants.join(' or ')} tools in this task, it is not connected. ${how}`
+          : '';
       return {
         ok: true,
         content: `${head}${tools}${needs}\n\n${hit.body.slice(0, SKILL_BODY_MAX)}`,
