@@ -125,12 +125,12 @@ describe('Find any app', () => {
       open(api);
       await screen.findByRole('heading', { level: 2, name: 'Find any app' });
       type('zz');
-      await screen.findByText('Sentry');
+      await screen.findByText('Acme Widgets');
       return document.querySelector('section ul') as HTMLElement;
     };
 
     it('shows an https icon as a lazy image with no referrer', async () => {
-      const list = await find(searching(hit('s', 'Sentry', 'https://s.test/i.png')));
+      const list = await find(searching(hit('acme', 'Acme Widgets', 'https://s.test/i.png')));
       const img = list.querySelector('img') as HTMLImageElement;
       expect(img.getAttribute('src')).toBe('https://s.test/i.png');
       expect(img.getAttribute('alt')).toBe('');
@@ -140,16 +140,16 @@ describe('Find any app', () => {
     });
 
     it('shows a monogram when the icon is missing or not https', async () => {
-      const list = await find(searching(hit('s', 'Sentry', 'http://s.test/i.png')));
+      const list = await find(searching(hit('acme', 'Acme Widgets', 'http://s.test/i.png')));
       expect(list.querySelector('img')).toBeNull();
-      expect(list.querySelector('[data-monogram]')?.textContent).toBe('S');
+      expect(list.querySelector('[data-monogram]')?.textContent).toBe('A');
     });
 
     it('falls back to the monogram when the image fails', async () => {
-      const list = await find(searching(hit('s', 'Sentry', 'https://s.test/i.png')));
+      const list = await find(searching(hit('acme', 'Acme Widgets', 'https://s.test/i.png')));
       fireEvent.error(list.querySelector('img') as HTMLImageElement);
       expect(list.querySelector('img')).toBeNull();
-      expect(list.querySelector('[data-monogram]')?.textContent).toBe('S');
+      expect(list.querySelector('[data-monogram]')?.textContent).toBe('A');
     });
   });
 });

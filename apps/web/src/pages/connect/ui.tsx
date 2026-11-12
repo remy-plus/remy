@@ -1,17 +1,6 @@
 // Small pieces shared by the connections, skills, schedules and brain screens.
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { type RemyApi, useApi } from '../../api/index.tsx';
-import dropbox from '../../assets/logos/dropbox.svg';
-import figma from '../../assets/logos/figma.svg';
-import gmail from '../../assets/logos/gmail.svg';
-import calendar from '../../assets/logos/google-calendar.svg';
-import drive from '../../assets/logos/google-drive.svg';
-import linear from '../../assets/logos/linear.svg';
-import notion from '../../assets/logos/notion.svg';
-import octocat from '../../assets/logos/octocat.svg';
-import slack from '../../assets/logos/slack.svg';
-import stripe from '../../assets/logos/stripe.svg';
-import zoom from '../../assets/logos/zoom.svg';
 import { Skeleton } from '../../components/Skeleton.tsx';
 import { describeError } from '../../lib/errors.ts';
 
@@ -138,19 +127,155 @@ export function Eyebrow({ children, id }: { children: ReactNode; id?: string }) 
   );
 }
 
-const LOGOS: Record<string, { src: string; light?: boolean }> = {
-  gmail: { src: gmail },
-  calendar: { src: calendar },
-  notion: { src: notion, light: true },
-  slack: { src: slack },
-  github: { src: octocat },
-  linear: { src: linear, light: true },
-  drive: { src: drive },
-  dropbox: { src: dropbox },
-  stripe: { src: stripe },
-  zoom: { src: zoom },
-  figma: { src: figma },
+type Mark = { src: string; light?: boolean };
+
+// Every file in the logos folder, as a URL (never inlined: the build keeps assets as files).
+const FILES = import.meta.glob<string>('../../assets/logos/*.svg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+const file = (name: string): string => FILES[`../../assets/logos/${name}.svg`] ?? '';
+
+/** Marks on a dark colour, drawn on a paper tile so they stay visible on the dark theme. */
+const LIGHT_TILE = new Set([
+  'notion',
+  'linear',
+  'sentry',
+  'vercel',
+  'x',
+  'zendesk',
+  'paypal',
+  'anthropic',
+  'wikipedia',
+  'apple',
+]);
+/** App id to file name, where the two differ. */
+const FILE_OF: Record<string, string> = {
+  calendar: 'google-calendar',
+  drive: 'google-drive',
+  github: 'octocat',
 };
+const MARK_IDS = [
+  'gmail',
+  'calendar',
+  'notion',
+  'slack',
+  'github',
+  'linear',
+  'drive',
+  'dropbox',
+  'stripe',
+  'zoom',
+  'figma',
+  'sentry',
+  'filesystem',
+  'fetch',
+  'memory',
+  'atlassian',
+  'asana',
+  'trello',
+  'todoist',
+  'airtable',
+  'hubspot',
+  'shopify',
+  'discord',
+  'telegram',
+  'whatsapp',
+  'gitlab',
+  'bitbucket',
+  'vercel',
+  'netlify',
+  'cloudflare',
+  'supabase',
+  'postgresql',
+  'mongodb',
+  'redis',
+  'docker',
+  'googledocs',
+  'googlesheets',
+  'googlemaps',
+  'google',
+  'youtube',
+  'spotify',
+  'reddit',
+  'x',
+  'intercom',
+  'zendesk',
+  'clickup',
+  'obsidian',
+  'zapier',
+  'paypal',
+  'mailchimp',
+  'anthropic',
+  'huggingface',
+  'perplexity',
+  'brave',
+  'duckduckgo',
+  'wikipedia',
+  'apple',
+];
+const LOGOS: Record<string, Mark> = Object.fromEntries(
+  MARK_IDS.map((id) => [id, { src: file(FILE_OF[id] ?? id), light: LIGHT_TILE.has(id) }]),
+);
+
+/** Other names a brand goes by, in the joined lowercase form (`google-drive` is `googledrive`). */
+export const LOGO_ALIASES: Record<string, string> = {
+  jira: 'atlassian',
+  confluence: 'atlassian',
+  gdrive: 'drive',
+  googledrive: 'drive',
+  gcal: 'calendar',
+  googlecalendar: 'calendar',
+  gdocs: 'googledocs',
+  gsheets: 'googlesheets',
+  gmaps: 'googlemaps',
+  twitter: 'x',
+  xcom: 'x',
+  postgres: 'postgresql',
+  mongo: 'mongodb',
+  gh: 'github',
+  claude: 'anthropic',
+  hf: 'huggingface',
+  ddg: 'duckduckgo',
+};
+/** Words that name a mark only when they are the whole id or name, never one word among several. */
+const WHOLE_ONLY = new Set(['x', 'calendar', 'drive', 'fetch', 'memory', 'filesystem', 'google']);
+
+const words = (s: string): string[] =>
+  s
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+function markIn(tokens: string[]): string | undefined {
+  const hit = (k: string): string | undefined => {
+    const id = LOGO_ALIASES[k] ?? k;
+    return Object.hasOwn(LOGOS, id) ? id : undefined;
+  };
+  const whole = hit(tokens.join(''));
+  if (whole) return whole;
+  for (let i = 0; i + 1 < tokens.length; i++) {
+    const two = hit(`${tokens[i]}${tokens[i + 1]}`);
+    if (two) return two;
+  }
+  for (const t of tokens) {
+    const one = WHOLE_ONLY.has(t) || WHOLE_ONLY.has(LOGO_ALIASES[t] ?? '') ? undefined : hit(t);
+    if (one) return one;
+  }
+  return undefined;
+}
+
+/**
+ * The bundled mark an app id or name clearly names, or undefined. An exact id wins, then the words
+ * of the id (after the last `/` of a registry name, so `io.github.x/y` is not GitHub), then the
+ * words of the name.
+ */
+export function findMark(id: string, name = ''): string | undefined {
+  if (Object.hasOwn(LOGOS, id)) return id;
+  const tail = id.includes('/') ? (id.split('/').pop() ?? '') : id;
+  return markIn(words(tail)) ?? markIn(words(name));
+}
 
 /** The first letter or digit of a name, uppercased; a neutral dot when it has none. */
 export function monogram(name: string): string {
@@ -174,7 +299,8 @@ export function AppLogo({
   icon?: string;
   size?: number;
 }) {
-  const logo = LOGOS[id];
+  const key = findMark(id, name);
+  const logo = key ? LOGOS[key] : undefined;
   const [broken, setBroken] = useState(false);
   const remote = !logo && icon?.startsWith('https://') && !broken ? icon : undefined;
   return (
