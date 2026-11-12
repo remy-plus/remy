@@ -75,5 +75,7 @@ export interface Browser {
   show(): Promise<void>;
   hide(): Promise<void>;
   readonly visible: boolean;
+  /** Set when pages open somewhere other than this computer, e.g. a cloud browser. */
+  readonly notice?: string;
   close(): Promise<void>;
 }

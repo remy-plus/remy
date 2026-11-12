@@ -7,6 +7,12 @@ import { isPrivateAddress } from '@remy/tools';
 import type { BrowserContext, Page } from 'playwright-core';
 import type { Browser, PageSnapshot, SearchHit } from './port.ts';
 import {
+  type RemoteSession,
+  type RemoteSessionProvider,
+  redactSecrets,
+  remoteNotice,
+} from './remote.ts';
+import {
   BotCheckError,
   firstUseful,
   looksLikeBotCheck,
@@ -27,6 +33,10 @@ export interface LocalBrowserOptions {
   /** Only these domains (exact or subdomain) open, like `--net-allow`. Default: any. */
   allow?: string[];
   navigationTimeoutMs?: number;
+  /** Drive a cloud browser instead of launching Chrome here. One session, started on first use. */
+  remote?: RemoteSessionProvider;
+  /** Release the remote session after this long unused. Default 5 minutes. */
+  idleMs?: number;
 }
 
 export const NO_BROWSER =
@@ -65,6 +75,7 @@ async function isLocalHost(host: string): Promise<boolean> {
 }
 
 export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
+  let api: Browser | undefined;
   const navTimeout = opts.navigationTimeoutMs ?? 30_000;
   let ctx: BrowserContext | undefined;
   let page: Page | undefined;
@@ -74,7 +85,79 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
   let refusedHost: string | undefined; // set when the allowlist, not the local rule, blocked a page
   let ownTab = 0; // tabs Remy opens itself (search), which must not become the current page
 
+  let session: RemoteSession | undefined;
+  let idle: ReturnType<typeof setTimeout> | undefined;
+  const idleMs = opts.idleMs ?? 300_000;
+
+  /** Remote only: restarts the idle timer on every use. */
+  function touch(): void {
+    if (!opts.remote) return;
+    if (idle) clearTimeout(idle);
+    idle = setTimeout(() => void api?.close(), idleMs);
+    idle.unref?.();
+  }
+
+  /** Same page rules for both kinds of browser: new tabs, window closed, address checks. */
+  async function guard(c: BrowserContext): Promise<void> {
+    c.setDefaultNavigationTimeout(navTimeout);
+    c.setDefaultTimeout(10_000);
+    c.on('page', (p) => {
+      if (ownTab === 0) page = p; // a link that opened a new tab: follow it
+    });
+    c.on('close', () => {
+      // The window was closed (or the cloud session ended): start fresh next time.
+      if (ctx === c) {
+        ctx = undefined;
+        page = undefined;
+        if (!opts.remote) visible = false;
+        else {
+          const s = session;
+          session = undefined;
+          void s?.close();
+        }
+      }
+    });
+    const allow = opts.allow;
+    if (!opts.allowLocal || allow)
+      await c.route('**/*', async (route) => {
+        const req = route.request();
+        if (!req.isNavigationRequest()) return route.continue();
+        // Chrome lets through addresses Node cannot read, such as one with a space in its host.
+        const url = URL.canParse(req.url()) ? new URL(req.url()) : undefined;
+        if (!url) return route.abort('blockedbyclient');
+        if (!/^https?:$/.test(url.protocol)) return route.continue();
+        const host = url.hostname;
+        if (allow && !allow.some((d) => host === d || host.endsWith(`.${d}`))) {
+          refusedHost = host;
+          return route.abort('blockedbyclient');
+        }
+        if (!opts.allowLocal && (await isLocalHost(host))) return route.abort('blockedbyclient');
+        return route.continue();
+      });
+  }
+
+  async function connectRemote(remote: RemoteSessionProvider): Promise<BrowserContext> {
+    const { chromium } = await import('playwright-core');
+    const made = await remote.createSession();
+    const secrets = [made.cdpUrl, new URL(made.cdpUrl).searchParams.get('apiKey') ?? undefined];
+    try {
+      const b = await chromium.connectOverCDP(made.cdpUrl, { timeout: navTimeout });
+      const c = b.contexts()[0] ?? (await b.newContext());
+      session = made;
+      await guard(c);
+      return c;
+    } catch (e) {
+      session = undefined;
+      await made.close();
+      const msg = redactSecrets(e instanceof Error ? e.message : String(e), secrets);
+      throw new Error(
+        `${remote.label} started a session but Remy could not connect to it: ${msg.split('\n')[0]}`,
+      );
+    }
+  }
+
   async function launch(): Promise<BrowserContext> {
+    if (opts.remote) return connectRemote(opts.remote);
     if (!profile) {
       mkdirSync(opts.profileDir, { recursive: true });
       // A background task can run while the chat has the profile open: it gets a fresh one.
@@ -93,37 +176,7 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
           ...(channel && { channel }),
           ...(visible ? { viewport: null } : { viewport: { width: 1280, height: 900 } }),
         });
-        c.setDefaultNavigationTimeout(navTimeout);
-        c.setDefaultTimeout(10_000);
-        c.on('page', (p) => {
-          if (ownTab === 0) page = p; // a link that opened a new tab: follow it
-        });
-        c.on('close', () => {
-          // The user closed the window: start hidden next time.
-          if (ctx === c) {
-            ctx = undefined;
-            page = undefined;
-            visible = false;
-          }
-        });
-        const allow = opts.allow;
-        if (!opts.allowLocal || allow)
-          await c.route('**/*', async (route) => {
-            const req = route.request();
-            if (!req.isNavigationRequest()) return route.continue();
-            // Chrome lets through addresses Node cannot read, such as one with a space in its host.
-            const url = URL.canParse(req.url()) ? new URL(req.url()) : undefined;
-            if (!url) return route.abort('blockedbyclient');
-            if (!/^https?:$/.test(url.protocol)) return route.continue();
-            const host = url.hostname;
-            if (allow && !allow.some((d) => host === d || host.endsWith(`.${d}`))) {
-              refusedHost = host;
-              return route.abort('blockedbyclient');
-            }
-            if (!opts.allowLocal && (await isLocalHost(host)))
-              return route.abort('blockedbyclient');
-            return route.continue();
-          });
+        await guard(c);
         return c;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -134,6 +187,7 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
   }
 
   async function context(): Promise<BrowserContext> {
+    touch();
     ctx ??= await launch();
     return ctx;
   }
@@ -186,6 +240,12 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
 
   /** Relaunches the same profile with or without a window, on the same page. */
   async function relaunch(show: boolean): Promise<void> {
+    if (opts.remote) {
+      const where = session?.viewerUrl ? ` You can watch it at ${session.viewerUrl}.` : '';
+      throw new Error(
+        `${remoteNotice(opts.remote.label)} There is no window to show here.${where} Ask the person to do this step themselves, or to turn off REMY_BROWSER.`,
+      );
+    }
     if (visible === show && ctx) return;
     const url = page && !page.isClosed() ? page.url() : undefined;
     const old = ctx;
@@ -207,7 +267,10 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
     return ctx && page && !page.isClosed() ? page : undefined;
   }
 
-  return {
+  api = {
+    get notice() {
+      return opts.remote ? remoteNotice(opts.remote.label) : undefined;
+    },
     async state() {
       const p = livePage();
       if (!p) return { open: false, url: '', title: '' };
@@ -289,13 +352,19 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
     hide: () => relaunch(false),
     async close() {
       const c = ctx;
+      const s = session;
       ctx = undefined;
       page = undefined;
+      session = undefined;
+      if (idle) clearTimeout(idle);
+      idle = undefined;
       await c?.close().catch(() => {});
+      await s?.close();
       if (!profile) return;
       if (profile === opts.profileDir) rmSync(join(profile, LOCK), { force: true });
       else rmSync(profile, { recursive: true, force: true });
       profile = undefined;
     },
   };
+  return api;
 }
