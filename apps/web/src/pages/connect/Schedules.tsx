@@ -274,8 +274,14 @@ export function Schedules() {
                     </p>
                   )}
                 </div>
-                <p className={`${mono} m-0 min-w-0 text-[13px]`}>{plainTime(s.when)}</p>
-                <p className={`${mono} m-0 min-w-0 text-[12px] text-muted`}>{s.next}</p>
+                <p className={`${mono} col-span-2 m-0 min-w-0 text-[13px] min-[900px]:col-span-1`}>
+                  {plainTime(s.when)}
+                </p>
+                <p
+                  className={`${mono} col-span-2 m-0 min-w-0 text-[12px] text-muted min-[900px]:col-span-1`}
+                >
+                  {s.next}
+                </p>
                 <Switch checked={s.enabled} label={s.title} onChange={(on) => toggle(s, on)} />
                 {s.fix ? (
                   <a href={s.fix.href} className={`${primary} block text-center`}>
