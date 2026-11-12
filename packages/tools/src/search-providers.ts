@@ -98,3 +98,92 @@ export function contextDevSearch(apiKey: string): SearchProvider {
     },
   };
 }
+
+const post = (
+  url: string,
+  headers: Record<string, string>,
+  body: unknown,
+): [string, RequestInit] => [
+  url,
+  {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json', ...headers },
+    body: JSON.stringify(body),
+  },
+];
+
+const bearer = (apiKey: string) => ({ authorization: `Bearer ${apiKey}` });
+const clean = (s: string | undefined) => s?.replace(/\s+/g, ' ').trim();
+
+/** Exa (https://docs.exa.ai/reference/search): the first 500 characters of each page as the snippet. */
+export function exaSearch(apiKey: string): SearchProvider {
+  return {
+    async search(query, count) {
+      const [url, init] = post(
+        'https://api.exa.ai/search',
+        { 'x-api-key': apiKey },
+        { query, numResults: count, type: 'auto', contents: { text: { maxCharacters: 500 } } },
+      );
+      const data = await json(await fetch(url, init), 'Exa');
+      return rows(data.results)
+        .slice(0, count)
+        .map((r) => {
+          const hl = (r as { highlights?: unknown }).highlights;
+          const fromHighlights = Array.isArray(hl) ? hl.join(' ') : undefined;
+          return toResult(r, clean(r.text) || clean(fromHighlights));
+        });
+    },
+  };
+}
+
+/** Perplexity Search API (https://docs.perplexity.ai/api-reference/search-post). */
+export function perplexitySearch(apiKey: string): SearchProvider {
+  return {
+    async search(query, count) {
+      const [url, init] = post('https://api.perplexity.ai/search', bearer(apiKey), {
+        query,
+        max_results: count,
+      });
+      const data = await json(await fetch(url, init), 'Perplexity');
+      return rows(data.results)
+        .slice(0, count)
+        .map((r) => toResult(r, r.snippet));
+    },
+  };
+}
+
+/** Linkup (https://docs.linkup.so/pages/documentation/api-reference/endpoint/post-search). */
+export function linkupSearch(apiKey: string): SearchProvider {
+  return {
+    async search(query, count) {
+      const [url, init] = post('https://api.linkup.so/v1/search', bearer(apiKey), {
+        q: query,
+        depth: 'standard',
+        outputType: 'searchResults',
+        maxResults: count,
+      });
+      const data = await json(await fetch(url, init), 'Linkup');
+      return rows(data.results)
+        .filter((r) => r.type !== 'image')
+        .slice(0, count)
+        .map((r) => toResult({ ...r, title: r.name ?? r.title }, r.content));
+    },
+  };
+}
+
+/** Serper, Google results (https://serper.dev). */
+export function serperSearch(apiKey: string): SearchProvider {
+  return {
+    async search(query, count) {
+      const [url, init] = post(
+        'https://google.serper.dev/search',
+        { 'x-api-key': apiKey },
+        { q: query, num: count },
+      );
+      const data = await json(await fetch(url, init), 'Serper');
+      return rows(data.organic)
+        .slice(0, count)
+        .map((r) => toResult({ ...r, url: r.link }, r.snippet));
+    },
+  };
+}
