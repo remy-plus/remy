@@ -308,9 +308,13 @@ function on(s: TaskState, e: Event) {
       if (!e.granted) {
         setResult(s, call, {
           ok: false,
-          error: e.note
-            ? `The user declined this action and said: ${e.note}`
-            : 'The user declined this action.',
+          // Do not retry it or find a way around it; but a fallback the user named in their own
+          // request ("if you cannot send it, save it") is what they asked for, so it stands.
+          error: `${
+            e.note
+              ? `The user declined this action and said: ${e.note}`
+              : 'The user declined this action.'
+          } Do not try it again or another way. If the user's own request already said what to do in that case, do that; otherwise say it was declined and finish.`,
           retryable: false,
           phase: 'before_effect',
         });
