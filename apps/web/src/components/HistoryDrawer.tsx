@@ -159,7 +159,7 @@ export function HistoryDrawer({ open, onClose }: { open: boolean; onClose: () =>
                                 className={`size-1.5 shrink-0 rounded-full ${c.state === 'working' ? 'bg-signal' : 'bg-transparent'}`}
                               />
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[15px] font-medium">
+                                <span className="block break-words text-[15px] font-medium">
                                   {c.title}
                                 </span>
                                 <span className="block text-[12px] text-muted">
