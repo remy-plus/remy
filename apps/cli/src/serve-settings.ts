@@ -67,6 +67,11 @@ export const prefsPatch = z
       .strict(),
     /** The one folder Remy may use for every web task; null goes back to a new empty folder each. */
     workspace: z.string().min(1).max(4096).nullable(),
+    /** The search route the person prefers (a service id); null means automatic. Not in WebPrefs. */
+    searchPrefer: z
+      .string()
+      .regex(/^[a-z][a-z0-9-]{1,23}$/)
+      .nullable(),
     /** The app is dark only. */
     appearance: z.literal('dark'),
   })

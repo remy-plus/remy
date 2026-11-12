@@ -10,6 +10,7 @@ import {
   routedSearch,
   type SearchFacts,
 } from './search.ts';
+import { readServiceKey } from './service-keys.ts';
 
 const none: SearchFacts = { keys: {}, docker: false, vmSetUp: false, browser: false };
 const hit = { title: 'T', url: 'https://a.test', snippet: 's' };
@@ -265,6 +266,25 @@ describe('resolveSearchKeys', () => {
     expect(calls).toEqual([]);
   });
 
+  it('the global REMY_KEYCHAIN=off stops real Keychain reads but not an injected exec', async () => {
+    const prev = process.env.REMY_KEYCHAIN;
+    process.env.REMY_KEYCHAIN = 'off';
+    try {
+      calls.length = 0;
+      // No exec: the real `security` must not run, so the answer is "none" without a spawn.
+      expect((await readServiceKey('EXA_API_KEY', 'exa', {}, { platform: 'darwin' })).source).toBe(
+        'none',
+      );
+      expect(
+        (await readServiceKey('EXA_API_KEY', 'exa', {}, { platform: 'darwin', exec })).source,
+      ).not.toBe('none');
+      expect(calls.length).toBe(1);
+    } finally {
+      if (prev === undefined) delete process.env.REMY_KEYCHAIN;
+      else process.env.REMY_KEYCHAIN = prev;
+    }
+  });
+
   it('reads a failing Keychain as no key', async () => {
     const r = await resolveSearchKeys(
       {},
@@ -276,5 +296,40 @@ describe('resolveSearchKeys', () => {
       },
     );
     expect(Object.values(r.sources).every((v) => v === 'none')).toBe(true);
+  });
+});
+
+describe('a saved preference', () => {
+  const keys = { exa: true, brave: true };
+  it('puts the preferred service with a key first, keeping the rest as fallbacks', () => {
+    const p = pickSearchRoute({ ...none, keys, prefer: 'brave' });
+    expect(p.chosen).toBe('brave');
+    expect(p.order).toEqual(['brave', 'exa']);
+    expect(p.override).toBe(false);
+    expect(p.preferred).toBe(true);
+  });
+  it('loses to REMY_SEARCH or config', () => {
+    const p = pickSearchRoute({ ...none, keys, override: 'exa', prefer: 'brave' });
+    expect(p.chosen).toBe('exa');
+    expect(p.order).toEqual(['exa']);
+    expect(p.override).toBe(true);
+    expect(p.preferred).toBeUndefined();
+  });
+  it('is ignored, without an error, when unknown or with no key', () => {
+    const auto = pickSearchRoute({ ...none, keys });
+    expect(pickSearchRoute({ ...none, keys, prefer: 'nonsense' })).toEqual(auto);
+    expect(pickSearchRoute({ ...none, keys, prefer: 'serper' })).toEqual(auto);
+    expect(pickSearchRoute({ ...none, keys, prefer: '  ' })).toEqual(auto);
+  });
+  it('reaches the plan through gatherSearchPlan', () => {
+    const plan = gatherSearchPlan({
+      env: { EXA_API_KEY: 'a', BRAVE_API_KEY: 'b' },
+      override: undefined,
+      prefer: 'Brave',
+      vmSetUp: false,
+      browser: false,
+      hasDocker: () => false,
+    });
+    expect(plan.chosen).toBe('brave');
   });
 });

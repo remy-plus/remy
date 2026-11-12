@@ -15,8 +15,10 @@ import {
   tavilySearch,
   tinyfishSearch,
 } from '@remy/tools';
-import { KEYCHAIN_SERVICE } from './credentials.ts';
-import { type AsyncExec, KEYCHAIN_TIMEOUT_MS, realAsyncExec } from './serve-voice.ts';
+import type { AsyncExec } from './serve-voice.ts';
+import { type KeySource, readServiceKey } from './service-keys.ts';
+
+export type { KeySource };
 
 export const SEARCH_CHOICES = [
   'browser',
@@ -59,6 +61,8 @@ export const routeLabel = (r: Route): string =>
 export interface SearchFacts {
   /** REMY_SEARCH or `search` in remy.config.json. */
   override?: string | undefined;
+  /** The service saved in the web app's Settings. Env or config (`override`) beats it; an unknown one, or one with no key, is ignored. */
+  prefer?: string | undefined;
   keys: Partial<Record<KeyRoute, boolean>>;
   /** Docker answers. */
   docker: boolean;
@@ -74,6 +78,8 @@ export interface SearchPlan {
   chosen?: Route;
   /** REMY_SEARCH set it. */
   override: boolean;
+  /** A saved preference (not REMY_SEARCH) put `chosen` first. */
+  preferred?: boolean;
   /** Search was switched off on purpose. */
   off: boolean;
   /** The one step that would make search better or work at all. Absent when nothing is needed. */
@@ -84,8 +90,21 @@ export interface SearchPlan {
 
 const TINYFISH_STEP = 'Get a free TinyFish key and set TINYFISH_API_KEY.';
 
-/** The route order for a machine. Pure. */
+/**
+ * The route order for a machine. Pure. REMY_SEARCH or config (`override`) wins; else a saved
+ * preference that names a service with a key goes first; anything else is automatic.
+ */
 export function pickSearchRoute(f: SearchFacts): SearchPlan {
+  const auto = pickBase(f);
+  const pf = f.prefer?.trim().toLowerCase();
+  if (f.override?.trim() || !pf || !Object.hasOwn(SERVICES, pf) || !f.keys[pf as KeyRoute])
+    return auto;
+  if (auto.chosen === pf) return { ...auto, preferred: true };
+  const order: Route[] = [pf as KeyRoute, ...auto.order.filter((r) => r !== pf)];
+  return { order, chosen: pf as KeyRoute, override: false, preferred: true, off: false };
+}
+
+function pickBase(f: SearchFacts): SearchPlan {
   const want = f.override?.trim().toLowerCase();
   if (want) {
     if (!isSearchChoice(want))
@@ -195,6 +214,7 @@ export function makeService(
 export function gatherSearchPlan(p: {
   env: Record<string, string | undefined>;
   override: string | undefined;
+  prefer?: string | undefined;
   vmSetUp: boolean;
   browser: boolean;
   hasDocker: () => boolean;
@@ -205,14 +225,13 @@ export function gatherSearchPlan(p: {
   const settled = Boolean(p.override?.trim()) || Object.values(keys).some(Boolean);
   return pickSearchRoute({
     override: p.override,
+    prefer: p.prefer,
     keys,
     docker: settled ? false : p.hasDocker(),
     vmSetUp: p.vmSetUp,
     browser: p.browser,
   });
 }
-
-export type KeySource = 'env' | 'keychain' | 'none';
 
 /** Services whose key may live in the Keychain (SearXNG is an address, not a key). */
 export const KEYED_ROUTES = (Object.keys(SERVICES) as KeyRoute[]).filter((k) => k !== 'searxng');
@@ -232,35 +251,21 @@ export async function resolveSearchKeys(
   sources: Record<KeyRoute, KeySource>;
   found: { name: string; value: string }[];
 }> {
-  const platform = opts.platform ?? process.platform;
-  const exec = opts.exec ?? realAsyncExec;
-  const useKeychain = platform === 'darwin' && env.REMY_KEYCHAIN !== 'off';
   const out = { ...env };
   const found: { name: string; value: string }[] = [];
   const sources = {} as Record<KeyRoute, KeySource>;
   await Promise.all(
     (Object.keys(SERVICES) as KeyRoute[]).map(async (route) => {
       const name = SERVICES[route].env;
-      if (env[name]?.trim()) {
-        sources[route] = 'env';
+      if (route === 'searxng') {
+        sources[route] = env[name]?.trim() ? 'env' : 'none';
         return;
       }
-      sources[route] = 'none';
-      if (!useKeychain || route === 'searxng') return;
-      try {
-        const r = await exec(
-          'security',
-          ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', route, '-w'],
-          opts.timeoutMs ?? KEYCHAIN_TIMEOUT_MS,
-        );
-        const value = r.stdout.replace(/\r?\n$/, '').trim();
-        if (r.status === 0 && value) {
-          out[name] = value;
-          sources[route] = 'keychain';
-          found.push({ name, value });
-        }
-      } catch {
-        // A locked or slow Keychain is "no key".
+      const r = await readServiceKey(name, route, env, opts);
+      sources[route] = r.source;
+      if (r.source === 'keychain' && r.value) {
+        out[name] = r.value;
+        found.push({ name, value: r.value });
       }
     }),
   );
