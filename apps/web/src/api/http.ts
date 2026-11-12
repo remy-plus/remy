@@ -26,6 +26,7 @@ import type {
   TaskListItem,
   TaskView,
   TrustLevel,
+  Webhook,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -199,6 +200,9 @@ export function createHttpApi(opts: {
       }),
     setWebhookEnabled: (id, enabled) =>
       post(`/api/webhooks/${encodeURIComponent(id)}/enabled`, { enabled }),
+    addWebhook: (input) =>
+      json<Webhook>('/api/webhooks', { method: 'POST', body: JSON.stringify(input) }),
+    removeWebhook: (name) => send('DELETE', `/api/webhooks/${encodeURIComponent(name)}`),
     // The server runs on this machine in its own time zone, so only the text and the phrase go.
     createSchedule: (s) =>
       json<{ id: string }>('/api/schedules', {

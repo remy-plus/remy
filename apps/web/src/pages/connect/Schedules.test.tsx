@@ -111,8 +111,7 @@ describe('Schedules', () => {
     );
     expect(screen.getByText('Nothing is due in the next 24 hours.')).toBeTruthy();
     expect(screen.getByText('No webhook yet.')).toBeTruthy();
-    // No route creates a webhook, so the screen names the terminal command instead of a fake button.
-    expect(screen.getByText(/remy webhook add/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'New webhook' })).toBeTruthy();
   });
 
   it('has landmarks and no unnamed button', async () => {
@@ -127,5 +126,68 @@ describe('Schedules', () => {
     for (const b of screen.getAllByRole('button')) expect(b.textContent?.trim()).not.toBe('');
     for (const s of screen.getAllByRole('switch'))
       expect(s.getAttribute('aria-label')).toBeTruthy();
+  });
+});
+
+describe('Webhooks', () => {
+  it('shows the server sentence when a name is refused', async () => {
+    open();
+    await screen.findByRole('region', { name: 'Webhooks' });
+    fireEvent.click(screen.getByRole('button', { name: 'New webhook' }));
+    expect(
+      screen.getByText(
+        /Whatever the caller sends is treated as information, never as instructions/,
+      ),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Bad Name' } });
+    fireEvent.change(screen.getByLabelText('What should Remy do with each call?'), {
+      target: { value: 'Check it' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create the webhook' }));
+    expect(await screen.findByText(/1 to 40 characters/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create the webhook' }));
+    expect(await screen.findByText('Give the webhook a name.')).toBeTruthy();
+  });
+
+  it('shows the address and a curl that reads the token from the terminal', async () => {
+    open(
+      '#/schedules',
+      apiWith({
+        addWebhook: async ({ name }) => ({
+          id: name,
+          name,
+          url: `POST http://127.0.0.1:7788/hook/${name}`,
+          detail: '',
+          enabled: false,
+        }),
+      }),
+    );
+    await screen.findByRole('region', { name: 'Webhooks' });
+    fireEvent.click(screen.getByRole('button', { name: 'New webhook' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'deploys' } });
+    fireEvent.change(screen.getByLabelText('What should Remy do with each call?'), {
+      target: { value: 'Check it' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create the webhook' }));
+    expect(await screen.findByText('The webhook deploys is created.')).toBeTruthy();
+    const curl = screen.getByText(/curl -X POST/).textContent ?? '';
+    expect(curl).toContain('curl -X POST http://127.0.0.1:7788/hook/deploys');
+    expect(curl).toContain('$(remy webhook token)');
+    expect(curl).not.toContain('POST POST');
+    expect(screen.getByRole('button', { name: 'Copy the command to call deploys' })).toBeTruthy();
+    expect(screen.getByText(/Webhooks are off for now/)).toBeTruthy();
+  });
+
+  it('asks before removing a webhook, and removes it on yes', async () => {
+    const removed: string[] = [];
+    open('#/schedules', apiWith({ removeWebhook: async (n) => void removed.push(n) }));
+    await screen.findByRole('region', { name: 'Webhooks' });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove new-invoice' }));
+    expect(removed).toEqual([]);
+    expect(await screen.findByText('Calls to this address will stop starting tasks.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Keep it' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(removed).toEqual(['new-invoice']));
   });
 });

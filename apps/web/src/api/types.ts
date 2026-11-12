@@ -343,6 +343,8 @@ export interface RemyApi {
   setScheduleEnabled(id: string, enabled: boolean): Promise<void>;
   runScheduleNow(id: string): Promise<{ taskId: string }>;
   setWebhookEnabled(id: string, enabled: boolean): Promise<void>;
+  addWebhook(input: { name: string; prompt: string }): Promise<Webhook>;
+  removeWebhook(name: string): Promise<void>;
   createSchedule(input: NewScheduleInput): Promise<{ id: string }>;
   brain(): Promise<BrainData>;
   updateNote(id: string, body: string): Promise<void>;

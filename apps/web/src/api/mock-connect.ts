@@ -1,5 +1,6 @@
 // Mock data for connections, skills, schedules and the brain. Mock-only: `remy serve` has no routes
 // for these yet. The numbers and names come from the approved frames.
+import { ApiError } from './http.ts';
 import type {
   AppPermission,
   BrainData,
@@ -532,6 +533,8 @@ export function createConnectMock(): Pick<
   | 'setScheduleEnabled'
   | 'runScheduleNow'
   | 'setWebhookEnabled'
+  | 'addWebhook'
+  | 'removeWebhook'
   | 'createSchedule'
   | 'brain'
   | 'updateNote'
@@ -669,6 +672,30 @@ export function createConnectMock(): Pick<
     async setWebhookEnabled(id, enabled) {
       const w = webhooks.find((x) => x.id === id);
       if (w) w.enabled = enabled;
+    },
+    async addWebhook({ name, prompt }) {
+      if (!/^[a-z0-9][a-z0-9_-]{0,39}$/.test(name))
+        throw new ApiError(
+          400,
+          'A hook name is 1 to 40 characters: lowercase letters, digits, - and _, starting with a letter or digit.',
+        );
+      if (!prompt.trim()) throw new ApiError(400, 'A hook needs a prompt.');
+      if (webhooks.some((w) => w.name === name))
+        throw new ApiError(409, `There is already a hook ${name}.`);
+      const hook: Webhook = {
+        id: name,
+        name,
+        url: `POST http://127.0.0.1:7788/hook/${name}`,
+        detail: `Runs “${prompt.trim()}”. Payloads are treated as untrusted.`,
+        enabled: webhooks.some((w) => w.enabled),
+      };
+      webhooks.push(hook);
+      return clone(hook);
+    },
+    async removeWebhook(name) {
+      const i = webhooks.findIndex((w) => w.name === name);
+      if (i < 0) throw new ApiError(404, 'There is no such webhook.');
+      webhooks.splice(i, 1);
     },
     async createSchedule(input: NewScheduleInput) {
       const id = `schedule_${schedules.length + 1}`;

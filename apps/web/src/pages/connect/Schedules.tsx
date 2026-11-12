@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import type { ScheduleItem, Webhook } from '../../api/index.tsx';
+import { type FormEvent, useId, useState } from 'react';
+import { type ScheduleItem, useApi, type Webhook } from '../../api/index.tsx';
 import { BrainTabs } from '../../components/BrainTabs.tsx';
+import { Confirm } from '../../components/Confirm.tsx';
+import { CopyCommand } from '../../components/CopyCommand.tsx';
 import { describeError } from '../../lib/errors.ts';
 import { clock } from '../../lib/when.ts';
 import {
   Eyebrow,
+  field,
   Loading,
   mono,
   Notice,
@@ -32,9 +35,117 @@ export function plainTime(text: string): string {
   });
 }
 
+/** The call a person can paste: the token is read by the shell, so it never shows in the browser. */
+export const curlFor = (w: Webhook): string =>
+  `curl -X POST ${w.url.replace(/^POST\s+/, '')} \\\n  -H "Authorization: Bearer $(remy webhook token)" \\\n  -H "Content-Type: application/json" \\\n  -d '{"event":"example"}'`;
+
+function NewWebhook({
+  onCreated,
+  onClose,
+}: {
+  onCreated: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const api = useApi();
+  const uid = useId();
+  const [name, setName] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [problem, setProblem] = useState('');
+  const [made, setMade] = useState<Webhook | null>(null);
+  const submit = async (ev: FormEvent) => {
+    ev.preventDefault();
+    setProblem('');
+    if (!name.trim()) return setProblem('Give the webhook a name.');
+    if (!prompt.trim()) return setProblem('Say what Remy should do with each call.');
+    try {
+      const hook = await api.addWebhook({ name: name.trim(), prompt: prompt.trim() });
+      setMade(hook);
+      await onCreated();
+    } catch (e) {
+      setProblem(describeError(e, FALLBACK));
+    }
+  };
+  if (made)
+    return (
+      <div role="status" className="mb-3 rounded-[10px] border border-edge bg-surface p-4">
+        <p className="m-0 text-[16px] font-medium">The webhook {made.name} is created.</p>
+        <p className="mt-2 mb-2 text-[14px] leading-relaxed text-muted">
+          Send a call to this address to start a job:
+        </p>
+        <p className={`${mono} m-0 mb-2 text-[13px] break-all`}>{made.url}</p>
+        <pre
+          className={`${code} m-0 mb-3 overflow-x-auto rounded-[10px] border border-edge bg-bg p-3`}
+        >
+          {curlFor(made)}
+        </pre>
+        <p className="mt-0 mb-3 text-[14px] leading-relaxed text-muted">
+          The command reads your token from the terminal, so it is never shown here.
+          {!made.enabled &&
+            ' Webhooks are off for now, so calls do nothing until you turn them on with the switch below.'}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyCommand command={curlFor(made)} title={made.name} what="call" />
+          <button type="button" className={quiet} onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  return (
+    <form
+      onSubmit={submit}
+      noValidate
+      aria-label="New webhook"
+      className="mb-3 rounded-[10px] border border-edge bg-surface p-4"
+    >
+      <label htmlFor={`${uid}-name`} className={`${mono} mb-2 block text-[12px] text-muted`}>
+        Name
+      </label>
+      <input
+        id={`${uid}-name`}
+        className={`${field} ${mono} text-[14px]`}
+        placeholder="deploys"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+      <p className="mt-2 mb-4 text-[13px] text-muted">
+        Lowercase letters, digits, - and _. It becomes the end of the address.
+      </p>
+      <label htmlFor={`${uid}-prompt`} className={`${mono} mb-2 block text-[12px] text-muted`}>
+        What should Remy do with each call?
+      </label>
+      <textarea
+        id={`${uid}-prompt`}
+        rows={3}
+        className={`${field} bg-bg`}
+        placeholder="Check the deploy result and tell me if anything failed."
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+      />
+      <p className="mt-2 mb-4 text-[13px] leading-relaxed text-muted">
+        Whatever the caller sends is treated as information, never as instructions. Remy asks before
+        it changes anything.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" className={primary}>
+          Create the webhook
+        </button>
+        <button type="button" className={quiet} onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+      <div className="mt-3">
+        <Notice>{problem}</Notice>
+      </div>
+    </form>
+  );
+}
+
 export function Schedules() {
   const { api, data, setData, error, reload } = useLoad((a) => a.schedules());
   const [said, setSaid] = useState<Said | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<Webhook | null>(null);
   if (error) return <Unavailable message={error} onRetry={reload} />;
   if (!data) return <Loading label="Loading your schedules" />;
 
@@ -205,20 +316,21 @@ export function Schedules() {
           <Eyebrow id="hooks-h">Webhooks</Eyebrow>
           <span className={`${mono} text-[12px] text-muted`}>{data.webhooksNote}</span>
         </div>
+        {adding && <NewWebhook onCreated={refresh} onClose={() => setAdding(false)} />}
         {data.webhooks.length === 0 ? (
           <div className={empty}>
             <p className="m-0 text-[15px]">No webhook yet.</p>
-            <p className="mt-1 mb-0 max-w-[560px] text-[14px] leading-relaxed text-muted">
-              A webhook lets an outside service start a job. Adding one is not available in the app
-              yet: do it in the terminal with{' '}
-              <code className={code}>
-                remy webhook add &lt;name&gt; &quot;&lt;what to do&gt;&quot;
-              </code>
-              , then reload this page.
+            <p className="mt-1 mb-4 max-w-[560px] text-[14px] leading-relaxed text-muted">
+              A webhook lets an outside service start a job.
             </p>
+            {!adding && (
+              <button type="button" className={primary} onClick={() => setAdding(true)}>
+                New webhook
+              </button>
+            )}
           </div>
         ) : (
-          <ul className="m-0 list-none p-0">
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {data.webhooks.map((w) => (
               <li key={w.id} className="rounded-[10px] border border-edge bg-surface p-4">
                 <div className="flex items-center justify-between gap-4">
@@ -236,10 +348,42 @@ export function Schedules() {
                     {said.text}
                   </p>
                 )}
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    className={quiet}
+                    aria-label={`Remove ${w.name}`}
+                    onClick={() => setRemoving(w)}
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
+        {data.webhooks.length > 0 && !adding && (
+          <div className="mt-3">
+            <button type="button" className={primary} onClick={() => setAdding(true)}>
+              New webhook
+            </button>
+          </div>
+        )}
+        <Confirm
+          open={removing !== null}
+          title={`Remove ${removing?.name ?? ''}?`}
+          confirmLabel="Remove"
+          cancelLabel="Keep it"
+          onConfirm={async () => {
+            if (!removing) return;
+            await api.removeWebhook(removing.name);
+            setRemoving(null);
+            await refresh();
+          }}
+          onCancel={() => setRemoving(null)}
+        >
+          Calls to this address will stop starting tasks.
+        </Confirm>
       </section>
     </Page>
   );
