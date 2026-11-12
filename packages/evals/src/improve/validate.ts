@@ -16,11 +16,39 @@ export interface Edit {
   reason: string;
   /** Failed cases this edit is meant to fix. */
   cases: string[];
+  /** Set when the model gave a bare name and this full id was picked by comparing texts. */
+  resolvedFrom?: string;
 }
 
 export interface Dropped {
   id: string;
   why: string;
+  /** What the model wanted the text to be, cut to MAX_DROPPED_CHARS. Absent in older proposal files. */
+  to?: string;
+}
+
+export const MAX_DROPPED_CHARS = 2000;
+
+const words = (t: string) => new Set(t.toLowerCase().match(/[a-z0-9']+/g) ?? []);
+
+/** Share of words two texts have in common, 0 to 1. */
+export function jaccard(a: string, b: string): number {
+  const x = words(a);
+  const y = words(b);
+  if (x.size === 0 || y.size === 0) return 0;
+  let both = 0;
+  for (const w of x) if (y.has(w)) both += 1;
+  return both / (x.size + y.size - both);
+}
+
+/** The candidate whose current text the new text is clearly closest to, or undefined when it is not clear. */
+function closest(candidates: readonly PromptEntry[], to: string): PromptEntry | undefined {
+  const ranked = candidates
+    .map((entry) => ({ entry, score: jaccard(to, entry.text) }))
+    .sort((a, b) => b.score - a.score);
+  const [best, second] = ranked;
+  if (!best || best.score < 0.2) return undefined;
+  return best.score >= 1.5 * (second?.score ?? 0) ? best.entry : undefined;
 }
 
 /** Wording that would loosen approvals, taint handling, secrets or honesty. Checked on the new text only. */
@@ -53,19 +81,25 @@ const UNSAFE_CHARS = /[`\\]|\$\{/;
 
 /**
  * The entry an id names. Models often answer with the bare part (`finish`) instead of the full id
- * (`system:finish`), so a bare name is accepted when exactly one entry ends with it. Two matches are
- * ambiguous and dropped: guessing which prompt to rewrite is not a guess worth making.
+ * (`system:finish`), so a bare name is accepted when exactly one entry ends with it. With
+ * several matches the new text decides, but only when it is clearly closest to one current text
+ * (Jaccard over words, at least 0.2 and 1.5 times the runner-up). Otherwise it is ambiguous and dropped.
  */
 function findEntry(
   registry: readonly PromptEntry[],
   id: string,
-): { entry?: PromptEntry; ambiguous?: boolean } {
+  to?: string,
+): { entry?: PromptEntry; ambiguous?: boolean; resolved?: boolean } {
   const exact = registry.find((r) => r.id === id);
   if (exact) return { entry: exact };
   if (id.includes(':')) return {};
   const bare = registry.filter((r) => r.id.endsWith(`:${id}`));
   if (bare.length === 1) return { entry: bare[0] };
-  return bare.length > 1 ? { ambiguous: true } : {};
+  if (bare.length > 1) {
+    const pick = to ? closest(bare, to) : undefined;
+    return pick ? { entry: pick, resolved: true } : { ambiguous: true };
+  }
+  return {};
 }
 
 /** Checks the model's edits against what may change. Returns the ones that pass and why the others did not. */
@@ -81,8 +115,12 @@ export function validateEdits(
   for (const item of list) {
     const e = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
     const id = typeof e.id === 'string' ? e.id : '(no id)';
-    const drop = (why: string) => dropped.push({ id, why });
-    const found = findEntry(registry, id);
+    const drop = (why: string) => {
+      const d: Dropped = { id, why };
+      if (typeof e.to === 'string') d.to = e.to.slice(0, MAX_DROPPED_CHARS);
+      dropped.push(d);
+    };
+    const found = findEntry(registry, id, typeof e.to === 'string' ? e.to.trim() : undefined);
     const entry = found.entry;
     if (!entry) {
       drop(found.ambiguous ? 'more than one prompt has that name' : 'not a known prompt id');
@@ -144,7 +182,14 @@ export function validateEdits(
       continue;
     }
     seen.add(entry.id);
-    kept.push({ id: entry.id, from: entry.text, to, reason, cases: real });
+    kept.push({
+      id: entry.id,
+      from: entry.text,
+      to,
+      reason,
+      cases: real,
+      ...(found.resolved ? { resolvedFrom: id } : {}),
+    });
   }
   return { kept, dropped };
 }

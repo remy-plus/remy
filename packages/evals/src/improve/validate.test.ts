@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { promptRegistry } from './registry.ts';
-import { editsHash, MAX_EDIT_CHARS, validateEdits, weakens } from './validate.ts';
+import { type PromptEntry, promptRegistry } from './registry.ts';
+import {
+  editsHash,
+  MAX_DROPPED_CHARS,
+  MAX_EDIT_CHARS,
+  validateEdits,
+  weakens,
+} from './validate.ts';
 
 const registry = promptRegistry();
 const failed = new Set(['case-a', 'case-b']);
@@ -23,7 +29,7 @@ describe('validateEdits', () => {
 
   it('drops a locked id, even one named exactly', () => {
     for (const id of ['system:untrusted', 'system:secrets-honesty', 'tool:run_command'])
-      expect(run({ ...good, id }).dropped).toEqual([{ id, why: 'locked' }]);
+      expect(run({ ...good, id }).dropped).toEqual([{ id, why: 'locked', to: good.to }]);
   });
 
   it('drops an id that does not exist', () => {
@@ -111,5 +117,58 @@ describe('validateEdits', () => {
     const a = run(good).kept;
     expect(editsHash(a)).toBe(editsHash(run(good).kept));
     expect(editsHash(a)).not.toBe(editsHash([{ ...(a[0] as (typeof a)[0]), to: 'other' }]));
+  });
+});
+
+describe('a bare name that two entries end with', () => {
+  const entry = (id: string, text: string): PromptEntry => ({
+    id,
+    kind: id.startsWith('tool:') ? 'tool' : 'system',
+    text,
+    editable: true,
+  });
+  const fake = [
+    entry(
+      'system:finish',
+      'Before you finish, check that every file you changed was saved and say plainly what is done.',
+    ),
+    entry('tool:finish', 'Ends the task. Pass a short summary of the result.'),
+  ];
+  const go = (to: string, id = 'finish') =>
+    validateEdits([{ id, to, reason: 'clearer', cases: ['case-a'] }], fake, failed);
+
+  it('resolves to the entry whose current text the new text is closest to', () => {
+    const { kept, dropped } = go(
+      'Before you finish, check that every file you changed was saved, and say plainly what is done and what is not.',
+    );
+    expect(dropped).toEqual([]);
+    expect(kept[0]).toMatchObject({ id: 'system:finish', resolvedFrom: 'finish' });
+    const { kept: other } = go(
+      'Ends the task. Pass a short summary of the result and any open question.',
+    );
+    expect(other[0]).toMatchObject({ id: 'tool:finish', resolvedFrom: 'finish' });
+  });
+
+  it('drops it when no entry is clearly closer', () => {
+    const { kept, dropped } = go(
+      'Completely unrelated wording about something else entirely here.',
+    );
+    expect(kept).toEqual([]);
+    expect(dropped[0]?.why).toBe('more than one prompt has that name');
+    expect(dropped[0]?.to).toContain('unrelated');
+  });
+
+  it('leaves an exact full id alone', () => {
+    const { kept } = go(
+      'Ends the task. Pass a short summary of the result and any open question.',
+      'system:finish',
+    );
+    expect(kept[0]?.id).toBe('system:finish');
+    expect(kept[0]?.resolvedFrom).toBeUndefined();
+  });
+
+  it('keeps the proposed text of a dropped edit, cut to a limit', () => {
+    const { dropped } = run({ ...good, id: 'nope:x', to: 'x'.repeat(MAX_DROPPED_CHARS + 50) });
+    expect(dropped[0]?.to).toHaveLength(MAX_DROPPED_CHARS);
   });
 });

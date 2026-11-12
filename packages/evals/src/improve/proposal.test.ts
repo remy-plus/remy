@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -35,5 +35,16 @@ describe('proposal files', () => {
     const home = mkdtempSync(join(tmpdir(), 'remy-home-'));
     saveProposal(home, { ...proposal, version: 2 } as unknown as Proposal);
     expect(() => loadProposal(home, 'p1')).toThrow(/not a proposal/);
+  });
+
+  it('still loads a file whose dropped edits have no text', () => {
+    const home = mkdtempSync(join(tmpdir(), 'remy-home-'));
+    mkdirSync(join(home, 'improve'), { recursive: true });
+    const old = {
+      ...proposal,
+      dropped: [{ id: 'finish', why: 'more than one prompt has that name' }],
+    };
+    writeFileSync(join(home, 'improve', 'p1.json'), JSON.stringify(old));
+    expect(loadProposal(home, 'p1').proposal.dropped[0]?.to).toBeUndefined();
   });
 });
