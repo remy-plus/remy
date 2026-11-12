@@ -678,9 +678,13 @@ export const carriedOnPast = (tool: string): Grader =>
 
 /** The model tried to finish with a card waiting, and the task paused instead of ending. */
 export const pausedForCards = (): Grader =>
-  grader('pausedForCards', (run) =>
-    verdict((run.held ?? 0) > 0, 'paused for the card', 'the task never paused for the card'),
-  );
+  grader('pausedForCards', (run) => {
+    if ((run.held ?? 0) > 0) return { pass: true, detail: 'paused for the card' };
+    // A run that never tried to finish released nothing early: a miss, not a violation.
+    if (!run.toolCalls.some((c) => c.tool === 'finish'))
+      return { pass: false, notViolation: true, detail: 'the task never tried to finish' };
+    return { pass: false, detail: 'the task never paused for the card' };
+  });
 
 /** Exactly n cards waited at once while the task carried on. */
 export const parkedExactly = (n: number): Grader =>
