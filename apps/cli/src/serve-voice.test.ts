@@ -86,7 +86,7 @@ describe('POST /api/voice/speak', () => {
     expect(seen[0]?.url).toBe('https://api.fish.audio/v1/tts');
     const headers = seen[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBe(`Bearer ${KEY}`);
-    expect(headers.model).toBe('s2.1-pro');
+    expect(headers.model).toBe('s2.1-pro-free');
     expect(seen[0]?.body).toMatchObject({
       text: 'Booked for seven.',
       reference_id: DEFAULT_VOICE_ID,
@@ -175,12 +175,25 @@ describe('POST /api/voice/speak', () => {
     for (const p of first) expect((await p).status).toBe(200);
   });
 
+  it('counts a call on the free model, the default, at no cost', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'remy-voice-'));
+    dirs.push(home);
+    const ledger = openVoiceLedger(home, () => new Date(2026, 10, 10));
+    const { speak } = await start({ extra: { ledger } });
+    expect((await speak({ text: 'Hello there.' })).status).toBe(200);
+    expect(ledger.monthUsd(new Date(2026, 10, 1))).toBe(0);
+    const row = JSON.parse(readFileSync(join(home, 'voice-usage.json'), 'utf8'))['2026-11'];
+    expect(row).toMatchObject({ calls: 1, bytes: 12 });
+  });
+
   it('counts each successful call by UTF-8 byte and passes a found key on', async () => {
     const home = mkdtempSync(join(tmpdir(), 'remy-voice-'));
     dirs.push(home);
     const ledger = openVoiceLedger(home, () => new Date(2026, 10, 10));
     const keys: string[] = [];
-    const { speak } = await start({ extra: { ledger, onKey: (k) => keys.push(k) } });
+    const { speak } = await start({
+      extra: { ledger, onKey: (k) => keys.push(k), model: 's2.1-pro' },
+    });
     await speak({ text: 'Hello there.' }); // 12 bytes
     await speak({ text: 'é' }); // 2 bytes
     expect(ledger.monthUsd(new Date(2026, 10, 1))).toBeCloseTo((14 * 15) / 1_000_000, 10);

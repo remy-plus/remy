@@ -21,7 +21,8 @@ import { guard, HttpFail, jsonBody, type Mount, methodNotAllowed } from './serve
 export const FISH_URL = 'https://api.fish.audio/v1/tts';
 /** The voice model id (Fish `reference_id`) used until the person picks another. */
 export const DEFAULT_VOICE_ID = 'e13fa398a7f445a685316a3de6089ce7';
-export const FISH_MODEL = 's2.1-pro';
+/** Fish's free model: it works on a free Fish account, which is what most people will have. */
+export const FISH_MODEL = 's2.1-pro-free';
 /** Fish bills text by UTF-8 byte: US dollars per million bytes, by model (docs.fish.audio pricing). */
 const PRICE_PER_MILLION_BYTES: Record<string, number> = {
   's2.1-pro': 15,
