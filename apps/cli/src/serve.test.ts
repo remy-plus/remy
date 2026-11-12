@@ -16,7 +16,7 @@ import { MemoryEventStore } from '@remy/store';
 import { askUser, finish } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { listenServe, type ServeListening } from './serve.ts';
+import { createServe, listenServe, type ServeListening } from './serve.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { createLockout } from './webhook-lockout.ts';
 
@@ -113,6 +113,12 @@ async function serve(
     redact?: (t: string) => string;
     lockout?: ReturnType<typeof createLockout>;
     webRoot?: string;
+    limits?: {
+      maxRunning?: number;
+      maxStreams?: number;
+      maxOutcomes?: number;
+      outcomeTtlMs?: number;
+    };
   } = {},
 ) {
   const store = p.store ?? new MemoryEventStore();
@@ -141,6 +147,7 @@ async function serve(
       ...(p.redact && { redact: p.redact }),
       ...(p.lockout && { lockout: p.lockout }),
       ...(p.webRoot && { webRoot: p.webRoot }),
+      ...p.limits,
       log: (l) => logs.push(l),
       pollMs: 20,
       busyMs: 50,
@@ -568,5 +575,91 @@ describe('the web app on the same port', () => {
     const r = await api('/', { token: null });
     expect(r.status).toBe(404);
     expect(r.json.error).toContain('not built');
+  });
+});
+
+describe('resource caps', () => {
+  it('refuses a task beyond the running cap with 429, then accepts one when a run ends', async () => {
+    let release: () => void = () => {};
+    const hold = new Promise<void>((r) => {
+      release = r;
+    });
+    const { api } = await serve([call('ping', {}), call('ping', {}), done(), done(), done()], {
+      hold,
+      limits: { maxRunning: 2 },
+    });
+    const a = await api('/api/tasks', { body: { prompt: 'one' } });
+    const b = await api('/api/tasks', { body: { prompt: 'two' } });
+    expect([a.status, b.status]).toEqual([201, 201]);
+    const c = await api('/api/tasks', { body: { prompt: 'three' } });
+    expect(c.status).toBe(429);
+    expect(c.json.error).toBe(
+      'Remy is already working on 2 things. Wait for one to finish, or stop one in Activity.',
+    );
+    release();
+    await until(async () => (await api(`/api/tasks/${a.json.taskId}`)).json.status === 'succeeded');
+    await until(async () => (await api('/api/tasks', { body: { prompt: 'four' } })).status === 201);
+  });
+
+  it('does not count a task waiting for approval as running', async () => {
+    const { api } = await serve([call('note', { text: 'x' }), call('note', { text: 'y' })], {
+      limits: { maxRunning: 1 },
+    });
+    const id = (await api('/api/tasks', { body: { prompt: 'a' } })).json.taskId;
+    await until(async () => (await api(`/api/tasks/${id}`)).json.status === 'waiting_approval');
+    await until(async () => (await api('/api/tasks', { body: { prompt: 'b' } })).status === 201);
+  });
+
+  it('refuses a stream beyond the cap with 429', async () => {
+    const { api, base } = await serve([call('note', { text: 'x' })], { limits: { maxStreams: 1 } });
+    const id = (await api('/api/tasks', { body: { prompt: 'a' } })).json.taskId;
+    await until(async () => (await api(`/api/tasks/${id}`)).json.status === 'waiting_approval');
+    const ctl = new AbortController();
+    const first = await fetch(`${base}/api/tasks/${id}/stream`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: ctl.signal,
+    });
+    expect(first.status).toBe(200);
+    expect((await api(`/api/tasks/${id}/stream`)).status).toBe(429);
+    ctl.abort();
+  });
+
+  it('forgets old and surplus finished outcomes', async () => {
+    const store = new MemoryEventStore();
+    const runtime = createRuntime({
+      store,
+      model: new ScriptedModelClient([done(), done(), done(), done()]),
+      tools: tools(),
+      capabilities: () => ({}) as never,
+      sleep: async () => {},
+    });
+    const serveApi = createServe({
+      store,
+      runtime,
+      home,
+      version: '9.9.9',
+      config: () => ({
+        model: 'scripted',
+        permissions: { autoApprove: ['read'] },
+        budget: DEFAULT_BUDGET,
+        workspaceDir: '/w',
+      }),
+      tokenHash: () => serveTokenHash(home),
+      log: () => {},
+      maxOutcomes: 2,
+    });
+    for (let i = 0; i < 4; i++) {
+      const id = `task_${i}`;
+      await store.createTask(id, 'p', {
+        model: 'scripted',
+        permissions: { autoApprove: ['read'] },
+        budget: DEFAULT_BUDGET,
+        workspaceDir: '/w',
+      });
+      serveApi.ensureRun(id);
+      await until(() => !serveApi.runs.has(id));
+    }
+    expect([...serveApi.outcomes.keys()]).toEqual(['task_2', 'task_3']);
+    serveApi.stop();
   });
 });

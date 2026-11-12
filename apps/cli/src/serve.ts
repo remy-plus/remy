@@ -112,6 +112,13 @@ export interface ServeDeps {
    * the bind address when it is not loopback, and REMY_SERVE_HOSTS (a Tailscale name, say).
    */
   allowedHosts?: string[];
+  /** Most tasks started through the API that may run at once (default 8, or REMY_SERVE_MAX_RUNNING). */
+  maxRunning?: number;
+  /** Most open event streams (default 32). */
+  maxStreams?: number;
+  /** How many finished-task outcomes are kept (default 500), and for how long (default 10 minutes). */
+  maxOutcomes?: number;
+  outcomeTtlMs?: number;
 }
 
 const LOOPBACK_NAMES = new Set(['127.0.0.1', 'localhost', '[::1]']);
@@ -257,8 +264,35 @@ export function createServe(deps: ServeDeps) {
 
   let closed = false;
   const runs = new Map<string, Promise<void>>();
-  const outcomes = new Map<string, RunOutcome | { status: 'error'; error: string }>();
+  type Outcome = RunOutcome | { status: 'error'; error: string };
+  const outcomes = new Map<string, Outcome>();
+  const outcomeAt = new Map<string, number>();
   const streams = new Set<ServerResponse>();
+  const envRunning = Number(process.env.REMY_SERVE_MAX_RUNNING);
+  const maxRunning =
+    deps.maxRunning ?? (Number.isInteger(envRunning) && envRunning > 0 ? envRunning : 8);
+  const maxStreams = deps.maxStreams ?? 32;
+  const maxOutcomes = deps.maxOutcomes ?? 500;
+  const outcomeTtlMs = deps.outcomeTtlMs ?? 10 * 60_000;
+  let starting = 0; // tasks being created, counted before they reach `runs`
+  let opening = 0; // streams being opened, counted before they reach `streams`
+
+  const settled = (o: Outcome | undefined) =>
+    o !== undefined && (o.status === 'error' || isFinal(o));
+  /** Remembers an outcome, and forgets settled ones that are old or beyond the cap (oldest first). */
+  const remember = (id: string, o: Outcome) => {
+    const now = Date.now();
+    outcomes.delete(id);
+    outcomes.set(id, o);
+    outcomeAt.set(id, now);
+    for (const [k, v] of outcomes) {
+      if (runs.has(k) || !settled(v)) continue;
+      if (now - (outcomeAt.get(k) ?? now) > outcomeTtlMs || outcomes.size > maxOutcomes) {
+        outcomes.delete(k);
+        outcomeAt.delete(k);
+      }
+    }
+  };
 
   // ---- the tasks this server started and has not seen finish: resumed after a restart
   const trackedFile = join(deps.home, 'serve-tasks.json');
@@ -287,7 +321,7 @@ export function createServe(deps: ServeDeps) {
         try {
           // `advance` runs until the task needs the user, pauses or finishes, so one call is a whole run.
           const outcome = await runtime.advance(id);
-          outcomes.set(id, outcome);
+          remember(id, outcome);
           if (isFinal(outcome)) untrack(id);
           return;
         } catch (e) {
@@ -296,7 +330,7 @@ export function createServe(deps: ServeDeps) {
             continue;
           }
           const error = redact(e instanceof Error ? e.message : String(e));
-          outcomes.set(id, { status: 'error', error });
+          remember(id, { status: 'error', error });
           deps.log(`serve run ${id} stopped: ${error}`);
           return;
         }
@@ -389,6 +423,25 @@ export function createServe(deps: ServeDeps) {
 
   /** Creates a task and starts it in the background; shared by POST /api/tasks and the mounts. */
   async function beginTask(
+    prompt: string,
+    trust?: TrustLevel,
+    context?: ConversationTurn[],
+    startTainted?: boolean,
+  ) {
+    if (runs.size + starting >= maxRunning)
+      throw new HttpError(
+        429,
+        `Remy is already working on ${maxRunning} things. Wait for one to finish, or stop one in Activity.`,
+      );
+    starting++;
+    try {
+      return await createAndRun(prompt, trust, context, startTainted);
+    } finally {
+      starting--;
+    }
+  }
+
+  async function createAndRun(
     prompt: string,
     trust?: TrustLevel,
     context?: ConversationTurn[],
@@ -569,6 +622,32 @@ export function createServe(deps: ServeDeps) {
     id: string,
     from: string,
   ) {
+    if (streams.size + opening >= maxStreams)
+      return send(res, 429, {
+        error: 'Too many screens are listening at once. Close one and try again.',
+      });
+    opening++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      opening--;
+    };
+    try {
+      await openStream(req, res, url, id, from, release);
+    } finally {
+      release();
+    }
+  }
+
+  async function openStream(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    id: string,
+    from: string,
+    release: () => void,
+  ) {
     const header = req.headers['last-event-id'] ?? url.searchParams.get('lastEventId');
     const last = typeof header === 'string' && /^\d{1,9}$/.test(header) ? Number(header) : 0;
     let next = last + 1;
@@ -593,6 +672,7 @@ export function createServe(deps: ServeDeps) {
     });
     res.on('error', () => {});
     streams.add(res);
+    release();
     let gone = false;
     res.on('close', () => {
       gone = true;
@@ -627,7 +707,7 @@ export function createServe(deps: ServeDeps) {
     if (!res.writableEnded) res.end();
   }
 
-  return { handle, ensureRun, resumeTracked, streams, stop: () => (closed = true), runs };
+  return { handle, ensureRun, resumeTracked, streams, stop: () => (closed = true), runs, outcomes };
 }
 
 /** Starts listening. `bind` has already been checked by `resolveServeBind`. */
