@@ -100,8 +100,14 @@ describe('gatherFacts', () => {
     const p = {
       node: 'v26.1.0',
       platform: 'darwin',
-      hasChromeApp: () => (calls.push('chrome'), false),
-      daemonOn: () => (calls.push('daemon'), true),
+      hasChromeApp: () => {
+        calls.push('chrome');
+        return false;
+      },
+      daemonOn: () => {
+        calls.push('daemon');
+        return true;
+      },
       schedules: () => 1,
       search: plan({ keys: { tinyfish: true } }),
       ...over,

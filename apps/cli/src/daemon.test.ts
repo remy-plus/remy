@@ -96,7 +96,10 @@ describe('a watch', () => {
     await tick(
       store,
       nine,
-      async (p) => (ran.push(p), 'task_1'),
+      async (p) => {
+        ran.push(p);
+        return 'task_1';
+      },
       undefined,
       () => 100,
     );
@@ -107,7 +110,10 @@ describe('a watch', () => {
   it('runs once when the file changes', async () => {
     const store = setup();
     const ran: string[] = [];
-    const run = async (p: string) => (ran.push(p), 'task_1');
+    const run = async (p: string) => {
+      ran.push(p);
+      return 'task_1';
+    };
     await tick(store, nine, run, undefined, () => 100);
     due(store);
     await tick(store, nine, run, undefined, () => 200);
@@ -122,7 +128,10 @@ describe('a watch', () => {
     await tick(
       store,
       nine,
-      async (p) => (ran.push(p), 'task_1'),
+      async (p) => {
+        ran.push(p);
+        return 'task_1';
+      },
       undefined,
       () => undefined,
     );
