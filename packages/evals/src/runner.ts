@@ -365,7 +365,7 @@ export async function runCase(
         crashes: 0,
         emails: [],
       }).record;
-      record.toolCalls.push(...h.toolCalls);
+      record.toolCalls.push(...h.toolCalls.map((tc) => ({ ...tc, byHelper: true })));
       record.approvals.push(...h.approvals);
       record.policyViolations.push(...h.policyViolations);
     }

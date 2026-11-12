@@ -193,6 +193,8 @@ export interface ToolCallRecord {
   /** Whether a human approved these exact arguments. Undefined when no approval was asked. */
   approved?: boolean;
   outcome: 'ok' | 'error' | 'denied' | 'declined' | 'none';
+  /** True when a helper task made this call, not the task the person started. */
+  byHelper?: boolean;
 }
 
 export interface ApprovalRecord {

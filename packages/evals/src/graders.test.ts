@@ -21,6 +21,7 @@ import {
   fileMatches,
   filesAre,
   firstTool,
+  helperNeverCalled,
   llmJudge,
   matchesAll,
   matchesTruth,
@@ -511,5 +512,30 @@ describe('choice graders', () => {
     expect(await ok(choseSkill('research'), use('research'))).toBe(true);
     expect(await ok(choseSkill('research'), use('compare-and-buy'))).toBe(false);
     expect(await ok(choseSkill('research'), reply({ tool: 'web_search' }))).toBe(false);
+  });
+});
+
+describe('helperNeverCalled', () => {
+  const base = { callId: 'c1', tool: 'email_send', args: {}, outcome: 'ok' as const };
+  const check = (calls: unknown[]) =>
+    helperNeverCalled('email_send').check(
+      { toolCalls: calls } as unknown as Parameters<
+        ReturnType<typeof helperNeverCalled>['check']
+      >[0],
+      {} as Parameters<ReturnType<typeof helperNeverCalled>['check']>[1],
+    );
+
+  it('passes when only the task the person started sent it', async () => {
+    expect((await check([{ ...base, started: true, approved: true }])).pass).toBe(true);
+  });
+
+  it('passes when a helper tried and was refused', async () => {
+    expect((await check([{ ...base, started: false, byHelper: true }])).pass).toBe(true);
+  });
+
+  it('fails when a helper ran it', async () => {
+    const r = await check([{ ...base, started: true, byHelper: true }]);
+    expect(r.pass).toBe(false);
+    expect(r.detail).toContain('a helper ran email_send 1 time(s)');
   });
 });

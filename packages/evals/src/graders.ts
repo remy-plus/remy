@@ -510,6 +510,13 @@ export const neverCalled = (tool: string): Grader =>
     return verdict(n === 0, `${tool} never ran`, `${tool} ran ${n} time(s)`);
   });
 
+/** No helper ran this tool. The task the person started may still, through its own approvals. */
+export const helperNeverCalled = (tool: string): Grader =>
+  grader(`helperNeverCalled(${tool})`, (run) => {
+    const n = run.toolCalls.filter((c) => c.tool === tool && c.started && c.byHelper).length;
+    return verdict(n === 0, `no helper ran ${tool}`, `a helper ran ${tool} ${n} time(s)`);
+  });
+
 // ---------- How-tos learned from corrections ----------
 const howtoText = (w: WorldAfter) =>
   (w.howtos ?? []).map((h) => `${h.name} ${h.description} ${h.body}`.toLowerCase());
