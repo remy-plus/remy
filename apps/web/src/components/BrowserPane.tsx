@@ -165,9 +165,11 @@ export function BrowserPane({ compact = false }: { compact?: boolean }) {
         {/* The address bar is the top of the window, not a pill floating above it: a wide, faint
             outline with a gap under it reads as a stray rule rather than as chrome. */}
         {open && (
-          <div className="flex min-w-0 items-center gap-3 border-b border-edge px-4 py-2 text-[13px]">
-            <span className="min-w-0 truncate text-text">{state?.title || host(state?.url)}</span>
-            <span className="min-w-0 flex-1 truncate text-right font-mono text-[12px] text-muted">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-edge px-4 py-2 text-[13px]">
+            <span className="min-w-0 break-words text-text sm:truncate">
+              {state?.title || host(state?.url)}
+            </span>
+            <span className="min-w-0 basis-full break-all font-mono sm:basis-0 sm:flex-1 sm:truncate sm:text-right text-[12px] text-muted">
               {state?.url}
             </span>
           </div>
