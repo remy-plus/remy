@@ -49,7 +49,7 @@ export function Quiet() {
             setSetting('quiet', false);
             window.location.hash = '#/';
           }}
-          className="cursor-pointer border-0 bg-transparent p-0 font-mono text-[12px] text-muted underline hover:text-text"
+          className="cursor-pointer border-0 bg-transparent px-2 py-2.5 font-mono text-[12px] text-muted underline hover:text-text"
         >
           turn off
         </button>
