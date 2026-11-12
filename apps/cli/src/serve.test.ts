@@ -259,7 +259,10 @@ describe('auth', () => {
     });
     for (const x of [r, pre])
       expect([...x.headers.keys()].filter((k) => k.startsWith('access-control'))).toEqual([]);
-    expect(pre.status).toBe(405);
+    expect(r.status).toBe(403); // a foreign Origin is refused outright
+    expect(pre.status).toBe(403);
+    const same = await api('/api/tasks', { method: 'OPTIONS' });
+    expect(same.status).toBe(405);
     expect(logs.join('\n')).not.toContain(token);
   });
 });

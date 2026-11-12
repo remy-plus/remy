@@ -81,7 +81,8 @@ export function createWebhookHandler(deps: HandlerDeps) {
 
     const hook = deps.hook(name);
     if (!authorized(req.headers.authorization, hook, secret)) {
-      lockout.fail(from);
+      // Only a token that was offered and is wrong counts toward the lockout.
+      if (req.headers.authorization !== undefined) lockout.fail(from);
       return reply(401);
     }
     if (!hook) return reply(404);

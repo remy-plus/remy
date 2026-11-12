@@ -104,6 +104,15 @@ describe('webhook server', () => {
     expect(started).toEqual([]);
   });
 
+  it('does not count a missing token or an OPTIONS preflight toward the lockout', async () => {
+    const { post } = await setup({ lockout: createLockout(() => 0) });
+    for (let i = 0; i < 8; i++) {
+      expect((await post('/hook/deploys', { token: undefined })).status).toBe(401);
+      expect((await post('/hook/deploys', { method: 'OPTIONS' })).status).toBe(405);
+    }
+    expect((await post('/hook/deploys', { token: TOKEN })).status).not.toBe(429);
+  });
+
   it('allows POST only', async () => {
     const { post } = await setup();
     for (const method of ['GET', 'PUT', 'DELETE']) {

@@ -53,6 +53,8 @@ By default the compose file publishes the port on `127.0.0.1` only, so nothing e
 
 The static web files need no token, because they hold no data. Everything under `/api` does, and five wrong tokens lock an address out for a minute.
 
+The server also checks the name in the address bar (the Host header) and answers 421 to any name it does not know. It accepts loopback, this machine's own addresses and its host name (and `name.local`), read when it starts. For any other name, such as a Tailscale MagicDNS name or a reverse proxy name, set `REMY_SERVE_HOSTS=name1,name2`. This check is what stops a web page from reaching the server through DNS rebinding.
+
 ## Backups
 
 Everything is in the `remy-data` volume: the task history, notes, schedules, saved settings and the token hash. To back it up, stop the container so no write is half done, then copy the volume out:

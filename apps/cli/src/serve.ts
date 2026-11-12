@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { networkInterfaces, hostname as osHostname } from 'node:os';
 import { join } from 'node:path';
 import {
   type ConversationTurn,
@@ -63,6 +64,8 @@ export interface ApiCtx {
     prompt: string,
     trust?: TrustLevel,
     context?: ConversationTurn[],
+    /** Start tainted, as when an earlier turn of the chat read untrusted content. */
+    startTainted?: boolean,
   ): Promise<{ taskId: string }>;
 }
 export interface ApiResult {
@@ -104,6 +107,77 @@ export interface ServeDeps {
   busyTries?: number;
   /** Extra routes (connections, skills, schedules, brain), asked after the token check, in order. */
   mounts?: Mount[];
+  /**
+   * Host header values accepted besides loopback names (`host:port`, or a bare name for any port):
+   * the bind address when it is not loopback, and REMY_SERVE_HOSTS (a Tailscale name, say).
+   */
+  allowedHosts?: string[];
+}
+
+const LOOPBACK_NAMES = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/**
+ * Host header rule (blocks DNS rebinding: a rebinding page's Host is the attacker's domain, never
+ * one of these). Accepted: 127.0.0.1, localhost or [::1] with any port (any port so a Docker
+ * published port still works), plus the entries of `allowed`. Anything else gets 421.
+ */
+export function hostAllowed(host: string | undefined, allowed: readonly string[] = []): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  const name = h.startsWith('[') ? h.slice(0, h.indexOf(']') + 1) : (h.split(':')[0] as string);
+  if (LOOPBACK_NAMES.has(name) && (h === name || /^:\d{1,5}$/.test(h.slice(name.length))))
+    return true;
+  return allowed.some((a) => {
+    const x = a.toLowerCase();
+    return h === x || (!/:\d+$/.test(x) && name === (x.startsWith('[') ? x : x.split(':')[0]));
+  });
+}
+
+/** Minimal shape of `os.networkInterfaces()`, so tests can feed fixed values. */
+export type InterfaceMap = Record<string, readonly { address: string }[] | undefined>;
+
+/**
+ * Host names this machine answers to, for the Host check. Bound to 0.0.0.0 or ::, that is every
+ * interface address, the hostname and `hostname.local`; bound to one address, just that address.
+ * Bare names mean any port (Docker may publish a different one). A rebinding page carries its own
+ * domain in Host, never these. Read at listen time: addresses gained later need REMY_SERVE_HOSTS
+ * or a restart.
+ */
+export function ownHosts(bindHost: string, interfaces: InterfaceMap, hostname: string): string[] {
+  const fmt = (a: string): string | null => {
+    const bare = a.split('%')[0] as string;
+    if (!bare || /^fe80:/i.test(bare)) return null;
+    return bare.includes(':') ? `[${bare}]` : bare;
+  };
+  const unspecified = ['0.0.0.0', '::', '::0'].includes(bindHost);
+  if (!unspecified) {
+    const one = fmt(bindHost);
+    return one && !LOOPBACK_NAMES.has(one) ? [one.toLowerCase()] : [];
+  }
+  const out = new Set<string>();
+  for (const list of Object.values(interfaces))
+    for (const i of list ?? []) {
+      const a = fmt(i.address);
+      if (a) out.add(a.toLowerCase());
+    }
+  const h = hostname.trim().toLowerCase();
+  if (h) {
+    out.add(h);
+    if (!h.includes('.')) out.add(`${h}.local`);
+  }
+  return [...out];
+}
+
+/** Cross-site browser traffic: a cross-site fetch, or an Origin that is not this server's own. */
+function crossOrigin(req: IncomingMessage): boolean {
+  if (req.headers['sec-fetch-site'] === 'cross-site') return true;
+  const origin = req.headers.origin;
+  if (origin === undefined) return false;
+  try {
+    return new URL(origin).host.toLowerCase() !== (req.headers.host ?? '').toLowerCase();
+  } catch {
+    return true; // "null" and anything unparseable
+  }
 }
 
 export interface ServeListening {
@@ -314,11 +388,20 @@ export function createServe(deps: ServeDeps) {
   }
 
   /** Creates a task and starts it in the background; shared by POST /api/tasks and the mounts. */
-  async function beginTask(prompt: string, trust?: TrustLevel, context?: ConversationTurn[]) {
+  async function beginTask(
+    prompt: string,
+    trust?: TrustLevel,
+    context?: ConversationTurn[],
+    startTainted?: boolean,
+  ) {
     await deps.beforeStart?.();
     const taskId = `task_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
     const base = deps.config(taskId, trust);
-    const config = context?.length ? { ...base, context } : base;
+    const config = {
+      ...base,
+      ...(context?.length && { context }),
+      ...(startTainted && { startTainted: true }),
+    };
     await store.createTask(taskId, prompt, config);
     track(taskId);
     ensureRun(taskId);
@@ -377,12 +460,19 @@ export function createServe(deps: ServeDeps) {
       send(res, status, body, headers);
     };
 
+    if (!hostAllowed(req.headers.host, deps.allowedHosts))
+      return reply(421, { error: 'This address is not one Remy answers on.' });
     if (path === '/api') return reply(404);
     if (!path.startsWith('/api/')) return staticFiles(req, res); // the web app: no token, no API
     if (path === '/api/health') {
       if (method !== 'GET') return reply(405, undefined, { allow: 'GET' });
       return reply(200, { ok: true, version: deps.version });
     }
+
+    // Neither of these counts toward the lockout: a cross-site page must not be able to lock the
+    // person out of their own server by sending requests that carry no token.
+    if (crossOrigin(req)) return reply(403, { error: 'Cross-site requests are not accepted.' });
+    if (method === 'OPTIONS') return reply(405, undefined, { allow: 'GET, POST, PUT, DELETE' });
 
     if (lockout.blocked(from))
       return reply(
@@ -393,7 +483,8 @@ export function createServe(deps: ServeDeps) {
     const given = bearer(req.headers.authorization);
     const hash = deps.tokenHash();
     if (given === undefined || hash === undefined || !safeEqual(sha256Hex(given), hash)) {
-      lockout.fail(from);
+      // Only a token that was offered and is wrong counts; no Authorization header is just a 401.
+      if (req.headers.authorization !== undefined) lockout.fail(from);
       return reply(
         401,
         { error: 'A valid bearer token is required.' },
@@ -541,7 +632,10 @@ export function createServe(deps: ServeDeps) {
 
 /** Starts listening. `bind` has already been checked by `resolveServeBind`. */
 export async function listenServe(deps: ServeDeps, bind: ServeBind): Promise<ServeListening> {
-  const serve = createServe(deps);
+  const allowedHosts = [...(deps.allowedHosts ?? [])];
+  for (const h of (process.env.REMY_SERVE_HOSTS ?? '').split(','))
+    if (h.trim()) allowedHosts.push(h.trim());
+  const serve = createServe({ ...deps, allowedHosts });
   const server = createServer((req, res) => {
     serve.handle(req, res).catch(() => {
       if (!res.headersSent) send(res, 500);
@@ -556,6 +650,8 @@ export async function listenServe(deps: ServeDeps, bind: ServeBind): Promise<Ser
     server.once('error', reject);
     server.listen(bind.port, bind.host, () => resolve());
   });
+  if (!LOOPBACK_NAMES.has(bind.host) && bind.host !== '::1')
+    allowedHosts.push(...ownHosts(bind.host, networkInterfaces(), osHostname()));
   void serve
     .resumeTracked()
     .catch((e) =>
