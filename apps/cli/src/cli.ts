@@ -200,6 +200,13 @@ import {
 } from './serve-voice.ts';
 import { type BackgroundTask, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
+import {
+  addCommand,
+  parseDirectoryRef,
+  prepareFromDirectory,
+  searchBots,
+  searchSkillsSh,
+} from './skills-directory.ts';
 import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
@@ -293,9 +300,10 @@ Usage
   remy improve propose|check|apply|list
                                   Remy proposes edits to its own prompts from failed eval runs;
                                   nothing changes until you apply a checked proposal
-  remy skills [list|show <name>|add <folder or link>|update <name>|rm <name>]
+  remy skills [list|show <name>|find <query> [--bots]|add <folder, link, skills.sh:owner/repo/skill or bot:slug>|update <name>|rm <name>]
                                   How-tos Remy follows for kinds of tasks; add shows the
-                                  SKILL.md and asks first (--yes skips the question)
+                                  SKILL.md and asks first (--yes skips the question);
+                                  find searches skills.sh, or botdirectory.ai with --bots
   remy answer <id> "<text>"       Answer a pending question, then continue
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
@@ -401,6 +409,7 @@ const OPTIONS = {
   steps: { type: 'string' },
   cost: { type: 'string' },
   long: { type: 'boolean' },
+  bots: { type: 'boolean' },
   for: { type: 'string' },
   background: { type: 'boolean' },
   bind: { type: 'string' },
@@ -1902,13 +1911,42 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(plainSkill(hit));
           return 0;
         }
+        if (sub === 'find') {
+          need(2, 'remy skills find <query> [--bots]');
+          const q = rest.slice(1).join(' ');
+          const found = await (flags.bots ? searchBots : searchSkillsSh)(q, {
+            limit: 10,
+            ...(deps.fetch && { fetch: deps.fetch }),
+          });
+          if (!found.length) {
+            out(`Nothing found for "${q}".`);
+            return 0;
+          }
+          for (const r of found) {
+            out(`${r.name}${r.detail ? `  (${r.detail})` : ''}`);
+            if (r.description) out(`  ${r.description}`);
+            out(`  ${r.url}`);
+            out(`  ${addCommand(r)}`);
+            out();
+          }
+          out(
+            'Anyone can publish to these directories and nothing is checked for you. add shows the text first, and a skill is text only.',
+          );
+          return 0;
+        }
         if (sub === 'add') {
-          need(2, 'remy skills add <folder or link>');
+          need(2, 'remy skills add <folder, link, skills.sh:owner/repo/skill or bot:slug>');
           const where = rest[1] as string;
           const fromWeb = /^[a-z]+:\/\//i.test(where);
-          const c = fromWeb
-            ? await fetchSkill(where).then((f) => skills().prepareWeb(f.text, f.origin))
-            : skills().prepare(where);
+          const ref = parseDirectoryRef(where);
+          const c = ref
+            ? await prepareFromDirectory(ref.source, ref.id, {
+                skills: skills(),
+                ...(deps.fetch && { fetch: deps.fetch }),
+              })
+            : fromWeb
+              ? await fetchSkill(where).then((f) => skills().prepareWeb(f.text, f.origin))
+              : skills().prepare(where);
           out(plainSkill(c.skill));
           if (c.origin)
             out(
@@ -1970,7 +2008,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           return 0;
         }
         throw new Error(
-          'Use remy skills list, show <name>, add <folder or link>, update <name> or rm <name>.',
+          'Use remy skills list, show <name>, find <query>, add <folder or link>, update <name> or rm <name>.',
         );
       }
 
@@ -2338,7 +2376,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                     list,
                   ),
               }),
-              createSkillsMount({ skills: skills() }),
+              createSkillsMount({ skills: skills(), ...(deps.fetch && { fetch: deps.fetch }) }),
               createBrowserMount({ browser: () => browser, redact }),
               createVoiceMount({
                 key: fishKey,

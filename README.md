@@ -86,6 +86,8 @@ For a job that should run for hours, `remy run --background --for 3h "<task>"` s
 
 Skills are short how-tos Remy follows for kinds of tasks. Five are built in, and `remy skills add <link>` takes your own or one from GitHub. It shows you the whole text first. Skills from a link stay limited: reading one means any action needs your approval.
 
+To look for more, `remy skills find <query>` searches skills.sh, and `remy skills find <query> --bots` searches botdirectory.ai (the Skills screen in the web app has the same search). Add one with `remy skills add skills.sh:<owner/repo/skill>` or `remy skills add bot:<slug>`. A skills.sh skill is fetched from its GitHub repository and pinned to the commit; a bot becomes a skill whose text starts with its source and a note that it was written by someone else. Both are text only, shown to you before anything is saved, and a name you already have is never replaced. Anyone can publish to these directories and nothing is checked for you, so only you can install: no tool Remy has reaches the install, and a page or an email cannot add a skill.
+
 When you correct Remy ("no, use the other folder", "next time check the date first"), it may offer once, before it finishes, to save the fix as a short how-to: a title, when it applies and one to five steps, in your words. You see the whole text on an approval card and nothing is saved until you approve. The next similar task gets those steps with your message. How-tos you saved this way show as `[learned]` in `/skills` and `remy skills list`; edit the file that `remy skills show <name>` prints, or remove one with `remy skills rm <name>`. Remy never saves a secret in one, offers nothing when personalising is off, and helpers and scheduled runs never offer.
 
 ### Schedules
