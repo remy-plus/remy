@@ -67,6 +67,17 @@ describe('ScopedFs', () => {
     expect(readFileSync(outside, 'utf8')).toBe('top secret');
   });
 
+  it('tells the model how the person can allow another folder', async () => {
+    const fs = createScopedFs(root);
+    const e = await fs.readText('../secret.txt').catch((x: Error) => x);
+    expect(e).toBeInstanceOf(ScopeError);
+    const text = (e as Error).message;
+    expect(text).toContain('../secret.txt is outside the folder Remy may use');
+    expect(text).toContain(root);
+    expect(text).toContain('Folder Remy may use');
+    expect(text).toContain('--workspace');
+  });
+
   it('enforces a size limit on reads and writes', async () => {
     const fs = createScopedFs(root, { maxBytes: 4 });
     await expect(fs.readText('a.txt')).rejects.toThrow(/too large/i);

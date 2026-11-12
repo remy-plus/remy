@@ -45,6 +45,12 @@ export const fullFs = (fs: ScopedFs): ScopedFsFull => {
   return fs as ScopedFsFull;
 };
 
+/** The error for a path outside the folder, with how the person can allow another one. */
+const outside = (p: string, root: string) =>
+  new ScopeError(
+    `path escapes the workspace: ${p} is outside the folder Remy may use (${root}). The person can choose a different folder in Settings, under Folder Remy may use, or start remy serve with --workspace.`,
+  );
+
 export function createScopedFs(root: string, opts: { maxBytes?: number } = {}): ScopedFsFull {
   const maxBytes = opts.maxBytes ?? 5_000_000;
   const base = resolve(root);
@@ -59,7 +65,7 @@ export function createScopedFs(root: string, opts: { maxBytes?: number } = {}): 
       throw new ScopeError(`path must be relative to the workspace: ${JSON.stringify(p)}`);
     }
     const full = resolve(base, p);
-    if (!inside(base, full)) throw new ScopeError(`path escapes the workspace: ${p}`);
+    if (!inside(base, full)) throw outside(p, base);
     return full;
   };
 
@@ -82,9 +88,7 @@ export function createScopedFs(root: string, opts: { maxBytes?: number } = {}): 
 
   const check = async (p: string): Promise<string> => {
     const full = lexical(p);
-    if (!inside(await jail(), await anchor(full))) {
-      throw new ScopeError(`path escapes the workspace: ${p}`);
-    }
+    if (!inside(await jail(), await anchor(full))) throw outside(p, base);
     return full;
   };
 
