@@ -354,6 +354,13 @@ export interface RemyApi {
   setSkillEnabled(name: string, enabled: boolean): Promise<void>;
   runSkill(name: string): Promise<{ taskId: string }>;
   resolveSuggestion(accept: boolean): Promise<void>;
+  /** Skills from skills.sh or ready-made bots from botdirectory.ai. Read-only: it installs nothing. */
+  searchSkillDirectory(
+    q: string,
+    from: 'skills' | 'bots',
+  ): Promise<{ results: DirectoryResult[]; note: string }>;
+  /** Saves one directory result as a skill, as text at a fixed version. */
+  installFromDirectory(source: DirectoryResult['source'], id: string): Promise<SkillItem>;
   schedules(): Promise<SchedulesData>;
   setScheduleEnabled(id: string, enabled: boolean): Promise<void>;
   runScheduleNow(id: string): Promise<{ taskId: string }>;
@@ -487,6 +494,17 @@ export interface SkillItem {
   origin: string | null;
   steps: { title: string; detail: string }[];
   why: string | null;
+}
+/** One result from a public directory of skills or bots. */
+export interface DirectoryResult {
+  source: 'skills.sh' | 'botdirectory';
+  id: string;
+  name: string;
+  description: string;
+  detail: string;
+  url: string;
+  /** For a bot: the start of its prompt, so the person can read what they would install. */
+  preview?: string;
 }
 export interface SkillsData {
   skills: SkillItem[];

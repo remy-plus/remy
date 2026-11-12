@@ -10,6 +10,7 @@ import { AddConnection } from './pages/connect/AddConnection.tsx';
 import { AddMachine } from './pages/connect/AddMachine.tsx';
 import { Brain } from './pages/connect/Brain.tsx';
 import { Connections } from './pages/connect/Connections.tsx';
+import { FindSkill } from './pages/connect/FindSkill.tsx';
 import { NewSchedule } from './pages/connect/NewSchedule.tsx';
 import { Schedules } from './pages/connect/Schedules.tsx';
 import { Skills } from './pages/connect/Skills.tsx';
@@ -51,6 +52,8 @@ function Page({ path }: { path: string }) {
       return <Brain />;
     case 'skills':
       return <Skills />;
+    case 'skills-find':
+      return <FindSkill />;
     case 'schedules':
       return <Schedules />;
     case 'schedule-new':

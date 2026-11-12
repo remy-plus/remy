@@ -8,6 +8,7 @@ import type {
   CatalogApp,
   ConnectedApp,
   ConnectionsData,
+  DirectoryResult,
   Machine,
   NewScheduleInput,
   PermissionLevel,
@@ -172,6 +173,47 @@ const CATALOG: CatalogApp[] = [
       'Prepare comments. Nothing posts until you approve.',
       'Comment and edit. Each one asks first.',
     ),
+  },
+];
+
+const DIRECTORY: DirectoryResult[] = [
+  {
+    source: 'skills.sh',
+    id: 'acme/skills/pdf-forms',
+    name: 'pdf-forms',
+    description:
+      'Fill in PDF forms from a short list of answers, and check each field before saving.',
+    detail: '12,402 installs',
+    url: 'https://skills.sh/acme/skills/pdf-forms',
+  },
+  {
+    source: 'skills.sh',
+    id: 'acme/skills/meeting-notes',
+    name: 'meeting-notes',
+    description: 'Turn a transcript into decisions, owners and dates.',
+    detail: '3,118 installs',
+    url: 'https://skills.sh/acme/skills/meeting-notes',
+  },
+  {
+    source: 'botdirectory',
+    id: 'inbox-triage',
+    name: 'Inbox triage',
+    description:
+      'Sorts a mailbox into reply now, reply later and ignore, with one line of why each.',
+    detail: 'Email · Gmail, Outlook',
+    url: 'https://botdirectory.ai/bots/inbox-triage',
+    preview:
+      'You are an inbox triage assistant. Read each message and sort it into three groups: reply now, reply later, ignore. Give one line of reasoning for each. Never send, archive or delete anything.',
+  },
+  {
+    source: 'botdirectory',
+    id: 'invoice-chaser',
+    name: 'Invoice chaser',
+    description: 'Drafts polite reminders for invoices that are overdue.',
+    detail: 'Finance · Stripe, Gmail',
+    url: 'https://botdirectory.ai/bots/invoice-chaser',
+    preview:
+      'You write short, polite payment reminders. List overdue invoices, then draft one reminder for each. Drafts only.',
   },
 ];
 
@@ -529,6 +571,8 @@ export function createConnectMock(): Pick<
   | 'setSkillEnabled'
   | 'runSkill'
   | 'resolveSuggestion'
+  | 'searchSkillDirectory'
+  | 'installFromDirectory'
   | 'schedules'
   | 'setScheduleEnabled'
   | 'runScheduleNow'
@@ -627,6 +671,39 @@ export function createConnectMock(): Pick<
     async setSkillEnabled(name, enabled) {
       const s = skills.find((x) => x.name === name);
       if (s) s.enabled = enabled;
+    },
+    async searchSkillDirectory(q, from) {
+      const source = from === 'bots' ? 'botdirectory' : 'skills.sh';
+      const w = q.trim().toLowerCase();
+      const results = DIRECTORY.filter(
+        (r) =>
+          r.source === source &&
+          (r.name.toLowerCase().includes(w) || r.description.toLowerCase().includes(w)),
+      );
+      return wait({
+        results: clone(results),
+        note: `Results from ${source === 'skills.sh' ? 'skills.sh' : 'botdirectory.ai'}, not from Remy. Remy has not checked them.`,
+      });
+    },
+    async installFromDirectory(source, id) {
+      const r = DIRECTORY.find((x) => x.source === source && x.id === id);
+      if (!r) throw new ApiError(404, 'That is not in the directory any more.');
+      const name = r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      if (skills.some((x) => x.name === name))
+        throw new ApiError(409, `A skill named ${name} is already saved.`);
+      const item: SkillItem = {
+        name,
+        blurb: r.description,
+        source: 'yours',
+        enabled: true,
+        used: 0,
+        lastRun: null,
+        origin: `From ${source === 'skills.sh' ? 'skills.sh' : 'botdirectory.ai'}`,
+        steps: [{ title: 'Follow the saved text', detail: r.preview ?? r.description }],
+        why: null,
+      };
+      skills.push(item);
+      return clone(item);
     },
     async runSkill() {
       runs += 1;

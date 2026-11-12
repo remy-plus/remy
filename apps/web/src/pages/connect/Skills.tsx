@@ -75,6 +75,11 @@ export function Skills() {
         <p className="mt-3 mb-6 text-base text-muted">
           How you like things done, saved so Remy does them the same way every time.
         </p>
+        <p className="mt-0 mb-6">
+          <a className={quiet} href="#/skills/find">
+            Find a skill
+          </a>
+        </p>
         {data.skills.length === 0 && (
           <p className="m-0 text-[14px] text-muted">Nothing is saved yet.</p>
         )}

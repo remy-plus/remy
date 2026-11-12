@@ -31,6 +31,7 @@ describe('matchRoute', () => {
     expect(matchRoute('/tasks/task_1')).toEqual({ name: 'task', params: { id: 'task_1' } });
     expect(matchRoute('/brain').name).toBe('brain');
     expect(matchRoute('/skills').name).toBe('skills');
+    expect(matchRoute('/skills/find').name).toBe('skills-find');
     expect(matchRoute('/schedules').name).toBe('schedules');
     expect(matchRoute('/connections').name).toBe('connections');
     expect(matchRoute('/settings').name).toBe('settings');
@@ -64,6 +65,7 @@ describe('App routing', () => {
     ],
     ['#/brain', 'Brain', 'Brain'],
     ['#/skills', 'Skills', 'Brain'],
+    ['#/skills/find', 'Find a skill', 'Brain'],
     ['#/schedules', 'Schedules', 'Brain'],
     ['#/schedules/new', 'New schedule', 'Brain'],
     ['#/connections', 'Connections', 'Connections'],

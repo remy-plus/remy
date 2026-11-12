@@ -32,7 +32,12 @@ export const DOCK_ITEMS: DockItem[] = [
     label: 'Brain',
     href: '#/brain',
     // Scheduled jobs live under Brain, next to Notes and Skills (see BrainTabs).
-    match: (p) => p === '/brain' || p === '/skills' || p === '/schedules' || p === '/schedules/new',
+    match: (p) =>
+      p === '/brain' ||
+      p === '/skills' ||
+      p === '/skills/find' ||
+      p === '/schedules' ||
+      p === '/schedules/new',
   },
   {
     id: 'connections',

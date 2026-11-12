@@ -11,6 +11,7 @@ import type {
   ChatSummary,
   ChatView,
   ConnectionsData,
+  DirectoryResult,
   ExtendBody,
   Health,
   HomeData,
@@ -21,6 +22,7 @@ import type {
   ReviewData,
   SchedulesData,
   SettingsData,
+  SkillItem,
   SkillsData,
   StreamEvent,
   TaskListItem,
@@ -185,6 +187,18 @@ export function createHttpApi(opts: {
     skills: () => json<SkillsData>('/api/skills'),
     setSkillEnabled: (name, enabled) =>
       post(`/api/skills/${encodeURIComponent(name)}/enabled`, { enabled }),
+    searchSkillDirectory: (q, from) =>
+      json<{ results: DirectoryResult[]; note: string }>(
+        `/api/skills/directory?q=${encodeURIComponent(q)}&from=${from}`,
+      ),
+    async installFromDirectory(source, id) {
+      return (
+        await json<{ skill: SkillItem }>('/api/skills/directory/install', {
+          method: 'POST',
+          body: JSON.stringify({ source, id }),
+        })
+      ).skill;
+    },
     runSkill: (name) =>
       json<{ taskId: string }>(`/api/skills/${encodeURIComponent(name)}/run`, {
         method: 'POST',

@@ -7,6 +7,7 @@ export type RouteName =
   | 'task'
   | 'brain'
   | 'skills'
+  | 'skills-find'
   | 'schedules'
   | 'connections'
   | 'settings'
@@ -37,6 +38,7 @@ const TABLE: [pattern: string, name: RouteName][] = [
   ['/tasks/:id', 'task'],
   ['/brain', 'brain'],
   ['/skills', 'skills'],
+  ['/skills/find', 'skills-find'],
   ['/schedules', 'schedules'],
   ['/connections', 'connections'],
   ['/connections/add', 'connection-add'],
