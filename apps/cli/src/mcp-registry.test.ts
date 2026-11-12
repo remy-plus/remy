@@ -128,11 +128,110 @@ describe('toApp', () => {
     expect(app).toBeUndefined();
   });
 
-  it('ignores a package that is not npm', () => {
+  it('ignores a package type it does not run', () => {
     const app = toApp({
-      server: { name: 'x/y', packages: [{ registryType: 'pypi', identifier: 'thing' }] },
+      server: { name: 'x/y', packages: [{ registryType: 'nuget', identifier: 'thing' }] },
     });
     expect(app).toBeUndefined();
+  });
+
+  it('runs a pypi package with uvx, package arguments after the name', () => {
+    const app = toApp({
+      server: {
+        name: 'x/py',
+        packages: [
+          {
+            registryType: 'pypi',
+            identifier: 'thing-mcp',
+            runtimeArguments: [{ type: 'named', name: '--python', value: '3.12' }],
+            packageArguments: [{ type: 'positional', value: 'serve' }],
+          },
+        ],
+      },
+    });
+    expect(app?.kind).toBe('package');
+    expect(app?.command).toBe('uvx');
+    expect(app?.args).toEqual(['--python', '3.12', 'thing-mcp', 'serve']);
+  });
+
+  it('runs an oci package with docker and forwards each secret by name', () => {
+    const app = toApp({
+      server: {
+        name: 'x/box',
+        packages: [
+          {
+            registryType: 'oci',
+            identifier: 'ghcr.io/x/box:1.0',
+            packageArguments: [{ type: 'named', name: '--mode', value: 'stdio' }],
+            environmentVariables: [
+              { name: 'BOX_TOKEN', isRequired: true, isSecret: true },
+              { name: 'BOX_DEBUG' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(app?.command).toBe('docker');
+    expect(app?.args).toEqual([
+      'run',
+      '-i',
+      '--rm',
+      '-e',
+      'BOX_TOKEN',
+      'ghcr.io/x/box:1.0',
+      '--mode',
+      'stdio',
+    ]);
+    expect(app?.secrets.map((x) => x.key)).toEqual(['BOX_TOKEN']);
+  });
+
+  it('turns named arguments into a name and a value, positional ones into the value', () => {
+    const app = toApp({
+      server: {
+        name: 'x/args',
+        packages: [
+          {
+            registryType: 'npm',
+            identifier: 'pkg',
+            runtimeArguments: [{ type: 'named', name: '--flag' }],
+            packageArguments: [
+              { type: 'named', name: '--port', value: '80' },
+              { type: 'named', name: '--host=local' },
+              { type: 'positional', value: 'start' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(app?.args).toEqual(['-y', '--flag', 'pkg', '--port', '80', '--host=local', 'start']);
+  });
+
+  it('drops an argument that needs a value it cannot fill', () => {
+    const app = toApp({
+      server: {
+        name: 'x/hole',
+        packages: [
+          {
+            registryType: 'npm',
+            identifier: 'pkg',
+            packageArguments: [
+              { type: 'named', name: '--path', value: '{workspace}' },
+              { type: 'positional', value: 'run' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(app?.args).toEqual(['-y', 'pkg', 'run']);
+  });
+
+  it('prefers npm, then pypi, then oci', () => {
+    const pk = (registryType: string) => ({ registryType, identifier: `id-${registryType}` });
+    const cmd = (types: string[]) =>
+      toApp({ server: { name: 'x/m', packages: types.map(pk) } })?.args?.join(' ');
+    expect(cmd(['oci', 'pypi', 'npm'])).toBe('-y id-npm');
+    expect(cmd(['oci', 'pypi'])).toBe('id-pypi');
+    expect(cmd(['oci'])).toBe('run -i --rm id-oci');
   });
 });
 

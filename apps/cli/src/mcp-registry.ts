@@ -68,6 +68,7 @@ interface RawPackage {
   runtimeHint?: unknown;
   transport?: unknown;
   runtimeArguments?: unknown;
+  packageArguments?: unknown;
   environmentVariables?: unknown;
 }
 
@@ -112,29 +113,68 @@ function remoteOf(server: RawServer): { url: string; headers: RawHeader[] } | un
   return undefined;
 }
 
-/** The first npm package, as the command this machine would run. */
+interface RawArgument {
+  type?: unknown;
+  name?: unknown;
+  value?: unknown;
+}
+
+/**
+ * One argument as command-line tokens. A named argument is its `name` then its `value` (or the
+ * name alone), and a name that already carries `=` stays one token. A positional argument is its
+ * value. An argument whose value holds a `{placeholder}` needs input this code cannot supply, so
+ * it is dropped rather than passed through with the braces in it.
+ */
+function argTokens(raw: unknown): string[] {
+  const a = (raw ?? {}) as RawArgument;
+  const value = str(a.value);
+  if (/\{[^}]*\}/.test(value)) return [];
+  if (str(a.type) !== 'named') return value ? [value] : [];
+  const name = str(a.name);
+  if (!name) return value ? [value] : [];
+  if (name.includes('=') || !value) return [name];
+  return [name, value];
+}
+
+const argsOf = (v: unknown): string[] => arr(v).flatMap(argTokens);
+
+const PACKAGE_ORDER = ['npm', 'pypi', 'oci'];
+
+/** The best npm, pypi or oci package, in that order, as the command this machine would run. */
 function packageOf(
   server: RawServer,
 ): { command: string; args: string[]; env: RawEnv[] } | undefined {
-  for (const p of arr(server.packages) as RawPackage[]) {
-    const id = str(p.identifier);
-    if (!id) continue;
-    const kind = str(p.registryType);
-    if (kind && kind !== 'npm') continue;
-    const hint = str(p.runtimeHint) || 'npx';
-    const args = arr(p.runtimeArguments)
-      .map((a) => str((a as { value?: unknown })?.value))
-      .filter(Boolean);
-    // `npx` stops to ask before it installs anything, which would hang a server that is started
-    // without a terminal. Records that already say `-y` keep their own order.
-    const quiet = hint === 'npx' && !args.some((a) => a === '-y' || a === '--yes');
+  const all = (arr(server.packages) as RawPackage[])
+    .map((p) => ({ p, kind: str(p.registryType) || 'npm', id: str(p.identifier) }))
+    .filter((x) => x.id && PACKAGE_ORDER.includes(x.kind))
+    .sort((x, y) => PACKAGE_ORDER.indexOf(x.kind) - PACKAGE_ORDER.indexOf(y.kind));
+  const first = all[0];
+  if (!first) return undefined;
+  const { p, kind, id } = first;
+  const runtime = argsOf(p.runtimeArguments);
+  const pkgArgs = argsOf(p.packageArguments);
+  const env = arr(p.environmentVariables) as RawEnv[];
+
+  if (kind === 'pypi') {
+    return { command: str(p.runtimeHint) || 'uvx', args: [...runtime, id, ...pkgArgs], env };
+  }
+  if (kind === 'oci') {
+    // `docker run` does not hand the host's environment to the container. `-e NAME` with no value
+    // forwards it, so the secret never appears in the command itself.
+    const forward = env
+      .filter((e) => str(e.name) && (e.isRequired === true || e.isSecret === true))
+      .flatMap((e) => ['-e', str(e.name)]);
     return {
-      command: hint,
-      args: [...(quiet ? ['-y'] : []), ...args, id],
-      env: arr(p.environmentVariables) as RawEnv[],
+      command: str(p.runtimeHint) || 'docker',
+      args: ['run', '-i', '--rm', ...forward, ...runtime, id, ...pkgArgs],
+      env,
     };
   }
-  return undefined;
+  const hint = str(p.runtimeHint) || 'npx';
+  // `npx` stops to ask before it installs anything, which would hang a server that is started
+  // without a terminal. Records that already say `-y` keep their own order.
+  const quiet = hint === 'npx' && !runtime.some((a) => a === '-y' || a === '--yes');
+  return { command: hint, args: [...(quiet ? ['-y'] : []), ...runtime, id, ...pkgArgs], env };
 }
 
 const secretOf = (raw: RawEnv | RawHeader, fallback: string, template?: string): RegistrySecret => {

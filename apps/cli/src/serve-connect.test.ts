@@ -493,7 +493,7 @@ describe('GET /api/connections/search', () => {
       version: '1.0.0',
       remotes: [{ type: 'streamable-http', url }],
     },
-    _meta: { 'io.modelcontextprotocol/registry/official': { isLatest: true } },
+    _meta: { 'io.modelcontextprotocol.registry/official': { isLatest: true } },
   });
 
   const registry = (servers: unknown[], seen: string[] = []) => {
