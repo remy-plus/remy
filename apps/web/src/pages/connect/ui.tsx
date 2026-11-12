@@ -69,7 +69,7 @@ export function Page({
         {tabs}
         {crumb && (
           <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>
-            <a href="#/connections" className="text-text underline">
+            <a href="#/connections" className="-my-3 inline-block py-3 text-text underline">
               Connections
             </a>{' '}
             / {crumb}
