@@ -253,7 +253,7 @@ function AppRow({
       className={`${row} ${selected ? '-mx-3 rounded-[10px] border-transparent bg-surface px-3' : ''}`}
       aria-current={selected ? 'true' : undefined}
     >
-      <AppLogo id={app.id} />
+      <AppLogo id={app.id} name={app.name} />
       <div className="min-w-[160px] flex-1">
         <h3 className="m-0 text-[16px] font-medium">{app.name}</h3>
         <p className="m-0 mt-1 text-[14px] text-muted">{app.blurb}</p>

@@ -152,16 +152,54 @@ const LOGOS: Record<string, { src: string; light?: boolean }> = {
   figma: { src: figma },
 };
 
-/** An app's mark in a small tile. Decorative: the name always sits beside it. */
-export function AppLogo({ id, size = 28 }: { id: string; size?: number }) {
+/** The first letter or digit of a name, uppercased; a neutral dot when it has none. */
+export function monogram(name: string): string {
+  const m = name.match(/[\p{L}\p{N}]/u);
+  return m ? m[0].toUpperCase() : '·';
+}
+
+/**
+ * An app's mark in a small tile. Decorative: the name always sits beside it. With no bundled mark
+ * it shows a registry `icon` (https only, checked by the caller) when given, and otherwise the
+ * name's first letter, so a list of apps stays recognisable at a glance.
+ */
+export function AppLogo({
+  id,
+  name,
+  icon,
+  size = 28,
+}: {
+  id: string;
+  name: string;
+  icon?: string;
+  size?: number;
+}) {
   const logo = LOGOS[id];
+  const [broken, setBroken] = useState(false);
+  const remote = !logo && icon?.startsWith('https://') && !broken ? icon : undefined;
   return (
     <span
       aria-hidden="true"
       style={{ width: size + 12, height: size + 12 }}
       className={`grid shrink-0 place-items-center rounded-md border border-edge ${logo?.light ? 'bg-[#edebe6]' : 'bg-raise'}`}
     >
-      {logo && <img src={logo.src} alt="" width={size - 8} height={size - 8} />}
+      {logo ? (
+        <img src={logo.src} alt="" width={size - 8} height={size - 8} />
+      ) : remote ? (
+        <img
+          src={remote}
+          alt=""
+          width={size - 8}
+          height={size - 8}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <span data-monogram className={`${mono} text-[13px] leading-none text-muted`}>
+          {monogram(name)}
+        </span>
+      )}
     </span>
   );
 }

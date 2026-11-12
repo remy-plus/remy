@@ -107,4 +107,49 @@ describe('Find any app', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copy the command to add Linear' }));
     expect(await screen.findByText('remy connect --registry app.linear/linear')).toBeTruthy();
   });
+
+  describe('marks', () => {
+    const hit = (name: string, title: string, icon?: string) => ({
+      name,
+      title,
+      description: '',
+      version: '1',
+      kind: 'remote' as const,
+      where: `https://${name}.test`,
+      command: `remy connect --registry ${name}`,
+      ...(icon && { icon }),
+    });
+    const searching = (...apps: ReturnType<typeof hit>[]) =>
+      apiWith({ searchApps: () => Promise.resolve({ apps, note: 'note' }) });
+    const find = async (api: RemyApi) => {
+      open(api);
+      await screen.findByRole('heading', { level: 2, name: 'Find any app' });
+      type('zz');
+      await screen.findByText('Sentry');
+      return document.querySelector('section ul') as HTMLElement;
+    };
+
+    it('shows an https icon as a lazy image with no referrer', async () => {
+      const list = await find(searching(hit('s', 'Sentry', 'https://s.test/i.png')));
+      const img = list.querySelector('img') as HTMLImageElement;
+      expect(img.getAttribute('src')).toBe('https://s.test/i.png');
+      expect(img.getAttribute('alt')).toBe('');
+      expect(img.getAttribute('referrerpolicy')).toBe('no-referrer');
+      expect(img.getAttribute('loading')).toBe('lazy');
+      expect(list.querySelector('[data-monogram]')).toBeNull();
+    });
+
+    it('shows a monogram when the icon is missing or not https', async () => {
+      const list = await find(searching(hit('s', 'Sentry', 'http://s.test/i.png')));
+      expect(list.querySelector('img')).toBeNull();
+      expect(list.querySelector('[data-monogram]')?.textContent).toBe('S');
+    });
+
+    it('falls back to the monogram when the image fails', async () => {
+      const list = await find(searching(hit('s', 'Sentry', 'https://s.test/i.png')));
+      fireEvent.error(list.querySelector('img') as HTMLImageElement);
+      expect(list.querySelector('img')).toBeNull();
+      expect(list.querySelector('[data-monogram]')?.textContent).toBe('S');
+    });
+  });
 });

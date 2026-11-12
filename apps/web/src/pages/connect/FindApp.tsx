@@ -5,7 +5,7 @@ import type { RegistryApp, RegistrySearch } from '../../api/index.tsx';
 import { useApi } from '../../api/index.tsx';
 import { CopyCommand } from '../../components/CopyCommand.tsx';
 import { describeError } from '../../lib/errors.ts';
-import { field, mono, Notice } from './ui.tsx';
+import { AppLogo, field, mono, Notice } from './ui.tsx';
 
 const FALLBACK = 'That did not work. Check that Remy is still running, then try again.';
 const MIN = 2;
@@ -13,7 +13,8 @@ const badge = `${mono} rounded-[4px] border border-edge bg-raise px-1.5 py-px te
 
 function Row({ app }: { app: RegistryApp }) {
   return (
-    <li className="flex flex-col gap-2 border-t border-edge px-4 py-3.5 first:border-t-0 sm:flex-row sm:items-start sm:gap-x-4">
+    <li className="flex flex-col gap-2 border-t border-edge px-4 py-3.5 first:border-t-0 sm:flex-row sm:items-start sm:gap-x-3.5">
+      <AppLogo id={app.name} name={app.title || app.name} {...(app.icon && { icon: app.icon })} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-[15px] font-medium">{app.title}</span>

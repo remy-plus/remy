@@ -60,7 +60,7 @@ export function AddConnection() {
         connected ? (
           <div role="status">
             <div className="mb-5 flex items-center gap-3">
-              <AppLogo id={connected.id} size={32} />
+              <AppLogo id={connected.id} name={connected.name} size={32} />
               <h2 className="m-0 text-[22px] font-normal leading-tight">
                 {connected.name} is connected.
               </h2>
@@ -91,7 +91,7 @@ export function AddConnection() {
           app && (
             <form onSubmit={submit} aria-label={`Connect ${app.name}`}>
               <div className="mb-5 flex items-center gap-3">
-                <AppLogo id={app.id} size={32} />
+                <AppLogo id={app.id} name={app.name} size={32} />
                 <div>
                   <h2 className="m-0 text-[22px] font-normal leading-tight">Connect {app.name}</h2>
                   <p className="m-0 text-[14px] text-muted">
@@ -200,7 +200,7 @@ export function AddConnection() {
                   }}
                   className="sr-only"
                 />
-                <AppLogo id={a.id} />
+                <AppLogo id={a.id} name={a.name} />
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-2 text-[16px] font-medium">
                     {a.name}
