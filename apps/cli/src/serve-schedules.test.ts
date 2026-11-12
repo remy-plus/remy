@@ -182,4 +182,46 @@ describe('webhook routes', () => {
     );
     expect(hooks.enabled()).toBe(true);
   });
+
+  it('creates a hook, refuses a duplicate and a bad name, and never returns a token', async () => {
+    const { kit, hooks } = await start();
+    const made = await kit.api('/api/webhooks', {
+      body: { name: 'deploys', prompt: ' Check it ' },
+    });
+    expect(made.status).toBe(201);
+    expect(made.json).toEqual(
+      expect.objectContaining({
+        id: 'deploys',
+        name: 'deploys',
+        url: 'POST http://127.0.0.1:7788/hook/deploys',
+        enabled: false,
+      }),
+    );
+    expect(made.text).not.toMatch(/token ?hash|"token"/i);
+    expect(hooks.get('deploys')?.prompt).toBe('Check it');
+    const dup = await kit.api('/api/webhooks', { body: { name: 'deploys', prompt: 'x' } });
+    expect(dup.status).toBe(409);
+    const bad = await kit.api('/api/webhooks', { body: { name: 'Bad Name', prompt: 'x' } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error).toContain('1 to 40 characters');
+    const none = await kit.api('/api/webhooks', { body: { name: 'blank', prompt: '  ' } });
+    expect(none.status).toBe(400);
+    expect(none.json.error).toBe('A hook needs a prompt.');
+    expect(
+      (await kit.api('/api/webhooks', { body: { name: 'a', prompt: 'b', extra: 1 } })).status,
+    ).toBe(400);
+    hooks.setTokenHash('deploys', 'b'.repeat(64));
+    expect((await kit.api('/api/webhooks')).text).not.toContain('b'.repeat(64));
+    expect(hooks.list()).toHaveLength(1);
+  });
+
+  it('removes a hook, and says 404 for one that is not there', async () => {
+    const { kit, hooks } = await start();
+    hooks.add('deploys', 'Check it', NOW);
+    const gone = await kit.api('/api/webhooks/deploys', { method: 'DELETE' });
+    expect(gone.status).toBe(204);
+    expect(gone.text).toBe('');
+    expect(hooks.list()).toEqual([]);
+    expect((await kit.api('/api/webhooks/deploys', { method: 'DELETE' })).status).toBe(404);
+  });
 });

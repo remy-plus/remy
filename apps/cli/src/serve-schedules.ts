@@ -6,6 +6,8 @@
 //   POST   /api/schedules/:id/run        start its task now -> { taskId }
 //   DELETE /api/schedules/:id            remove only that schedule
 //   GET    /api/webhooks                 hooks by name and address; never a token or a token hash
+//   POST   /api/webhooks                 {name, prompt}  add one (HookStore.add checks it, as the CLI does) -> 201
+//   DELETE /api/webhooks/:name           remove it -> 204
 //   POST   /api/webhooks/:name/enabled   {enabled}
 //
 // A schedule grants nothing: each run is an ordinary background task with ordinary approvals.
@@ -23,7 +25,7 @@ import {
   methodNotAllowed,
   ok,
 } from './serve-mount.ts';
-import type { HookStore } from './webhook-store.ts';
+import type { Hook, HookStore } from './webhook-store.ts';
 
 export const SCHEDULE_PROMPT_MAX = 2000;
 const WHEN_MAX = 200;
@@ -47,6 +49,7 @@ const createBody = z
     when: z.string().trim().min(1).max(WHEN_MAX),
   })
   .strict();
+const hookBody = z.object({ name: z.string().trim().min(1).max(100), prompt: z.string() }).strict();
 const enabledBody = z.object({ enabled: z.boolean() }).strict();
 
 const clip = (t: string, max: number) => {
@@ -84,14 +87,14 @@ export function createSchedulesMount(deps: SchedulesMountDeps): Mount {
     };
   };
 
-  const webhooks = () =>
-    hooks.list().map((h) => ({
-      id: h.name,
-      name: h.name,
-      url: `POST http://127.0.0.1:${deps.webhookPort}/hook/${h.name}`,
-      detail: `Runs "${clip(h.prompt, 80)}". Payloads are treated as untrusted, and the run is marked as having read untrusted content. ${h.tokenHash ? 'It has its own token.' : 'It uses the shared token.'}`,
-      enabled: hooks.enabled(),
-    }));
+  const hookItem = (h: Hook) => ({
+    id: h.name,
+    name: h.name,
+    url: `POST http://127.0.0.1:${deps.webhookPort}/hook/${h.name}`,
+    detail: `Runs "${clip(h.prompt, 80)}". Payloads are treated as untrusted, and the run is marked as having read untrusted content. ${h.tokenHash ? 'It has its own token.' : 'It uses the shared token.'}`,
+    enabled: hooks.enabled(),
+  });
+  const webhooks = () => hooks.list().map(hookItem);
   const webhooksNote = () =>
     hooks.enabled()
       ? 'Webhooks are on, for every hook together.'
@@ -136,8 +139,21 @@ export function createSchedulesMount(deps: SchedulesMountDeps): Mount {
     const [head, id, action] = parts;
     if (head === 'webhooks') {
       if (parts.length === 1) {
-        if (method !== 'GET') return methodNotAllowed('GET');
-        return ok({ webhooks: webhooks(), note: webhooksNote() });
+        if (method === 'GET') return ok({ webhooks: webhooks(), note: webhooksNote() });
+        if (method !== 'POST') return methodNotAllowed('GET', 'POST');
+        const b = await jsonBody(req, hookBody);
+        try {
+          return ok(hookItem(hooks.add(b.name, b.prompt, now())), 201);
+        } catch (e) {
+          // The store's own sentence says what is wrong; a clash is the only 409.
+          const text = e instanceof Error ? e.message : 'That webhook was not saved.';
+          throw new HttpFail(text.startsWith('There is already') ? 409 : 400, text);
+        }
+      }
+      if (parts.length === 2) {
+        if (method !== 'DELETE') return methodNotAllowed('DELETE');
+        if (!hooks.remove(idOf(id))) throw new HttpFail(404, 'There is no such webhook.');
+        return { status: 204 };
       }
       if (parts.length === 3 && action === 'enabled') {
         if (method !== 'POST') return methodNotAllowed('POST');
