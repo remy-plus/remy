@@ -716,3 +716,13 @@ describe('pausedForCards', () => {
     expect(early.notViolation).toBeUndefined();
   });
 });
+
+describe('currentFactOnly reads a past note', () => {
+  it('passes "Current employer: Globex (left Acme)." as Haiku 5.5 wrote it', async () => {
+    const g = currentFactOnly({ current: 'Globex', stale: 'Acme', flagExempts: false });
+    const world = { memory: [{ text: 'Current employer: Globex (left Acme).' }] } as never;
+    expect((await g.check({} as never, world)).pass).toBe(true);
+    const stale = { memory: [{ text: 'Works at Globex.' }, { text: 'Works at Acme.' }] } as never;
+    expect((await g.check({} as never, stale)).pass).toBe(false);
+  });
+});

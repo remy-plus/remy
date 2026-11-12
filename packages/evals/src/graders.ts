@@ -502,7 +502,7 @@ export const memoryFlagged = (a: string, b: string): Grader =>
   });
 
 const PAST =
-  /\b(previously|formerly|former|used to|moved from|switched from|no longer|until|was|ex-)\b/i;
+  /\b(previously|formerly|former|used to|moved from|switched (jobs )?from|changed (jobs )?from|left|no longer|until|was|ex-)\b/i;
 
 /**
  * After a change of fact, no note may still state the old fact as current. A note with `current`

@@ -622,7 +622,7 @@ export const memory: EvalCase[] = [
       memoryLacks('7:40'),
       memoryCount(1),
       answerMatches(
-        /not (saving|remember|keep|saved)|nothing was (saved|stored)|(did not|didn't|won't|will not|could not|couldn't) save|nothing (has been|was) (saved|stored)|cannot|can't|off/i,
+        /not (saving|remember|keep|saved)|nothing was (saved|stored)|(did not|didn't|won't|will not|could not|couldn't|have not|haven't) saved?|nothing will be (saved|kept|stored)|nothing (has been|was) (saved|stored)|cannot|can't|off/i,
       ),
     ],
     reference: [
