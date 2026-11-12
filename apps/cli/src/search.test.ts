@@ -6,6 +6,7 @@ import {
   noRouteMessage,
   pickSearchRoute,
   type Route,
+  resolveSearchKeys,
   routedSearch,
   type SearchFacts,
 } from './search.ts';
@@ -20,8 +21,18 @@ const unavailable = (msg: string): SearchProvider => ({
 });
 
 describe('pickSearchRoute', () => {
-  it('puts a key route first, in the order TinyFish, Brave, Tavily, Context.dev, SearXNG', () => {
-    const all = { tinyfish: true, brave: true, tavily: true, context: true, searxng: true };
+  it('puts a key route first, in the order Exa, TinyFish, Perplexity, Tavily, Linkup, Serper, Brave, Context.dev, SearXNG', () => {
+    const all = {
+      exa: true,
+      tinyfish: true,
+      perplexity: true,
+      tavily: true,
+      linkup: true,
+      serper: true,
+      brave: true,
+      context: true,
+      searxng: true,
+    };
     const plan = pickSearchRoute({
       ...none,
       keys: all,
@@ -30,15 +41,19 @@ describe('pickSearchRoute', () => {
       browser: true,
     });
     expect(plan.order).toEqual([
+      'exa',
       'tinyfish',
-      'brave',
+      'perplexity',
       'tavily',
+      'linkup',
+      'serper',
+      'brave',
       'context',
       'searxng',
       'vm',
       'browser',
     ]);
-    expect(plan.chosen).toBe('tinyfish');
+    expect(plan.chosen).toBe('exa');
     expect(plan.step).toBeUndefined();
     expect(pickSearchRoute({ ...none, keys: { context: true, brave: true } }).chosen).toBe('brave');
   });
@@ -84,6 +99,7 @@ describe('pickSearchRoute', () => {
     const bad = pickSearchRoute({ ...none, override: 'google' });
     expect(bad.order).toEqual([]);
     expect(bad.step).toContain('browser, vm, context');
+    expect(pickSearchRoute({ ...none, override: 'exa' }).step).toContain('remy search key exa');
   });
 });
 
@@ -200,8 +216,10 @@ describe('routedSearch', () => {
 describe('noRouteMessage', () => {
   it('uses the plan reason when nothing was tried', () => {
     const msg = noRouteMessage(pickSearchRoute({ ...none, override: 'tavily' }), new Map());
-    expect(msg).toContain('TAVILY_API_KEY is not set');
-    expect(msg).toContain('Set TAVILY_API_KEY, or unset REMY_SEARCH.');
+    expect(msg).toContain('no key is set for it (TAVILY_API_KEY or the Keychain)');
+    expect(msg).toContain(
+      'Set TAVILY_API_KEY or run remy search key tavily, or unset REMY_SEARCH.',
+    );
   });
 });
 
@@ -209,5 +227,54 @@ describe('makeService', () => {
   it('makes the service from its key and refuses a missing one as unavailable', () => {
     expect(makeService('brave', { BRAVE_API_KEY: 'k' }).search).toBeTypeOf('function');
     expect(() => makeService('brave', {})).toThrow(SearchUnavailable);
+  });
+});
+
+describe('resolveSearchKeys', () => {
+  const calls: string[][] = [];
+  const exec = async (_c: string, args: string[]) => {
+    calls.push(args);
+    const account = args[args.indexOf('-a') + 1];
+    return account === 'exa' || account === 'serper'
+      ? { status: 0, stdout: `kc-${account}\n` }
+      : { status: 44, stdout: '' };
+  };
+
+  it('prefers the environment, then the Keychain account named for the route', async () => {
+    calls.length = 0;
+    const r = await resolveSearchKeys({ SERPER_API_KEY: 'from-env' }, { platform: 'darwin', exec });
+    expect(r.sources).toMatchObject({
+      exa: 'keychain',
+      serper: 'env',
+      tinyfish: 'none',
+      searxng: 'none',
+    });
+    expect(r.env.EXA_API_KEY).toBe('kc-exa');
+    expect(r.env.SERPER_API_KEY).toBe('from-env');
+    expect(r.found).toEqual([{ name: 'EXA_API_KEY', value: 'kc-exa' }]);
+    expect(calls.some((a) => a.includes('serper') || a.includes('searxng'))).toBe(false);
+    expect(calls[0]).toEqual(expect.arrayContaining(['-s', 'remy']));
+  });
+
+  it('skips the Keychain off macOS or with REMY_KEYCHAIN=off', async () => {
+    calls.length = 0;
+    expect((await resolveSearchKeys({}, { platform: 'linux', exec })).sources.exa).toBe('none');
+    expect(
+      (await resolveSearchKeys({ REMY_KEYCHAIN: 'off' }, { platform: 'darwin', exec })).sources.exa,
+    ).toBe('none');
+    expect(calls).toEqual([]);
+  });
+
+  it('reads a failing Keychain as no key', async () => {
+    const r = await resolveSearchKeys(
+      {},
+      {
+        platform: 'darwin',
+        exec: async () => {
+          throw new Error('locked');
+        },
+      },
+    );
+    expect(Object.values(r.sources).every((v) => v === 'none')).toBe(true);
   });
 });

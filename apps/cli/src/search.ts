@@ -1,16 +1,22 @@
 // Which route answers web_search. The order is fixed and explained: a search service whose key is
-// set, then the container, then Remy's own hidden browser, else none. REMY_SEARCH overrides it.
+// set (in the environment, else the macOS Keychain), then the container, then Remy's own hidden browser, else none. REMY_SEARCH overrides it.
 // A route that cannot recover (bad key, Docker gone, a bot check) is dropped for the rest of the
 // process and the next one answers. Nothing here ever opens a window.
 import {
   braveSearch,
   contextDevSearch,
+  exaSearch,
+  linkupSearch,
+  perplexitySearch,
   type SearchProvider,
   SearchUnavailable,
   searxngSearch,
+  serperSearch,
   tavilySearch,
   tinyfishSearch,
 } from '@remy/tools';
+import { KEYCHAIN_SERVICE } from './credentials.ts';
+import { type AsyncExec, KEYCHAIN_TIMEOUT_MS, realAsyncExec } from './serve-voice.ts';
 
 export const SEARCH_CHOICES = [
   'browser',
@@ -19,6 +25,10 @@ export const SEARCH_CHOICES = [
   'brave',
   'tavily',
   'tinyfish',
+  'exa',
+  'perplexity',
+  'linkup',
+  'serper',
   'searxng',
   'off',
 ] as const;
@@ -29,9 +39,13 @@ export const isSearchChoice = (v: string): v is SearchChoice =>
 
 /** Services with a key, in the order they are tried. */
 export const SERVICES = {
+  exa: { env: 'EXA_API_KEY', label: 'Exa', make: exaSearch },
   tinyfish: { env: 'TINYFISH_API_KEY', label: 'TinyFish', make: tinyfishSearch },
-  brave: { env: 'BRAVE_API_KEY', label: 'Brave', make: braveSearch },
+  perplexity: { env: 'PERPLEXITY_API_KEY', label: 'Perplexity', make: perplexitySearch },
   tavily: { env: 'TAVILY_API_KEY', label: 'Tavily', make: tavilySearch },
+  linkup: { env: 'LINKUP_API_KEY', label: 'Linkup', make: linkupSearch },
+  serper: { env: 'SERPER_API_KEY', label: 'Serper', make: serperSearch },
+  brave: { env: 'BRAVE_API_KEY', label: 'Brave', make: braveSearch },
   context: { env: 'CONTEXT_DEV_API_KEY', label: 'Context.dev', make: contextDevSearch },
   searxng: { env: 'SEARXNG_URL', label: 'SearXNG', make: searxngSearch },
 } as const;
@@ -90,8 +104,8 @@ export function pickSearchRoute(f: SearchFacts): SearchPlan {
         order: [],
         override: true,
         off: false,
-        why: `REMY_SEARCH picks ${SERVICES[want].label} but ${SERVICES[want].env} is not set`,
-        step: `Set ${SERVICES[want].env}, or unset REMY_SEARCH.`,
+        why: `REMY_SEARCH picks ${SERVICES[want].label} but no key is set for it (${SERVICES[want].env} or the Keychain)`,
+        step: `Set ${SERVICES[want].env}${want === 'searxng' ? '' : ` or run remy search key ${want}`}, or unset REMY_SEARCH.`,
       };
     return { order: [want], chosen: want, override: true, off: false };
   }
@@ -196,4 +210,59 @@ export function gatherSearchPlan(p: {
     vmSetUp: p.vmSetUp,
     browser: p.browser,
   });
+}
+
+export type KeySource = 'env' | 'keychain' | 'none';
+
+/** Services whose key may live in the Keychain (SearXNG is an address, not a key). */
+export const KEYED_ROUTES = (Object.keys(SERVICES) as KeyRoute[]).filter((k) => k !== 'searxng');
+
+/**
+ * Where each service's key comes from: the environment first, then (macOS, REMY_KEYCHAIN not off)
+ * the Keychain under service `remy`, account = the route id. Lookups run in parallel, never block
+ * the event loop, and a slow or locked Keychain reads as "no key". `env` is the input plus any key
+ * found, and `found` lists the keys read from the Keychain so the caller can register them to be
+ * redacted.
+ */
+export async function resolveSearchKeys(
+  env: Record<string, string | undefined>,
+  opts: { platform?: NodeJS.Platform; exec?: AsyncExec; timeoutMs?: number } = {},
+): Promise<{
+  env: Record<string, string | undefined>;
+  sources: Record<KeyRoute, KeySource>;
+  found: { name: string; value: string }[];
+}> {
+  const platform = opts.platform ?? process.platform;
+  const exec = opts.exec ?? realAsyncExec;
+  const useKeychain = platform === 'darwin' && env.REMY_KEYCHAIN !== 'off';
+  const out = { ...env };
+  const found: { name: string; value: string }[] = [];
+  const sources = {} as Record<KeyRoute, KeySource>;
+  await Promise.all(
+    (Object.keys(SERVICES) as KeyRoute[]).map(async (route) => {
+      const name = SERVICES[route].env;
+      if (env[name]?.trim()) {
+        sources[route] = 'env';
+        return;
+      }
+      sources[route] = 'none';
+      if (!useKeychain || route === 'searxng') return;
+      try {
+        const r = await exec(
+          'security',
+          ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', route, '-w'],
+          opts.timeoutMs ?? KEYCHAIN_TIMEOUT_MS,
+        );
+        const value = r.stdout.replace(/\r?\n$/, '').trim();
+        if (r.status === 0 && value) {
+          out[name] = value;
+          sources[route] = 'keychain';
+          found.push({ name, value });
+        }
+      } catch {
+        // A locked or slow Keychain is "no key".
+      }
+    }),
+  );
+  return { env: out, sources, found };
 }

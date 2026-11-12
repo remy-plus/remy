@@ -11,7 +11,7 @@ export interface FileConfig {
   autoApprove?: string[];
   budget?: Partial<Budget>;
   netAllow?: string[];
-  /** Which service searches: browser, context, brave, tavily, tinyfish, searxng or off (REMY_SEARCH wins). */
+  /** Which service searches: browser, vm, exa, tinyfish, perplexity, tavily, linkup, serper, brave, context, searxng or off (REMY_SEARCH wins). */
   search?: string;
   /** Same shape as Claude Desktop's `mcpServers`. Wins over servers saved by `remy connect`. */
   mcpServers?: Record<string, McpServerConfig>;
