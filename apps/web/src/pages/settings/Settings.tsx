@@ -69,7 +69,7 @@ export function Settings({ section = 'dock' }: { section?: string }) {
         aria-label="Settings sections"
         className="border-b border-edge px-5 py-4 md:border-r md:border-b-0 md:py-8 md:pr-5 md:pl-10"
       >
-        <ul className="-mx-3 m-0 flex flex-wrap gap-1 p-0 md:mx-0 md:block md:space-y-1">
+        <ul className="-mx-3 m-0 grid grid-cols-2 gap-1 p-0 min-[520px]:flex min-[520px]:flex-wrap md:mx-0 md:block md:space-y-1">
           {SECTIONS.map((s) => {
             const on = s.id === (current ?? '');
             return (
