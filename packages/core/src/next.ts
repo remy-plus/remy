@@ -208,7 +208,7 @@ export const isClaimedWork = (text: string) => claimsAny(text, [...ACTION_CLAIMS
 export const isClaimedAction = (text: string) => claimsAny(text, ACTION_CLAIMS);
 
 const claimsAny = (text: string, claims: RegExp[]) => {
-  const t = text.replace(/\u2019/g, "'");
+  const t = text.replace(/\u2019/g, "'").replace(KNOWN_FACT, 'the $1');
   return !DONE_BEFORE.test(t) && claims.some((re) => re.test(t));
 };
 
@@ -217,6 +217,13 @@ export const isPromisedWork = (text: string) =>
   /\b(?:(?:let's|let me|i'll|i will) (?:now |first )?(?:start|begin)\b|(?:i'll|i will) now\b|(?:first|now),? (?:i'll|i will|let me)\b)/i.test(
     text.replace(/\u2019/g, "'"),
   );
+
+/**
+ * "A note I have saved about you" reports something that already exists, which is how an answer
+ * from the person's notes reads. "I saved a note that..." is a claim and does not match.
+ */
+const KNOWN_FACT =
+  /\b(?:the |a |your |that |this )?(notes?|facts?|details?|memor(?:y|ies)|info(?:rmation)?)(?: that| which)? (?:i|we)(?:'ve| have)? (?:saved|stored|noted|kept)\b(?: (?:about|on|for) (?:you|them))?/gi;
 
 const DONE_BEFORE =
   /\b(earlier|previously|yesterday|last (week|month|night|time)|the other day|in (a|an|our) (previous|earlier|past))\b/i;

@@ -430,6 +430,9 @@ describe('work claimed with no tool run', () => {
     '- Emailed the count to the manager',
     'I wrote flagged.txt with three rows.',
     'I successfully deleted the old files.',
+    'I saved a note that your pet is Kiwi.',
+    "I've emailed Erin.",
+    "Your pet is Kiwi, per the note I have saved about you. I've emailed Erin.",
   ])('claims work: %s', (text) => {
     expect(isClaimedWork(text)).toBe(true);
   });
@@ -446,6 +449,10 @@ describe('work claimed with no tool run', () => {
     'Yes, I emailed Sam last week.',
     'To send an email, press the button.',
     "The email hasn't been sent.",
+    'Your pet is a dog named Kiwi, according to the note you saved earlier.',
+    'From your saved notes: your passport expires in March 2029.',
+    "Your pet is called Kiwi. It's a dog, according to a note I have saved about you.",
+    'You have a dog named Kiwi, per the notes I saved.',
   ])('does not claim work: %s', (text) => {
     expect(isClaimedWork(text)).toBe(false);
   });

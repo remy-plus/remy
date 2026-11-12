@@ -60,7 +60,7 @@ export function planGateTextMessage(open: PlanStep[]): string {
 }
 
 const CLAIM_GATE_BODY =
-  'No tool has done this work: no file was written and no message was sent. Do the work now by calling your tools. If you cannot do it, say so plainly and do not say that it is done.';
+  'No tool has done this work: no file was written and no message was sent. Do the work now by calling your tools. If you cannot do it, say so plainly and do not say that it is done. If you are answering from the notes sent with the message, say what the notes say and do not say that you saved, sent or changed anything, then finish again.';
 
 /** Sent back when the model says it did the work but no tool ran. */
 export const CLAIM_GATE_MESSAGE = `(From Remy, not the user.) ${CLAIM_GATE_PREFIX} ${CLAIM_GATE_BODY}`;
