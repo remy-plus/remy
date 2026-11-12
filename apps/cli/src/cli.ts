@@ -182,8 +182,10 @@ import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
 import {
   assertUnderMonthlyCap,
+  capToMonthRemaining,
   configWithPrefs,
   createSpend,
+  monthRemaining,
   openWebPrefs,
   settingsRoutes,
 } from './serve-settings.ts';
@@ -2222,6 +2224,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         })();
         const voiceLedger = openVoiceLedger(home, undefined, (line) => out(st.dim(line)));
         const spend = createSpend(store, undefined, (at) => voiceLedger.monthUsd(at));
+        let monthLeft = Number.POSITIVE_INFINITY; // set by beforeStart, read by config
         // Read on each use (a short while cached, never blocking the server), so a key added later
         // works without a restart. A slow or locked Keychain reads as "no key".
         const fishKeys = createFishKeySource(() => readFishKeyAsync(env, process.platform));
@@ -2300,9 +2303,16 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 : join(home, 'workspaces', id);
               const config = taskConfig(file, model.id, folder);
               mkdirSync(config.workspaceDir, { recursive: true });
-              return configWithPrefs(config, webPrefs.chosen(), trust);
+              // beforeStart ran just before this, in the same turn, and left what the month has left.
+              return capToMonthRemaining(
+                configWithPrefs(config, webPrefs.chosen(), trust),
+                monthLeft,
+              );
             },
-            beforeStart: () => assertUnderMonthlyCap(webPrefs, spend),
+            beforeStart: async () => {
+              await assertUnderMonthlyCap(webPrefs, spend);
+              monthLeft = await monthRemaining(webPrefs, spend);
+            },
             tokenHash: () => serveTokenHash(home),
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),

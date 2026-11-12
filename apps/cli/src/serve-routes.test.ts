@@ -24,6 +24,7 @@ import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
 import {
   assertUnderMonthlyCap,
+  capToMonthRemaining,
   configWithPrefs,
   createSpend,
   openWebPrefs,
@@ -742,5 +743,34 @@ describe('actions', () => {
     const { api } = await serve([]);
     expect((await api('/api/token/rotate', { body: { x: 1 } })).status).toBe(400);
     expect((await api('/api/models/test', { body: { model: 'other' } })).status).toBe(400);
+  });
+});
+
+describe('capToMonthRemaining', () => {
+  const base = {
+    model: 'm',
+    permissions: { autoApprove: [] },
+    budget: { ...DEFAULT_BUDGET, maxCostUsd: 2 },
+    workspaceDir: '/w',
+  } as unknown as Parameters<typeof capToMonthRemaining>[0];
+  const left = (monthly: number, spent: number, perTask = 2) =>
+    capToMonthRemaining(
+      configWithPrefs(base, { budget: { monthly, perTask } }),
+      Math.max(0, monthly - spent),
+    ).budget.maxCostUsd;
+
+  it('stops a task at what is left of the month', () => {
+    expect(left(25, 24)).toBe(1);
+    expect(left(25, 25)).toBe(0);
+    expect(left(25, 30)).toBe(0);
+  });
+  it('keeps the per-task cap when it is smaller than the remainder', () => {
+    expect(left(25, 10, 0.5)).toBe(0.5);
+  });
+  it('leaves the old behaviour when no remaining amount applies', () => {
+    expect(configWithPrefs(base, { budget: { monthly: 25, perTask: 2 } }).budget.maxCostUsd).toBe(
+      2,
+    );
+    expect(capToMonthRemaining(base, Number.POSITIVE_INFINITY).budget.maxCostUsd).toBe(2);
   });
 });

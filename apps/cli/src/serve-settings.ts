@@ -174,6 +174,21 @@ export function configWithPrefs(
   return { ...base, permissions, budget: { ...base.budget, maxCostUsd } };
 }
 
+/**
+ * Stops a task at what is left of the month (never below 0), so a running task cannot overshoot it.
+ * Known limit: two tasks started at the same moment each get the full remainder, so the month can
+ * still be overshot by up to one task's spend.
+ */
+export function capToMonthRemaining(config: TaskConfig, remainingUsd: number): TaskConfig {
+  const maxCostUsd = Math.max(0, Math.min(config.budget.maxCostUsd, remainingUsd));
+  return { ...config, budget: { ...config.budget, maxCostUsd } };
+}
+
+/** What is left of this month's cap in US dollars, never below 0. */
+export async function monthRemaining(prefs: WebPrefsStore, spend: Spend): Promise<number> {
+  return Math.max(0, prefs.get().budget.monthly - (await spend()));
+}
+
 // ---- what the Settings screen shows besides the values
 
 export interface SettingsDeps {
