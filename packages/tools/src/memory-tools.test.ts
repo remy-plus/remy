@@ -14,6 +14,7 @@ import {
   memoryQuery,
   NOTES_BUDGET_TOKENS,
   NOTES_MAX,
+  notesBlock,
   noteTokens,
   selectMemories,
 } from './memory-tools.ts';
@@ -217,14 +218,32 @@ describe('recall', () => {
     note('m7', 'Writes emails in a warm tone', 'preference', '2026-01-07'),
   ];
 
-  it('puts lexical matches first, then the newest preferences', () => {
+  it('puts lexical matches first, then the newest preferences, after standing constraints', () => {
     const got = selectMemories(all, 'convert this recipe from cups to metric units');
-    expect(got[0]?.id).toBe('m1');
-    expect(got.map((e) => e.id)).toEqual(['m1', 'm7', 'm5', 'm3']);
+    expect(got[1]?.id).toBe('m1');
+    expect(got.map((e) => e.id)).toEqual(['m2', 'm1', 'm7', 'm5', 'm3']);
+  });
+
+  it('always sends standing constraints, even when no word of the task matches', () => {
+    const got = selectMemories(all, 'suggest a place for a team dinner on Friday');
+    expect(got[0]?.id).toBe('m2');
+    expect(got.map((e) => e.id)).toContain('m2');
+  });
+
+  it('keeps standing notes first and does not repeat them when they also match', () => {
+    const got = selectMemories(all, 'is this peanut sauce ok');
+    expect(got.filter((e) => e.id === 'm2')).toHaveLength(1);
+    expect(got[0]?.id).toBe('m2');
+  });
+
+  it('tells the model the notes are partial and that standing facts apply to every task', () => {
+    const block = notesBlock(all, 'zzz');
+    expect(block).toContain('shape every task');
+    expect(block).toContain('call recall');
   });
 
   it('falls back to newest preferences when nothing matches, and to nothing for no notes', () => {
-    expect(selectMemories(all, 'zzz qqq').map((e) => e.id)).toEqual(['m7', 'm5', 'm3', 'm1']);
+    expect(selectMemories(all, 'zzz qqq').map((e) => e.id)).toEqual(['m2', 'm7', 'm5', 'm3', 'm1']);
     expect(selectMemories([], 'anything')).toEqual([]);
   });
 
