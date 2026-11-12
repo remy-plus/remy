@@ -4,7 +4,7 @@
 // each other: a cassette is keyed on the request.
 import { BROWSER_TOOL_NAMES } from '@remy/browser';
 import { BUILTIN_SKILLS } from '@remy/tools';
-import { choseNoTool, choseSkill, choseTool } from '../graders.ts';
+import { allOf, answerContains, anyOf, choseNoTool, choseSkill, choseTool } from '../graders.ts';
 import type { EvalCase, Grader, Move } from '../types.ts';
 import { fetchUrl, finish } from './util.ts';
 
@@ -166,12 +166,15 @@ const recallPick: EvalCase[] = [
     choseTool({ any: ['recall'], not: ['web_search'] }),
     [call('recall', { query: 'Lisbon hotel' })],
   ),
-  // The note is a fact, and shares no words with the question, so it is not in the prompt:
-  // only `recall` reaches it.
+  // Recall by meaning puts "Based in Lisbon" in the notes sent with "where I live", so answering
+  // from them is as right as calling recall. Searching the web for it is not.
   pick(
     'recall-something-i-said',
     'What did I tell you about where I live?',
-    choseTool({ any: ['recall'], not: ['web_search'] }),
+    anyOf(
+      choseTool({ any: ['recall'], not: ['web_search'] }),
+      allOf(choseTool({ not: ['web_search'] }), answerContains('Lisbon')),
+    ),
     [call('recall', { query: 'where the user lives' })],
     {
       world: kit({
