@@ -2,11 +2,19 @@
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRuntime, DEFAULT_BUDGET, type ModelResponse, ToolRegistry } from '@remy/core';
+import {
+  createRuntime,
+  DEFAULT_BUDGET,
+  defineTool,
+  fold,
+  type ModelResponse,
+  ToolRegistry,
+} from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { finish } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { HttpError, listenServe, type ServeListening } from './serve.ts';
 import { chatRoutes, contextFrom, openChats, titleFrom } from './serve-chats.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
@@ -36,14 +44,33 @@ interface CallOpts {
   body?: unknown;
 }
 
-async function rig(opts: { overBudget?: boolean } = {}) {
+async function rig(opts: { overBudget?: boolean; firstReadsPage?: boolean } = {}) {
   const store = new MemoryEventStore();
   const runtime = createRuntime({
     store,
     model: new ScriptedModelClient(
-      Array.from({ length: 12 }, (_, i) => answer(`Answer ${i + 1}.`)),
+      opts.firstReadsPage
+        ? [
+            { calls: [{ tool: 'peek', args: {} }], usage },
+            ...Array.from({ length: 12 }, (_, i) => answer(`Answer ${i + 1}.`)),
+          ]
+        : Array.from({ length: 12 }, (_, i) => answer(`Answer ${i + 1}.`)),
     ),
-    tools: new ToolRegistry([finish]),
+    tools: new ToolRegistry([
+      finish,
+      defineTool({
+        name: 'peek',
+        description: 'Read a page',
+        args: z.object({}),
+        risk: 'read',
+        effect: 'none',
+        outputTrust: 'untrusted',
+        timeoutMs: 1000,
+        maxOutputChars: 1000,
+        preview: () => 'Read a page',
+        execute: async () => ({ ok: true, content: 'page text', trust: 'untrusted' }),
+      }),
+    ]),
     capabilities: () => ({}) as never,
     leaseMs: 300,
     sleep: async () => {},
@@ -241,5 +268,34 @@ describe('titles and context', () => {
     const chars = big.reduce((n, t) => n + t.prompt.length + t.answer.length, 0);
     expect(chars).toBeLessThanOrEqual(8000);
     expect(big.at(-1)?.prompt).toBe('q2');
+  });
+
+  it('starts a follow-up tainted when an earlier turn read untrusted content', async () => {
+    const { api, finished, store } = await rig({ firstReadsPage: true });
+    const first = await api('/api/chats/messages', { body: { text: 'Read that page' } });
+    await finished(first.json.chatId, 1);
+    expect(fold(await store.read(first.json.taskId)).tainted).toBe(true);
+    const next = await api('/api/chats/messages', {
+      body: { chatId: first.json.chatId, text: 'Now do something' },
+    });
+    expect(
+      ((await configOf(store, next.json.taskId)) as { startTainted?: boolean }).startTainted,
+    ).toBe(true);
+    await finished(first.json.chatId, 2);
+    expect(fold(await store.read(next.json.taskId)).tainted).toBe(true);
+  });
+
+  it('does not taint a follow-up when no earlier turn read untrusted content', async () => {
+    const { api, finished, store } = await rig();
+    const first = await api('/api/chats/messages', { body: { text: 'Say hi' } });
+    await finished(first.json.chatId, 1);
+    const next = await api('/api/chats/messages', {
+      body: { chatId: first.json.chatId, text: 'Again' },
+    });
+    expect(
+      ((await configOf(store, next.json.taskId)) as { startTainted?: boolean }).startTainted,
+    ).toBeUndefined();
+    await finished(first.json.chatId, 2);
+    expect(fold(await store.read(next.json.taskId)).tainted).toBe(false);
   });
 });

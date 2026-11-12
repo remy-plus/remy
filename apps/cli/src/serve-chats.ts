@@ -161,6 +161,14 @@ export function contextFrom(states: TaskState[]): ConversationTurn[] {
   return kept.reverse();
 }
 
+/** Whether an earlier turn that goes into the context read untrusted content. */
+export function contextTainted(states: TaskState[]): boolean {
+  return states
+    .filter((s) => s.status === 'succeeded' && s.final?.answer)
+    .slice(-CONTEXT_TURNS)
+    .some((s) => s.tainted);
+}
+
 const messageBody = z
   .object({
     chatId: z.string().max(100).optional(),
@@ -225,8 +233,11 @@ export function chatRoutes(d: ChatDeps): ApiRoute {
     if (body.trust !== undefined && !isTrustLevel(body.trust))
       throw new HttpError(400, 'trust must be ask, steady or away.');
     const chat = body.chatId === undefined ? undefined : need(body.chatId);
-    const context = chat ? contextFrom(await states(chat)) : undefined;
-    const { taskId } = await ctx.startTask(body.text, body.trust, context);
+    const earlier = chat ? await states(chat) : undefined;
+    const context = earlier ? contextFrom(earlier) : undefined;
+    // An earlier answer that read untrusted content may carry an injected instruction forward.
+    const tainted = earlier ? contextTainted(earlier) : false;
+    const { taskId } = await ctx.startTask(body.text, body.trust, context, tainted);
     const saved = chat ? chats.append(chat.id, taskId) : chats.create(titleFrom(body.text), taskId);
     if (!saved) throw NOT_FOUND;
     return json(201, { chatId: saved.id, taskId });
