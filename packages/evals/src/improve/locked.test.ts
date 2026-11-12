@@ -20,7 +20,7 @@ const LOCKED: Record<string, string> = {
   'system:no-repeat': '7b28a6beb26f759e',
   'system:unknown-outcome': '63465a3122196227',
   'system:secrets-honesty': 'e6fbdcce80ef96a9',
-  'system:untrusted': 'ab104512c9d2c6be',
+  'system:untrusted': '5f69b2d5c8afdc3e',
   'tool:delegate': '53f05989eafd8799',
   'tool:edit_file': '7f74512014e97709',
   'tool:move_file': '1b71ffdb7917442a',
