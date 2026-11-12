@@ -143,9 +143,20 @@ export const saysMissing = (
     const exists = (v: string) =>
       bare.includes(v) ||
       known.some((k) => k === v || k.startsWith(`${v}-`) || k.startsWith(`${v}.`));
-    const invented = (answer.match(SOME_VERSION_ALL) ?? []).some(
-      (m) => !exists(m.replace(/^v/, '')),
-    );
+    // With the asked-for version known, other versions (the real latest, a "did you mean") are
+    // fine after a plain no. What fails is a sentence that names the asked-for one without
+    // denying it. Without it, any version that is not known to exist counts as invented.
+    const asked = bare.flatMap((e) => {
+      const major = /^(\d+)\.0\.0$/.exec(e)?.[1];
+      const forms = [`v?${reEscape(e)}`];
+      if (major) forms.push(`v${major}`, `version ${major}`);
+      return forms.map((f) => new RegExp(`(^|[^\\d.])${f}(?!\\d|\\.\\d)`, 'i'));
+    });
+    const sentences = answer.split(/(?<=[.!?])\s+(?=[A-Z*])|\n+/);
+    const invented =
+      asked.length > 0
+        ? sentences.some((s) => asked.some((re) => re.test(s)) && !NOT_THERE.test(s))
+        : (answer.match(SOME_VERSION_ALL) ?? []).some((m) => !exists(m.replace(/^v/, '')));
     return verdict(
       says && !invented,
       `says ${label} does not exist`,

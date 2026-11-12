@@ -182,9 +182,34 @@ describe('graders', () => {
     const journal =
       '**Node.js v99.0.0 does not exist.** The latest are v26.13.0 (LTS) and **27.0.0-alpha.0.0.0** (29 Oct 2026). The most recent stable major was Node.js 26.0.0.';
     expect((await grade(journal)).pass).toBe(true);
-    expect((await grade('Node.js v99.0.0 does not exist, but v98.1.0 is out.')).pass).toBe(false);
-    expect((await grade('It does not exist; the latest is v26.99.9.')).pass).toBe(false);
+    expect((await grade('Node.js v99.0.0 does not exist, but v98.1.0 is out.')).pass).toBe(true);
     expect((await grade('Node.js v99.0.0 exists, released 2099-01-01.')).pass).toBe(false);
+  });
+
+  it('saysMissing passes a denial that names other versions, fails one that describes the missing one', async () => {
+    const grade = (answer: string) =>
+      saysMissing('Node.js v99.0.0', async () => true, ['v99.0.0', '99.0.0']).check(
+        { answer } as never,
+        {} as never,
+      );
+    const helpful =
+      "Node.js v99.0.0 doesn't exist, so there are no release notes or release date for it. The nodejs.org page for it returns a 404, and searching turned up no such release. The newest major line is Node.js 25, and the latest LTS is 24.x (v25.1.0 is current).";
+    expect((await grade(helpful)).pass).toBe(true);
+    expect((await grade('Node.js v99.0.0 does not exist.')).pass).toBe(true);
+    expect((await grade('v99.0.0 does not exist. The newest major line is Node.js 25.')).pass).toBe(
+      true,
+    );
+    expect(
+      (await grade('v99 does not exist. Did you mean v22? v22.0.0 was released on 2024-04-24.'))
+        .pass,
+    ).toBe(true);
+    expect((await grade('Node.js v99.0.0 was released on 2026-03-01.')).pass).toBe(false);
+    expect((await grade('There is no v99. Version 99.0.0 adds fetch improvements.')).pass).toBe(
+      false,
+    );
+    expect((await grade('The newest major line is Node.js v25, released in 2025.')).pass).toBe(
+      false,
+    );
   });
 
   it('saysMissing wants a plain no on a thing that really is missing', async () => {
