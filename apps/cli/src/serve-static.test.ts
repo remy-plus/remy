@@ -59,6 +59,33 @@ function raw(port: number, path: string, method = 'GET') {
   );
 }
 
+describe('security headers', () => {
+  it('allow https images and nothing else remote', async () => {
+    const port = await start();
+    const csp = String((await raw(port, '/')).headers['content-security-policy']);
+    expect(csp).toContain("img-src 'self' data: https:;");
+    expect(csp).not.toMatch(/http:(?!\/)/);
+    for (const d of ["default-src 'self'", "frame-ancestors 'none'", "base-uri 'none'"])
+      expect(csp).toContain(d);
+    expect(SECURITY_HEADERS['content-security-policy']).toBe(csp);
+  });
+});
+
+describe('dotfiles', () => {
+  it('answer 404 like a missing file', async () => {
+    writeFileSync(join(root, '.env'), 'SECRET=1');
+    writeFileSync(join(root, 'assets', '.hidden'), 'x');
+    mkdirSync(join(root, '.well-known'));
+    writeFileSync(join(root, '.well-known', 'x'), 'x');
+    const port = await start();
+    for (const path of ['/.env', '/assets/.hidden', '/.well-known/x', '/.well-known/', '/%2eenv']) {
+      const r = await raw(port, path);
+      expect(r.status, path).toBe(404);
+      expect(r.body).not.toContain('SECRET');
+    }
+  });
+});
+
 describe('static files', () => {
   it('serves index.html at the root and for routes with no extension', async () => {
     const port = await start();
@@ -220,7 +247,7 @@ describe('static files', () => {
         expect(r.headers[name], `${method} ${path} ${name}`).toBe(value);
     }
     expect(SECURITY_HEADERS['content-security-policy']).toBe(
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     );
     expect(SECURITY_HEADERS['x-frame-options']).toBe('DENY');
     expect(SECURITY_HEADERS['referrer-policy']).toBe('no-referrer');

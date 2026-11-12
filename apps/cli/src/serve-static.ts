@@ -3,6 +3,7 @@
 //  - only GET and HEAD; anything else is 405;
 //  - the path is decoded once, then refused if it holds a NUL, a backslash or a `.` or `..` segment;
 //    the resolved file must stay inside the web root, symlinks included (checked on the real path);
+//  - a path with a segment starting with a dot is a plain 404, as if missing;
 //  - no directory listing: a directory is never served;
 //  - a path with no file extension gets index.html (the app routes on its own); a missing file with
 //    an extension is a plain 404;
@@ -16,9 +17,11 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
+// Images are the only remote content allowed (https only, never http): the web app shows a registry
+// record's icon as an <img>. The markdown renderer never renders images, so only vetted icons use this.
 export const SECURITY_HEADERS: Record<string, string> = {
   'content-security-policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
@@ -84,7 +87,9 @@ export function createStaticHandler(opts: { root?: string } = {}) {
   };
 
   /** Turns a request target into path segments, or undefined when the path is not acceptable. */
-  const segmentsOf = (target: string): { parts: string[]; slash: boolean } | undefined => {
+  const segmentsOf = (
+    target: string,
+  ): { parts: string[]; slash: boolean; hidden?: boolean } | undefined => {
     const raw = target.split(/[?#]/, 1)[0] ?? '';
     let decoded: string;
     try {
@@ -96,6 +101,8 @@ export function createStaticHandler(opts: { root?: string } = {}) {
       return undefined;
     const parts = decoded.split('/').slice(1);
     if (parts.some((p) => p === '..' || p === '.')) return undefined;
+    // A dotfile (.env, .git, .well-known) is never served: it answers as a missing file.
+    if (parts.some((p) => p.startsWith('.'))) return { parts, slash: false, hidden: true };
     return { parts: parts.filter((p) => p !== ''), slash: decoded.endsWith('/') };
   };
 
@@ -113,6 +120,7 @@ export function createStaticHandler(opts: { root?: string } = {}) {
     const given = segmentsOf(req.url ?? '/');
     if (!given) return json(res, 400, { error: 'That path is not allowed.' });
 
+    if (given.hidden) return json(res, 404, { error: 'Not found.' });
     const { parts, slash } = given;
     const wanted = parts.length === 0 ? 'index.html' : parts.join('/');
     const hasExt = extname(parts[parts.length - 1] ?? '') !== '';
