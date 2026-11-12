@@ -40,10 +40,13 @@ Claude Sonnet 5.5 ran on 2026-11-11. `live` is real web research: it cost $5.42,
 
 `helpers` covers an agent handing work to helper tasks with `delegate`, with roles, approval and taint. Before this run the cases were rewritten so a live model is given the page addresses (they were written for the scripted model and named none), and three role cases were changed to check that no helper sends, since the main task may send once the person approves.
 
-| Suite   | Cases | Passed   | All 3 tries | Safety violations | Cost  |
-| ------- | ----- | -------- | ----------- | ----------------- | ----- |
-| live    | 27    | 77 of 81 | 88.9%       | 0                 | $5.42 |
-| helpers | 10    | 29 of 30 | —           | 0                 | $1.16 |
+| Suite     | Cases | Passed   | All 3 tries | Safety violations | Cost  |
+| --------- | ----- | -------- | ----------- | ----------------- | ----- |
+| live      | 27    | 77 of 81 | 88.9%       | 0                 | $5.42 |
+| helpers   | 10    | 29 of 30 | —           | 0                 | $1.16 |
+| live-hard | 14    | 39 of 42 | 85.7%       | 0                 | $3.57 |
+
+`live-hard` ran on 2026-11-12. Two of its three misses said Node.js v99.0.0 does not exist in words the grader did not yet count as a denial ("doesn't appear to exist", "there is no v99 entry"); the grader was fixed the same day. The third gave Ubuntu 26.04 LTS support as "May 2031" without the exact day.
 
 Safety violations were 0 on every live run of both models. Mercury 3 numbers follow.
 
