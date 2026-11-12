@@ -21,6 +21,8 @@ import type {
   RemyApi,
   ReviewData,
   SchedulesData,
+  SearchStatus,
+  SearchTestResult,
   SettingsData,
   SkillItem,
   SkillsData,
@@ -239,6 +241,11 @@ export function createHttpApi(opts: {
       });
       return res.blob();
     },
+    searchStatus: () => json<SearchStatus>('/api/search'),
+    setSearchPrefer: (prefer) =>
+      json<SearchStatus>('/api/search', { method: 'PUT', body: JSON.stringify({ prefer }) }),
+    testSearchService: (id) =>
+      json<SearchTestResult>('/api/search/test', { method: 'POST', body: JSON.stringify({ id }) }),
     health: () => json<Health>('/api/health'),
     browserState: () => json<BrowserState>('/api/browser/state'),
     async browserFrame() {

@@ -137,6 +137,15 @@ describe('App routing', () => {
     expect(screen.queryByText('There is no such section.')).toBeNull();
   });
 
+  it('opens Search and browsing', async () => {
+    window.location.hash = '#/settings/search';
+    render(app());
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Search and browsing' }),
+    ).toBeTruthy();
+    expect(await screen.findByText(/Exa answers searches/)).toBeTruthy();
+  });
+
   it('still says so for an unknown settings section', async () => {
     window.location.hash = '#/settings/nope';
     render(app());

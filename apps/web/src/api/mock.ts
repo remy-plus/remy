@@ -10,6 +10,8 @@ import type {
   NeedCard,
   RemyApi,
   ReviewData,
+  SearchService,
+  SearchStatus,
   SettingsData,
   StreamEvent,
   TaskListItem,
@@ -614,6 +616,25 @@ const SETTINGS: SettingsData = {
   },
 };
 
+const MOCK_SEARCH: SearchService[] = [
+  { id: 'exa', label: 'Exa', key: 'keychain', kind: 'search' },
+  { id: 'tavily', label: 'Tavily', key: 'none', kind: 'search' },
+  {
+    id: 'firecrawl',
+    label: 'Firecrawl',
+    key: 'none',
+    kind: 'reader',
+    note: 'Reads pages that need a real browser to show their text.',
+  },
+  {
+    id: 'steel',
+    label: 'Steel',
+    key: 'none',
+    kind: 'browser',
+    note: 'A browser in the cloud, for sites that block this computer.',
+  },
+];
+
 export function createMockApi(): RemyApi {
   const tasks = new Map<string, TaskView>(SEEDS.map((s) => [s.id, taskView(s)]));
   const updated = new Map<string, string>(SEEDS.map((s) => [s.id, iso(s.at)]));
@@ -621,6 +642,18 @@ export function createMockApi(): RemyApi {
   let counter = 0;
   let notes = SETTINGS.notes;
   let workspace: WorkspaceInfo = { path: null, source: 'task', saved: null };
+  let searchPrefer: string | null = null;
+  const searchView = (): SearchStatus => {
+    const want = MOCK_SEARCH.find((s) => s.id === searchPrefer && s.key !== 'none');
+    const first = MOCK_SEARCH.find((s) => s.kind === 'search' && s.key !== 'none');
+    return {
+      chosen: (want ?? first)?.id ?? null,
+      order: MOCK_SEARCH.filter((s) => s.kind === 'search' && s.key !== 'none').map((s) => s.id),
+      services: MOCK_SEARCH,
+      override: null,
+      prefer: searchPrefer,
+    };
+  };
   const get = (id: string) => {
     const v = tasks.get(id);
     if (!v) throw new Error('There is no such task.');
@@ -764,6 +797,26 @@ export function createMockApi(): RemyApi {
             { name: 'Lisbon trip', links: 19 },
           ],
         },
+      };
+    },
+    async searchStatus() {
+      return searchView();
+    },
+    async setSearchPrefer(prefer) {
+      searchPrefer = prefer === 'auto' ? null : prefer;
+      return searchView();
+    },
+    async testSearchService(id) {
+      const s = MOCK_SEARCH.find((x) => x.id === id);
+      if (!s || s.key === 'none') throw new Error(`${s?.label ?? 'That service'} has no key yet.`);
+      return {
+        ok: true,
+        ms: 1300,
+        titles: [
+          'Node.js 24 is now the current release',
+          'Node.js releases',
+          'Node.js 22 enters maintenance',
+        ],
       };
     },
     async settings() {

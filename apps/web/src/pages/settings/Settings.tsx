@@ -8,6 +8,7 @@ import { DockSection } from './dock.tsx';
 import { Memory } from './memory.tsx';
 import { Model } from './model.tsx';
 import { Notifications } from './notifications.tsx';
+import { SearchSection } from './search.tsx';
 import {
   ROW_SECTIONS,
   SECTION_ALIASES,
@@ -24,6 +25,7 @@ const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
   memory: Memory,
   computer: Computer,
   model: Model,
+  search: SearchSection,
   notifications: Notifications,
 };
 

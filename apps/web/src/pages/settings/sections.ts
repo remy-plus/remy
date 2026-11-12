@@ -13,6 +13,7 @@ export const SECTIONS = [
   { id: 'trust', label: 'How much Remy does on its own' },
   { id: 'budget', label: 'Spending' },
   { id: 'model', label: 'Model and keys' },
+  { id: 'search', label: 'Search and browsing' },
   { id: 'memory', label: 'Memory and privacy' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'computer', label: 'This computer' },

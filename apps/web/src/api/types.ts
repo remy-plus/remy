@@ -299,6 +299,33 @@ export interface BrowserState {
   title?: string;
 }
 
+/** One service Remy can search, read pages or browse with. `key` says where its key is, never what it is. */
+export interface SearchService {
+  id: string;
+  label: string;
+  key: 'env' | 'keychain' | 'none';
+  kind: 'search' | 'reader' | 'browser';
+  note?: string;
+}
+/** GET /api/search: which service answers web search now, and the choices. */
+export interface SearchStatus {
+  chosen: string | null;
+  why?: string;
+  step?: string;
+  order: string[];
+  services: SearchService[];
+  /** REMY_SEARCH or remy.config.json: it beats the saved choice. */
+  override: string | null;
+  /** The service the person chose in Settings; null is automatic. */
+  prefer?: string | null;
+}
+export interface SearchTestResult {
+  ok: boolean;
+  ms: number;
+  titles: string[];
+  error?: string;
+}
+
 export interface RemyApi {
   readonly kind: 'mock' | 'http';
   browserState(): Promise<BrowserState>;
@@ -325,6 +352,12 @@ export interface RemyApi {
   speakAudio?(text: string, signal?: AbortSignal): Promise<Blob>;
   /** Saves some of the values in `ServerPrefs`. Rejects with a message safe to show. */
   updateSettings(patch: SettingsPatch): Promise<void>;
+  /** Web search status and choices (GET /api/search). Absent on an older server. */
+  searchStatus?(): Promise<SearchStatus>;
+  /** Saves which service to prefer; 'auto' goes back to the first service with a key. */
+  setSearchPrefer?(prefer: string): Promise<SearchStatus>;
+  /** Runs one real search through a service that has a key. */
+  testSearchService?(id: string): Promise<SearchTestResult>;
   health(): Promise<Health>;
   /** Resolves when `token` is accepted; rejects with a message safe to show. Does not store the token. */
   testToken(token: string): Promise<{ running: number }>;

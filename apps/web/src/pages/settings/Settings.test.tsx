@@ -65,12 +65,12 @@ const withMethod = <K extends keyof RemyApi>(key: K, value: RemyApi[K]): RemyApi
 beforeEach(() => window.localStorage.clear());
 
 describe('Settings', () => {
-  it('lists the seven sections as links and marks the open one', async () => {
+  it('lists the eight sections as links and marks the open one', async () => {
     await open('trust', 'How much Remy does on its own');
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
     const links = within(nav).getAllByRole('link');
     expect(links.map((a) => a.getAttribute('href'))).toEqual(
-      ['dock', 'trust', 'budget', 'model', 'memory', 'notifications', 'computer'].map(
+      ['dock', 'trust', 'budget', 'model', 'search', 'memory', 'notifications', 'computer'].map(
         (s) => `#/settings/${s}`,
       ),
     );
@@ -546,6 +546,7 @@ describe('Settings', () => {
     ['trust', 'How much Remy does on its own'],
     ['budget', 'Spending'],
     ['model', 'Model and keys'],
+    ['search', 'Search and browsing'],
     ['memory', 'Memory and privacy'],
     ['notifications', 'Notifications'],
     ['computer', 'This computer'],
