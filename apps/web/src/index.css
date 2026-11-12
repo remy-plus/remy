@@ -240,3 +240,13 @@ body {
     animation: none;
   }
 }
+
+/* iPhone Safari zooms the page when a field under 16px takes focus, and does not zoom back.
+   On touch screens every text field is 16px, whatever its own class says. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
