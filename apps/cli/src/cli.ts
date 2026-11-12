@@ -111,7 +111,15 @@ import {
 import type { ConnectFlowApi } from './connect-ui.ts';
 import type { ConnectionsApi } from './connections-view.ts';
 import { openConversation, savedTurns, summarizeTurns, turnOf } from './conversation.ts';
-import { gatherSearchPlan, makeService, routedSearch } from './search.ts';
+import {
+  gatherSearchPlan,
+  type KeyRoute,
+  type KeySource,
+  makeService,
+  resolveSearchKeys,
+  routedSearch,
+} from './search.ts';
+import { searchCommand } from './search-command.ts';
 import { installerFor } from './service.ts';
 
 /** Past tasks `recall` searches. */
@@ -308,6 +316,10 @@ Usage
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
   remy show <id> [--json]         Show what a task did (--json prints raw events)
+  remy search [key <service> [--key-stdin]|test [<service>]]
+                                  Which search route answers and why, and which services have a key
+                                  (environment or Keychain); key saves one in the Keychain without
+                                  showing it; test runs one real search on a service and times it
   remy login [<provider> --key-stdin [--model <id>] [--base-url <url>]]
                                   Connect a provider: pick one, paste the key, done
   remy login --list               Show saved logins (never the keys)
@@ -387,13 +399,30 @@ Setup
   this machine (Chrome, Edge or Chromium) with its own profile in REMY_HOME/browser; it shows the
   window when you need to sign in. REMY_BROWSER=off turns it off; REMY_BROWSER_LOCAL=on lets it
   open local addresses.
-  Search picks its own route: a service whose key is set (TINYFISH_API_KEY, BRAVE_API_KEY,
-  TAVILY_API_KEY, CONTEXT_DEV_API_KEY, SEARXNG_URL, in that order), then the container
+  Search picks its own route: a service whose key is set (EXA_API_KEY, TINYFISH_API_KEY,
+  PERPLEXITY_API_KEY, TAVILY_API_KEY, LINKUP_API_KEY, SERPER_API_KEY, BRAVE_API_KEY,
+  CONTEXT_DEV_API_KEY, SEARXNG_URL, in that order; on a Mac a key may be in the Keychain instead,
+  service remy, account exa, perplexity, ...: remy search key <service>), then the container
   (remy browser vm start, with Docker running), then the hidden browser. A route that stops working
   is skipped and the next answers; remy doctor shows the order and the step to improve it.
-  REMY_SEARCH (or "search" in remy.config.json) forces one: browser, vm, context, brave, tavily,
-  tinyfish, searxng or off.
+  REMY_SEARCH (or "search" in remy.config.json) forces one: browser, vm, exa, tinyfish,
+  perplexity, tavily, linkup, serper, brave, context, searxng or off.
 `;
+
+const SEARCHLESS = new Set([
+  'login',
+  'logout',
+  'connect',
+  'list',
+  'show',
+  'cancel',
+  'memory',
+  'skills',
+  'trust',
+  'approvals',
+  'review',
+  'browser',
+]);
 
 const OPTIONS = {
   profile: { type: 'string' },
@@ -456,12 +485,20 @@ const SECRET_ENV = [
   'TAVILY_API_KEY',
   'TINYFISH_API_KEY',
   'CONTEXT_DEV_API_KEY',
+  'EXA_API_KEY',
+  'PERPLEXITY_API_KEY',
+  'LINKUP_API_KEY',
+  'SERPER_API_KEY',
 ];
 const TOOL_SECRETS = [
   'BRAVE_API_KEY',
   'TAVILY_API_KEY',
   'TINYFISH_API_KEY',
   'CONTEXT_DEV_API_KEY',
+  'EXA_API_KEY',
+  'PERPLEXITY_API_KEY',
+  'LINKUP_API_KEY',
+  'SERPER_API_KEY',
   'SEARXNG_URL',
 ];
 
@@ -536,6 +573,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'doctor',
       'review',
       'improve',
+      'search',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -872,11 +910,21 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
         existsSync(p),
       ));
+  // Search keys: the environment, plus any found in the Keychain once `prepareSearch` has run.
+  let searchEnv = env;
+  let searchSources: Record<KeyRoute, KeySource> | undefined;
+  let searchPrepared: Promise<void> | undefined;
+  const prepareSearch = () =>
+    (searchPrepared ??= resolveSearchKeys(env).then((r) => {
+      searchEnv = r.env;
+      searchSources = r.sources;
+      for (const k of r.found) addSecret(k.name, k.value);
+    }));
   let searchPlanMemo: ReturnType<typeof gatherSearchPlan> | undefined;
   /** The search route order, worked out once per process; Docker is asked only when no pick or key settles it. */
   const searchPlan = (file: FileConfig) =>
     (searchPlanMemo ??= gatherSearchPlan({
-      env,
+      env: searchEnv,
       override: env.REMY_SEARCH ?? file.search,
       vmSetUp: existsSync(vmFile()),
       browser: machineHasBrowser(),
@@ -1054,7 +1102,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   () => false,
                 ),
               )
-            : makeService(route, env),
+            : makeService(route, searchEnv),
       );
       tools.add(
         createWebSearch(provider, {
@@ -1749,7 +1797,21 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
 
   try {
     if (chatMode) return await chatFlow();
+    if (command && !SEARCHLESS.has(command)) await prepareSearch();
     switch (command) {
+      case 'search':
+        return await searchCommand({
+          rest,
+          keyStdin: Boolean(flags['key-stdin']),
+          env: searchEnv,
+          isTTY: deps.isTTY,
+          out: deps.out,
+          plan: searchPlan(cfg()),
+          sources: searchSources as Record<KeyRoute, KeySource>,
+          readStdin: deps.readStdin,
+          askSecret: deps.askSecret,
+        });
+
       case 'run': {
         const prompt = rest.join(' ').trim();
         if (!prompt) throw new Error('Usage: remy run "<prompt>"');
