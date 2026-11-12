@@ -148,7 +148,7 @@ export function Brain() {
             id="brain-search"
             type="search"
             className={`${field} min-w-[200px] flex-1 py-2! text-[14px]`}
-            placeholder="Search by meaning: “who handles the audit?”"
+            placeholder="Search by meaning"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
