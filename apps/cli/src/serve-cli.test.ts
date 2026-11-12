@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fold, type ModelResponse } from '@remy/core';
@@ -6,7 +6,7 @@ import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type CliDeps, cli } from './cli.ts';
-import { serveTokenHash } from './serve-token.ts';
+import { announceFirstRunToken, FIRST_RUN_TOKEN_FILE, serveTokenHash } from './serve-token.ts';
 import { sha256Hex } from './webhook-token.ts';
 
 const usage = { inTokens: 100, outTokens: 20 };
@@ -65,6 +65,23 @@ describe('remy serve token', () => {
   });
 });
 
+describe('first-run token', () => {
+  it('is printed on a terminal and written to a 0600 file elsewhere', () => {
+    const lines: string[] = [];
+    announceFirstRunToken(home, 'tok-tty', true, (l) => lines.push(l));
+    expect(lines[0]).toBe('tok-tty');
+    expect(existsSync(join(home, FIRST_RUN_TOKEN_FILE))).toBe(false);
+
+    lines.length = 0;
+    announceFirstRunToken(home, 'tok-log', false, (l) => lines.push(l));
+    expect(lines.join('\n')).not.toContain('tok-log');
+    expect(lines.join('\n')).toContain(join(home, FIRST_RUN_TOKEN_FILE));
+    expect(lines.join('\n')).toContain('delete');
+    expect(readFileSync(join(home, FIRST_RUN_TOKEN_FILE), 'utf8').trim()).toBe('tok-log');
+    expect(statSync(join(home, FIRST_RUN_TOKEN_FILE)).mode & 0o777).toBe(0o600);
+  });
+});
+
 describe('remy serve', () => {
   it('refuses a non-loopback host without REMY_SERVE_ALLOW_REMOTE=on', async () => {
     const h = harness({ model: new ScriptedModelClient([]) });
@@ -93,8 +110,13 @@ describe('remy serve', () => {
       throw new Error(`serve did not start: ${h.o.out} ${h.o.err}`);
     };
     const port = await started();
-    // The first run made a token and printed it once.
-    const token = h.o.out.split('\n')[0] as string;
+    // The first run made a token. Off a terminal it is in a private file, never in the output.
+    const tokenFile = join(home, 'serve-token-first-run.txt');
+    const token = readFileSync(tokenFile, 'utf8').trim();
+    expect(h.o.out).not.toContain(token);
+    expect(h.o.out).toContain(tokenFile);
+    expect(h.o.out).toContain('--rotate');
+    expect(statSync(tokenFile).mode & 0o777).toBe(0o600);
     expect(serveTokenHash(home)).toBe(sha256Hex(token));
     const api = (path: string, body?: object) =>
       fetch(`http://127.0.0.1:${port}${path}`, {

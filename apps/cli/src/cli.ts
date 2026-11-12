@@ -191,7 +191,7 @@ import {
   settingsRoutes,
 } from './serve-settings.ts';
 import { createSkillsMount } from './serve-skills.ts';
-import { makeServeToken, serveTokenHash } from './serve-token.ts';
+import { announceFirstRunToken, makeServeToken, serveTokenHash } from './serve-token.ts';
 import {
   createFishKeySource,
   createVoiceMount,
@@ -2207,11 +2207,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const { runtime } = makeRuntime(file, { model: true, hooks: {} });
         await mcp?.ready;
         if (!serveTokenHash(home)) {
-          out(makeServeToken(home));
-          out(
-            st.dim(
-              'That is your token. It is shown once. Send it as: Authorization: Bearer <token>',
-            ),
+          announceFirstRunToken(home, makeServeToken(home), deps.isTTY, (line) =>
+            out(line.startsWith('That is') ? st.dim(line) : line),
           );
         }
         const webPrefs = openWebPrefs(home, () => loadPrefs(home).trust);

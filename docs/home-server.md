@@ -31,10 +31,11 @@ The image shows `healthy` in `docker ps` once that answers.
 
 ## The sign-in token
 
-The first start makes a token and prints it once in the log. Only its hash is kept in `/data`.
+The first start makes a token. A container's log is kept, so the token is not printed there: it is written to a private file (mode 0600) in `/data`, and the log says where. Only its hash is kept besides. Read it, sign in, then delete the file.
 
 ```
-docker logs remy
+docker exec remy cat /data/serve-token-first-run.txt
+docker exec remy rm /data/serve-token-first-run.txt
 ```
 
 The API takes it as `Authorization: Bearer <token>`. The web app at `http://127.0.0.1:7790/` has a sign-in screen for it; the screens are still being wired to the API, so some show sample data for now. If you missed it, or want a new one, make one with:

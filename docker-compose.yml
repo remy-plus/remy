@@ -1,5 +1,6 @@
 # Remy on a home server. Start it with: docker compose up -d --build
-# The one-time sign-in token is printed in the first start's log: docker compose logs remy
+# The one-time sign-in token is not printed in the log. It is in /data/serve-token-first-run.txt:
+#   docker compose exec remy cat /data/serve-token-first-run.txt   (delete it after signing in)
 services:
   remy:
     build: .
