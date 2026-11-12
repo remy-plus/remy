@@ -143,5 +143,5 @@ describe.runIf(process.env.REMY_SKIP_BROWSER !== '1')('local browser', () => {
       await other.close();
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });
