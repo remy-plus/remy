@@ -157,7 +157,7 @@ export function SignIn({
 
         <p className="mt-6 mb-0 text-[14px] text-muted">
           Lost it? On the server, run{' '}
-          <code className="font-mono text-text">remy serve token --rotate</code>.
+          <code className="whitespace-nowrap font-mono text-text">remy serve token --rotate</code>.
         </p>
         <p className="mt-4 mb-0 border-t border-edge pt-4 text-[13px] leading-relaxed text-muted">
           Remy runs on your server. Your chats, keys and files stay there, and nothing is sent
