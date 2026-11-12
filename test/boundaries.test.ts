@@ -105,7 +105,9 @@ describe('package boundaries', () => {
 
 describe('tools use capabilities, not globals', () => {
   // Only the capability implementations may touch the filesystem or the network directly.
-  const EXEMPT = ['scoped-fs.ts', 'scoped-fetch.ts', 'search-providers.ts'];
+  // readers.ts calls a reading service directly, like search-providers.ts, and vets every address
+  // with the scoped-fetch rules before it does.
+  const EXEMPT = ['scoped-fs.ts', 'scoped-fetch.ts', 'search-providers.ts', 'readers.ts'];
   const files = sourceFiles(join(ROOT, 'packages/tools/src')).filter(
     (f) => !f.endsWith('.test.ts') && !EXEMPT.some((e) => f.endsWith(e)),
   );
