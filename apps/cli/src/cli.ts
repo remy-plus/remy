@@ -183,6 +183,7 @@ import { createSchedulesMount } from './serve-schedules.ts';
 import {
   assertUnderMonthlyCap,
   capToMonthRemaining,
+  chooseWorkspace,
   configWithPrefs,
   createSpend,
   monthRemaining,
@@ -2288,6 +2289,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   notesCount,
                   needsKey: (p) => Boolean(PROFILES[p]?.keyEnv),
                   voiceReady: () => Boolean(fishKeys.peek()),
+                  workspaceFlag: flags.workspace ? resolve(cwd, flags.workspace) : undefined,
+                  userHome: deps.homeDir ?? homedir(),
                 },
                 spend,
               ),
@@ -2297,10 +2300,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             home,
             version: version(),
             config: (id, trust) => {
-              // --workspace points every web task at one folder the person chose (say, ~/Desktop).
-              const folder = flags.workspace
-                ? resolve(cwd, flags.workspace)
-                : join(home, 'workspaces', id);
+              // --workspace points every web task at one folder (say, ~/Desktop); else the folder
+              // saved in Settings; else a new empty folder for this task.
+              const { folder } = chooseWorkspace(
+                flags.workspace ? resolve(cwd, flags.workspace) : undefined,
+                webPrefs.get().workspace,
+                join(home, 'workspaces', id),
+              );
               const config = taskConfig(file, model.id, folder);
               mkdirSync(config.workspaceDir, { recursive: true });
               // beforeStart ran just before this, in the same turn, and left what the month has left.

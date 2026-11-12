@@ -234,6 +234,7 @@ describe('settings', () => {
       quietHours: { from: '23:00', to: '07:00' },
       notifications: { approvals: true, finished: true, noticed: false, reviewAt: '07:30' },
       voice: { id: 'e13fa398a7f445a685316a3de6089ce7' },
+      workspace: null,
       appearance: 'dark',
     });
     expect(r.json.voice).toEqual({ ready: false });

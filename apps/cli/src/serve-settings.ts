@@ -3,8 +3,17 @@
 // terminal changes. Only the keys below can be set; the file only holds what the person chose, so
 // an unset trust falls back to the terminal's. Trust and the per-task stop apply to new tasks.
 // Nothing here returns a key or a token.
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  chmodSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { EventStore, TaskConfig, TrustLevel } from '@remy/core';
 import { fold } from '@remy/core';
 import { z } from 'zod';
@@ -56,6 +65,8 @@ export const prefsPatch = z
       })
       .partial()
       .strict(),
+    /** The one folder Remy may use for every web task; null goes back to a new empty folder each. */
+    workspace: z.string().min(1).max(4096).nullable(),
     /** The app is dark only. */
     appearance: z.literal('dark'),
   })
@@ -73,6 +84,8 @@ export interface WebPrefs {
   quietHours: { from: string; to: string };
   notifications: { approvals: boolean; finished: boolean; noticed: boolean; reviewAt: string };
   voice: { id: string };
+  /** The folder every web task works in, or null for a new empty folder per task. */
+  workspace: string | null;
   appearance: 'dark';
 }
 
@@ -85,6 +98,7 @@ export const WEB_PREFS_DEFAULTS: WebPrefs = {
   quietHours: { from: '23:00', to: '07:00' },
   notifications: { approvals: true, finished: true, noticed: false, reviewAt: '07:30' },
   voice: { id: DEFAULT_VOICE_ID },
+  workspace: null,
   appearance: 'dark',
 };
 
@@ -108,6 +122,72 @@ const merge = (a: PrefsPatch, b: PrefsPatch): PrefsPatch => ({
     : {}),
   ...(a.voice || b.voice ? { voice: { ...a.voice, ...b.voice } } : {}),
 });
+
+export type WorkspaceSource = 'flag' | 'setting' | 'task';
+
+/**
+ * Which folder a new task works in: the one `remy serve --workspace` was given, else the one saved
+ * in Settings, else `perTask` (a new empty folder for each task).
+ */
+export function chooseWorkspace(
+  flag: string | undefined,
+  pref: string | null | undefined,
+  perTask: string,
+): { folder: string; source: WorkspaceSource } {
+  if (flag) return { folder: flag, source: 'flag' };
+  if (pref) return { folder: pref, source: 'setting' };
+  return { folder: perTask, source: 'task' };
+}
+
+const inside = (root: string, p: string) => {
+  const rel = relative(root, p);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+};
+const real = (p: string): string | undefined => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Checks a folder the person typed and returns the real path to store. Throws an HttpError 400
+ * with a plain sentence when the folder is not one Remy should be given: it must be an absolute
+ * path (a leading ~ is the home folder) to a folder that exists, not the root of the disk, not the
+ * home folder itself, and not Remy's own data folder or any folder that contains it (keys live there).
+ */
+export function checkWorkspace(input: string, home: string, userHome: string = homedir()): string {
+  const text = input.trim();
+  const expanded =
+    text === '~' ? userHome : text.startsWith('~/') ? join(userHome, text.slice(2)) : text;
+  if (!isAbsolute(expanded))
+    throw new HttpError(
+      400,
+      'Type the full path of the folder, starting with / or ~, for example ~/Documents/Projects.',
+    );
+  let isDir = false;
+  try {
+    isDir = statSync(expanded).isDirectory();
+  } catch {
+    throw new HttpError(400, 'That folder does not exist.');
+  }
+  if (!isDir) throw new HttpError(400, 'That is a file, not a folder.');
+  const path = real(resolve(expanded));
+  if (!path) throw new HttpError(400, 'That folder does not exist.');
+  if (path === resolve(path, '..'))
+    throw new HttpError(400, 'Pick one folder, not the whole disk.');
+  const hereHome = real(userHome) ?? resolve(userHome);
+  if (path === hereHome)
+    throw new HttpError(400, 'Pick a folder inside your home folder, not the whole home folder.');
+  const remyHome = real(home) ?? resolve(home);
+  if (inside(remyHome, path) || inside(path, remyHome))
+    throw new HttpError(
+      400,
+      "That folder holds Remy's own data and keys. Pick a different folder, such as one in Documents.",
+    );
+  return path;
+}
 
 /** `fallbackTrust` is the terminal's saved level, used until the web app sets one. */
 export function openWebPrefs(
@@ -134,6 +214,7 @@ export function openWebPrefs(
       quietHours: { ...d.quietHours, ...c.quietHours },
       notifications: { ...d.notifications, ...c.notifications },
       voice: { ...d.voice, ...c.voice },
+      workspace: c.workspace ?? null,
       appearance: 'dark',
     };
   };
@@ -208,6 +289,10 @@ export interface SettingsDeps {
   needsKey?: (provider: string) => boolean;
   /** Whether a voice key is saved, so Settings can say what spoken replies will use. */
   voiceReady?: () => boolean;
+  /** The folder `remy serve --workspace` was given, already resolved; it beats the saved setting. */
+  workspaceFlag?: string | undefined;
+  /** The person's home folder, for `~` and the home-folder refusal. Defaults to the real one. */
+  userHome?: string;
   now?: () => Date;
 }
 
@@ -258,6 +343,13 @@ const NAMES: Record<string, string> = {
   groq: 'Groq',
 };
 
+/** Which folder tasks use and why, for the Settings row. `path` is null for a new empty folder per task. */
+export function workspaceView(d: Pick<SettingsDeps, 'prefs' | 'workspaceFlag'>) {
+  const saved = d.prefs.get().workspace;
+  const { folder, source } = chooseWorkspace(d.workspaceFlag, saved, '');
+  return { path: source === 'task' ? null : folder, source, saved };
+}
+
 export function settingsView(d: SettingsDeps, spentMonth: number) {
   const t = (d.now ?? (() => new Date()))();
   const daysInMonth = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
@@ -278,6 +370,7 @@ export function settingsView(d: SettingsDeps, spentMonth: number) {
     budget: { usedMonth: Math.round(spentMonth * 100) / 100, daysLeft: daysInMonth - t.getDate() },
     notes: d.notesCount() ?? 0,
     voice: { ready: d.voiceReady?.() ?? false },
+    workspace: workspaceView(d),
     server: { address: d.address(), lastSignIns: [] as { at: string; where: string }[] },
     about: {
       version: d.version,
@@ -295,6 +388,7 @@ export function settingsRoutes(d: SettingsDeps, spend: Spend): ApiRoute {
     if (ctx.method === 'GET') return { status: 200, body: settingsView(d, await spend()) };
     if (ctx.method === 'PUT') {
       const patch = await ctx.body(prefsPatch);
+      if (patch.workspace) patch.workspace = checkWorkspace(patch.workspace, d.home, d.userHome);
       try {
         d.prefs.update(patch);
       } catch {
