@@ -1,5 +1,6 @@
 // The only gate between a model's proposed call and a tool's execute(). PLAN.md "Security enforced in code".
 import { z } from 'zod';
+import { describeAction, helperActionsOf } from './helper-actions.ts';
 import type { CallState, TaskState } from './state.ts';
 import {
   canStandingAllow,
@@ -74,6 +75,29 @@ export function decide(
       kind: 'deny',
       reason: `this exact ${call.tool} call may already have gone through, so it was not sent again. Tell the user it may or may not have happened, and do not say it failed or that it worked`,
     };
+  // 1b3. The same rule across tasks: a helper's change that happened, or may have, is not made
+  // again by the parent (or by the next helper). The helper's calls are not in this task's log,
+  // so they are matched by tool and by what the call would show a person (who, which subject).
+  if (tool.effect === 'unsafe_to_retry' || tool.effect === 'reconcilable') {
+    const preview = (() => {
+      try {
+        return tool.preview(parsed.data as never);
+      } catch {
+        return undefined;
+      }
+    })();
+    const byHelper = helperActionsOf(state.calls).find(
+      (a) =>
+        a.tool === call.tool &&
+        callRisk(tool, call.args) !== 'read' &&
+        (a.argsHash === call.argsHash || a.preview === preview),
+    );
+    if (byHelper)
+      return {
+        kind: 'deny',
+        reason: `a helper already did this, or may have, so it was not done again. ${describeAction(byHelper)}`,
+      };
+  }
   // 1c. A task may ask the user only so many questions; after that it works with what it has.
   if (call.tool === 'ask_user') {
     const asked = Object.values(state.calls ?? {}).filter(
