@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { type Kit, startKit } from './serve-kit.test-kit.ts';
 import { createSkillsMount, stepsOf } from './serve-skills.ts';
 import { openSkills } from './skills.ts';
+import { fakeNet } from './skills-directory.test-kit.ts';
 
 let kit: Kit | undefined;
 afterEach(async () => {
@@ -14,11 +15,11 @@ afterEach(async () => {
 const md = (name: string, description: string, body: string, extra = '') =>
   `---\nname: ${name}\ndescription: ${description}\n${extra}---\n${body}\n`;
 
-async function start() {
+async function start(f?: (u: string) => Promise<Response>) {
   let store: ReturnType<typeof openSkills> | undefined;
   kit = await startKit((home) => {
     store = openSkills(home, join(home, 'project'));
-    return [createSkillsMount({ skills: store })];
+    return [createSkillsMount({ skills: store, ...(f && { fetch: f as typeof fetch }) })];
   });
   const put = (dir: string, name: string, text: string) => {
     mkdirSync(join(dir, name), { recursive: true });
@@ -147,5 +148,62 @@ describe('stepsOf', () => {
       { title: 'Third', detail: '' },
     ]);
     expect(stepsOf(`1. ${'x'.repeat(500)}`)[0]?.title).toHaveLength(160);
+  });
+});
+
+describe('skills directory routes', () => {
+  it('needs the bearer token', async () => {
+    const { kit } = await start(fakeNet().f);
+    expect((await kit.api('/api/skills/directory?q=pdf', { token: null })).status).toBe(401);
+    expect(
+      (await kit.api('/api/skills/directory/install', { method: 'POST', token: null, body: {} }))
+        .status,
+    ).toBe(401);
+  });
+
+  it('searches both directories with a note, and caches for 60 seconds', async () => {
+    const net = fakeNet();
+    const { kit } = await start(net.f);
+    const a = await kit.api('/api/skills/directory?q=pdf&from=skills');
+    expect(a.status).toBe(200);
+    expect(a.json.results[0]).toMatchObject({
+      id: 'anthropics/skills/pdf',
+      detail: '227,931 installs',
+    });
+    expect(a.json.note).toContain('text only');
+    await kit.api('/api/skills/directory?q=PDF');
+    expect(net.seen.filter((u) => u.includes('skills.sh/api/search'))).toHaveLength(1);
+    const b = await kit.api('/api/skills/directory?q=call&from=bots');
+    expect(b.json.results[0]).toMatchObject({ source: 'botdirectory', id: 'call-cost-saver' });
+    expect((await kit.api('/api/skills/directory?q=')).status).toBe(400);
+    expect((await kit.api('/api/skills/directory?q=x&from=nope')).status).toBe(400);
+  });
+
+  it('answers 502 with a sentence when the directory is down', async () => {
+    const { kit } = await start(async () => {
+      throw new Error('offline');
+    });
+    const r = await kit.api('/api/skills/directory?q=pdf');
+    expect(r.status).toBe(502);
+    expect(r.json.error ?? r.text).toContain('skills.sh could not be reached');
+  });
+
+  it('installs from each directory (201), then 409, 404 and 400', async () => {
+    const { kit, store } = await start(fakeNet().f);
+    const post = (body: unknown) =>
+      kit.api('/api/skills/directory/install', { method: 'POST', body });
+    const a = await post({ source: 'skills.sh', id: 'anthropics/skills/pdf' });
+    expect(a.status).toBe(201);
+    expect(a.json.skill).toMatchObject({ name: 'pdf', source: 'yours', enabled: true });
+    expect(a.json.skill.origin).toContain('From a link');
+    expect(store.web('pdf')?.origin.commit).toBeDefined();
+    expect((await post({ source: 'skills.sh', id: 'anthropics/skills/pdf' })).status).toBe(409);
+    const b = await post({ source: 'botdirectory', id: 'call-cost-saver' });
+    expect(b.status).toBe(201);
+    expect(b.json.skill.name).toBe('call-cost-saver');
+    expect((await post({ source: 'botdirectory', id: 'missing-bot' })).status).toBe(404);
+    expect((await post({ source: 'skills.sh', id: 'bad' })).status).toBe(400);
+    expect((await post({ source: 'other', id: 'x' })).status).toBe(400);
+    expect((await post({ source: 'skills.sh', id: 'a/b/c', extra: 1 })).status).toBe(400);
   });
 });
