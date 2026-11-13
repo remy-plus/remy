@@ -892,3 +892,102 @@ describe('/browser', () => {
     expect(noteTexts(broken.chat)[0]).toContain('no browser');
   });
 });
+
+describe('local voice', () => {
+  const notes = (chat: Chat) =>
+    chat.getState().items.flatMap((i) => (i.kind === 'note' ? [i.text] : []));
+  type Heard = { ok: true; text: string } | { ok: false; message: string };
+  function fakeVoice(problem?: string) {
+    const spoken: string[] = [];
+    let stopped = 0;
+    let finish: (r: Heard) => void = () => {};
+    const handle = {
+      cancelled: false,
+      stop() {
+        finish({ ok: true, text: 'Remind me to call the dentist' });
+      },
+      cancel() {
+        handle.cancelled = true;
+        finish({ ok: false, message: 'Stopped listening.' });
+      },
+      result: new Promise<Heard>((r) => {
+        finish = r;
+      }),
+    };
+    return {
+      spoken,
+      handle,
+      stops: () => stopped,
+      deps: {
+        listen: () => handle,
+        speak: async (t: string) => void spoken.push(t),
+        stopSpeaking: () => void stopped++,
+        problem: async () => problem,
+      },
+    };
+  }
+
+  it('/voice turns spoken replies on and off; only the final answer is said', async () => {
+    const v = fakeVoice();
+    const { chat } = harness(new ScriptedModelClient([done('Four.'), done('Eight.')]), undefined, {
+      voice: v.deps,
+    });
+    await chat.submit('/voice');
+    expect(chat.getState().voiceOn).toBe(true);
+    await chat.submit('what is 2+2');
+    expect(v.spoken).toEqual(['Four.']);
+    await chat.submit('/voice');
+    expect(chat.getState().voiceOn).toBe(false);
+    await chat.submit('double it');
+    expect(v.spoken).toEqual(['Four.']);
+    expect(notes(chat).join('\n')).toContain('Spoken replies are off');
+  });
+
+  it('/voice says the one next step when speech is not possible', async () => {
+    const { chat } = harness(new ScriptedModelClient([]), undefined, {
+      voice: fakeVoice('Spoken replies use the macOS say command.').deps,
+    });
+    await chat.submit('/voice');
+    expect(chat.getState().voiceOn).toBeFalsy();
+    expect(notes(chat).at(-1)).toContain('say command');
+  });
+
+  it('/listen puts the transcript in the draft and sends nothing', async () => {
+    const v = fakeVoice();
+    const { chat, store } = harness(new ScriptedModelClient([]), undefined, { voice: v.deps });
+    await chat.submit('/listen');
+    expect(chat.getState().listening).toBe(true);
+    chat.stopListening();
+    await vi.waitFor(() =>
+      expect(chat.getState().draft?.text).toBe('Remind me to call the dentist'),
+    );
+    expect(chat.getState().listening).toBe(false);
+    expect(await store.listTasks()).toHaveLength(0);
+    expect(chat.getState().items.some((i) => i.kind === 'user')).toBe(false);
+  });
+
+  it('Esc cancels a recording and leaves no draft', async () => {
+    const v = fakeVoice();
+    const { chat } = harness(new ScriptedModelClient([]), undefined, { voice: v.deps });
+    await chat.submit('/listen');
+    chat.cancelListening();
+    await vi.waitFor(() => expect(chat.getState().listening).toBe(false));
+    expect(v.handle.cancelled).toBe(true);
+    expect(chat.getState().draft).toBeUndefined();
+  });
+
+  it('shows what went wrong when recording cannot start', async () => {
+    const { chat } = harness(new ScriptedModelClient([]), undefined, {
+      voice: {
+        ...fakeVoice().deps,
+        listen: () => ({
+          ok: false as const,
+          message: 'Voice needs whisper.cpp: brew install whisper-cpp',
+        }),
+      },
+    });
+    await chat.submit('/listen');
+    expect(chat.getState().listening).toBeFalsy();
+    expect(notes(chat).at(-1)).toContain('brew install whisper-cpp');
+  });
+});

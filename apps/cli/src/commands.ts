@@ -16,6 +16,11 @@ export const COMMANDS: CommandInfo[] = [
   { name: 'connections', summary: 'See connected apps; switch them off or remove them' },
   { name: 'approvals', summary: 'See the tools you always allow; stop allowing one' },
   { name: 'trust', summary: 'Choose how much Remy does without asking: ask, steady or away' },
+  { name: 'voice', summary: 'Have Remy say each answer out loud, on this computer (on or off)' },
+  {
+    name: 'listen',
+    summary: 'Speak instead of typing: Enter ends it, you check the text before sending',
+  },
   { name: 'browser', summary: "Show or hide Remy's browser window, e.g. to sign in to a site" },
   { name: 'bg', summary: 'Run a task in the background: /bg <task>', aliases: ['background'] },
   { name: 'sessions', summary: 'Pick up an unfinished task', aliases: ['resume'] },

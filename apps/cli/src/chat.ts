@@ -193,6 +193,29 @@ export interface ChatState {
   theme: ThemeChoice;
   /** The trust level new tasks start with; shown in the status row unless it is `ask`. */
   trust: TrustLevel;
+  /** /voice: Remy speaks each final answer. */
+  voiceOn?: boolean;
+  /** /listen: the microphone is open until Enter. */
+  listening?: boolean;
+  /** Text for the composer to take, for the person to read and send; `n` makes each one new. */
+  draft?: { text: string; n: number };
+}
+
+/** Local voice, as the chat sees it: nothing here leaves the machine. */
+export interface VoiceDeps {
+  /** Starts a recording, or says what is missing. */
+  listen():
+    | {
+        stop(): void;
+        cancel(): void;
+        result: Promise<{ ok: true; text: string } | { ok: false; message: string }>;
+      }
+    | { ok: false; message: string };
+  /** Speaks the start of an answer; resolves when it ends or is stopped. */
+  speak(text: string): Promise<unknown>;
+  stopSpeaking(): void;
+  /** What is missing for voice, as one plain next step; undefined when all is there. */
+  problem(): Promise<string | undefined>;
 }
 
 export interface RuntimeHooks {
@@ -255,6 +278,8 @@ export interface ChatDeps {
   saveMinimal?: (on: boolean) => boolean;
   /** The trust level for new tasks, and a way to save a new one. */
   trust?: { get(): TrustLevel; set(level: TrustLevel): boolean };
+  /** /voice and /listen: local speech to text and text to speech; absent where voice is off. */
+  voice?: VoiceDeps;
   /** /profile opens when the host keeps a profile. */
   profileEnabled?: boolean;
   /** /memory: the saved notes about the user, and whether they are in use. */
@@ -327,6 +352,10 @@ export interface Chat {
   continueRun(yes: boolean): Promise<void>;
   /** Stops the running task. It stays resumable. */
   interrupt(): Promise<void>;
+  /** Ends the recording started by /listen and puts what was said in the composer. */
+  stopListening(): void;
+  /** Ends the recording and throws it away. */
+  cancelListening(): void;
   /**
    * Interrupts the running task and sends this message in its place. Messages already queued
    * keep their place behind it. With no task running it is a plain `submit`.
@@ -495,6 +524,7 @@ const MAX_REASONING_CHARS = 2000;
 const MAX_PICKER_ROWS = 8;
 
 export function createChat(deps: ChatDeps): Chat {
+  let listening: { stop(): void; cancel(): void } | undefined;
   let s: ChatState = {
     ...initial(),
     contextWindow: deps.contextWindow,
@@ -860,6 +890,7 @@ export function createChat(deps: ChatDeps): Chat {
           deps.conversation?.onTurn(id);
           void compact();
           const ms = s.turnStartedAt === undefined ? undefined : Date.now() - s.turnStartedAt;
+          if (s.voiceOn) void deps.voice?.speak(answer);
           return await end(true, {
             kind: 'reply',
             text: answer,
@@ -1108,6 +1139,39 @@ export function createChat(deps: ChatDeps): Chat {
         return void commit({ kind: 'error', text: 'Could not save the trust level.' });
       set({ trust: word });
       commit({ kind: 'note', text: trustChanged(word) });
+    } else if (name === 'voice') {
+      if (!deps.voice) return void commit({ kind: 'note', text: 'Voice is not available here.' });
+      if (s.voiceOn) {
+        deps.voice.stopSpeaking();
+        set({ voiceOn: false });
+        return void commit({ kind: 'note', text: 'Spoken replies are off.' });
+      }
+      return deps.voice.problem().then((p) => {
+        if (p) return commit({ kind: 'note', text: p });
+        set({ voiceOn: true });
+        commit({
+          kind: 'note',
+          text: 'Spoken replies are on. Remy says each final answer, shortly, on this computer. /voice again turns them off.',
+        });
+      });
+    } else if (name === 'listen') {
+      if (!deps.voice) return void commit({ kind: 'note', text: 'Voice is not available here.' });
+      if (listening) return;
+      deps.voice.stopSpeaking();
+      const h = deps.voice.listen();
+      if (!('result' in h)) return void commit({ kind: 'note', text: h.message });
+      listening = h;
+      set({ listening: true });
+      commit({
+        kind: 'note',
+        text: 'Listening. Press Enter when you are done (Esc cancels, 30 seconds at most). Nothing is sent until you press Enter again.',
+      });
+      void h.result.then((r) => {
+        if (listening === h) listening = undefined;
+        set({ listening: false });
+        if (r.ok) set({ draft: { text: r.text, n: (s.draft?.n ?? 0) + 1 } });
+        else commit({ kind: 'note', text: r.message });
+      });
     } else if (name === 'schedules') {
       commit({
         kind: 'note',
@@ -1448,7 +1512,14 @@ export function createChat(deps: ChatDeps): Chat {
       }
     },
 
-    interrupt: () => halt(false),
+    interrupt: () => {
+      deps.voice?.stopSpeaking();
+      return halt(false);
+    },
+    stopListening: () => listening?.stop(),
+    cancelListening: () => {
+      listening?.cancel();
+    },
 
     async sendNow(text, pasted) {
       if (s.phase === 'idle') return api.submit(text, pasted);

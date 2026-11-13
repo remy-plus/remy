@@ -4,8 +4,8 @@ import {
   type Exec,
   MAX_SPOKEN_CHARS,
   NEXT_STEP,
-  type RunResult,
   type Running,
+  type RunResult,
   spokenText,
   type VoiceEnv,
 } from './voice-local.ts';
@@ -84,9 +84,12 @@ describe('check', () => {
 
 describe('transcribe', () => {
   it('runs whisper-cli with an argument list and reads the text', async () => {
-    const f = fake((c) => (c.args.includes('-m') ? { stdout: ' Remind me to call the dentist. \n' } : {}), {
-      files: ['/h/voice/ggml-base.en.bin', '/w/a.wav'],
-    });
+    const f = fake(
+      (c) => (c.args.includes('-m') ? { stdout: ' Remind me to call the dentist. \n' } : {}),
+      {
+        files: ['/h/voice/ggml-base.en.bin', '/w/a.wav'],
+      },
+    );
     const r = await createVoice(f.env).transcribe('/w/a.wav');
     expect(r).toEqual({ ok: true, text: 'Remind me to call the dentist.' });
     const run = f.calls.find((c) => c.args.includes('-m'));
@@ -136,13 +139,12 @@ describe('transcribe', () => {
 
 describe('record', () => {
   it('records 16 kHz mono through ffmpeg, stops on request, reads it and deletes the folder', async () => {
-    const f = fake(
-      (c) =>
-        c.file === 'whisper-cli' && c.args.includes('-m')
-          ? { stdout: 'call the dentist' }
-          : c.file === 'ffmpeg' && c.args.includes('avfoundation')
-            ? 'hang'
-            : {},
+    const f = fake((c) =>
+      c.file === 'whisper-cli' && c.args.includes('-m')
+        ? { stdout: 'call the dentist' }
+        : c.file === 'ffmpeg' && c.args.includes('avfoundation')
+          ? 'hang'
+          : {},
     );
     const h = createVoice(f.env).record({ maxSeconds: 99 });
     if (!('result' in h)) throw new Error('expected a handle');
@@ -233,7 +235,10 @@ describe('speak', () => {
 
   it('gives a next step when say is missing, and says nothing for empty text', async () => {
     const f = fake(missing('say'));
-    expect(await createVoice(f.env).speak('Hello there')).toEqual({ ok: false, message: NEXT_STEP.say });
+    expect(await createVoice(f.env).speak('Hello there')).toEqual({
+      ok: false,
+      message: NEXT_STEP.say,
+    });
     expect((await createVoice(fake(() => ({})).env).speak('```code```')).ok).toBe(false);
   });
 });

@@ -102,6 +102,7 @@ import {
   type ModelChoice,
   type RuntimeHooks,
   releaseLease,
+  type VoiceDeps,
 } from './chat.ts';
 import { computerCommand } from './computer-command.ts';
 import { type FileConfig, loadConfig } from './config.ts';
@@ -229,6 +230,7 @@ import { fetchSkill } from './skills-web.ts';
 import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
+import { createVoice, realVoiceEnv } from './voice-local.ts';
 import { DEFAULT_PORT as DEFAULT_WEBHOOK_PORT } from './webhook-bind.ts';
 import { BODY_MAX_BYTES, webhookConfig, webhookPrompt } from './webhook-payload.ts';
 import { daemonWebhooks, processStarter, startWebhooks } from './webhook-service.ts';
@@ -362,6 +364,7 @@ Usage
                                   live event stream. 127.0.0.1 only unless REMY_SERVE_ALLOW_REMOTE=on
   remy serve token [--rotate]     Make the access token (shown once; only its hash is kept)
   remy doctor                     See what is set up and the next step for each
+  remy voice test                 Check local voice: whisper.cpp, the speech model, ffmpeg, say
   remy review [--since 24h|7d|<date>]
                                   What ran without you (schedules, watches, background), what it
                                   changed, and what waits for your OK. Reads the log only
@@ -583,6 +586,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'webhook',
       'serve',
       'doctor',
+      'voice',
       'review',
       'improve',
       'search',
@@ -1505,6 +1509,30 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   }
 
   const trustNow = (): TrustLevel => loadPrefs(home).trust ?? 'ask';
+  /** Local voice for the chat: made on first use, so a task that never talks starts nothing. */
+  const chatVoice = (): VoiceDeps => {
+    let v: ReturnType<typeof createVoice> | undefined;
+    const get = () => {
+      v ??= createVoice(realVoiceEnv(home));
+      return v;
+    };
+    return {
+      listen: () => {
+        const h = get().record();
+        return 'result' in h
+          ? {
+              stop: h.stop,
+              cancel: h.cancel,
+              result: h.result.then((r) => (r.ok ? { ok: true as const, text: r.text } : r)),
+            }
+          : h;
+      },
+      speak: (text) => get().speak(text),
+      stopSpeaking: () => void get().stopSpeaking(),
+      // Spoken replies need only `say`; /listen reports its own missing parts.
+      problem: async () => (await get().check()).find((p) => p.part === 'say' && !p.ok)?.message,
+    };
+  };
 
   /** The task config shared by `run` and the chat: flags beat the config file, which beats defaults. */
   function taskConfig(
@@ -1786,6 +1814,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         get: trustNow,
         set: (level) => savePrefs(home, { trust: level }),
       },
+      voice: chatVoice(),
       runtime: (hooks) => {
         const made = makeRuntime(file, { model, hooks });
         registry = made.tools;
@@ -2208,6 +2237,19 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           },
           { home, cwd, env, out, model: deps.model, ask: deps.ask, isTTY: deps.isTTY },
         );
+
+      case 'voice': {
+        if (rest[0] !== 'test') throw new Error('Use remy voice test.');
+        const voice = createVoice(realVoiceEnv(home));
+        const parts = await voice.check();
+        for (const p of parts) out(`${p.ok ? 'ok     ' : 'missing'}  ${p.message}`);
+        if (parts.every((p) => p.ok)) {
+          const heard = await voice.speak('Voice is working.');
+          out(heard.ok ? 'ok       Spoke a test line.' : `missing  ${heard.message}`);
+        }
+        out('Everything runs on this computer; nothing is sent anywhere.');
+        return parts.every((p) => p.ok) ? 0 : 1;
+      }
 
       case 'doctor': {
         const facts = machineFacts();

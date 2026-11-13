@@ -66,6 +66,7 @@ export function useChatKeys(o: ChatKeysOptions) {
   }, [approvalId]);
 
   const quit = useCallback(async () => {
+    chat.cancelListening();
     await chat.interrupt();
     // Let the last frame (the "Stopped" line) print before Ink shuts down.
     setTimeout(exit, 30);
@@ -74,6 +75,14 @@ export function useChatKeys(o: ChatKeysOptions) {
   useEffect(() => {
     if (state.wantsExit) void quit();
   }, [state.wantsExit, quit]);
+
+  // What was said after /listen lands in the prompt to read; Enter sends it.
+  const seenDraft = useRef(state.draft?.n ?? 0);
+  useEffect(() => {
+    if (!state.draft || state.draft.n === seenDraft.current) return;
+    seenDraft.current = state.draft.n;
+    setInput(withText(state.draft.text));
+  }, [state.draft]);
 
   useEffect(() => {
     if (state.clears === seenClears.current) return;
@@ -220,6 +229,11 @@ export function useChatKeys(o: ChatKeysOptions) {
         setInput(EMPTY_INPUT);
         setNoting(true);
       } else if (/^v$/i.test(ch)) setExpanded((x) => !x);
+      return;
+    }
+    if (state.listening) {
+      if (key.return) return chat.stopListening();
+      if (key.escape) return chat.cancelListening();
       return;
     }
     if (key.escape) {
