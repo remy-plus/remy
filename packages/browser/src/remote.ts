@@ -24,6 +24,8 @@ export interface RemoteSessionProvider {
   notice?: string;
   /** Why there is no window to show. Default: the cloud-browser sentence. */
   noWindow?: string;
+  /** Open a new tab instead of adopting one the engine already has (Lightpanda's start-up page cannot navigate). */
+  ownTab?: boolean;
   createSession(): Promise<RemoteSession>;
 }
 

@@ -197,7 +197,9 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
   async function currentPage(): Promise<Page> {
     const c = await context();
     if (!page || page.isClosed())
-      page = c.pages().find((p) => !p.isClosed()) ?? (await c.newPage());
+      page =
+        (opts.remote?.ownTab ? undefined : c.pages().find((p) => !p.isClosed())) ??
+        (await c.newPage());
     return page;
   }
 

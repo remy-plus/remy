@@ -137,6 +137,7 @@ export function createLightpandaProvider(opts: LightpandaOptions): RemoteSession
     label: 'Lightpanda',
     notice: LIGHTPANDA_NOTICE,
     noWindow: LIGHTPANDA_NO_WINDOW,
+    ownTab: true,
     async createSession(): Promise<RemoteSession> {
       const port = await freePort();
       const env = { ...(opts.env ?? process.env), LIGHTPANDA_DISABLE_TELEMETRY: 'true' };

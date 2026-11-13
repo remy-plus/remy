@@ -132,4 +132,15 @@ describe('remote driver', () => {
     const b = createLocalBrowser({ profileDir: '/nonexistent', fallbackNotice: 'Using Chrome.' });
     expect(b.notice).toBe('Using Chrome.');
   });
+  it('opens its own tab when the engine asks for one, even if it has a page already', async () => {
+    const ctx = fakeContext();
+    const fresh = vi.spyOn(ctx, 'newPage');
+    connect.mockResolvedValue({ contexts: () => [ctx], newContext: async () => ctx });
+    const b = createLocalBrowser({
+      profileDir: '/nonexistent',
+      remote: { ...provider({ close: async () => {} }), ownTab: true },
+    });
+    await b.open('https://example.com/');
+    expect(fresh).toHaveBeenCalledTimes(1);
+  });
 });
