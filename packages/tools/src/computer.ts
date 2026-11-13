@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process';
 import { defineTool, type ToolResult } from '@remy/core';
 import { z } from 'zod';
+import { type BoatConfig, type BoatDeps, boatComputer } from './boat-computer.ts';
 
 export interface ComputerOutput {
   exitCode: number;
@@ -83,7 +84,7 @@ export interface DockerConfig {
   network?: 'bridge' | 'none';
 }
 
-export type ComputerConfig = SshConfig | DockerConfig;
+export type ComputerConfig = SshConfig | DockerConfig | BoatConfig;
 
 /**
  * A machine reached over ssh with the user's own key. Host key checking stays on (the host must
@@ -257,12 +258,22 @@ export function dockerComputer(cfg: DockerConfig, exec: Exec = nodeExec): Comput
 }
 
 /** The provider for one config entry. */
-export function computerFromConfig(cfg: ComputerConfig, exec: Exec = nodeExec): Computer {
+export function computerFromConfig(
+  cfg: ComputerConfig,
+  exec: Exec = nodeExec,
+  boat?: BoatDeps,
+): Computer {
+  if (cfg.kind === 'boat') {
+    if (!boat) throw new Error(`${cfg.name}: a Boat computer needs a way to read the Boat key`);
+    return boatComputer(cfg, boat);
+  }
   return cfg.kind === 'docker' ? dockerComputer(cfg, exec) : sshComputer(cfg, exec);
 }
 
 /** One plain line for a config entry, without making a connection. */
 export function describeComputer(cfg: ComputerConfig): string {
+  if (cfg.kind === 'boat')
+    return `Boat cloud computer remy-${cfg.name} (${cfg.size ?? 'default'}, EU)`;
   if (cfg.kind === 'docker')
     return cfg.container
       ? `docker container ${cfg.container}`

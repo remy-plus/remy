@@ -1,3 +1,4 @@
+export * from './boat-computer.ts';
 export * from './builtin-skills.ts';
 export * from './calc-tools.ts';
 export * from './computer.ts';
