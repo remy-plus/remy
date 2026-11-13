@@ -35,6 +35,8 @@ export interface LocalBrowserOptions {
   navigationTimeoutMs?: number;
   /** Drive a cloud browser instead of launching Chrome here. One session, started on first use. */
   remote?: RemoteSessionProvider;
+  /** Said in the browser's status when Remy fell back to Chrome from an engine that was asked for. */
+  fallbackNotice?: string;
   /** Release the remote session after this long unused. Default 5 minutes. */
   idleMs?: number;
 }
@@ -243,7 +245,9 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
     if (opts.remote) {
       const where = session?.viewerUrl ? ` You can watch it at ${session.viewerUrl}.` : '';
       throw new Error(
-        `${remoteNotice(opts.remote.label)} There is no window to show here.${where} Ask the person to do this step themselves, or to turn off REMY_BROWSER.`,
+        opts.remote.noWindow
+          ? `${opts.remote.noWindow} Ask the person to do this step themselves, or to turn off the engine.`
+          : `${remoteNotice(opts.remote.label)} There is no window to show here.${where} Ask the person to do this step themselves, or to turn off REMY_BROWSER.`,
       );
     }
     if (visible === show && ctx) return;
@@ -269,7 +273,9 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
 
   api = {
     get notice() {
-      return opts.remote ? remoteNotice(opts.remote.label) : undefined;
+      return opts.remote
+        ? (opts.remote.notice ?? remoteNotice(opts.remote.label))
+        : opts.fallbackNotice;
     },
     async state() {
       const p = livePage();

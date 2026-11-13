@@ -9,9 +9,11 @@ import {
   type Browser,
   browserSearch,
   createBrowserTools,
+  createLightpandaProvider,
   createLocalBrowser,
   profileInUse,
   remoteNotice,
+  resolveEngine,
 } from '@remy/browser';
 import {
   type ApprovalRequest,
@@ -1051,8 +1053,27 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     if (choice.kind === 'error') throw new Error(choice.message);
     if (choice.kind === 'remote')
       for (const v of choice.secrets) addSecret('REMOTE_BROWSER_KEY', v);
+    // REMY_BROWSER_ENGINE=lightpanda: a small engine started on this computer. If the program is
+    // missing, Remy says so (here and in the browser's status) and uses Chrome. Never silently.
+    const engine = resolveEngine(env);
+    if (engine.kind === 'error') throw new Error(engine.message);
+    if (engine.kind !== 'chrome' && choice.kind === 'remote')
+      throw new Error(
+        'REMY_BROWSER (a cloud browser) and REMY_BROWSER_ENGINE are both set. Use one: unset either.',
+      );
+    if (!browser && engine.kind === 'missing')
+      process.stderr.write(`${engine.message} Using Chrome for now.\n`);
     browser ??= createLocalBrowser({
       ...(choice.kind === 'remote' && { remote: choice.provider }),
+      ...(engine.kind === 'lightpanda' && {
+        remote: createLightpandaProvider({
+          binary: engine.path,
+          allowLocal: env.REMY_BROWSER_LOCAL === 'on',
+        }),
+      }),
+      ...(engine.kind === 'missing' && {
+        fallbackNotice: `${engine.message} Using Chrome for now.`,
+      }),
       profileDir: browserDir(),
       allowLocal: env.REMY_BROWSER_LOCAL === 'on',
       ...(allow && { allow }),

@@ -105,4 +105,31 @@ describe('remote driver', () => {
     await vi.advanceTimersByTimeAsync(2);
     expect(close).toHaveBeenCalledTimes(1);
   });
+  it('an engine on this computer says so, not "cloud", and has no window or profile', async () => {
+    const ctx = fakeContext();
+    connect.mockResolvedValue({ contexts: () => [ctx], newContext: async () => ctx });
+    const close = vi.fn(async () => {});
+    const b = createLocalBrowser({
+      profileDir: '/nonexistent',
+      remote: {
+        ...provider({ close }),
+        id: 'lightpanda',
+        label: 'Lightpanda',
+        notice: 'Pages open in Lightpanda.',
+        noWindow: 'Lightpanda has no window to show.',
+      },
+    });
+    expect(b.notice).toBe('Pages open in Lightpanda.');
+    await b.open('https://example.com/');
+    const err = (await b.show().catch((e: Error) => e)) as Error;
+    expect(err.message).toContain('Lightpanda has no window to show.');
+    expect(err.message).not.toMatch(/cloud/);
+    await b.close();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the fallback notice when Chrome is used instead of an engine that was asked for', () => {
+    const b = createLocalBrowser({ profileDir: '/nonexistent', fallbackNotice: 'Using Chrome.' });
+    expect(b.notice).toBe('Using Chrome.');
+  });
 });

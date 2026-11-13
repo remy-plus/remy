@@ -20,6 +20,10 @@ export interface RemoteSessionProvider {
   id: string;
   /** Display name, e.g. "Steel". */
   label: string;
+  /** What the status line says. Default: the cloud-browser sentence. */
+  notice?: string;
+  /** Why there is no window to show. Default: the cloud-browser sentence. */
+  noWindow?: string;
   createSession(): Promise<RemoteSession>;
 }
 
