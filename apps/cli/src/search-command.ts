@@ -64,7 +64,7 @@ function status(c: SearchCommandContext): string[] {
   if (c.extra?.length) lines.push('', 'Page readers and cloud browser:', ...c.extra);
   lines.push(
     '',
-    'Save a key with remy search key <id> (a service above, or firecrawl, cloudflare, cloudflare-account, steel, browserbase, browserbase-project). Check a search service with remy search test <service>.',
+    'Save a key with remy search key <id> (a service above, or firecrawl, cloudflare, cloudflare-account, steel, browserbase, browserbase-project, boat). Check a search service with remy search test <service>.',
   );
   return lines;
 }

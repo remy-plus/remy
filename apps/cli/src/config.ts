@@ -2,7 +2,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Budget } from '@remy/core';
 import { type McpServerConfig, mcpServersSchema } from '@remy/mcp';
-import type { ComputerConfig, DockerConfig, SshConfig } from '@remy/tools';
+import {
+  BOAT_SIZES,
+  type BoatConfig,
+  type ComputerConfig,
+  type DockerConfig,
+  type SshConfig,
+} from '@remy/tools';
 
 export interface FileConfig {
   profile?: string;
@@ -84,9 +90,19 @@ export function loadConfig(cwd: string, home: string): FileConfig {
         if (typeof o[k] !== 'string') throw bad(`${at} needs "${k}" as text`);
         return o[k] as string;
       };
-      if (o.kind !== undefined && o.kind !== 'ssh' && o.kind !== 'docker')
-        throw bad(`${at}: "kind" must be "ssh" or "docker"`);
+      if (o.kind !== undefined && o.kind !== 'ssh' && o.kind !== 'docker' && o.kind !== 'boat')
+        throw bad(`${at}: "kind" must be "ssh", "docker" or "boat"`);
       text('name', true);
+      if (o.kind === 'boat') {
+        if (
+          o.size !== undefined &&
+          !(typeof o.size === 'string' && (BOAT_SIZES as readonly string[]).includes(o.size))
+        )
+          throw bad(`${at}: "size" must be ${BOAT_SIZES.join(', ')}`);
+        if (o.idleStopSeconds !== undefined && typeof o.idleStopSeconds !== 'number')
+          throw bad(`${at}: "idleStopSeconds" must be a number`);
+        return o as unknown as BoatConfig;
+      }
       if (o.kind === 'docker') {
         const container = text('container', false);
         const image = text('image', false);

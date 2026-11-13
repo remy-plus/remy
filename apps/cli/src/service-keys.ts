@@ -36,7 +36,7 @@ export async function readServiceKey(
   return { source: 'none' };
 }
 
-/** Keys for page readers and cloud browsers that `remy search key <id>` can save. */
+/** Keys for page readers, cloud browsers and a Boat cloud computer that `remy search key <id>` can save. */
 export const EXTRA_KEYS = {
   firecrawl: {
     env: 'FIRECRAWL_API_KEY',
@@ -67,6 +67,11 @@ export const EXTRA_KEYS = {
     env: 'BROWSERBASE_PROJECT_ID',
     label: 'Browserbase project id',
     use: 'goes with the Browserbase key for the cloud browser',
+  },
+  boat: {
+    env: 'BOAT_API_KEY',
+    label: 'Boat API key',
+    use: 'lets Remy use your own Boat cloud computer (remy computer add <name> --boat)',
   },
 } as const;
 export type ExtraKeyId = keyof typeof EXTRA_KEYS;

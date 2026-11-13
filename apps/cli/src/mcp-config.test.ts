@@ -234,8 +234,16 @@ describe('docker computers in remy.config.json', () => {
     expect(read(list)()).toEqual(list);
   });
 
+  it('reads a boat entry', () => {
+    const list = [{ kind: 'boat', name: 'cloud', size: 'large', idleStopSeconds: 1800 }];
+    expect(read(list)()).toEqual(list);
+    expect(read([{ kind: 'boat', name: 'c' }])()).toEqual([{ kind: 'boat', name: 'c' }]);
+  });
+
   it.each([
-    [{ kind: 'vm', name: 'x' }, /"kind" must be "ssh" or "docker"/],
+    [{ kind: 'vm', name: 'x' }, /"kind" must be "ssh", "docker" or "boat"/],
+    [{ kind: 'boat', name: 'x', size: 'huge' }, /"size" must be/],
+    [{ kind: 'boat', name: 'x', idleStopSeconds: 'x' }, /"idleStopSeconds" must be a number/],
     [{ kind: 'docker', name: 'x' }, /either "container" or "image"/],
     [{ kind: 'docker', name: 'x', image: 'a', container: 'b' }, /either "container" or "image"/],
     [{ kind: 'docker', name: 'x', image: 5 }, /"image" as text/],
