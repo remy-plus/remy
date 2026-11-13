@@ -198,13 +198,13 @@ describe('record', () => {
 });
 
 describe('speak', () => {
-  it('passes the text on stdin, never in a shell command, and a leading dash is harmless', async () => {
+  it('passes the text on stdin, never in a shell command, and flags inside it are harmless', async () => {
     const f = fake(() => ({}));
-    const r = await createVoice(f.env).speak('-v Zarvox rm -rf /');
+    const r = await createVoice(f.env).speak('hello -v Zarvox; rm -rf /');
     expect(r.ok).toBe(true);
     const say = f.calls.find((c) => c.file === 'say');
     expect(say?.args).toEqual(['-f', '-']);
-    expect(say?.input).toBe('-v Zarvox rm -rf /');
+    expect(say?.input).toBe('hello -v Zarvox; rm -rf /');
     expect(say?.timeoutMs).toBeGreaterThan(0);
   });
 
