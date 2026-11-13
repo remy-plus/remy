@@ -49,6 +49,7 @@ import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
   calculate,
+  computerFromConfig,
   createComputerTools,
   createDelegate,
   createFetchUrl,
@@ -75,7 +76,6 @@ import {
   type SearchProvider,
   SKILLS_HINT,
   skillsBlock,
-  sshComputer,
   updatePlan,
   writeFile,
 } from '@remy/tools';
@@ -101,6 +101,7 @@ import {
   type RuntimeHooks,
   releaseLease,
 } from './chat.ts';
+import { computerCommand } from './computer-command.ts';
 import { type FileConfig, loadConfig } from './config.ts';
 import { connectCommand } from './connect.ts';
 import {
@@ -325,6 +326,9 @@ Usage
   remy cancel <id>                Stop a task for good
   remy list [--status <status>]   List tasks
   remy show <id> [--json]         Show what a task did (--json prints raw events)
+  remy computer list|add|test|rm  Machines Remy may run commands on: add <name> --docker <image>
+                                  (Remy keeps its own container), --container <name>, or
+                                  --ssh user@host[:port] [--key <path>]; test runs uname -a there
   remy search [key <id> [--key-stdin]|test [<service>]]
                                   Which search route answers and why, and which services have a key
                                   (environment or Keychain); key saves one in the Keychain without
@@ -475,6 +479,11 @@ const OPTIONS = {
   deny: { type: 'boolean' },
   always: { type: 'boolean' },
   note: { type: 'string' },
+  docker: { type: 'string' },
+  container: { type: 'string' },
+  ssh: { type: 'string' },
+  key: { type: 'string' },
+  network: { type: 'string' },
   version: { type: 'boolean', short: 'v' },
   help: { type: 'boolean', short: 'h' },
 } as const;
@@ -575,6 +584,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       'review',
       'improve',
       'search',
+      'computer',
     ].includes(command)
   )
     throw new Error(`Unknown command "${command}". Run remy help.`);
@@ -1105,7 +1115,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       tools.add(t);
     // Machines the user set up in remy.config.json. A bad entry stops here with the reason.
     if (file.computers?.length)
-      for (const t of createComputerTools(file.computers.map((c) => sshComputer(c)))) tools.add(t);
+      for (const t of createComputerTools(file.computers.map((c) => computerFromConfig(c))))
+        tools.add(t);
     const helpersOn = env.REMY_HELPERS === 'on' || env.REMY_HELPERS === 'act';
     const helpersAct = env.REMY_HELPERS === 'act';
     const helperRoles = loadHelperRoles(home, process.cwd()).roles;
@@ -1870,6 +1881,23 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     if (command === 'search') await Promise.all([prepareSearch(), prepareReader()]);
     else if (command === 'doctor') await prepareSearch();
     switch (command) {
+      case 'computer':
+        return await computerCommand({
+          rest,
+          flags: {
+            docker: flags.docker,
+            container: flags.container,
+            ssh: flags.ssh,
+            key: flags.key,
+            network: flags.network,
+          },
+          list: () => cfg().computers ?? [],
+          configPath:
+            [join(cwd, 'remy.config.json'), join(home, 'remy.config.json')].find(existsSync) ??
+            join(home, 'remy.config.json'),
+          out: deps.out,
+        });
+
       case 'search':
         return await searchCommand({
           rest,
