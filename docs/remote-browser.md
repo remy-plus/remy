@@ -31,3 +31,9 @@ Every guard still runs on this computer before a page opens: loopback, private-n
 ## Sources
 
 Steel sessions (create, viewer link, `wss://connect.steel.dev?apiKey=...&sessionId=...`, release): docs.steel.dev. Browserbase create session (`X-BB-API-Key`, `connectUrl`) and update session (`REQUEST_RELEASE`): docs.browserbase.com. Steel's raw HTTP paths were not shown in the pages read (only the SDK); the paths used are `POST /v1/sessions` and `POST /v1/sessions/{id}/release`. Not yet run against either service.
+
+## An engine on this computer: Lightpanda (optional)
+
+`REMY_BROWSER_ENGINE=lightpanda` runs pages in Lightpanda, a small headless engine that Remy starts on this computer (127.0.0.1 only, a free port, stopped when the browser closes or sits idle). Nothing leaves your computer. Download the nightly for your machine from github.com/lightpanda-io/browser/releases/tag/nightly to `~/.remy/engines/lightpanda` (or point `REMY_LIGHTPANDA_PATH` at it) and make it runnable. If it is missing, Remy says so and uses Chrome, and says that in the browser's status.
+
+It has no window and no saved profile, so signed-in sites do not work, and some pages read with extra hidden text. Chrome stays the default. The numbers are in `docs/reports/browser-measure-2026-11-12.md`; measure again with `pnpm --filter @remy/browser bench`.

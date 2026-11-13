@@ -221,17 +221,78 @@ async function worker(engine: 'chrome' | 'lightpanda'): Promise<RunResult> {
   };
 }
 
+interface RawResult {
+  engine: string;
+  /** Launch (or start the engine) and connect, until a blank tab exists. */
+  engineStartMs: number;
+  /** goto (domcontentloaded) of the 4 fixture pages after the first, no settling, no reader. */
+  rawFixtureMs: number;
+  rawRealMs: number;
+  peakRssMb: number;
+}
+
+/**
+ * The engine alone, straight through Playwright: no 500 ms network-idle wait, no page reader. The
+ * Remy numbers above are dominated by that wait, which hides the difference between engines.
+ */
+async function rawWorker(engine: 'chrome' | 'lightpanda'): Promise<RawResult> {
+  const fixture = await startFixtureServer();
+  let peak = 0;
+  const sampler = setInterval(() => {
+    try {
+      peak = Math.max(peak, descendantsRssKb());
+    } catch {}
+  }, 100);
+  const { chromium } = await import('playwright-core'); // loaded before the clock starts
+  const t0 = performance.now();
+  let close = async () => {};
+  let page: import('playwright-core').Page;
+  if (engine === 'lightpanda') {
+    const choice = resolveEngine({ REMY_BROWSER_ENGINE: 'lightpanda' });
+    if (choice.kind !== 'lightpanda') throw new Error('Lightpanda is not installed');
+    const session = await createLightpandaProvider({
+      binary: choice.path,
+      allowLocal: true,
+    }).createSession();
+    const b = await chromium.connectOverCDP(session.cdpUrl);
+    const c = b.contexts()[0] ?? (await b.newContext());
+    page = await c.newPage();
+    close = async () => {
+      await b.close().catch(() => {});
+      await session.close();
+    };
+  } else {
+    const b = await chromium.launch({ channel: 'chrome', headless: true });
+    page = await (await b.newContext()).newPage();
+    close = () => b.close();
+  }
+  const engineStartMs = performance.now() - t0;
+  const go = async (urls: string[]) => {
+    const t = performance.now();
+    for (const u of urls) await page.goto(u, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    return performance.now() - t;
+  };
+  const rawFixtureMs = await go(
+    ['/article', '/form', '/js', '/table'].map((p) => `${fixture.origin}${p}`),
+  );
+  const rawRealMs = await go(REAL.map((p) => p.url));
+  await close();
+  clearInterval(sampler);
+  fixture.stop();
+  return { engine, engineStartMs, rawFixtureMs, rawRealMs, peakRssMb: peak / 1024 };
+}
+
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? (s[m] as number) : ((s[m - 1] as number) + (s[m] as number)) / 2;
 };
 
-function runWorker(engine: string): Promise<RunResult> {
+function runWorker<T = RunResult>(engine: string, mode = '--worker'): Promise<T> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--conditions=@remy/source', process.argv[1] as string, '--worker', engine],
+      ['--conditions=@remy/source', process.argv[1] as string, mode, engine],
       { stdio: ['ignore', 'pipe', 'inherit'] },
     );
     let out = '';
@@ -240,7 +301,7 @@ function runWorker(engine: string): Promise<RunResult> {
     });
     child.on('exit', (code) => {
       try {
-        resolve(JSON.parse(out.trim().split('\n').pop() ?? '') as RunResult);
+        resolve(JSON.parse(out.trim().split('\n').pop() ?? '') as T);
       } catch {
         reject(new Error(`${engine} worker exited ${code} without a result`));
       }
@@ -253,6 +314,12 @@ async function main(): Promise<void> {
   const wi = args.indexOf('--worker');
   if (wi >= 0) {
     const r = await worker(args[wi + 1] as 'chrome' | 'lightpanda');
+    process.stdout.write(`${JSON.stringify(r)}\n`);
+    process.exit(0);
+  }
+  const ri = args.indexOf('--raw');
+  if (ri >= 0) {
+    const r = await rawWorker(args[ri + 1] as 'chrome' | 'lightpanda');
     process.stdout.write(`${JSON.stringify(r)}\n`);
     process.exit(0);
   }
@@ -292,9 +359,26 @@ async function main(): Promise<void> {
       ];
     }),
   );
-  const json = JSON.stringify({ runs, summary, all }, null, 2);
+  const rawAll: Record<string, RawResult[]> = { chrome: [], lightpanda: [] };
+  for (let i = 0; i < runs; i++)
+    for (const engine of ['chrome', 'lightpanda']) {
+      process.stderr.write(`raw run ${i + 1}/${runs}: ${engine}\n`);
+      (rawAll[engine] as RawResult[]).push(await runWorker<RawResult>(engine, '--raw'));
+    }
+  const raw = Object.fromEntries(
+    Object.entries(rawAll).map(([engine, rs]) => [
+      engine,
+      {
+        engineStartMs: Math.round(median(rs.map((r) => r.engineStartMs))),
+        rawFixtureMsFor4Pages: Math.round(median(rs.map((r) => r.rawFixtureMs))),
+        rawRealMsFor5Pages: Math.round(median(rs.map((r) => r.rawRealMs))),
+        peakRssMb: Math.round(median(rs.map((r) => r.peakRssMb))),
+      },
+    ]),
+  );
+  const json = JSON.stringify({ runs, summary, raw, all, rawAll }, null, 2);
   if (out) writeFileSync(out, json);
-  process.stdout.write(`${JSON.stringify({ runs, summary }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ runs, summary, raw }, null, 2)}\n`);
 }
 
 await main();
