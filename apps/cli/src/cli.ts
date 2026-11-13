@@ -2,7 +2,7 @@ import { execFile, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -993,6 +993,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       homeDir: homedir(),
       logFile: join(home, 'logs', 'daemon.log'),
       path: env.PATH,
+      remyHome: env.REMY_HOME || undefined,
+      user: userInfo().username,
       run: (cmd, args) => {
         const r = spawnSync(cmd, args, { encoding: 'utf8' });
         return { status: r.status, stdout: r.stdout ?? '' };

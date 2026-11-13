@@ -27,6 +27,10 @@ export interface ServiceContext {
   logFile: string;
   /** The PATH to give the service, where the platform sets almost none. */
   path?: string | undefined;
+  /** REMY_HOME when the person set one, so a service started by the system reads the same data. */
+  remyHome?: string | undefined;
+  /** The login name, for the one linger line systemd needs. */
+  user?: string | undefined;
   run: RunCommand;
   files: ServiceFiles;
 }
@@ -72,7 +76,7 @@ export function systemdQuote(text: string, what: string, expandsVariables = true
 }
 
 /** A systemd user unit: starts at login and comes back after a failure. */
-export function systemdUnit(entry: EntryPoint, path = ''): string {
+export function systemdUnit(entry: EntryPoint, path = '', remyHome = ''): string {
   if (!entry.execPath.startsWith('/'))
     throw new Error('systemd needs the full path to node, and this one is not.');
   const words = [entry.execPath, ...entry.execArgv, entry.script, 'daemon', 'run']
@@ -85,7 +89,7 @@ After=network-online.target
 [Service]
 Type=simple
 ExecStart=${words}
-${path ? `Environment=${systemdQuote(`PATH=${path}`, 'PATH', false)}\n` : ''}Restart=on-failure
+${path ? `Environment=${systemdQuote(`PATH=${path}`, 'PATH', false)}\n` : ''}${remyHome ? `Environment=${systemdQuote(`REMY_HOME=${remyHome}`, 'REMY_HOME', false)}\n` : ''}Restart=on-failure
 RestartSec=5
 
 [Install]
@@ -206,13 +210,19 @@ export function systemdInstaller(ctx: ServiceContext): ServiceInstaller {
           `${why}\nRun this in your own service or a terminal instead:\n  ${run.map(shellQuote).join(' ')}`,
         );
       }
-      ctx.files.write(unit, systemdUnit(ctx.entry, ctx.path));
+      ctx.files.write(unit, systemdUnit(ctx.entry, ctx.path, ctx.remyHome));
       ctl('daemon-reload');
-      if (ctl('enable', '--now', UNIT).status !== 0)
+      // `enable --now` leaves a daemon that is already running on the old unit and the old code.
+      if (ctl('enable', UNIT).status !== 0 || ctl('restart', UNIT).status !== 0)
         throw new Error(
           'systemd did not start the daemon. Check: systemctl --user status remy.service',
         );
-      return 'The daemon is on and starts when you log in. To keep it running while you are logged out, run loginctl enable-linger yourself.';
+      const user = ctx.user ?? '<your user name>';
+      const linger = ctx.run('loginctl', ['show-user', user, '--property=Linger', '--value']);
+      const lingers = linger.status === 0 && (linger.stdout ?? '').trim() === 'yes';
+      return lingers
+        ? 'The daemon is on and keeps running when you log out.'
+        : `The daemon is on and starts when you log in. To keep it running while you are logged out, run: loginctl enable-linger ${user}`;
     },
     uninstall() {
       ctl('disable', '--now', UNIT);

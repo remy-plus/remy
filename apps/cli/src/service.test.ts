@@ -141,14 +141,42 @@ describe('systemd installer', () => {
     expect(f.commands).toEqual([
       sys('show-environment'),
       sys('daemon-reload'),
-      sys('enable', '--now', 'remy.service'),
+      sys('enable', 'remy.service'),
+      sys('restart', 'remy.service'),
+      ['loginctl', 'show-user', '<your user name>', '--property=Linger', '--value'],
     ]);
   });
 
-  it('suggests linger and never runs it', () => {
+  it('restarts a daemon that is already running, so a reinstall picks up the new unit', () => {
     const f = fake();
-    expect(installerFor('linux', f.ctx)?.install()).toContain('loginctl enable-linger');
-    expect(f.commands.flat()).not.toContain('loginctl');
+    installerFor('linux', f.ctx)?.install();
+    expect(f.commands).toContainEqual(sys('restart', 'remy.service'));
+    expect(f.commands).not.toContainEqual(sys('enable', '--now', 'remy.service'));
+  });
+
+  it('suggests linger with the real user name and never runs it', () => {
+    const f = fake();
+    expect(installerFor('linux', { ...f.ctx, user: 'sam' })?.install()).toContain(
+      'run: loginctl enable-linger sam',
+    );
+    expect(f.commands.map((c) => c[1])).not.toContain('enable-linger');
+  });
+
+  it('says nothing about linger when it is already on', () => {
+    const f = fake({
+      fail: (c) => (c === 'loginctl' ? { status: 0, stdout: 'yes\n' } : undefined),
+    });
+    const said = installerFor('linux', { ...f.ctx, user: 'sam' })?.install();
+    expect(said).toBe('The daemon is on and keeps running when you log out.');
+  });
+
+  it('gives the service the same REMY_HOME as the person who installed it', () => {
+    const f = fake();
+    installerFor('linux', { ...f.ctx, remyHome: '/data/my remy' })?.install();
+    expect(f.written[unitPath]).toContain('Environment="REMY_HOME=/data/my remy"\n');
+    const plain = fake();
+    installerFor('linux', plain.ctx)?.install();
+    expect(plain.written[unitPath]).not.toContain('REMY_HOME');
   });
 
   it('says so and prints the foreground command when systemd is not there', () => {
@@ -161,7 +189,7 @@ describe('systemd installer', () => {
   });
 
   it('says so when enable fails', () => {
-    const f = fake({ fail: (_c, a) => (a[1] === 'enable' ? { status: 1 } : undefined) });
+    const f = fake({ fail: (_c, a) => (a[1] === 'restart' ? { status: 1 } : undefined) });
     expect(() => installerFor('linux', f.ctx)?.install()).toThrow(
       'systemd did not start the daemon',
     );
