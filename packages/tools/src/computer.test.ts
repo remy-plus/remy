@@ -1,6 +1,13 @@
 import type { ToolContext } from '@remy/core';
 import { describe, expect, it } from 'vitest';
-import { createComputerTools, type Exec, sshComputer } from './computer.ts';
+import {
+  computerFromConfig,
+  createComputerTools,
+  describeComputer,
+  dockerComputer,
+  type Exec,
+  sshComputer,
+} from './computer.ts';
 import { createScopedFs } from './scoped-fs.ts';
 
 const ctx = (): ToolContext => ({
@@ -108,5 +115,223 @@ describe('computer_run', () => {
     ]);
     const r = await slow?.execute({ computer: 'home', command: 'sleep 99' }, ctx());
     expect(r).toMatchObject({ ok: false, phase: 'after_effect' });
+  });
+});
+
+describe('sshComputer known hosts file', () => {
+  it('passes a known_hosts file of its own and refuses a broken one', async () => {
+    let seen: string[] = [];
+    const exec: Exec = async (_f, args) => {
+      seen = args;
+      return { exitCode: 0, stdout: '', stderr: '' };
+    };
+    await sshComputer({ ...cfg, knownHostsPath: '/t/known hosts' }, exec).run('true', {
+      timeoutMs: 1000,
+    });
+    expect(seen).toContain('UserKnownHostsFile=/t/known hosts');
+    expect(() => sshComputer({ ...cfg, knownHostsPath: '' })).toThrow();
+    expect(() => sshComputer({ ...cfg, knownHostsPath: '/a\n/b' })).toThrow();
+  });
+});
+
+type Call = { file: string; args: string[]; timeoutMs: number };
+type Out = { exitCode: number; stdout?: string; stderr?: string; timedOut?: boolean };
+/** A fake docker: answers each call from `script(args)` and records every call. */
+function fakeDocker(script: (args: string[]) => Out) {
+  const calls: Call[] = [];
+  const exec: Exec = async (file, args, o) => {
+    calls.push({ file, args, timeoutMs: o.timeoutMs });
+    const r = script(args);
+    return {
+      exitCode: r.exitCode,
+      stdout: r.stdout ?? '',
+      stderr: r.stderr ?? '',
+      ...(r.timedOut && { timedOut: true }),
+    };
+  };
+  return { exec, calls, verbs: () => calls.map((c) => c.args[0]) };
+}
+const NO_SUCH = { exitCode: 1, stderr: 'Error: No such object: remy-computer-box' };
+const run = { timeoutMs: 1000 };
+const owned = { kind: 'docker', name: 'box', image: 'debian:stable-slim' } as const;
+const mine = { kind: 'docker', name: 'web', container: 'my-web' } as const;
+
+describe('dockerComputer', () => {
+  it('creates the container on first use, then reuses it', async () => {
+    let made = false;
+    const d = fakeDocker((a) => {
+      if (a[0] === 'inspect') return made ? { exitCode: 0, stdout: 'true\n' } : NO_SUCH;
+      if (a[0] === 'run') {
+        made = true;
+        return { exitCode: 0, stdout: 'abc\n' };
+      }
+      return { exitCode: 0, stdout: 'Linux\n' };
+    });
+    const c = dockerComputer(owned, d.exec);
+    expect(c.where).toBe('docker container remy-computer-box (debian:stable-slim)');
+    expect((await c.run('uname', run)).stdout).toBe('Linux\n');
+    await c.run('uname', run);
+    expect(d.verbs()).toEqual(['inspect', 'run', 'exec', 'exec']);
+    expect(d.calls[1]?.args).toEqual([
+      'run',
+      '-d',
+      '--name',
+      'remy-computer-box',
+      '--label',
+      'remy.computer=box',
+      '--init',
+      '--network',
+      'bridge',
+      'debian:stable-slim',
+      'sleep',
+      'infinity',
+    ]);
+    expect(d.calls[1]?.timeoutMs).toBeGreaterThan(100_000);
+    expect(d.calls[2]?.args).toEqual(['exec', '-i', 'remy-computer-box', 'sh', '-c', 'uname']);
+  });
+
+  it('never mounts, shares the socket or runs privileged, and can cut the network', async () => {
+    const d = fakeDocker((a) => (a[0] === 'inspect' ? NO_SUCH : { exitCode: 0 }));
+    const c = dockerComputer({ ...owned, network: 'none' }, d.exec);
+    await c.run('true', run);
+    const made = d.calls[1]?.args.join(' ') ?? '';
+    expect(made).toContain('--network none');
+    expect(made).not.toMatch(/-v |--volume|--mount|privileged|docker\.sock|--pid|--cap-add/);
+    expect(c.where).toContain('no network');
+  });
+
+  it('starts a stopped container it owns instead of making another', async () => {
+    const d = fakeDocker((a) =>
+      a[0] === 'inspect' ? { exitCode: 0, stdout: 'false\n' } : { exitCode: 0 },
+    );
+    await dockerComputer(owned, d.exec).run('true', run);
+    expect(d.verbs()).toEqual(['inspect', 'start', 'exec']);
+  });
+
+  it('runs in a container that already runs, and never creates one', async () => {
+    const d = fakeDocker((a) =>
+      a[0] === 'inspect' ? { exitCode: 0, stdout: 'true\n' } : { exitCode: 0, stdout: 'x' },
+    );
+    const c = dockerComputer(mine, d.exec);
+    expect(c.where).toBe('docker container my-web');
+    await c.run('ls "a b"; echo $HOME', run);
+    expect(d.calls[1]?.args).toEqual(['exec', '-i', 'my-web', 'sh', '-c', 'ls "a b"; echo $HOME']);
+    const gone = fakeDocker(() => ({ exitCode: 1, stderr: 'Error: No such object: my-web' }));
+    await expect(dockerComputer(mine, gone.exec).run('x', run)).rejects.toThrow(
+      'There is no container named my-web.',
+    );
+    expect(gone.verbs()).toEqual(['inspect']);
+    const stopped = fakeDocker(() => ({ exitCode: 0, stdout: 'false\n' }));
+    await expect(dockerComputer(mine, stopped.exec).run('x', run)).rejects.toThrow(
+      'is not running',
+    );
+    expect(stopped.verbs()).toEqual(['inspect']);
+  });
+
+  it('says so when Docker is not installed or not running', async () => {
+    const missing = fakeDocker(() => ({ exitCode: 255, stderr: 'docker was not found' }));
+    await expect(dockerComputer(owned, missing.exec).run('x', run)).rejects.toThrow(
+      'Docker is not installed',
+    );
+    for (const stderr of [
+      'Cannot connect to the Docker daemon at unix:///x. Is the docker daemon running?',
+      'error during connect: Get "http://docker.sock/v1.47/containers": dial unix',
+    ]) {
+      const off = fakeDocker(() => ({ exitCode: 1, stderr }));
+      await expect(dockerComputer(owned, off.exec).run('x', run)).rejects.toThrow(
+        'Docker is not running. Start Docker Desktop or `colima start`, then try again.',
+      );
+      expect(off.verbs()).toEqual(['inspect']);
+    }
+    const down = fakeDocker(() => ({ exitCode: 1, stderr: 'Cannot connect to the Docker daemon' }));
+    const [tool] = createComputerTools([dockerComputer(owned, down.exec)]);
+    expect(await tool?.execute({ computer: 'box', command: 'ls' }, ctx())).toMatchObject({
+      ok: false,
+      phase: 'before_effect',
+      error: expect.stringContaining('Docker is not running'),
+    });
+  });
+
+  it('reports a failed create, a failed start and a failed check', async () => {
+    const bad = fakeDocker((a) =>
+      a[0] === 'inspect' ? NO_SUCH : { exitCode: 125, stderr: 'pull access denied' },
+    );
+    await expect(dockerComputer(owned, bad.exec).run('x', run)).rejects.toThrow(
+      'Could not create remy-computer-box from debian:stable-slim: pull access denied',
+    );
+    const nostart = fakeDocker((a) =>
+      a[0] === 'inspect' ? { exitCode: 0, stdout: 'false' } : { exitCode: 1, stderr: 'boom' },
+    );
+    await expect(dockerComputer(owned, nostart.exec).run('x', run)).rejects.toThrow(
+      'Could not start',
+    );
+    const odd = fakeDocker(() => ({ exitCode: 1, stderr: 'permission denied' }));
+    await expect(dockerComputer(owned, odd.exec).run('x', run)).rejects.toThrow('could not check');
+  });
+
+  it("passes the command's own exit code and output through, and a timeout", async () => {
+    const d = fakeDocker((a) =>
+      a[0] === 'inspect'
+        ? { exitCode: 0, stdout: 'true' }
+        : { exitCode: 7, stdout: 'o', stderr: 'e' },
+    );
+    expect(await dockerComputer(owned, d.exec).run('exit 7', run)).toEqual({
+      exitCode: 7,
+      stdout: 'o',
+      stderr: 'e',
+    });
+    const slow = fakeDocker((a) =>
+      a[0] === 'inspect' ? { exitCode: 0, stdout: 'true' } : { exitCode: 255, timedOut: true },
+    );
+    const [tool] = createComputerTools([dockerComputer(owned, slow.exec)]);
+    expect(await tool?.execute({ computer: 'box', command: 'sleep 99' }, ctx())).toMatchObject({
+      ok: false,
+      phase: 'after_effect',
+    });
+  });
+
+  it('checks again when the container disappears between commands', async () => {
+    let alive = true;
+    const d = fakeDocker((a) => {
+      if (a[0] === 'inspect') return alive ? { exitCode: 0, stdout: 'true' } : NO_SUCH;
+      if (a[0] === 'exec' && !alive)
+        return { exitCode: 1, stderr: 'Error: No such container: remy-computer-box' };
+      return { exitCode: 0 };
+    });
+    const c = dockerComputer(owned, d.exec);
+    await c.run('x', run);
+    alive = false;
+    await expect(c.run('x', run)).rejects.toThrow('Docker could not run it');
+    alive = true;
+    await c.run('x', run);
+    expect(d.verbs()).toEqual(['inspect', 'exec', 'exec', 'inspect', 'exec']);
+  });
+
+  it.each([
+    { name: '-x' },
+    { name: 'a b' },
+    { image: '-v/:/host' },
+    { image: 'Debian' },
+    { image: 'a b' },
+    { image: undefined },
+    { container: 'x' },
+    { network: 'host' as never },
+  ])('refuses unsafe or incomplete settings %o', (bad) => {
+    expect(() => dockerComputer({ ...owned, ...bad })).toThrow();
+  });
+
+  it('refuses a container name that starts with a dash', () => {
+    expect(() => dockerComputer({ kind: 'docker', name: 'w', container: '--privileged' })).toThrow(
+      'Invalid container',
+    );
+  });
+
+  it('computerFromConfig and describeComputer pick by kind', () => {
+    expect(computerFromConfig(owned).where).toContain('docker container');
+    expect(computerFromConfig(cfg).where).toBe('ssh remy@10.0.0.5');
+    expect(computerFromConfig({ kind: 'ssh', ...cfg }).where).toBe('ssh remy@10.0.0.5');
+    expect(describeComputer(owned)).toBe('docker container remy-computer-box (debian:stable-slim)');
+    expect(describeComputer(mine)).toBe('docker container my-web');
+    expect(describeComputer({ ...cfg, port: 22 })).toBe('ssh remy@10.0.0.5:22');
   });
 });
