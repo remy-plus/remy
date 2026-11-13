@@ -64,6 +64,8 @@ describe('security headers', () => {
     const port = await start();
     const csp = String((await raw(port, '/')).headers['content-security-policy']);
     expect(csp).toContain("img-src 'self' data: https:;");
+    // Remy's voice plays Fish audio from a blob: URL; without this the browser refuses it.
+    expect(csp).toContain("media-src 'self' blob: data:;");
     expect(csp).not.toMatch(/http:(?!\/)/);
     for (const d of ["default-src 'self'", "frame-ancestors 'none'", "base-uri 'none'"])
       expect(csp).toContain(d);
@@ -247,7 +249,7 @@ describe('static files', () => {
         expect(r.headers[name], `${method} ${path} ${name}`).toBe(value);
     }
     expect(SECURITY_HEADERS['content-security-policy']).toBe(
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; media-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     );
     expect(SECURITY_HEADERS['x-frame-options']).toBe('DENY');
     expect(SECURITY_HEADERS['referrer-policy']).toBe('no-referrer');
