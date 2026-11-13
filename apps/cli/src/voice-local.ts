@@ -244,7 +244,7 @@ export function createVoice(env: VoiceEnv) {
       '-f',
       'avfoundation',
       '-i',
-      ':0',
+      ':default',
       '-t',
       String(seconds),
       '-ar',
