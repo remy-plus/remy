@@ -47,7 +47,8 @@ const nodeExec: Exec = (file, args, { timeoutMs, signal }) =>
           exitCode: !e ? 0 : typeof e.code === 'number' ? e.code : 255,
           stdout: String(stdout ?? ''),
           stderr: e?.code === 'ENOENT' ? `${file} was not found` : String(stderr ?? ''),
-          ...(e?.killed && { timedOut: true }),
+          // docker exits 0 when it is stopped by the timeout, so the kill itself is what counts.
+          ...((e?.killed || (child.killed && !signal?.aborted)) && { timedOut: true }),
         });
       },
     );
@@ -137,7 +138,7 @@ const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const IMAGE_RE = /^[a-z0-9][a-z0-9./_:@-]*$/;
 const CREATE_TIMEOUT_MS = 300_000;
 const DAEMON_DOWN =
-  /cannot connect to the docker daemon|is the docker daemon running|error during connect|docker daemon is not running/i;
+  /cannot connect to the docker daemon|failed to connect to the docker api|is the docker daemon running|error during connect|docker daemon is not running/i;
 const GONE = /no such (container|object)/i;
 
 /** A problem with Docker itself (not the command), always before the command ran. */
@@ -234,6 +235,11 @@ export function dockerComputer(cfg: DockerConfig, exec: Exec = nodeExec): Comput
         opts.timeoutMs,
         opts.signal,
       );
+      // Stopping the docker client does not stop the command inside. A container Remy owns is
+      // restarted (its files stay) so nothing keeps running unseen; a container the person runs
+      // is left alone.
+      if (r.timedOut && owned)
+        await docker(['restart', '-t', '1', container], 30_000).catch(() => undefined);
       if (r.exitCode === 125 || (r.exitCode !== 0 && GONE.test(r.stderr))) {
         ready = false;
         throw new ComputerSetupError(`Docker could not run it in ${container}: ${r.stderr.trim()}`);

@@ -235,6 +235,7 @@ describe('dockerComputer', () => {
     );
     for (const stderr of [
       'Cannot connect to the Docker daemon at unix:///x. Is the docker daemon running?',
+      'failed to connect to the docker API at unix:///x.sock; check if the path is correct and if the daemon is running',
       'error during connect: Get "http://docker.sock/v1.47/containers": dial unix',
     ]) {
       const off = fakeDocker(() => ({ exitCode: 1, stderr }));
@@ -288,6 +289,21 @@ describe('dockerComputer', () => {
       ok: false,
       phase: 'after_effect',
     });
+  });
+
+  it('restarts a container it owns after a timeout, but not one the person runs', async () => {
+    const script = (a: string[]): Out =>
+      a[0] === 'inspect'
+        ? { exitCode: 0, stdout: 'true' }
+        : a[0] === 'exec'
+          ? { exitCode: 0, timedOut: true }
+          : { exitCode: 0 };
+    const mineOwn = fakeDocker(script);
+    await dockerComputer(owned, mineOwn.exec).run('sleep 99', run);
+    expect(mineOwn.calls.at(-1)?.args).toEqual(['restart', '-t', '1', 'remy-computer-box']);
+    const theirs = fakeDocker(script);
+    await dockerComputer(mine, theirs.exec).run('sleep 99', run);
+    expect(theirs.verbs()).toEqual(['inspect', 'exec']);
   });
 
   it('checks again when the container disappears between commands', async () => {
