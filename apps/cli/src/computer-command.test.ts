@@ -164,3 +164,46 @@ describe('remy computer', () => {
     expect(saved()).toEqual([]);
   });
 });
+
+describe('remy computer add --boat', () => {
+  it('saves a boat entry and says it needs the persons own key', async () => {
+    const add = ctx(['add', 'cloud'], { flags: { boat: true, size: 'small' } });
+    expect(await computerCommand(add.c)).toBe(0);
+    expect(saved()).toEqual([{ kind: 'boat', name: 'cloud', size: 'small' }]);
+    expect(add.text()).toContain('Boat cloud computer remy-cloud (small, EU)');
+    expect(add.text()).toContain('remy search key boat');
+    expect(add.text()).toContain('costs money after its 7-day trial');
+  });
+
+  it('refuses a region, a bad size, or mixing with another kind', async () => {
+    await expect(
+      computerCommand(ctx(['add', 'c'], { flags: { boat: true, region: 'eu' } }).c),
+    ).rejects.toThrow(/EU regions only/);
+    await expect(
+      computerCommand(ctx(['add', 'c'], { flags: { boat: true, size: 'huge' } }).c),
+    ).rejects.toThrow(/--size is one of/);
+    await expect(
+      computerCommand(ctx(['add', 'c'], { flags: { boat: true, docker: 'x' } }).c),
+    ).rejects.toThrow(/Choose one of/);
+    await expect(
+      computerCommand(ctx(['add', 'c'], { flags: { docker: 'debian', size: 'small' } }).c),
+    ).rejects.toThrow(/--size goes with --boat/);
+  });
+
+  it('lists a boat machine and rm says the Boat computer is not deleted', async () => {
+    await computerCommand(ctx(['add', 'cloud'], { flags: { boat: true } }).c);
+    const ls = ctx(['list']);
+    await computerCommand(ls.c);
+    expect(ls.text()).toBe('cloud: Boat cloud computer remy-cloud (default, EU)\n');
+    const rm = ctx(['rm', 'cloud']);
+    await computerCommand(rm.c);
+    expect(rm.text()).toContain('does not delete the Boat computer');
+    expect(saved()).toEqual([]);
+  });
+
+  it('test with no key explains how to add one and runs nothing', async () => {
+    await computerCommand(ctx(['add', 'cloud'], { flags: { boat: true } }).c);
+    const t = ctx(['test', 'cloud'], { boat: { getKey: async () => undefined } });
+    await expect(computerCommand(t.c)).rejects.toThrow(/remy search key boat/);
+  });
+});

@@ -2,6 +2,10 @@
 // a container that already runs, or a server over ssh). Saved in remy.config.json. `test` runs
 // `uname -a` there without a model or an approval card, because the person typed the command.
 import {
+  BOAT_SIZES,
+  type BoatConfig,
+  type BoatDeps,
+  type BoatSize,
   type Computer,
   type ComputerConfig,
   computerFromConfig,
@@ -20,7 +24,12 @@ export interface ComputerCommandContext {
     ssh?: string | undefined;
     key?: string | undefined;
     network?: string | undefined;
+    boat?: boolean | undefined;
+    size?: string | undefined;
+    region?: string | undefined;
   };
+  /** How a Boat computer reads the person's own key. */
+  boat?: BoatDeps | undefined;
   /** The `computers` of the config file Remy reads. */
   list: () => ComputerConfig[];
   /** The file `add` and `rm` write. */
@@ -37,6 +46,7 @@ const USAGE = `Usage:
   remy computer add <name> --docker <image> [--network none]
   remy computer add <name> --container <running-container>
   remy computer add <name> --ssh user@host[:port] [--key <path>]
+  remy computer add <name> --boat [--size small|default|large|xlarge]   (your own Boat key)
   remy computer test <name>
   remy computer rm <name>`;
 
@@ -51,7 +61,10 @@ export function parseSshTarget(v: string): Pick<SshConfig, 'user' | 'host' | 'po
 
 export async function computerCommand(c: ComputerCommandContext): Promise<number> {
   const [sub, name, ...extra] = c.rest;
-  const make = c.make ?? ((cfg: ComputerConfig) => computerFromConfig(cfg, c.exec));
+  const make =
+    c.make ??
+    ((cfg: ComputerConfig) =>
+      computerFromConfig(cfg, c.exec, c.boat ?? { getKey: async () => undefined }));
   const list = c.list();
   const find = (n: string | undefined) => {
     if (!n) throw new Error(USAGE);
@@ -78,9 +91,15 @@ export async function computerCommand(c: ComputerCommandContext): Promise<number
     }
     case 'add': {
       if (!name) throw new Error(USAGE);
-      const { docker, container, ssh, key, network } = c.flags;
-      const kinds = [docker, container, ssh].filter((v) => v !== undefined).length;
-      if (kinds !== 1) throw new Error(`Choose one of --docker, --container or --ssh.\n${USAGE}`);
+      const { docker, container, ssh, key, network, boat, size, region } = c.flags;
+      const kinds = [docker, container, ssh, boat ? true : undefined].filter(
+        (v) => v !== undefined,
+      ).length;
+      if (kinds !== 1)
+        throw new Error(`Choose one of --docker, --container, --ssh or --boat.\n${USAGE}`);
+      if (region !== undefined)
+        throw new Error('Boat has no region setting: it runs in EU regions only.');
+      if (size !== undefined && !boat) throw new Error('--size goes with --boat.');
       if (list.some((x) => x.name === name))
         throw new Error(
           `There is already a machine named ${name}. Remove it first with remy computer rm ${name}.`,
@@ -89,7 +108,16 @@ export async function computerCommand(c: ComputerCommandContext): Promise<number
       if (network !== undefined && docker === undefined)
         throw new Error('--network goes with --docker.');
       let cfg: ComputerConfig;
-      if (ssh !== undefined) {
+      if (boat) {
+        if (size !== undefined && !(BOAT_SIZES as readonly string[]).includes(size))
+          throw new Error(`--size is one of ${BOAT_SIZES.join(', ')}.`);
+        const b: BoatConfig = {
+          kind: 'boat',
+          name,
+          ...(size !== undefined && { size: size as BoatSize }),
+        };
+        cfg = b;
+      } else if (ssh !== undefined) {
         const t = parseSshTarget(ssh);
         if (!t) throw new Error(`"${ssh}" is not user@host or user@host:port.`);
         cfg = { name, ...t, ...(key !== undefined && { keyPath: key }) };
@@ -111,6 +139,10 @@ export async function computerCommand(c: ComputerCommandContext): Promise<number
       const where = make(cfg).where;
       writeComputers(c.configPath, [...list, cfg]);
       c.out(`Added ${name}: ${where}. Check it with remy computer test ${name}.\n`);
+      if (boat)
+        c.out(
+          'It uses your own Boat key (remy search key boat, or BOAT_API_KEY). Boat costs money after its 7-day trial; Remy has no Boat account and adds nothing to your bill.\n',
+        );
       return 0;
     }
     case 'test': {
@@ -135,6 +167,10 @@ export async function computerCommand(c: ComputerCommandContext): Promise<number
         list.filter((x) => x.name !== cfg.name),
       );
       const owned = cfg.kind === 'docker' && cfg.image !== undefined;
+      if (cfg.kind === 'boat')
+        c.out(
+          `Removing ${cfg.name} from Remy does not delete the Boat computer. It stops by itself when idle; delete it at boat.dev to stop all charges.\n`,
+        );
       c.out(
         `Removed ${cfg.name} (${describeComputer(cfg)}).${owned ? ` Its container stays until you run docker rm -f remy-computer-${cfg.name}.` : ''}\n`,
       );

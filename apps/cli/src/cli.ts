@@ -50,6 +50,7 @@ import {
 import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
+  type BoatDeps,
   calculate,
   computerFromConfig,
   createComputerTools,
@@ -131,6 +132,7 @@ import {
 import { searchCommand, TEST_QUERY } from './search-command.ts';
 import { createSearchMount, type SearchStatusView } from './serve-search.ts';
 import { installerFor } from './service.ts';
+import { readServiceKey } from './service-keys.ts';
 
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
@@ -331,8 +333,9 @@ Usage
   remy list [--status <status>]   List tasks
   remy show <id> [--json]         Show what a task did (--json prints raw events)
   remy computer list|add|test|rm  Machines Remy may run commands on: add <name> --docker <image>
-                                  (Remy keeps its own container), --container <name>, or
-                                  --ssh user@host[:port] [--key <path>]; test runs uname -a there
+                                  (Remy keeps its own container), --container <name>,
+                                  --ssh user@host[:port] [--key <path>], or --boat [--size s]
+                                  (your own Boat cloud computer); test runs uname -a there
   remy search [key <id> [--key-stdin]|test [<service>]]
                                   Which search route answers and why, and which services have a key
                                   (environment or Keychain); key saves one in the Keychain without
@@ -485,6 +488,9 @@ const OPTIONS = {
   always: { type: 'boolean' },
   note: { type: 'string' },
   docker: { type: 'string' },
+  boat: { type: 'boolean' },
+  size: { type: 'string' },
+  region: { type: 'string' },
   container: { type: 'string' },
   ssh: { type: 'string' },
   key: { type: 'string' },
@@ -927,6 +933,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
         existsSync(p),
       ));
+  // The person's own Boat key, read only when a Boat computer first runs a command.
+  const boatDeps = (): BoatDeps => ({
+    getKey: async () => (await readServiceKey('BOAT_API_KEY', 'boat', env)).value,
+  });
   // Search keys: the environment, plus any found in the Keychain once `prepareSearch` has run. That
   // runs only when a search is first needed (the first web_search call, `remy search`, `remy
   // doctor`, the search status route), so commands that never search never touch the Keychain.
@@ -1140,7 +1150,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       tools.add(t);
     // Machines the user set up in remy.config.json. A bad entry stops here with the reason.
     if (file.computers?.length)
-      for (const t of createComputerTools(file.computers.map((c) => computerFromConfig(c))))
+      for (const t of createComputerTools(
+        file.computers.map((c) => computerFromConfig(c, undefined, boatDeps())),
+      ))
         tools.add(t);
     const helpersOn = env.REMY_HELPERS === 'on' || env.REMY_HELPERS === 'act';
     const helpersAct = env.REMY_HELPERS === 'act';
@@ -1940,8 +1952,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             ssh: flags.ssh,
             key: flags.key,
             network: flags.network,
+            boat: Boolean(flags.boat),
+            size: flags.size as string | undefined,
+            region: flags.region as string | undefined,
           },
           list: () => cfg().computers ?? [],
+          boat: boatDeps(),
           configPath:
             [join(cwd, 'remy.config.json'), join(home, 'remy.config.json')].find(existsSync) ??
             join(home, 'remy.config.json'),
