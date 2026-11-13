@@ -24,7 +24,14 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { hostname } from 'node:os';
 import { dirname } from 'node:path';
 import { isStdio, type McpServerConfig } from '@remy/mcp';
-import { type Exec, isPrivateAddress, type SshConfig, sshComputer } from '@remy/tools';
+import {
+  type ComputerConfig,
+  describeComputer,
+  type Exec,
+  isPrivateAddress,
+  type SshConfig,
+  sshComputer,
+} from '@remy/tools';
 import { z } from 'zod';
 import { applyPlan, planFromEntry, SERVER_NAME, takenNames } from './connect-plan.ts';
 import type { ConnectionRow } from './connections-view.ts';
@@ -54,9 +61,9 @@ export interface ConnectMountDeps {
   host?: Pick<McpHost, 'list' | 'toolNames'> & Partial<Pick<McpHost, 'start'>>;
   secrets: SecretStore;
   /** `computers` of remy.config.json. */
-  computers(): SshConfig[];
+  computers(): ComputerConfig[];
   /** Writes the machine list back to the config file Remy reads. */
-  saveComputers(list: SshConfig[]): void;
+  saveComputers(list: ComputerConfig[]): void;
   /** How ssh runs (tests replace it). */
   exec?: Exec;
   /** Addresses a host name points to (tests replace it). */
@@ -242,7 +249,7 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
     });
     const machines = machinesOf().map((c) => ({
       name: c.name,
-      detail: `ssh ${c.user}@${c.host}${c.port ? `:${c.port}` : ''}`,
+      detail: describeComputer(c),
       // Reaching a machine takes a real ssh call, so a list never makes one: "Test" does.
       status: 'unchecked' as const,
     }));
@@ -511,7 +518,7 @@ export function createConnectMount(deps: ConnectMountDeps): Mount {
 }
 
 /** Writes `computers` into the config file, keeping every other key, atomically. */
-export function writeComputers(path: string, list: SshConfig[]): void {
+export function writeComputers(path: string, list: ComputerConfig[]): void {
   let current: Record<string, unknown> = {};
   if (existsSync(path)) {
     try {

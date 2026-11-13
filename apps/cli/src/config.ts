@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Budget } from '@remy/core';
 import { type McpServerConfig, mcpServersSchema } from '@remy/mcp';
-import type { SshConfig } from '@remy/tools';
+import type { ComputerConfig, DockerConfig, SshConfig } from '@remy/tools';
 
 export interface FileConfig {
   profile?: string;
@@ -15,8 +15,11 @@ export interface FileConfig {
   search?: string;
   /** Same shape as Claude Desktop's `mcpServers`. Wins over servers saved by `remy connect`. */
   mcpServers?: Record<string, McpServerConfig>;
-  /** Machines Remy may run commands on over ssh: [{ name, host, user, port?, keyPath? }]. */
-  computers?: SshConfig[];
+  /**
+   * Machines Remy may run commands on: ssh ({ name, host, user, port?, keyPath? }, kind "ssh" or
+   * none) or a container ({ name, kind: "docker", container? or image?, network? }).
+   */
+  computers?: ComputerConfig[];
 }
 
 const strings = (v: unknown, name: string): string[] | undefined => {
@@ -73,14 +76,32 @@ export function loadConfig(cwd: string, home: string): FileConfig {
     const list = raw.computers;
     const bad = (m: string) => new Error(`${path}: "computers" ${m}`);
     if (!Array.isArray(list)) throw bad('must be a list');
-    out.computers = list.map((c, i) => {
+    out.computers = list.map((c, i): ComputerConfig => {
       const o = (c ?? {}) as Record<string, unknown>;
-      for (const k of ['name', 'host', 'user'])
-        if (typeof o[k] !== 'string') throw bad(`entry ${i + 1} needs "${k}" as text`);
+      const at = `entry ${i + 1}`;
+      const text = (k: string, needed: boolean) => {
+        if (o[k] === undefined && !needed) return undefined;
+        if (typeof o[k] !== 'string') throw bad(`${at} needs "${k}" as text`);
+        return o[k] as string;
+      };
+      if (o.kind !== undefined && o.kind !== 'ssh' && o.kind !== 'docker')
+        throw bad(`${at}: "kind" must be "ssh" or "docker"`);
+      text('name', true);
+      if (o.kind === 'docker') {
+        const container = text('container', false);
+        const image = text('image', false);
+        if ((container === undefined) === (image === undefined))
+          throw bad(`${at} needs either "container" or "image", not both`);
+        if (o.network !== undefined && o.network !== 'bridge' && o.network !== 'none')
+          throw bad(`${at}: "network" must be "bridge" or "none"`);
+        return o as unknown as DockerConfig;
+      }
+      text('host', true);
+      text('user', true);
       if (o.port !== undefined && typeof o.port !== 'number')
-        throw bad(`entry ${i + 1}: "port" must be a number`);
-      if (o.keyPath !== undefined && typeof o.keyPath !== 'string')
-        throw bad(`entry ${i + 1}: "keyPath" must be text`);
+        throw bad(`${at}: "port" must be a number`);
+      text('keyPath', false);
+      text('knownHostsPath', false);
       return o as unknown as SshConfig;
     });
   }

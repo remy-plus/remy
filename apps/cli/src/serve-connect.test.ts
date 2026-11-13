@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import type { McpServerConfig } from '@remy/mcp';
-import type { Exec, SshConfig } from '@remy/tools';
+import type { ComputerConfig, Exec } from '@remy/tools';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ConnectionRow } from './connections-view.ts';
 import { loadSaved, saveSaved } from './mcp-config.ts';
@@ -20,14 +20,14 @@ interface Setup {
   config?: Record<string, McpServerConfig>;
   rows?: ConnectionRow[];
   tools?: Record<string, string[]>;
-  machines?: SshConfig[];
+  machines?: ComputerConfig[];
   exec?: Exec;
   resolve?: (host: string) => Promise<string[]>;
   registryFetch?: typeof fetch;
 }
 
 async function start(s: Setup = {}) {
-  const calls = { ssh: [] as string[][], started: [] as string[], saved: [] as SshConfig[][] };
+  const calls = { ssh: [] as string[][], started: [] as string[], saved: [] as ComputerConfig[][] };
   let machines = s.machines ?? [];
   kit = await startKit((home) => [
     createConnectMount({

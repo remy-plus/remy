@@ -217,3 +217,32 @@ describe('computers in remy.config.json', () => {
     expect(() => loadConfig(join(home, '..'), home)).toThrow(/entry 1 needs "host"/);
   });
 });
+
+describe('docker computers in remy.config.json', () => {
+  const read = (computers: unknown) => {
+    const dir = mkdtempSync(join(tmpdir(), 'remy-comp-'));
+    writeFileSync(join(dir, 'remy.config.json'), JSON.stringify({ computers }));
+    return () => loadConfig(join(dir, '..'), dir).computers;
+  };
+
+  it('reads docker entries next to ssh ones', () => {
+    const list = [
+      { kind: 'docker', name: 'box', image: 'debian:stable-slim', network: 'none' },
+      { kind: 'docker', name: 'web', container: 'my-web' },
+      { kind: 'ssh', name: 'home', host: 'h', user: 'u', knownHostsPath: '/k' },
+    ];
+    expect(read(list)()).toEqual(list);
+  });
+
+  it.each([
+    [{ kind: 'vm', name: 'x' }, /"kind" must be "ssh" or "docker"/],
+    [{ kind: 'docker', name: 'x' }, /either "container" or "image"/],
+    [{ kind: 'docker', name: 'x', image: 'a', container: 'b' }, /either "container" or "image"/],
+    [{ kind: 'docker', name: 'x', image: 5 }, /"image" as text/],
+    [{ kind: 'docker', name: 'x', image: 'a', network: 'host' }, /"network" must be/],
+    [{ kind: 'docker', image: 'a' }, /needs "name"/],
+    [{ name: 'x', host: 'h', user: 'u', knownHostsPath: 3 }, /"knownHostsPath" as text/],
+  ])('rejects %j with the reason', (entry, why) => {
+    expect(read([entry])).toThrow(why);
+  });
+});
