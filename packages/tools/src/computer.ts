@@ -140,6 +140,7 @@ const CREATE_TIMEOUT_MS = 300_000;
 const DAEMON_DOWN =
   /cannot connect to the docker daemon|failed to connect to the docker api|is the docker daemon running|error during connect|docker daemon is not running/i;
 const GONE = /no such (container|object)/i;
+const FROM_DAEMON = /error response from daemon/i;
 
 /** A problem with Docker itself (not the command), always before the command ran. */
 export class ComputerSetupError extends Error {}
@@ -240,7 +241,13 @@ export function dockerComputer(cfg: DockerConfig, exec: Exec = nodeExec): Comput
       // is left alone.
       if (r.timedOut && owned)
         await docker(['restart', '-t', '1', container], 30_000).catch(() => undefined);
-      if (r.exitCode === 125 || (r.exitCode !== 0 && GONE.test(r.stderr))) {
+      // Docker's own failures say so ("Error response from daemon"); a command that exits 125 or
+      // prints "no such object" by itself still ran, so it is a normal result, not a setup error.
+      if (
+        r.exitCode !== 0 &&
+        FROM_DAEMON.test(r.stderr) &&
+        (r.exitCode === 125 || GONE.test(r.stderr))
+      ) {
         ready = false;
         throw new ComputerSetupError(`Docker could not run it in ${container}: ${r.stderr.trim()}`);
       }

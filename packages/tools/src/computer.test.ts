@@ -306,12 +306,26 @@ describe('dockerComputer', () => {
     expect(theirs.verbs()).toEqual(['inspect', 'exec']);
   });
 
+  it('passes through a command of its own that exits 125 or prints "no such object"', async () => {
+    const d = fakeDocker((a) =>
+      a[0] === 'inspect'
+        ? { exitCode: 0, stdout: 'true' }
+        : { exitCode: 125, stderr: 'no such object' },
+    );
+    const r = await dockerComputer(owned, d.exec).run('exit 125', run);
+    expect(r.exitCode).toBe(125);
+    expect(r.stderr).toBe('no such object');
+  });
+
   it('checks again when the container disappears between commands', async () => {
     let alive = true;
     const d = fakeDocker((a) => {
       if (a[0] === 'inspect') return alive ? { exitCode: 0, stdout: 'true' } : NO_SUCH;
       if (a[0] === 'exec' && !alive)
-        return { exitCode: 1, stderr: 'Error: No such container: remy-computer-box' };
+        return {
+          exitCode: 1,
+          stderr: 'Error response from daemon: No such container: remy-computer-box',
+        };
       return { exitCode: 0 };
     });
     const c = dockerComputer(owned, d.exec);
