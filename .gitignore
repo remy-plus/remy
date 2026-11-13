@@ -15,3 +15,5 @@ apps/cli/release/
 .agents/
 skills-lock.json
 .taste-skill/
+
+HANDOFF.md
