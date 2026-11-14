@@ -26,7 +26,7 @@ import { type MemoryStore, plainMemory } from './memory.ts';
 import { completePaths, fileContext, MAX_FILES, mentionedPaths } from './mentions.ts';
 import { defaultMore, type More, pauseQuestion } from './pause.ts';
 import { isThemeChoice, type ThemeChoice } from './prefs.ts';
-import { bodyMessage, explainTooLarge, providerName } from './provider-error.ts';
+import { bodyMessage, explainModelError } from './provider-error.ts';
 import {
   changedPaths,
   type FileTouch,
@@ -461,27 +461,7 @@ export function parsePlan(args: unknown): PlanStep[] | undefined {
   return out.length ? out : undefined;
 }
 
-/** A model failure in plain words, ending with the one thing to do. Undefined when unknown. */
-export function explainModelError(msg: string): string | undefined {
-  if (/daily limit is used up|tokens per day|requests per day/i.test(msg)) {
-    const wait = /try again in ([\dhm.]+s?)/i.exec(msg)?.[1]?.replace(/\.\d+s$/, 's');
-    return `${providerName(msg)}'s daily limit for this model is used up. ${wait ? `Try again in ${wait}, or switch` : 'Switch'} with /model.`;
-  }
-  const large = explainTooLarge(msg);
-  if (large) return large;
-  const m = msg.toLowerCase();
-  if (/http (401|403)\b|invalid api key|incorrect api key|unauthorized|api_key_invalid/.test(m))
-    return 'The key was rejected. Run /login to replace it.';
-  if (/http 429|rate limit|too many requests/.test(m))
-    return `${providerName(msg)} is rate-limiting this key. Wait a minute and send your message again, or switch with /model.`;
-  if (/insufficient_quota|exceeded your current quota|http 402|out of credit/.test(m))
-    return 'The account is out of credit. Add credit with the provider, or switch with /model.';
-  if (/http 404|model_not_found|does not exist|not found/.test(m) && /model/.test(m))
-    return 'This key cannot use that model. Pick another with /model.';
-  if (/network error|fetch failed|enotfound|econnrefused|econnreset|timed out|etimedout/.test(m))
-    return 'Could not reach the model. Check your connection, then send your message again.';
-  return undefined;
-}
+export { explainModelError };
 
 /** One calm line: what happened, then what to do next. */
 export function friendlyError(e: unknown): string {

@@ -172,6 +172,7 @@ import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
 import { loadPrefs, savePrefs, type ThemeChoice } from './prefs.ts';
 import { createProfileStore, profileContext } from './profile.ts';
+import { explainModelError } from './provider-error.ts';
 import { reachLines, recommendReach } from './reach.ts';
 import { readReachFacts } from './reach-facts.ts';
 import { withRecall } from './recall.ts';
@@ -1245,6 +1246,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       helperTools: (t) => !t.name.startsWith('browser_') && t.name !== 'save_howto',
       helperRoles,
       helpersAct,
+      ...(deps.sleep && { sleep: deps.sleep }),
       systemPrompt: [
         SYSTEM_PROMPT,
         ...(browserOn() ? [BROWSER_HINT] : []),
@@ -1321,7 +1323,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     o: Exclude<RunOutcome, { status: `waiting_${string}` | 'paused' }>,
   ) {
     if (o.status === 'succeeded') out(o.answer?.trim() || 'Done.');
-    else if (o.status === 'failed') out(`Failed: ${o.reason ?? 'the task could not finish.'}`);
+    else if (o.status === 'failed')
+      out(
+        `Failed: ${(o.reason && explainModelError(o.reason, 'run')) || o.reason || 'the task could not finish.'}`,
+      );
     else out(`Cancelled. ${o.reason ?? ''}`.trim());
     const s = await rt.state(id);
     out(st.dim(`${id}, ${s.step} steps, ${fmtCost(s.costUsd)}. Details: remy show ${id}`));

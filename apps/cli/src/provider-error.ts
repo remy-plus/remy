@@ -31,6 +31,19 @@ export function providerName(raw: string): string {
   return 'The provider';
 }
 
+/** Where the words are read: the chat, `remy run` and friends, or the web app. Each has its own commands. */
+export type Surface = 'chat' | 'run' | 'web';
+
+const WORDS: Record<Surface, { login: string; switchCmd: string; again: string }> = {
+  chat: { login: '/login', switchCmd: '/model', again: 'send your message again' },
+  run: { login: 'remy login', switchCmd: 'remy login', again: 'run it again' },
+  web: {
+    login: 'remy login in a terminal',
+    switchCmd: 'remy login in a terminal',
+    again: 'start the task again',
+  },
+};
+
 const num = (n: number) => n.toLocaleString('en-US');
 
 /**
@@ -41,13 +54,14 @@ const num = (n: number) => n.toLocaleString('en-US');
 const IMAGE_LIMIT = /total number of images exceeds the maximum allowed of (\d+)/i;
 
 /** A request the provider refused for its size (HTTP 413, a token cap below the request, a context limit). */
-export function explainTooLarge(raw: string): string | undefined {
+export function explainTooLarge(raw: string, surface: Surface = 'chat'): string | undefined {
+  const { switchCmd } = WORDS[surface];
   const m = bodyMessage(raw);
   const images = IMAGE_LIMIT.exec(m)?.[1];
   if (images) {
     const who = providerName(raw);
     const owner = who === 'The provider' ? 'this model' : who;
-    return `This request carries more images than ${owner} accepts (${images} at most). Send fewer images, or switch models with /model.`;
+    return `This request carries more images than ${owner} accepts (${images} at most). Send fewer images, or switch models with ${switchCmd}.`;
   }
   const limit = /\blimit\s+(\d[\d,]*)/i.exec(m)?.[1];
   const asked = /\brequested\s+(\d[\d,]*)/i.exec(m)?.[1];
@@ -62,8 +76,51 @@ export function explainTooLarge(raw: string): string | undefined {
   if (!size && !over) return undefined;
   const who = providerName(raw);
   const owner = who === 'The provider' ? 'This provider' : who;
-  const next = 'Try a shorter request, or switch models with /model.';
+  const next = `Try a shorter request, or switch models with ${switchCmd}.`;
   if (limit !== undefined && asked !== undefined && /per minute|tpm/i.test(m))
     return `${owner} allows ${num(Number(limit.replace(/,/g, '')))} tokens a minute on this key; this request needed ${num(Number(asked.replace(/,/g, '')))}. ${next}`;
   return `This request is larger than ${who === 'The provider' ? 'the model accepts' : `${who} accepts`}. ${next}`;
+}
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** A model failure in plain words, ending with the one thing to do. Undefined when unknown. */
+export function explainModelError(msg: string, surface: Surface = 'chat'): string | undefined {
+  const { login, switchCmd, again } = WORDS[surface];
+  if (/daily limit is used up|tokens per day|requests per day/i.test(msg)) {
+    const wait = /try again in ([\dhm.]+s?)/i.exec(msg)?.[1]?.replace(/\.\d+s$/, 's');
+    return `${providerName(msg)}'s daily limit for this model is used up. ${wait ? `Try again in ${wait}, or switch` : 'Switch'} with ${switchCmd}.`;
+  }
+  const large = explainTooLarge(msg, surface);
+  if (large) return large;
+  const m = msg.toLowerCase();
+  if (/http (401|403)\b|invalid api key|incorrect api key|unauthorized|api_key_invalid/.test(m))
+    return `The key was rejected. Run ${login} to replace it.`;
+  if (/http 429|rate limit|too many requests/.test(m))
+    return `${providerName(msg)} is rate-limiting this key. Wait a minute and ${again}, or switch with ${switchCmd}.`;
+  if (/insufficient_quota|exceeded your current quota|http 402|out of credit/.test(m))
+    return `The account is out of credit. Add credit with the provider, or switch with ${switchCmd}.`;
+  if (/http 404|model_not_found|does not exist|not found/.test(m) && /model/.test(m))
+    return `This key cannot use that model. Pick another with ${switchCmd}.`;
+  if (/http 404/.test(m))
+    return `The provider has nothing at that address. Check it with ${login}.`;
+  if (/timed out|etimedout/.test(m))
+    return `The model took too long to answer. Check your connection, then ${again}.`;
+  if (/network error|fetch failed|enotfound|econnrefused|econnreset/.test(m))
+    return `Could not reach the model. Check your connection, then ${again}.`;
+  if (/http 5\d\d\b/.test(m)) {
+    const who = providerName(msg) === 'The provider' ? "The model's provider" : providerName(msg);
+    return `${who} had a problem on its side. Wait a moment, then ${again}, or switch with ${switchCmd}.`;
+  }
+  if (/empty reply/.test(m))
+    return `The model sent back an empty reply each time. ${capital(again)}, or switch with ${switchCmd}.`;
+  if (
+    /invalid json in response|reply was cut off|response has no choices|response has no body/.test(
+      m,
+    )
+  )
+    return `The model's server sent a reply Remy could not read. ${capital(again)}, or switch with ${switchCmd}.`;
+  if (/tool call still invalid|no valid tool call/.test(m))
+    return `The model kept asking for something Remy cannot do, so Remy stopped it. ${capital(again)}, or switch with ${switchCmd}.`;
+  return undefined;
 }

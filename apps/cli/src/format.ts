@@ -66,6 +66,11 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
         return `step ${ev.step}  ${what}  ${st.dim(stats)}`;
       }
       case 'model.failed':
+        // Live, the person sees a calm line; the raw error stays in the log for `remy show`.
+        if (opts.live)
+          return ev.retryable
+            ? st.dim(`The model did not answer (attempt ${ev.attempt}).`)
+            : undefined;
         return `model failed (attempt ${ev.attempt}): ${truncate(ev.error, 120)}`;
       case 'policy.decided':
         if (ev.decision.kind === 'allow' && ev.decision.via === 'standing')
@@ -106,6 +111,8 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
       case 'user.answered':
         return `you answered: ${truncate(ev.answer, 120)}`;
       case 'budget.exhausted':
+        if (ev.limit === 'model')
+          return `lost contact with the model after ${ev.steps} steps; the task is saved`;
         return `paused at the ${ev.limit} limit after ${ev.steps} steps and $${ev.costUsd.toFixed(2)}`;
       case 'budget.extended':
         return `continued by ${ev.by}: now up to ${ev.maxSteps} steps and $${ev.maxCostUsd.toFixed(2)}`;
