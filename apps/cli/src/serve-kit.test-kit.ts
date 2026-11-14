@@ -3,7 +3,13 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRuntime, DEFAULT_BUDGET, type ModelResponse, ToolRegistry } from '@remy/core';
+import {
+  createRuntime,
+  DEFAULT_BUDGET,
+  type ModelResponse,
+  type Tool,
+  ToolRegistry,
+} from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { finish } from '@remy/tools';
@@ -33,14 +39,26 @@ export interface Kit {
   close(): Promise<void>;
 }
 
-export async function startKit(make: (home: string) => Mount[]): Promise<Kit> {
+export interface KitOptions {
+  /** The model's answers, in order (default: finish at once, twenty times). */
+  script?: ModelResponse[];
+  /** Tools besides `finish`. */
+  tools?: Tool[];
+  /** The built web app to serve. */
+  webRoot?: string;
+}
+
+export async function startKit(
+  make: (home: string) => Mount[],
+  opts: KitOptions = {},
+): Promise<Kit> {
   const home = mkdtempSync(join(tmpdir(), 'remy-serve-kit-'));
   const token = makeServeToken(home);
   const store = new MemoryEventStore();
   const runtime = createRuntime({
     store,
-    model: new ScriptedModelClient(Array.from({ length: 20 }, () => done)),
-    tools: new ToolRegistry([finish]),
+    model: new ScriptedModelClient(opts.script ?? Array.from({ length: 20 }, () => done)),
+    tools: new ToolRegistry([finish, ...(opts.tools ?? [])]),
     capabilities: () => ({}) as never,
     leaseMs: 300,
     sleep: async () => {},
@@ -64,6 +82,7 @@ export async function startKit(make: (home: string) => Mount[]): Promise<Kit> {
       pollMs: 20,
       busyMs: 50,
       mounts: make(home),
+      ...(opts.webRoot && { webRoot: opts.webRoot }),
     },
     { host: '127.0.0.1', port: 0 },
   );
