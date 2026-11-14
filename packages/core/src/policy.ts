@@ -148,6 +148,16 @@ export function decide(
           'this task read untrusted content, and this opens an address nobody has shown it yet',
       };
   }
+  // 4a'. The same for words typed into a page's form and sent: only the person's own words go.
+  if (state.tainted && tool.typedOut) {
+    const sent = tool.typedOut(parsed.data as never);
+    if (sent && !personSaid(sent, state))
+      return {
+        kind: 'require_approval',
+        reason:
+          'this task read untrusted content, and this sends words you did not give to a form the page chose',
+      };
+  }
   // 4b. Trust level. Only a `write` call to a tool that opted in, never in a tainted task (step 4
   // returned already), never in a helper (a helper's permissions carry no level, and a role or
   // skill can only shut tools, not open them), and never past the deny list (step 2).
@@ -173,6 +183,20 @@ function knownText(
     if (c.result?.ok) parts.push(c.result.content, ...(c.result.sources ?? []));
   }
   return parts.join('\n');
+}
+
+/** Whether the person's own words (the task, earlier turns, their answers) contain `text`. */
+function personSaid(
+  text: string,
+  state: Partial<Pick<TaskState, 'calls' | 'prompt'>> & Pick<TaskState, 'config'>,
+): boolean {
+  const flat = (t: string) => t.toLowerCase().replace(/\s+/g, ' ').trim();
+  const want = flat(text);
+  if (!want) return true;
+  const parts: string[] = [state.prompt ?? ''];
+  for (const turn of state.config.context ?? []) parts.push(turn.prompt);
+  for (const c of Object.values(state.calls ?? {})) if (c.userAnswer) parts.push(c.userAnswer);
+  return flat(parts.join('\n')).includes(want);
 }
 
 /** An address counts as shown only when it appears whole (a trailing slash or fragment aside). */

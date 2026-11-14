@@ -205,6 +205,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
     risk: 'read',
     effect: 'none',
     timeoutMs: 30_000,
+    typedOut: ({ text, submit }) => (submit ? text : undefined),
     preview: ({ ref, text, submit }) =>
       `Type "${text.slice(0, 80)}" into [${ref}]${submit ? ' and press Enter' : ''} on ${host(browser.current()?.url)}`,
     async execute({ ref, text, submit }) {

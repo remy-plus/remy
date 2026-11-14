@@ -502,6 +502,12 @@ export interface Tool<A = unknown> {
    * `https://evil.test/?q=<something private>` and a read needs no card.
    */
   egress?(args: A): string[];
+  /**
+   * Words one call sends to a place the page chose (a search box's Enter), when it sends any. In
+   * a task that read untrusted content, words the person did not give need approval, because a
+   * page can ask Remy to type something private into its own form.
+   */
+  typedOut?(args: A): string | undefined;
   effect: Effect;
   outputTrust: Trust;
   timeoutMs: number;
