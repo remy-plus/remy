@@ -46,8 +46,12 @@ export const writeFile = defineTool({
   outputTrust: 'trusted',
   timeoutMs: 15_000,
   maxOutputChars: 2_000,
-  preview: ({ path, content }) =>
-    `Write ${content.length} characters to ${path}, replacing it if it exists`,
+  preview: ({ path, content }) => {
+    // The card shows the words too: an approval of "120 characters" says nothing about what they are.
+    const text = content.replace(/\s+/g, ' ').trim();
+    const shown = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+    return `Write ${content.length} characters to ${path}, replacing it if it exists: "${shown}"`;
+  },
   async execute({ path, content }, ctx) {
     try {
       let kept = '';
