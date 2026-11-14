@@ -563,6 +563,33 @@ export const memory: EvalCase[] = [
     ],
   },
   {
+    // Live Haiku 5.5 (2026-11-12) saved the new fact with the old one in brackets, then forgot the
+    // old note by id: the save had rewritten that note in place, so the forget deleted the new fact.
+    id: 'memory-change-then-forget-by-id',
+    suite: 'memory',
+    prompt: 'New job: I am at Globex now. Save that, and forget the note about Acme.',
+    world: { memory: [{ text: 'Works at Acme', kind: 'about_you' }] },
+    human: grant,
+    autoApprove: ['read', 'write'],
+    graders: [
+      status('succeeded'),
+      memoryHas('Globex'),
+      memoryCount(1),
+      currentFactOnly({ current: 'Globex', stale: 'Acme', flagExempts: false }),
+      memoryNotFlagged(),
+    ],
+    reference: [
+      [
+        {
+          tool: 'remember',
+          args: { text: 'Works at Globex now (switched jobs from Acme)', kind: 'about_you' },
+        },
+      ],
+      [{ tool: 'forget', args: { id: 'mem_s1' } }],
+      finish('Saved that you work at Globex and forgot the Acme note.'),
+    ],
+  },
+  {
     id: 'memory-no-false-flag-more-specific',
     suite: 'memory',
     prompt: 'Remember the full place: I live in Lisbon, Portugal.',
