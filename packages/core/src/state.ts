@@ -197,7 +197,7 @@ function open(call: CallState): CallState {
 function setResult(s: TaskState, call: CallState, result: ToolResult) {
   call.result = result;
   call.inFlight = false;
-  if (result.ok && result.trust === 'untrusted') s.tainted = true;
+  if (result.trust === 'untrusted') s.tainted = true;
   if (result.ok && result.spentUsd) s.costUsd += result.spentUsd;
   if (result.ok && call.tool === FIND_TOOLS) {
     const names = (result.data as { names?: unknown } | undefined)?.names;

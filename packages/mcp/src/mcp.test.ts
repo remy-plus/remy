@@ -412,6 +412,7 @@ describe('wrapped tools', () => {
       error: 'quota exceeded',
       retryable: false,
       phase: 'unknown',
+      trust: 'untrusted',
     });
   });
 

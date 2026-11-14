@@ -181,7 +181,8 @@ export function toTools(
       },
       async execute(args, ctx): Promise<ToolResult> {
         const out = await conn.callTool(t.name, args, { signal: ctx.signal, timeoutMs });
-        if (!out.ok) return out;
+        // A server's error text is the server's words: fenced, and the task counts as tainted.
+        if (!out.ok) return { ...out, trust: 'untrusted' };
         const text = capText(renderResult(out.result), MAX_OUTPUT_CHARS);
         if (out.result.isError === true) {
           // The server ran the tool and said it failed. What it did first is unknown, so never retry.
@@ -190,6 +191,7 @@ export function toTools(
             error: text || `${t.name} failed without a message`,
             retryable: false,
             phase: 'unknown',
+            trust: 'untrusted',
           };
         }
         return { ok: true, content: text || '(no output)', trust: 'untrusted' };

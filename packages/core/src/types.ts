@@ -32,6 +32,8 @@ export type ToolResult =
       error: string;
       retryable: boolean;
       phase: 'before_effect' | 'after_effect' | 'unknown';
+      /** `untrusted` when the error text was written by another party (a server's message): it taints the task and is fenced, like any other untrusted output. */
+      trust?: Trust;
     };
 
 /**

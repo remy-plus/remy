@@ -154,7 +154,10 @@ export const defang = (text: string): string =>
   text.replace(/<\s*\/?\s*untrusted[^>]*>?/gi, '[tag removed]');
 
 export function renderResult(result: ToolResult, tool: string, maxChars: number): string {
-  if (!result.ok) return `Error: ${result.error}`;
+  if (!result.ok)
+    return result.trust === 'untrusted'
+      ? `Error: <untrusted source="${tool}">\n${defang(result.error)}\n</untrusted>`
+      : `Error: ${result.error}`;
   let text = result.content;
   if (text.length > maxChars)
     text = `${text.slice(0, maxChars)}\n[truncated ${text.length - maxChars} characters]`;
