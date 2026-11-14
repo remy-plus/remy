@@ -1302,7 +1302,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       const s = await makeRuntime(cfg(), { model: false }).runtime.state(id);
       out(st.bold(pauseQuestion(o, defaultMore(s)).replace(/ Continue.*$/, '')));
       out(`Continue: ${st.accent(continueCommand(id))}`);
-      out(st.dim(`More or less: remy continue ${id} --steps <n> --cost <usd>`));
+      if (o.limit !== 'model')
+        out(st.dim(`More or less: remy continue ${id} --steps <n> --cost <usd>`));
     } else if (o.status === 'waiting_approval') {
       out(`${st.bold('Approval needed:')} ${o.request.preview}`);
       out(st.dim(`Risk: ${o.request.risk}. Why: ${o.request.reason}`));
@@ -1348,7 +1349,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const s = await rt.state(id);
         if (!deps.isTTY || !deps.ask) {
           await followUp(id, o);
-          return 0;
+          // A task that could not reach its model did not finish: say so to scripts too.
+          return o.limit === 'model' ? 1 : 0;
         }
         out();
         const a = await deps.ask(`${pauseQuestion(o, defaultMore(s))} [y/N] `);

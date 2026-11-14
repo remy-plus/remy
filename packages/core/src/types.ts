@@ -227,7 +227,7 @@ export type Event =
   /** A limit ran out. What was spent is recorded so the pause card can say it. */
   | {
       type: 'budget.exhausted';
-      limit: 'steps' | 'cost' | 'time';
+      limit: 'steps' | 'cost' | 'time' | 'model';
       steps: number;
       costUsd: number;
       elapsedMs: number;
@@ -542,7 +542,7 @@ export const MAX_WAITING_CARDS = 3;
 export type RunOutcome =
   | { status: 'waiting_approval'; request: ApprovalRequest; summary?: string }
   | { status: 'waiting_user'; question: string }
-  | { status: 'paused'; limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number }
+  | { status: 'paused'; limit: 'steps' | 'cost' | 'time' | 'model'; steps: number; costUsd: number }
   | { status: FinalStatus; answer?: string; reason?: string };
 
 export interface Runtime {

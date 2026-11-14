@@ -74,7 +74,12 @@ export interface TaskState {
   held?: { summary: string };
   pendingQuestion?: { question: string; callId?: string };
   /** Set while status is `paused`: which limit ran out and what was spent. */
-  pause?: { limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number; elapsedMs: number };
+  pause?: {
+    limit: 'steps' | 'cost' | 'time' | 'model';
+    steps: number;
+    costUsd: number;
+    elapsedMs: number;
+  };
   /** The budget the task started with; `remy continue` offers it again by default. */
   initialBudget: Budget;
   /** The step of the last progress note (0: none yet). */
@@ -392,6 +397,7 @@ function on(s: TaskState, e: Event) {
         maxWallMs: e.maxWallMs,
       };
       s.pause = undefined;
+      s.modelAttempts = 0;
       s.status = 'running';
       return;
     case 'progress':

@@ -24,6 +24,9 @@ const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
 /** "Paused after 30 steps and $0.42. Continue for 30 more steps?" */
 export function pauseQuestion(o: Paused, more: Required<More>): string {
   const spent = `${o.steps} ${o.steps === 1 ? 'step' : 'steps'} and ${usd(o.costUsd)}`;
+  // Nothing ran out: the model could not be reached, and the task waits where it stopped.
+  if (o.limit === 'model')
+    return `Remy lost contact with the model after ${spent}. The task is saved. Continue once you are back online?`;
   const offer =
     o.limit === 'cost'
       ? `${usd(more.costUsd)} more`

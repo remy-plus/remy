@@ -438,6 +438,18 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
             const unnamed = limited && e.retryAfterMs === undefined;
             const backoff = (unnamed ? rateLimitBackoffMs : backoffMs)(attempt, random);
             await sleep(Math.max(asked, backoff));
+          } else if (e instanceof ModelError && e.unreachable) {
+            // The model is out of reach, not the task at fault: keep it, and let the person carry on later.
+            await commit([
+              failed,
+              {
+                type: 'budget.exhausted',
+                limit: 'model',
+                steps: s.step,
+                costUsd: s.costUsd,
+                elapsedMs: clock.now() - s.createdAt,
+              },
+            ]);
           } else {
             const reason = `The model failed: ${failed.error}`;
             await commit([failed, { type: 'task.finished', status: 'failed', reason }]);
@@ -840,13 +852,21 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         if (s.status !== 'paused') throw new Error('the task is not paused');
         const b = s.config.budget;
         const elapsed = clock.now() - s.createdAt;
+        // Paused because the model could not be reached: no budget ran out, so none is added,
+        // except time that passed while the person was away.
+        const added =
+          s.pause?.limit === 'model'
+            ? elapsed >= b.maxWallMs
+              ? { wallMs: s.initialBudget.maxWallMs }
+              : {}
+            : more;
         await commit([
           {
             type: 'budget.extended',
-            maxSteps: b.maxSteps + (more.steps ?? 0),
-            maxCostUsd: b.maxCostUsd + (more.costUsd ?? 0),
+            maxSteps: b.maxSteps + (added.steps ?? 0),
+            maxCostUsd: b.maxCostUsd + (added.costUsd ?? 0),
             // Time is counted from now, so a long pause does not eat the new allowance.
-            maxWallMs: more.wallMs ? elapsed + more.wallMs : Math.max(b.maxWallMs, elapsed),
+            maxWallMs: added.wallMs ? elapsed + added.wallMs : Math.max(b.maxWallMs, elapsed),
             by,
           },
         ]);
