@@ -91,7 +91,13 @@ export function isPrivateAddress(ip: string): boolean {
   }
   if (g0 === 0x64 && g1 === 0xff9b) return privateV4([g6 >> 8, g6 & 255, g7 >> 8, g7 & 255]);
   if (g0 === 0x2002) return privateV4([g1 >> 8, g1 & 255, g2 >> 8, g2 & 255]); // 6to4
-  return (g0 & 0xfe00) === 0xfc00 || (g0 & 0xffc0) === 0xfe80 || (g0 & 0xff00) === 0xff00;
+  if (g0 === 0x2001 && g1 === 0) return true; // Teredo: carries an IPv4 address that may be private
+  return (
+    (g0 & 0xfe00) === 0xfc00 || // unique local
+    (g0 & 0xffc0) === 0xfe80 || // link-local
+    (g0 & 0xffc0) === 0xfec0 || // site-local (deprecated, still routed on old networks)
+    (g0 & 0xff00) === 0xff00 // multicast
+  );
 }
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
