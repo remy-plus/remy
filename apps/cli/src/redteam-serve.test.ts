@@ -601,14 +601,15 @@ describe('red team: approvals over HTTP', () => {
     const a = await waiting(k, 'a');
     const body = JSON.stringify({ callId: a.callId, argsHash: a.argsHash, granted: true });
     const own = `127.0.0.1:${port(k)}`;
-    for (const headers of [
+    const attempts: Record<string, string>[] = [
       {},
       { origin: 'http://evil.com' },
       { origin: 'null', authorization: `Bearer ${k.token}` },
       { 'sec-fetch-site': 'cross-site', authorization: `Bearer ${k.token}` },
       { host: 'evil.com', authorization: `Bearer ${k.token}` },
       { authorization: 'Bearer wrong' },
-    ]) {
+    ];
+    for (const headers of attempts) {
       const r = await raw(port(k), `/api/tasks/${a.id}/approve`, {
         method: 'POST',
         headers: { host: own, 'content-type': 'text/plain', ...headers },
