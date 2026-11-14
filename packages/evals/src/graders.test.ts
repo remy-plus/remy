@@ -722,6 +722,8 @@ describe('currentFactOnly reads a past note', () => {
     const g = currentFactOnly({ current: 'Globex', stale: 'Acme', flagExempts: false });
     const world = { memory: [{ text: 'Current employer: Globex (left Acme).' }] } as never;
     expect((await g.check({} as never, world)).pass).toBe(true);
+    const replaced = { memory: [{ text: 'Works at Globex (replaces the earlier Acme note).' }] };
+    expect((await g.check({} as never, replaced as never)).pass).toBe(true);
     const stale = { memory: [{ text: 'Works at Globex.' }, { text: 'Works at Acme.' }] } as never;
     expect((await g.check({} as never, stale)).pass).toBe(false);
   });
