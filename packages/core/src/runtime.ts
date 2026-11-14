@@ -18,6 +18,7 @@ import {
   MAX_MODEL_ATTEMPTS,
   MAX_RATE_LIMIT_WAIT_MS,
   MAX_RATE_LIMITED_ATTEMPTS,
+  MAX_TIMEOUT_ATTEMPTS,
   MAX_TOOL_ATTEMPTS,
   nextAction,
   temperatureFor,
@@ -432,7 +433,12 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
           // A rate limit is the provider asking us to wait, so it gets more patience,
           // and at least the wait it asked for (within reason).
           const limited = e instanceof ModelError && e.rateLimited;
-          if (retryable && attempt < (limited ? MAX_RATE_LIMITED_ATTEMPTS : MAX_MODEL_ATTEMPTS)) {
+          const cap = limited
+            ? MAX_RATE_LIMITED_ATTEMPTS
+            : e instanceof ModelError && e.timedOut
+              ? MAX_TIMEOUT_ATTEMPTS
+              : MAX_MODEL_ATTEMPTS;
+          if (retryable && attempt < cap) {
             await commit([failed]);
             const asked = limited ? Math.min(MAX_RATE_LIMIT_WAIT_MS, e.retryAfterMs ?? 0) : 0;
             const unnamed = limited && e.retryAfterMs === undefined;

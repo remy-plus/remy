@@ -158,7 +158,10 @@ async function readStream(
     if (e instanceof ModelError) throw e;
     if (signal.aborted) throw new ModelError('request aborted', false);
     if (timeout.aborted)
-      throw new ModelError(`timed out after ${timeoutMs}ms`, true, { unreachable: true });
+      throw new ModelError(`timed out after ${timeoutMs}ms`, true, {
+        unreachable: true,
+        timedOut: true,
+      });
     throw new ModelError(`network error: ${(e as Error).message}`, true, { unreachable: true });
   }
   // A connection that closes without a finish reason or [DONE] was cut off: half an answer is not an answer.
@@ -237,7 +240,10 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       } catch (e) {
         if (signal.aborted) throw new ModelError('request aborted', false);
         if (timeout.aborted)
-          throw new ModelError(`timed out after ${timeoutMs}ms`, true, { unreachable: true });
+          throw new ModelError(`timed out after ${timeoutMs}ms`, true, {
+            unreachable: true,
+            timedOut: true,
+          });
         throw new ModelError(`network error: ${(e as Error).message}`, true, { unreachable: true });
       }
 

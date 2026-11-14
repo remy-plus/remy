@@ -61,4 +61,13 @@ describe('a model that cannot be reached', () => {
     const id = await start();
     expect(await runtime.advance(id)).toMatchObject({ status: 'failed' });
   });
+
+  it('gives up on a model that never answers after two tries, not five', async () => {
+    const slow = () =>
+      new ModelError('timed out after 120000ms', true, { unreachable: true, timedOut: true });
+    const { runtime, start, model } = make(Array.from({ length: 5 }, slow));
+    const id = await start();
+    expect(await runtime.advance(id)).toMatchObject({ status: 'paused', limit: 'model' });
+    expect(model.requests).toHaveLength(2);
+  });
 });

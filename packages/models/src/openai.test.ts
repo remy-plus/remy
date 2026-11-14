@@ -326,6 +326,7 @@ describe('createOpenAIClient', () => {
     const err = await client.complete(req, sig()).catch((e) => e);
     expect(err.retryable).toBe(true);
     expect(err.unreachable).toBe(true);
+    expect(err.timedOut).toBe(true);
     expect(err.message).toMatch(/timed out/);
   });
 

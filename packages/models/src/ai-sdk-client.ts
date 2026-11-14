@@ -106,7 +106,7 @@ function toModelError(e: unknown, signal: AbortSignal, timeout: AbortSignal, ms:
   if (e instanceof ModelError) return e;
   if (signal.aborted) return new ModelError('request aborted', false);
   if (timeout.aborted)
-    return new ModelError(`timed out after ${ms}ms`, true, { unreachable: true });
+    return new ModelError(`timed out after ${ms}ms`, true, { unreachable: true, timedOut: true });
   if (APICallError.isInstance(e)) {
     const detail = (e.responseBody ?? e.message).slice(0, 500);
     if (e.statusCode !== undefined)

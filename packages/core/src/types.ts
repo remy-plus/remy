@@ -372,16 +372,25 @@ export class ModelError extends Error {
    * 5xx, a busy provider, a cut-off reply). Nothing is wrong with the task: it can carry on later.
    */
   readonly unreachable: boolean;
+  /** The provider took too long to answer. A second try is fair; five would leave the person waiting many minutes. */
+  readonly timedOut: boolean;
   constructor(
     message: string,
     retryable: boolean,
-    rate?: { rateLimited?: true; retryAfterMs?: number; tooLarge?: true; unreachable?: true },
+    rate?: {
+      rateLimited?: true;
+      retryAfterMs?: number;
+      tooLarge?: true;
+      unreachable?: true;
+      timedOut?: true;
+    },
   ) {
     super(message);
     this.retryable = retryable;
     this.rateLimited = rate?.rateLimited ?? false;
     this.tooLarge = rate?.tooLarge ?? false;
     this.unreachable = rate?.unreachable ?? false;
+    this.timedOut = rate?.timedOut ?? false;
     if (rate?.retryAfterMs !== undefined) this.retryAfterMs = rate.retryAfterMs;
   }
 }
