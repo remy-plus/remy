@@ -39,7 +39,7 @@ export function decide(
   call: PlannedCall,
   tool: Tool | undefined,
   state: Pick<TaskState, 'config' | 'tainted'> &
-    Partial<Pick<TaskState, 'calls' | 'alwaysAllowed'>>,
+    Partial<Pick<TaskState, 'calls' | 'alwaysAllowed' | 'prompt'>>,
 ): PolicyDecision {
   // 1. Unknown tool or invalid arguments.
   if (!tool) return { kind: 'deny', reason: `there is no tool named "${call.tool}"` };
@@ -136,6 +136,18 @@ export function decide(
       kind: 'require_approval',
       reason: 'this task read untrusted content (a web page, search result, email or pasted text)',
     };
+  // 4a. After untrusted content, even a read may not carry data out in an address: one that the
+  // person typed or a tool showed is fine, a new one needs a human.
+  if (state.tainted && tool.egress) {
+    const known = knownText(state);
+    const novel = tool.egress(parsed.data as never).filter((u) => !isKnown(u, known));
+    if (novel.length)
+      return {
+        kind: 'require_approval',
+        reason:
+          'this task read untrusted content, and this opens an address nobody has shown it yet',
+      };
+  }
   // 4b. Trust level. Only a `write` call to a tool that opted in, never in a tainted task (step 4
   // returned already), never in a helper (a helper's permissions carry no level, and a role or
   // skill can only shut tools, not open them), and never past the deny list (step 2).
@@ -148,6 +160,27 @@ export function decide(
   // 5. Standing permissions.
   if (autoApprove.includes(risk)) return { kind: 'allow' };
   return { kind: 'require_approval', reason: `${label(risk)} isn't auto-approved` };
+}
+
+/** Everything the task was shown or told, as text: the person's words and what tools returned. */
+function knownText(
+  state: Partial<Pick<TaskState, 'calls' | 'prompt'>> & Pick<TaskState, 'config'>,
+) {
+  const parts: string[] = [state.prompt ?? ''];
+  for (const turn of state.config.context ?? []) parts.push(turn.prompt, turn.answer);
+  for (const c of Object.values(state.calls ?? {})) {
+    if (c.userAnswer) parts.push(c.userAnswer);
+    if (c.result?.ok) parts.push(c.result.content, ...(c.result.sources ?? []));
+  }
+  return parts.join('\n');
+}
+
+/** An address counts as shown only when it appears whole (a trailing slash or fragment aside). */
+function isKnown(url: string, known: string): boolean {
+  const bare = (u: string) => u.trim().replace(/#.*$/, '').replace(/\/+$/, '');
+  const want = bare(url);
+  if (!want) return true;
+  return known.includes(want) || known.includes(`${want}/`);
 }
 
 /** Whether the task's trust level clears this call. Pure: it reads only the recorded config. */

@@ -90,6 +90,7 @@ export function createFetchUrl(opts: FetchUrlOptions = {}) {
     timeoutMs: 20_000,
     maxOutputChars: 20_000,
     preview: ({ url }) => `Fetch the web page ${url}`,
+    egress: ({ url }) => [url],
     async execute({ url, max_chars }, ctx): Promise<ToolResult> {
       const max = max_chars ?? FETCH_MAX_CHARS;
       let note = '';

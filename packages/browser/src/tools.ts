@@ -133,6 +133,7 @@ export function createBrowserTools(browser: Browser): Tool[] {
     effect: 'none',
     timeoutMs: 45_000,
     preview: ({ url }) => `Open ${url} in the browser`,
+    egress: ({ url }) => [url],
     async execute({ url, max_chars }) {
       if (!/^https?:\/\//i.test(url)) return refused('Only http and https addresses open.');
       try {

