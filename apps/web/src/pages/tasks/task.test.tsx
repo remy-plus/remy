@@ -103,6 +103,22 @@ describe('Task view', () => {
     expect(screen.queryByText(/failed/i)).toBeNull();
   });
 
+  it('says the job is saved when Remy lost contact with the model, and offers to carry on', async () => {
+    const api = createMockApi();
+    const getTask = api.getTask.bind(api);
+    vi.spyOn(api, 'getTask').mockImplementation(async (taskId) => ({
+      ...(await getTask(taskId)),
+      status: 'paused',
+      pause: { limit: 'model', steps: 3, costUsd: 0.01, elapsedMs: 5000 },
+    }));
+    open('#/tasks/task_rename', api);
+    const paused = await screen.findByRole('region', { name: 'Paused' });
+    expect(within(paused).getByText(/Remy lost contact with the model/)).toBeTruthy();
+    expect(within(paused).getByText(/saved/)).toBeTruthy();
+    expect(within(paused).getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(paused.textContent).not.toMatch(/limit|undefined/);
+  });
+
   it('offers a way forward when a job has no steps yet', async () => {
     open('#/tasks/task_rename');
     const empty = await screen.findByRole('region', { name: 'No steps yet' });

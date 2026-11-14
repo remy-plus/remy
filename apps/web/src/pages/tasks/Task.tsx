@@ -675,19 +675,33 @@ function TaskScreen({ id }: { id: string }) {
               aria-label="Paused"
               className="mb-6 max-w-[680px] rounded-[10px] border border-edge-hi bg-surface p-4"
             >
-              <p className="m-0 mb-1 text-[16px]">
-                Remy paused at the {LIMIT[view.pause.limit]}: {view.pause.steps} steps,{' '}
-                {money(view.pause.costUsd)}.
-              </p>
-              <p className="m-0 mb-3 text-[14px] text-muted">
-                Adding to the limit lets Remy carry on. Stopping here keeps what it has done so far.
-              </p>
+              {view.pause.limit === 'model' ? (
+                <>
+                  <p className="m-0 mb-1 text-[16px]">
+                    Remy lost contact with the model after {view.pause.steps} steps.
+                  </p>
+                  <p className="m-0 mb-3 text-[14px] text-muted">
+                    The job is saved where it stopped. Check your connection, then try again.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="m-0 mb-1 text-[16px]">
+                    Remy paused at the {LIMIT[view.pause.limit]}: {view.pause.steps} steps,{' '}
+                    {money(view.pause.costUsd)}.
+                  </p>
+                  <p className="m-0 mb-3 text-[14px] text-muted">
+                    Adding to the limit lets Remy carry on. Stopping here keeps what it has done so
+                    far.
+                  </p>
+                </>
+              )}
               <button
                 type="button"
                 className={primaryButton}
                 onClick={() => act(() => api.extend(id, {}), 'Carrying on.')}
               >
-                Keep going
+                {view.pause.limit === 'model' ? 'Try again' : 'Keep going'}
               </button>
             </section>
           )}

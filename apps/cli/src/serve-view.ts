@@ -2,6 +2,7 @@
 // ever a JSON string: the server never returns HTML, and the pages that read it must not treat a
 // string as markup either.
 import type { CallState, TaskState, TaskSummary } from '@remy/core';
+import { explainModelError } from './provider-error.ts';
 
 export type Redact = (text: string) => string;
 
@@ -50,6 +51,18 @@ function callView(c: CallState) {
   };
 }
 
+/** A failed task's reason in plain words when it is a model failure; the raw text stays in the log. */
+const plainReason = (reason: string | undefined) =>
+  reason === undefined ? undefined : (explainModelError(reason, 'web') ?? reason);
+
+/** The outcome of a run, with a failed reason in plain words. */
+function plainOutcome(outcome: unknown): unknown {
+  const o = outcome as { status?: unknown; reason?: unknown } | null;
+  if (o?.status === 'failed' && typeof o.reason === 'string')
+    return { ...o, reason: plainReason(o.reason) };
+  return outcome;
+}
+
 /** The folded state as a safe JSON view: no pasted text, no conversation context, no secrets. */
 export function taskView(
   s: TaskState,
@@ -76,10 +89,10 @@ export function taskView(
     ...(s.pendingQuestion && { pendingQuestion: s.pendingQuestion }),
     ...(s.pause && { pause: s.pause }),
     ...(s.held && { held: s.held }),
-    ...(s.final && { final: s.final }),
+    ...(s.final && { final: { ...s.final, reason: plainReason(s.final.reason) } }),
     calls: Object.values(s.calls).map(callView),
     running: extra.running,
-    ...(extra.outcome !== undefined && { outcome: extra.outcome }),
+    ...(extra.outcome !== undefined && { outcome: plainOutcome(extra.outcome) }),
   };
   return redactDeep(view, redact);
 }

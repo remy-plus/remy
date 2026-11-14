@@ -71,7 +71,12 @@ export interface TaskView {
   };
   pendingApproval?: ApprovalCard;
   pendingQuestion?: { question: string; callId?: string };
-  pause?: { limit: 'steps' | 'cost' | 'time'; steps: number; costUsd: number; elapsedMs: number };
+  pause?: {
+    limit: 'steps' | 'cost' | 'time' | 'model';
+    steps: number;
+    costUsd: number;
+    elapsedMs: number;
+  };
   held?: { summary: string };
   final?: { status: 'succeeded' | 'failed' | 'cancelled'; answer?: string; reason?: string };
   calls: CallView[];
