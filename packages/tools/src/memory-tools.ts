@@ -131,13 +131,16 @@ export function createMemoryTools(port: MemoryPort): Tool[] {
       const lines: string[] = [];
       const ids: string[] = [];
       for (const n of notes) {
+        const was = new Map(port.list().map((e) => [e.id, e.text]));
         const r = port.add({ text: n.text, kind: n.kind, source: ctx.taskId });
         ids.push(r.entry.id);
         const clash = r.status === 'exists' ? [] : (r.conflicts ?? []);
         lines.push(
           r.status === 'exists'
             ? `Already remembered (${r.entry.id}).`
-            : `${r.status === 'merged' ? 'Updated an existing note' : 'Remembered'} (${r.entry.id}).`,
+            : r.status === 'merged'
+              ? `Updated an existing note (${r.entry.id}), which said ${JSON.stringify(was.get(r.entry.id) ?? '')}; it now says ${JSON.stringify(r.entry.text)}. Forgetting ${r.entry.id} would delete this note.`
+              : `Remembered (${r.entry.id}).`,
         );
         if (clash.length)
           lines.push(
