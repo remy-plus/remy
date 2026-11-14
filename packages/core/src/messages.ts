@@ -149,13 +149,17 @@ fields with browser_type. Sending, saving, deleting or paying goes through brows
 the user first. When a site needs a sign-in, a CAPTCHA, a password or a card
 number, call browser_show and ask the user to do that part in the window.`;
 
+/** Untrusted text cannot carry its own fence tags: an opening or closing one is replaced, so it cannot end the block early. */
+export const defang = (text: string): string =>
+  text.replace(/<\s*\/?\s*untrusted[^>]*>?/gi, '[tag removed]');
+
 export function renderResult(result: ToolResult, tool: string, maxChars: number): string {
   if (!result.ok) return `Error: ${result.error}`;
   let text = result.content;
   if (text.length > maxChars)
     text = `${text.slice(0, maxChars)}\n[truncated ${text.length - maxChars} characters]`;
   return result.trust === 'untrusted'
-    ? `<untrusted source="${tool}">\n${text}\n</untrusted>`
+    ? `<untrusted source="${tool}">\n${defang(text)}\n</untrusted>`
     : text;
 }
 
@@ -163,7 +167,9 @@ export function renderResult(result: ToolResult, tool: string, maxChars: number)
 export function fencePasted(text: string, pasted: string[] | undefined): string {
   let out = text;
   for (const seg of [...new Set(pasted ?? [])].filter(Boolean)) {
-    out = out.split(seg).join(`<untrusted source="pasted by the user">\n${seg}\n</untrusted>`);
+    out = out
+      .split(seg)
+      .join(`<untrusted source="pasted by the user">\n${defang(seg)}\n</untrusted>`);
   }
   return out;
 }
