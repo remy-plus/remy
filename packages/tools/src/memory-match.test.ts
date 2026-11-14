@@ -38,6 +38,17 @@ describe('sameFact', () => {
       expect(sameFact(n(a), n(b)), `${a} / ${b}`).toBe(false);
   });
 
+  it('never merges a note that says the fact changed', () => {
+    const pairs: [string, string][] = [
+      ['Works at Acme', 'Works at Globex now (switched jobs from Acme)'],
+      ['Works at Acme', 'Works at Globex, previously Acme'],
+      ['Lives in Lisbon', 'Lives in Porto, moved from Lisbon'],
+      ['Likes tea', 'No longer likes tea'],
+      ['Works at Acme', 'Left Acme'],
+    ];
+    for (const [a, b] of pairs) expect(sameFact(n(a), n(b)), `${a} / ${b}`).toBe(false);
+  });
+
   it('never merges notes of different kinds', () => {
     expect(sameFact(n('Likes tea', 'preference'), n('Likes tea', 'about_you'))).toBe(false);
   });
@@ -52,6 +63,8 @@ describe('contradicts', () => {
       ['Is based in Berlin', 'Lives in Munich'],
       ['Name is Dana', 'My name is Dan'],
       ['Favourite colour is blue', 'Favorite colour is green'],
+      ['Works at Acme', 'Works at Globex now (switched jobs from Acme)'],
+      ['Lives in Lisbon', 'Lives in Porto (moved from Lisbon)'],
     ];
     for (const [a, b] of pairs) expect(contradicts(n(a), n(b)), `${a} / ${b}`).toBe(true);
   });
@@ -99,6 +112,15 @@ describe('planAdd', () => {
     expect(longer).toMatchObject({ action: 'merge', text: 'Likes tea with milk and honey' });
     const shorter = planAdd(have, n('Likes milk tea', 'preference'));
     expect(shorter).toMatchObject({ action: 'merge', text: 'Likes tea with milk' });
+  });
+
+  it('adds a changed fact as a new note instead of rewriting the old one', () => {
+    const p = planAdd(
+      [entry('s1', 'Works at Acme')],
+      n('Works at Globex now (switched jobs from Acme)'),
+    );
+    expect(p.action).toBe('add');
+    expect(p.conflicts.map((c) => c.id)).toEqual(['s1']);
   });
 
   it('adds a contradicting note and names what it contradicts', () => {

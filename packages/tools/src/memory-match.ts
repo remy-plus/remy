@@ -16,6 +16,14 @@ const NEGATIONS = new Set(
   'not no never dont doesnt didnt cannot cant wont without hates avoids'.split(' '),
 );
 
+/**
+ * Words that say a fact changed ("switched jobs from Acme", "previously Lisbon", "no longer"). A
+ * note with one is never the same fact as an older note: merging it would rewrite the old note
+ * under its old id, and a later forget of that id would delete the new fact.
+ */
+const CHANGE =
+  /\b(previously|formerly|former|used to|moved from|switched|changed|left|no longer|anymore|instead of|ex)\b/i;
+
 const stem = (w: string) =>
   w.length > 4 && w.endsWith('ies')
     ? `${w.slice(0, -3)}y`
@@ -67,6 +75,7 @@ const overlap = (a: Set<string>, b: Set<string>) => {
 export function sameFact(a: Pick<MemoryEntry, 'text' | 'kind'>, b: typeof a): boolean {
   if (a.kind !== b.kind) return false;
   if (normaliseNote(a.text) === normaliseNote(b.text)) return true;
+  if (CHANGE.test(a.text) || CHANGE.test(b.text)) return false;
   const x = wordsOf(a.text);
   const y = wordsOf(b.text);
   if (x.negated !== y.negated || !x.words.size || !y.words.size) return false;
@@ -91,7 +100,13 @@ function slotOf(text: string): { slot: string; value: Set<string> } | undefined 
   const t = normaliseNote(text).replace(/^(?:the )?user\s+/, '');
   for (const [slot, re, at] of SLOTS) {
     const m = re.exec(t);
-    if (m) return { slot: slot(m), value: wordsOf(m[at] as string).words };
+    if (m) {
+      // "Globex now (switched jobs from Acme)": the value is what comes before the change words.
+      const value = (m[at] as string).split(
+        /[(;]|,? *\b(?:previously|formerly|after|since|moved|switched|changed|left|instead|not)\b/,
+      )[0] as string;
+      return { slot: slot(m), value: wordsOf(value).words };
+    }
   }
   return undefined;
 }
