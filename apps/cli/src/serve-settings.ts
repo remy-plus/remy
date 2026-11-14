@@ -189,12 +189,13 @@ export function checkWorkspace(input: string, home: string, userHome: string = h
   if (path === hereHome)
     throw new HttpError(400, 'Pick a folder inside your home folder, not the whole home folder.');
   const remyHome = real(home) ?? resolve(home);
-  if (inside(remyHome, path) || inside(path, remyHome))
+  // The disk ignores letter case on a Mac, so `Remy-Data` and `remy-data` are one folder.
+  const fold = (x: string) => (process.platform === 'darwin' ? x.toLowerCase() : x);
+  if (inside(fold(remyHome), fold(path)) || inside(fold(path), fold(remyHome)))
     throw new HttpError(
       400,
       "That folder holds Remy's own data and keys. Pick a different folder, such as one in Documents.",
     );
-  const fold = (x: string) => (process.platform === 'darwin' ? x.toLowerCase() : x);
   if (!inside(fold(hereHome), fold(path)))
     throw new HttpError(400, 'Pick a folder inside your home folder, such as one in Documents.');
   const top = fold(relative(hereHome, path)).split(sep)[0] ?? '';
