@@ -45,6 +45,7 @@ describe('sameFact', () => {
       ['Lives in Lisbon', 'Lives in Porto, moved from Lisbon'],
       ['Likes tea', 'No longer likes tea'],
       ['Works at Acme', 'Left Acme'],
+      ['Works at Acme', 'Works at Globex (replaces the earlier Acme note)'],
     ];
     for (const [a, b] of pairs) expect(sameFact(n(a), n(b)), `${a} / ${b}`).toBe(false);
   });

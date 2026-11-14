@@ -22,7 +22,7 @@ const NEGATIONS = new Set(
  * under its old id, and a later forget of that id would delete the new fact.
  */
 const CHANGE =
-  /\b(previously|formerly|former|used to|moved from|switched|changed|left|no longer|anymore|instead of|ex)\b/i;
+  /\b(previously|formerly|former|used to|moved from|switched|changed|replaces|replaced|earlier|left|no longer|anymore|instead of|ex)\b/i;
 
 const stem = (w: string) =>
   w.length > 4 && w.endsWith('ies')
@@ -103,7 +103,7 @@ function slotOf(text: string): { slot: string; value: Set<string> } | undefined 
     if (m) {
       // "Globex now (switched jobs from Acme)": the value is what comes before the change words.
       const value = (m[at] as string).split(
-        /[(;]|,? *\b(?:previously|formerly|after|since|moved|switched|changed|left|instead|not)\b/,
+        /[(;]|,? *\b(?:previously|formerly|after|since|moved|switched|changed|replaces|replaced|left|instead|not)\b/,
       )[0] as string;
       return { slot: slot(m), value: wordsOf(value).words };
     }
