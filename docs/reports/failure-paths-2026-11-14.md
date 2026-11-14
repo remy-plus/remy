@@ -1,0 +1,45 @@
+# Failure paths, 2026-11-14
+
+Goal: a person who hits a common failure reads one plain sentence that says what happened and what to do next, and Remy never hangs, loops, crashes or loses the task.
+
+Each case was run for real with `remy run` from source against a local fake model server (node `http`), a temp `REMY_HOME` and `REMY_KEYCHAIN=off`, and through a real `remy serve` driven with curl. No paid calls. The chat is covered by controller tests (`apps/cli/src/chat-failure.test.ts`), not by a terminal session.
+
+| Failure | Before (`remy run`) | After (`remy run`) | Commit |
+| --- | --- | --- | --- |
+| No key, no model saved | `Remy needs a model first. Run remy login to connect one, or set REMY_PROFILE and REMY_MODEL.` | Same (already plain). `remy serve` says the same and exits 1. | none needed |
+| Profile set, key missing | `The openai profile needs an API key. Run remy login, or set OPENAI_API_KEY.` | Same | none needed |
+| Wrong key (401) | `Failed: The model failed: HTTP 401: {"error":{"message":"Incorrect API key provided: sk-abc",...}}` | `Failed: The key was rejected. Run remy login to replace it.` | a535baf |
+| Out of credit (402, or 429 with "quota") | `Failed: The model failed: this key is out of credit or over its spend limit. ... You exceeded your current quota, pl...` | `Failed: The account is out of credit. Add credit with the provider, or switch with remy login.` | a535baf |
+| Host does not resolve, connection refused | Five lines `model failed (attempt N): network error: fetch failed`, then `Failed: The model failed: network error: fetch failed`. The task was finished as failed and could not be continued. | Five lines `The model did not answer (attempt N).`, then `Remy lost contact with the model after 0 steps and $0.00. The task is saved.` and `Continue: remy continue <id>`. Exit 1. | 9f09f90, a535baf |
+| Host accepts and never answers | Five waits of 120 s each would pass in silence (over 10 minutes; worked out from the code, not timed), then the raw `timed out after 120000ms` and a failed task | Two waits, then the same saved-and-paused message (measured for real: about 4 minutes) | 9472f1e, 9f09f90 |
+| Model name does not exist (404) | `Failed: The model failed: HTTP 404: {"error":{"message":"The model `nope-1` does not exist ...` | `Failed: This key cannot use that model. Pick another with remy login.` | a535baf |
+| Server error (500) | Five raw `HTTP 500` lines, then failed | Five calm lines, then paused and saved (same message as the lost network) | 9f09f90, a535baf |
+| Malformed tool-call JSON | `Failed: The model failed: tool call still invalid after 2 retries: Arguments for tool "write_file" are not a valid JSON object: {"path": "a.txt", "content": .` | `Failed: The model kept asking for something Remy cannot do, so Remy stopped it. Run it again, or switch with remy login.` | a535baf |
+| Empty reply | Five raw `model failed ... the model returned an empty reply`, then `Failed: The model failed: the model returned an empty reply` | `Failed: The model sent back an empty reply each time. Run it again, or switch with remy login.` | a535baf |
+| Reply that is not JSON (HTML error page) | `Failed: The model failed: invalid JSON in response body` | `Failed: The model's server sent a reply Remy could not read. Run it again, or switch with remy login.` | a535baf |
+| Reply cut off mid-stream, connection closed cleanly | The half answer was returned as if it were complete (found by reading `readStream`, then covered by a test) | Treated as a failed try and retried: `the reply was cut off before it finished` | e7d909d |
+| Reply cut off mid-stream, connection reset | `network error` path, as for a lost network (unit test only) | Paused and saved (unit test only) | 9f09f90 |
+| Model keeps calling a tool that does not exist | Stopped after the strategy's retries (no loop), but printed the raw tool list: `Unknown tool "does_not_exist". Available tools: read_file, write_file, ...` | The "kept asking for something Remy cannot do" sentence above, nothing else | a535baf |
+| Network drops in the middle of a task (after a tool ran) | `Failed: The model failed: network error: fetch failed`; the task was finished as failed, so `remy resume` could not continue it | Paused and saved. With the network back, `remy continue <id>` ran the next step and finished the task (checked for real: step 2, `Wrote a.txt.`). Prints `Continuing <id>.` with no talk of more steps or money. | 9f09f90, ad383eb |
+
+## The web app (`remy serve`)
+
+The server used to send the raw reason, so the feed showed `The model failed: HTTP 401: {...}`. Now `final.reason` and `outcome.reason` are the same plain sentence, worded for the web (`Run remy login in a terminal to replace it.`), and the raw text stays in the event log. A task paused because the model was out of reach shows "Remy lost contact with the model after N steps", "The job is saved where it stopped. Check your connection, then try again.", and a Try again button (the existing extend route, which adds no budget in this case). Checked with a real `remy serve`: a 401 model gives `The key was rejected. Run remy login in a terminal to replace it.`; an unresolvable host gives `status: paused`, `pause.limit: model`. Commit 9e09df4.
+
+## The chat
+
+The chat already turned most model errors into one sentence (`explainModelError`). The explainer moved to `provider-error.ts` so `remy run`, the chat and the web share it, and gained the cases above (timeout, 5xx, empty reply, unreadable reply, tool call that cannot work). The chat shows the saved-task pause note when the network drops. Covered by tests in `chat-failure.test.ts`.
+
+## Not tested
+
+- The chat in a real terminal (the Ink screen). Only the controller was driven, with scripted model errors.
+- The web app in a browser: the new paused card is covered by a component test and the server output by curl, but nobody clicked Try again against a real server.
+- A real provider. Every failure came from a local fake server, so the exact wording of real 401, 402 and 5xx bodies is as the fake sent them.
+- `remy serve` when a run throws something unexpected (disk full, for example): the outcome carries `{status: 'error', error}` and the web app does not read it, so that task looks stuck on "running". Not changed here.
+- Timeouts shorter than the 120 s default cannot be set from the command line, so the hang case took the full 2 x 120 s.
+
+## Decisions
+
+- A model that cannot be reached pauses the task (`budget.exhausted` with `limit: 'model'`) instead of failing it. This reuses the pause machinery, so `remy continue`, the chat's continue prompt and the web's Keep going button all work without a new command. Continuing resets the retry count and adds no steps or money.
+- A model that answers badly (empty, unreadable, invalid tool calls) still fails the task: nothing is wrong with the connection, so waiting will not help.
+- Timeouts get two tries (`MAX_TIMEOUT_ATTEMPTS`), everything else five.

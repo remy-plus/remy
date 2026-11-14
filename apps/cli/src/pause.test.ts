@@ -1,7 +1,8 @@
+import { DEFAULT_BUDGET } from '@remy/core';
 import { describe, expect, it } from 'vitest';
 import { defaultMore, pauseQuestion } from './pause.ts';
 
-const more = defaultMore({ initialBudget: { maxSteps: 30, maxCostUsd: 1, maxWallMs: 600_000 } });
+const more = defaultMore({ initialBudget: DEFAULT_BUDGET });
 
 describe('pauseQuestion', () => {
   it('words a budget pause by what ran out', () => {
