@@ -16,6 +16,7 @@ import { finish } from '@remy/tools';
 import { listenServe, type ServeListening } from './serve.ts';
 import type { Mount } from './serve-mount.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
+import type { createLockout } from './webhook-lockout.ts';
 
 const usage = { inTokens: 10, outTokens: 10 };
 const done: ModelResponse = { calls: [{ tool: 'finish', args: { answer: 'Done.' } }], usage };
@@ -46,6 +47,8 @@ export interface KitOptions {
   tools?: Tool[];
   /** The built web app to serve. */
   webRoot?: string;
+  /** A real lockout, to test it (the default never blocks). */
+  lockout?: ReturnType<typeof createLockout>;
 }
 
 export async function startKit(
@@ -77,7 +80,7 @@ export async function startKit(
       }),
       tokenHash: () => serveTokenHash(home),
       // Many wrong-token requests in one test must stay 401, not turn into a lockout.
-      lockout: { blocked: () => false, fail: () => {} },
+      lockout: opts.lockout ?? { blocked: () => false, fail: () => {} },
       log: () => {},
       pollMs: 20,
       busyMs: 50,

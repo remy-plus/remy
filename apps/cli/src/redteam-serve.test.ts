@@ -12,6 +12,7 @@ import { createBrainMount } from './serve-brain.ts';
 import { type Kit, startKit } from './serve-kit.test-kit.ts';
 import { createSkillsMount } from './serve-skills.ts';
 import { openSkills } from './skills.ts';
+import { createLockout } from './webhook-lockout.ts';
 
 const usage = { inTokens: 10, outTokens: 10 };
 const call = (tool: string, args: unknown): ModelResponse => ({ calls: [{ tool, args }], usage });
@@ -635,5 +636,46 @@ describe('red team: approvals over HTTP', () => {
       expect(r.status, JSON.stringify(body)).toBe(400);
     }
     expect(effects.notes).toEqual([]);
+  });
+});
+
+describe('red team: the lockout', () => {
+  it('cannot be set off by a web page, and cannot be dodged with a forwarded address', async () => {
+    kit = await startKit(() => [], { lockout: createLockout(Date.now, 60_000) });
+    const k = kit;
+    const own = `127.0.0.1:${port(k)}`;
+    // A page cannot lock the person out: its requests are refused before the token is looked at.
+    for (let i = 0; i < 20; i++) {
+      const r = await raw(port(k), '/api/tasks', {
+        headers: {
+          host: own,
+          origin: 'http://evil.com',
+          'sec-fetch-site': 'cross-site',
+          authorization: `Bearer wrong-${i}`,
+        },
+      });
+      expect(r.status).toBe(403);
+    }
+    const fine = await raw(port(k), '/api/tasks', {
+      headers: { authorization: `Bearer ${k.token}` },
+    });
+    expect(fine.status).toBe(200);
+    // A guesser cannot get a fresh allowance by claiming to be someone else.
+    for (let i = 0; i < 5; i++)
+      await raw(port(k), '/api/tasks', {
+        headers: {
+          authorization: `Bearer guess-${i}`,
+          'x-forwarded-for': `10.0.0.${i}`,
+          forwarded: `for=10.9.9.${i}`,
+        },
+      });
+    const locked = await raw(port(k), '/api/tasks', {
+      headers: {
+        authorization: `Bearer ${k.token}`,
+        'x-forwarded-for': '10.1.2.3',
+        'x-real-ip': '10.4.5.6',
+      },
+    });
+    expect(locked.status).toBe(429);
   });
 });
