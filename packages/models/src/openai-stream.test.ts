@@ -158,4 +158,23 @@ describe('createOpenAIClient streaming', () => {
     expect(err).toBeInstanceOf(ModelError);
     expect((err as ModelError).retryable).toBe(false);
   });
+
+  it('does not hand back half an answer when the stream ends without finishing', async () => {
+    const { client } = make(() =>
+      sse(chunk({ choices: [{ delta: { content: 'The answer is' } }] })),
+    );
+    const err = await client.complete(req, sig(), () => {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ModelError);
+    expect((err as ModelError).retryable).toBe(true);
+    expect((err as ModelError).unreachable).toBe(true);
+    expect((err as ModelError).message).toMatch(/cut off/);
+  });
+
+  it('accepts a stream that ends with a finish reason even without [DONE]', async () => {
+    const { client } = make(() =>
+      sse(chunk({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })),
+    );
+    const res = await client.complete(req, sig(), () => {});
+    expect(res.text).toBe('ok');
+  });
 });

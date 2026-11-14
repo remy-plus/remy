@@ -298,6 +298,21 @@ describe('createOpenAIClient', () => {
     const err = await client.complete(req, sig()).catch((e) => e);
     expect(err).toBeInstanceOf(ModelError);
     expect(err.retryable).toBe(true);
+    expect(err.unreachable).toBe(true);
+  });
+
+  it('marks a 5xx and a busy provider as unreachable, but not a bad key or a missing model', async () => {
+    for (const [status, unreachable] of [
+      [500, true],
+      [503, true],
+      [429, true],
+      [401, false],
+      [404, false],
+    ] as const) {
+      const { client } = make(() => new Response('{"error":{"message":"x"}}', { status }));
+      const err = await client.complete(req, sig()).catch((e) => e);
+      expect(err.unreachable, String(status)).toBe(unreachable);
+    }
   });
 
   it('times out as retryable', async () => {
@@ -310,6 +325,7 @@ describe('createOpenAIClient', () => {
     });
     const err = await client.complete(req, sig()).catch((e) => e);
     expect(err.retryable).toBe(true);
+    expect(err.unreachable).toBe(true);
     expect(err.message).toMatch(/timed out/);
   });
 

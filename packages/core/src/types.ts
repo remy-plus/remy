@@ -367,15 +367,21 @@ export class ModelError extends Error {
   readonly retryAfterMs?: number;
   /** The request itself was bigger than the provider accepts (HTTP 413, or a tokens-per-minute cap smaller than the request). Sending less can help. */
   readonly tooLarge: boolean;
+  /**
+   * The model could not be reached or the provider failed on its side (no network, a timeout, a
+   * 5xx, a busy provider, a cut-off reply). Nothing is wrong with the task: it can carry on later.
+   */
+  readonly unreachable: boolean;
   constructor(
     message: string,
     retryable: boolean,
-    rate?: { rateLimited?: true; retryAfterMs?: number; tooLarge?: true },
+    rate?: { rateLimited?: true; retryAfterMs?: number; tooLarge?: true; unreachable?: true },
   ) {
     super(message);
     this.retryable = retryable;
     this.rateLimited = rate?.rateLimited ?? false;
     this.tooLarge = rate?.tooLarge ?? false;
+    this.unreachable = rate?.unreachable ?? false;
     if (rate?.retryAfterMs !== undefined) this.retryAfterMs = rate.retryAfterMs;
   }
 }

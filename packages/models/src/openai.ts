@@ -107,9 +107,11 @@ async function readStream(
   timeoutMs: number,
 ): Promise<Reply> {
   const reply: Reply = { text: '', calls: [], finishReason: undefined, usage: {} };
+  let sawDone = false;
   const handle = (line: string) => {
     if (!line.startsWith('data:')) return;
     const payload = line.slice(5).trim();
+    if (payload === '[DONE]') sawDone = true;
     if (!payload || payload === '[DONE]') return;
     let chunk: Json;
     try {
@@ -155,9 +157,13 @@ async function readStream(
   } catch (e) {
     if (e instanceof ModelError) throw e;
     if (signal.aborted) throw new ModelError('request aborted', false);
-    if (timeout.aborted) throw new ModelError(`timed out after ${timeoutMs}ms`, true);
-    throw new ModelError(`network error: ${(e as Error).message}`, true);
+    if (timeout.aborted)
+      throw new ModelError(`timed out after ${timeoutMs}ms`, true, { unreachable: true });
+    throw new ModelError(`network error: ${(e as Error).message}`, true, { unreachable: true });
   }
+  // A connection that closes without a finish reason or [DONE] was cut off: half an answer is not an answer.
+  if (!sawDone && reply.finishReason === undefined)
+    throw new ModelError('the reply was cut off before it finished', true, { unreachable: true });
   reply.calls = reply.calls.filter(Boolean);
   return reply;
 }
@@ -230,8 +236,9 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
         });
       } catch (e) {
         if (signal.aborted) throw new ModelError('request aborted', false);
-        if (timeout.aborted) throw new ModelError(`timed out after ${timeoutMs}ms`, true);
-        throw new ModelError(`network error: ${(e as Error).message}`, true);
+        if (timeout.aborted)
+          throw new ModelError(`timed out after ${timeoutMs}ms`, true, { unreachable: true });
+        throw new ModelError(`network error: ${(e as Error).message}`, true, { unreachable: true });
       }
 
       if (!res.ok) {
@@ -365,12 +372,16 @@ export function httpError(status: number, detail: string, headers: Headers): Mod
   if (status === 429 || status === 503)
     return new ModelError(`HTTP ${status}: ${detail}`, true, {
       rateLimited: true,
+      unreachable: true,
       retryAfterMs: retryAfterMs(headers, Date.now()),
       ...(tooLarge ? { tooLarge: true } : {}),
     });
   return new ModelError(
     `HTTP ${status}: ${detail}`,
     status >= 500 || (status === 400 && BAD_MODEL_OUTPUT.test(detail)),
-    tooLarge ? { tooLarge: true } : undefined,
+    {
+      ...(tooLarge && { tooLarge: true as const }),
+      ...(status >= 500 && { unreachable: true as const }),
+    },
   );
 }

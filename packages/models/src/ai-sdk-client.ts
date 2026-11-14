@@ -105,13 +105,16 @@ function toPrompt(system: string, messages: Message[]): LanguageModelV4Prompt {
 function toModelError(e: unknown, signal: AbortSignal, timeout: AbortSignal, ms: number) {
   if (e instanceof ModelError) return e;
   if (signal.aborted) return new ModelError('request aborted', false);
-  if (timeout.aborted) return new ModelError(`timed out after ${ms}ms`, true);
+  if (timeout.aborted)
+    return new ModelError(`timed out after ${ms}ms`, true, { unreachable: true });
   if (APICallError.isInstance(e)) {
     const detail = (e.responseBody ?? e.message).slice(0, 500);
     if (e.statusCode !== undefined)
       return httpError(e.statusCode, detail, new Headers(e.responseHeaders));
   }
-  return new ModelError(`network error: ${e instanceof Error ? e.message : String(e)}`, true);
+  return new ModelError(`network error: ${e instanceof Error ? e.message : String(e)}`, true, {
+    unreachable: true,
+  });
 }
 
 /** Raw client: like the OpenAI one, it reports tool calls as-is and leaves repair to the strategies. */
