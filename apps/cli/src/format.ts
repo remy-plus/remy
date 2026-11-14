@@ -48,10 +48,13 @@ function summarizeArgs(args: unknown): string {
 export function createTimeline(st: Styler, opts: { live: boolean }) {
   const calls = new Map<string, { tool: string; args: unknown }>();
   let t0: number | undefined;
+  /** The last pause was the model being out of reach, so carrying on adds no budget. */
+  let pausedByModel = false;
 
   const learn = (e: StoredEvent) => {
     if (e.event.type === 'model.responded')
       for (const c of e.event.calls) calls.set(c.callId, { tool: c.tool, args: c.args });
+    if (e.event.type === 'budget.exhausted') pausedByModel = e.event.limit === 'model';
   };
   const nameOf = (id: string) => calls.get(id)?.tool ?? id;
 
@@ -111,10 +114,14 @@ export function createTimeline(st: Styler, opts: { live: boolean }) {
       case 'user.answered':
         return `you answered: ${truncate(ev.answer, 120)}`;
       case 'budget.exhausted':
+        // Live, the follow-up under the timeline already says it, with the command to carry on.
         if (ev.limit === 'model')
-          return `lost contact with the model after ${ev.steps} steps; the task is saved`;
+          return opts.live
+            ? undefined
+            : `lost contact with the model after ${ev.steps} ${ev.steps === 1 ? 'step' : 'steps'}; the task is saved`;
         return `paused at the ${ev.limit} limit after ${ev.steps} steps and $${ev.costUsd.toFixed(2)}`;
       case 'budget.extended':
+        if (pausedByModel) return opts.live ? undefined : `continued by ${ev.by}`;
         return `continued by ${ev.by}: now up to ${ev.maxSteps} steps and $${ev.maxCostUsd.toFixed(2)}`;
       case 'progress':
         return st.dim(`progress: ${ev.text}`);

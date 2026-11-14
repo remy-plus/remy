@@ -14,7 +14,12 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(home, { recursive: true, force: true }));
 
-async function run(errors: Error[]) {
+const answer = {
+  calls: [{ tool: 'finish', args: { answer: 'Wrote a.txt.' } }],
+  usage: { inTokens: 1, outTokens: 1 },
+};
+
+async function run(errors: (Error | typeof answer)[], argv: string[] = ['run', 'write a file']) {
   const o = { out: '', err: '' };
   const deps: CliDeps = {
     env: { REMY_HOME: home },
@@ -30,8 +35,8 @@ async function run(errors: Error[]) {
     model: new ScriptedModelClient(errors),
     sleep: async () => {},
   };
-  const code = await cli(['run', 'write a file'], deps);
-  return { code, out: o.out, err: o.err };
+  const code = await cli(argv, deps);
+  return { code, out: o.out, err: o.err, deps, o };
 }
 
 const bad = (body: string) => new ModelError(`HTTP 401: ${body}`, false);
@@ -68,5 +73,19 @@ describe('remy run when the model fails', () => {
     expect(r.out).toContain('Remy lost contact with the model');
     expect(r.out).toMatch(/Continue: .*remy continue task_[0-9a-f]{12}/);
     expect(r.out).not.toMatch(/fetch failed|Failed:/);
+  });
+
+  it('remy continue carries on a paused task without talking about more steps or money', async () => {
+    const down = () => new ModelError('network error: fetch failed', true, { unreachable: true });
+    const first = await run([...Array.from({ length: 5 }, down), answer]);
+    const id = /task_[0-9a-f]{12}/.exec(first.out)?.[0] ?? '';
+    // Same store, same home: the network is back.
+    first.deps.model = new ScriptedModelClient([answer]);
+    first.o.out = '';
+    const code = await cli(['continue', id], first.deps);
+    expect(code).toBe(0);
+    expect(first.o.out).toContain(`Continuing ${id}.`);
+    expect(first.o.out).toContain('Wrote a.txt.');
+    expect(first.o.out).not.toMatch(/more steps|continued by user|up to \d+ steps/);
   });
 });

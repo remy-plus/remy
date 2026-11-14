@@ -2044,7 +2044,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             ...(steps !== undefined && { steps }),
             ...(costUsd !== undefined && { costUsd }),
           });
+          const byModel = s.pause?.limit === 'model';
           await rt.extend(id, more, 'user');
+          if (byModel) {
+            out(st.dim(`Continuing ${id}.`));
+            return;
+          }
           const bits = [
             more.steps && `${more.steps} more steps`,
             more.costUsd && `$${more.costUsd.toFixed(2)} more`,
