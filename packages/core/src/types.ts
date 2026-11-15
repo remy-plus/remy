@@ -114,6 +114,11 @@ export interface ConversationTurn {
   pasted?: string[];
   answer: string;
   /**
+   * Tools whose results the answer drew on (no finish or plan), so a later turn knows the answer
+   * was checked and does not take it back. Absent in older records.
+   */
+  tools?: string[];
+  /**
    * A summary of the turns before the ones kept (in `answer`; `prompt` is empty). Written by the
    * model from the user's typed words and Remy's answers, never from pasted text, so it is as
    * trusted as the turns themselves. Only ever the first turn; always kept.

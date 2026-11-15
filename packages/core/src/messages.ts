@@ -215,6 +215,13 @@ export function renderContext(turns: ConversationTurn[] | undefined): Message[] 
 export const SUMMARY_LEAD =
   'Summary of the earlier conversation, written by Remy (background, not a new request):';
 
+/** Which tools backed an earlier answer, so the model does not take back what it checked. */
+export const toolsNote = (tools: string[]) =>
+  `[In that turn Remy used: ${[...new Set(tools)].slice(0, 8).join(', ')}.]`;
+
+/** Tools of a task that count as backing its answer: those that returned a result. */
+export const BOOKKEEPING_TOOLS = new Set(['finish', 'update_plan']);
+
 function renderTurns(turns: ConversationTurn[] | undefined): Message[] {
   const all = turns ?? [];
   let start = 0;
@@ -228,7 +235,10 @@ function renderTurns(turns: ConversationTurn[] | undefined): Message[] {
   while (kept.length && turnChars(kept) > MAX_CONTEXT_CHARS) kept.shift();
   return kept.flatMap((t): Message[] => [
     { role: 'user', content: fencePasted(t.prompt, t.pasted) },
-    { role: 'assistant', content: t.answer },
+    {
+      role: 'assistant',
+      content: t.tools?.length ? `${toolsNote(t.tools)}\n${t.answer}` : t.answer,
+    },
   ]);
 }
 

@@ -331,3 +331,17 @@ describe('system rule parts', () => {
     ).toBe(SYSTEM_PROMPT);
   });
 });
+
+describe('earlier turns name the tools behind their answers', () => {
+  it('puts the tools before the answer, and leaves a turn without them as it was', () => {
+    const out = renderContext([
+      { prompt: 'hi', answer: 'Hi. Nothing new.', tools: ['whats_new', 'whats_new'] },
+      { prompt: 'thanks', answer: 'Any time.' },
+    ]);
+    expect(out[1]).toEqual({
+      role: 'assistant',
+      content: '[In that turn Remy used: whats_new.]\nHi. Nothing new.',
+    });
+    expect(out[3]).toEqual({ role: 'assistant', content: 'Any time.' });
+  });
+});
