@@ -209,6 +209,7 @@ import { chatRoutes } from './serve-chats.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { createFilesMount } from './serve-files.ts';
 import { homeRoutes } from './serve-home.ts';
+import { announceListening, linkLines, watchLinkRequests } from './serve-link.ts';
 import { createLiveBus } from './serve-live.ts';
 import { createLocationMount } from './serve-location.ts';
 import { createModelSetupMount } from './serve-model-setup.ts';
@@ -391,6 +392,9 @@ Usage
                                   in your browser. This is the way to start: with no model yet it
                                   asks for a key in the browser
   remy serve token [--rotate]     Make the access token (shown once; only its hash is kept)
+  remy serve link [--url <address>]
+                                  A fresh one-time sign-in link and QR code for the running
+                                  server, for a phone (terminal only; works once, 10 minutes)
   remy doctor                     See what is set up and the next step for each
   remy voice test                 Check local voice: whisper.cpp, the speech model, ffmpeg, say
   remy review [--since 24h|7d|<date>]
@@ -2568,7 +2572,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           out(st.dim('Shown once. Send it as: Authorization: Bearer <token>'));
           return 0;
         }
-        if (rest[0]) throw new Error('Use remy serve, or remy serve token [--rotate].');
+        if (rest[0] === 'link') {
+          if (rest[1]) throw new Error('Use remy serve link [--url <address>].');
+          if (!deps.isTTY)
+            throw new Error(
+              'A sign-in link holds a code that works once, so it is shown only on a terminal. Run remy serve link in a terminal (with Docker: docker exec -it remy remy serve link).',
+            );
+          for (const line of await linkLines(home, {
+            color: level !== 'none',
+            interfaces: networkInterfaces(),
+            ...(flags.url && { url: flags.url }),
+          }))
+            out(line);
+          return 0;
+        }
+        if (rest[0])
+          throw new Error('Use remy serve, remy serve token [--rotate] or remy serve link.');
         // The address is checked first, so a refused one never opens the store or a connection.
         const bind = resolveServeBind({ host: flags.host, port: flags.port }, env);
         const file = cfg();
@@ -2907,7 +2926,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               );
           }
         }
+        // Where this server listens, and a watch for `remy serve link` (it hands over a code's hash).
+        const unannounce = announceListening(home, listening);
+        const unwatch = watchLinkRequests(home, signInCodes);
         await (deps.serveStop ?? new Promise<void>(() => {}));
+        unwatch();
+        unannounce();
         await listening.close();
         return 0;
       }

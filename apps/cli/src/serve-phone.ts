@@ -16,6 +16,17 @@ export function qrLines(link: string, color: boolean): string[] {
   }
 }
 
+/** One address's lines: what to do, the QR code, and the link as text. */
+export function phoneBlock(origin: string, code: string, color: boolean): string[] {
+  const link = signInLinkAt(origin, code);
+  return [
+    '',
+    `To sign in on your phone, scan this with its camera (${origin}). It works once, for 10 minutes.`,
+    ...qrLines(link, color),
+    `Or open: ${link}`,
+  ];
+}
+
 /**
  * The lines to print for the given addresses (`http://host:port`), each with its own code. Another
  * code is kept valid alongside, so scanning one does not spoil the rest. Empty with no address.
@@ -27,13 +38,7 @@ export function phoneSignInLines(
 ): string[] {
   const lines: string[] = [];
   for (const origin of origins) {
-    const link = signInLinkAt(origin, codes.mint({ keep: true }));
-    lines.push(
-      '',
-      `To sign in on your phone, scan this with its camera (${origin}). It works once, for 10 minutes.`,
-      ...qrLines(link, opts.color),
-      `Or open: ${link}`,
-    );
+    lines.push(...phoneBlock(origin, codes.mint({ keep: true }), opts.color));
   }
   if (lines.length > 0) lines.push('', NETWORK_WARNING);
   return lines;
