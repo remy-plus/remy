@@ -219,7 +219,7 @@ function personSaid(text: string, state: WordsState): boolean {
 
 /** Words that carry no meaning of their own in a short note. */
 const FILLER = new Set(
-  "a an the at in on for to of and with is am are was be been my i im me i'm that this it as by from also very really just always usually now user they he she do does like likes their his her them your you".split(
+  "a an the at in on for to of and with is am are was be been has have my i im me i'm that this it as by from also very really just always usually now user they he she do does like likes their his her them your you".split(
     ' ',
   ),
 );

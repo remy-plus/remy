@@ -37,6 +37,7 @@ const EDITABLE = [
   'system:work-steps',
   'system:finish',
   'system:tone',
+  'system:get-to-know',
   'system:alternatives',
   'system:ask-confirm',
   'system:open-items',

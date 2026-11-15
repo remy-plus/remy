@@ -63,6 +63,13 @@ describe('a note in the person’s own words', () => {
     expect(kind('Lives in Philadelphia', s)).toBe('allow');
   });
 
+  it('counts "none" as a fact too: "Has no allergies" from "No allergies"', () => {
+    const s = state('Anything for dinner? No allergies, I eat everything.', {}, false);
+    expect(kind('Has no allergies and eats everything', s)).toBe('allow');
+    expect(kind('Has no food allergies', s)).toBe('require_approval'); // "food" was not said
+    expect(kind('Has a peanut allergy', s)).toBe('require_approval');
+  });
+
   it('asks when the note adds a word they did not say', () => {
     const s = state("I'm vegetarian, find me a restaurant");
     expect(kind('Is vegetarian and avoids eggs', s)).toBe('require_approval');
