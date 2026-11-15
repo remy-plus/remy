@@ -39,6 +39,7 @@ export function withNativeTools(raw: ModelClient): ModelClient {
       signal: AbortSignal,
       onText?: (delta: string) => void,
       onReasoning?: (delta: string) => void,
+      onAnswer?: (delta: string) => void,
     ): Promise<ModelResponse> {
       const known = new Set(req.tools.map((t) => t.name));
       const messages: Message[] = [...req.messages];
@@ -50,6 +51,7 @@ export function withNativeTools(raw: ModelClient): ModelClient {
           signal,
           attempt === 0 ? onText : undefined,
           attempt === 0 ? onReasoning : undefined,
+          attempt === 0 ? onAnswer : undefined,
         );
         usage = addUsage(usage, res.usage);
         const problem = findProblem(res, known);

@@ -5,6 +5,7 @@ import {
   ModelError,
   type ModelResponse,
 } from '@remy/core';
+import { createAnswerStream } from './answer-stream.ts';
 import type { RawRequest } from './types.ts';
 
 export interface OpenAIClientOptions {
@@ -102,11 +103,13 @@ async function readStream(
   res: Response,
   onText: (delta: string) => void,
   onReasoning: ((delta: string) => void) | undefined,
+  onAnswer: ((delta: string) => void) | undefined,
   signal: AbortSignal,
   timeout: AbortSignal,
   timeoutMs: number,
 ): Promise<Reply> {
   const reply: Reply = { text: '', calls: [], finishReason: undefined, usage: {} };
+  const answers = onAnswer ? createAnswerStream(onAnswer) : undefined;
   let sawDone = false;
   const handle = (line: string) => {
     if (!line.startsWith('data:')) return;
@@ -137,6 +140,11 @@ async function readStream(
       const fn = (c.function ?? {}) as Json;
       if (typeof fn.name === 'string') call.name += fn.name;
       if (typeof fn.arguments === 'string') call.args += fn.arguments;
+      answers?.push(
+        i,
+        typeof fn.name === 'string' ? fn.name : undefined,
+        typeof fn.arguments === 'string' ? fn.arguments : undefined,
+      );
     }
   };
 
@@ -188,6 +196,7 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       signal: AbortSignal,
       onText?: (delta: string) => void,
       onReasoning?: (delta: string) => void,
+      onAnswer?: (delta: string) => void,
     ): Promise<ModelResponse> {
       const messages = toOpenAIMessages(req.system, req.messages);
       const body: Json = {
@@ -217,7 +226,8 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
           function: { name: t.name, description: t.description, parameters: t.parameters },
         }));
       if (req.responseFormat) body.response_format = req.responseFormat;
-      if (onText || onReasoning) {
+      const streaming = Boolean(onText || onReasoning || onAnswer);
+      if (streaming) {
         body.stream = true;
         body.stream_options = { include_usage: true };
       }
@@ -253,11 +263,12 @@ export function createOpenAIClient(opts: OpenAIClientOptions): ModelClient {
       }
 
       let reply: Reply;
-      if (onText || onReasoning)
+      if (streaming)
         reply = await readStream(
           res,
           onText ?? (() => {}),
           onReasoning,
+          onAnswer,
           signal,
           timeout,
           timeoutMs,

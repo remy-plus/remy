@@ -70,11 +70,12 @@ export function debugModel(inner: ModelClient, log: DebugLog): ModelClient {
       signal: AbortSignal,
       onText,
       onReasoning,
+      onAnswer,
     ): Promise<ModelResponse> {
       const t0 = Date.now();
       log.write('model.request', { model: inner.id, request: req });
       try {
-        const response = await inner.complete(req, signal, onText, onReasoning);
+        const response = await inner.complete(req, signal, onText, onReasoning, onAnswer);
         log.write('model.response', { latencyMs: Date.now() - t0, response });
         return response;
       } catch (e) {

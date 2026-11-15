@@ -114,8 +114,9 @@ export function withJsonTools(raw: ModelClient): ModelClient {
       signal: AbortSignal,
       onText?: (delta: string) => void,
       onReasoning?: (delta: string) => void,
+      onAnswer?: (delta: string) => void,
     ): Promise<ModelResponse> {
-      if (!req.tools.length) return raw.complete(req, signal, onText, onReasoning);
+      if (!req.tools.length) return raw.complete(req, signal, onText, onReasoning, onAnswer);
       const known = new Set(req.tools.map((t) => t.name));
       const responseFormat: Record<string, unknown> = raw.caps.jsonSchema
         ? {

@@ -90,6 +90,12 @@ export interface RuntimeDeps {
   onText?: (delta: string) => void;
   /** Reasoning summaries, where the provider streams them. Like `onText`, never persisted. */
   onReasoning?: (delta: string) => void;
+  /**
+   * What a model is writing right now, per task: plain text and the `answer` of a `finish` call,
+   * with `start` before every model call (and every retry), when a screen should empty its buffer.
+   * Transient like `onText`: nothing here is stored, and the stored events remain the truth.
+   */
+  onLive?: (taskId: string, e: LiveEvent) => void;
   /** Called before each model call, including retries. */
   onModelStart?: () => void;
   /** Narrows the read tools helpers get, e.g. tools that cannot run side by side. */
@@ -99,6 +105,12 @@ export interface RuntimeDeps {
   /** The host lets helpers whose role says `act` ask to change things (with approval each time). */
   helpersAct?: boolean;
 }
+
+/** One piece of a reply as it is written; see `RuntimeDeps.onLive`. */
+export type LiveEvent =
+  | { kind: 'start' }
+  | { kind: 'text'; delta: string }
+  | { kind: 'answer'; delta: string };
 
 export class TaskBusyError extends Error {
   override name = 'TaskBusyError';
@@ -214,6 +226,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
       onText: undefined,
       onReasoning: undefined,
       onModelStart: undefined,
+      onLive: undefined,
     }));
 
   async function runHelper(
@@ -365,8 +378,21 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
         offered.set(s.taskId, names);
         const t0 = clock.now();
         let res: Awaited<ReturnType<ModelClient['complete']>>;
+        // Streamed text goes to the CLI's hook and to live screens of this task.
+        const live = deps.onLive;
+        const textOut =
+          deps.onText || live
+            ? (d: string) => {
+                deps.onText?.(d);
+                live?.(s.taskId, { kind: 'text', delta: d });
+              }
+            : undefined;
+        const answerOut = live
+          ? (d: string) => live(s.taskId, { kind: 'answer', delta: d })
+          : undefined;
         try {
           deps.onModelStart?.();
+          live?.(s.taskId, { kind: 'start' });
           const base = deps.systemPrompt ?? SYSTEM_PROMPT;
           // Only when the model is really offered a subset and has find_tools to widen it.
           const system =
@@ -394,8 +420,9 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
                   temperature: temperatureFor(s.modelAttempts),
                 },
                 signal,
-                deps.onText,
+                textOut,
                 deps.onReasoning,
+                answerOut,
               );
               break;
             } catch (e) {
@@ -415,6 +442,7 @@ export function createRuntime(deps: RuntimeDeps): RemyRuntime {
               }
               toolBudgetChars = Math.max(500, Math.floor(baseBudget / 2));
               deps.onModelStart?.();
+              live?.(s.taskId, { kind: 'start' });
             }
           }
           // Nothing to act on or report: a glitch, not an answer.

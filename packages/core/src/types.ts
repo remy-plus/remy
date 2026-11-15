@@ -352,13 +352,15 @@ export interface ModelClient {
   /**
    * `onText` receives assistant text as it arrives. The returned response is the same either way.
    * `onReasoning` receives reasoning summaries, only from providers that stream them; it is never
-   * part of the response and never stored.
+   * part of the response and never stored. `onAnswer` receives the `answer` of a `finish` call as
+   * the model writes it (the arguments of no other tool); it is likewise never stored.
    */
   complete(
     req: ModelRequest,
     signal: AbortSignal,
     onText?: (delta: string) => void,
     onReasoning?: (delta: string) => void,
+    onAnswer?: (delta: string) => void,
   ): Promise<ModelResponse>;
 }
 

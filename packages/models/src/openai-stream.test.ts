@@ -178,3 +178,72 @@ describe('createOpenAIClient streaming', () => {
     expect(res.text).toBe('ok');
   });
 });
+
+describe('the answer of a finish call', () => {
+  const finishChunks = (...argPieces: string[]) =>
+    toolDelta(0, { name: 'finish', arguments: argPieces[0] ?? '' }, 'c1') +
+    argPieces
+      .slice(1)
+      .map((a) => toolDelta(0, { arguments: a }))
+      .join('') +
+    chunk({ choices: [{ delta: {}, finish_reason: 'tool_calls' }] }) +
+    'data: [DONE]\n\n';
+
+  it('streams the answer as it is written and still returns the whole call', async () => {
+    const { client, seen } = make(() =>
+      sse(finishChunks('{"answer":"It is ', 'sunny\\n', 'in caf\\u00e9."}')),
+    );
+    const got: string[] = [];
+    const res = await client.complete(req, sig(), undefined, undefined, (d) => got.push(d));
+    expect(got.join('')).toBe('It is sunny\nin café.');
+    expect(got.length).toBeGreaterThan(1);
+    expect(res.calls).toEqual([{ tool: 'finish', args: { answer: 'It is sunny\nin café.' } }]);
+    expect(JSON.parse(String(seen[0]?.body)).stream).toBe(true);
+  });
+
+  it('never forwards the arguments of another tool', async () => {
+    const other =
+      toolDelta(0, {
+        name: 'write_file',
+        arguments: '{"path":"a.txt","answer":"x","content":"sec',
+      }) +
+      toolDelta(0, { arguments: 'ret"}' }) +
+      chunk({ choices: [{ delta: {}, finish_reason: 'tool_calls' }] }) +
+      'data: [DONE]\n\n';
+    const { client } = make(() => sse(other));
+    const got: string[] = [];
+    const text: string[] = [];
+    await client.complete(
+      req,
+      sig(),
+      (d) => text.push(d),
+      undefined,
+      (d) => got.push(d),
+    );
+    expect(got).toEqual([]);
+    expect(text).toEqual([]);
+  });
+
+  it('keeps plain text on onText and out of onAnswer', async () => {
+    const { client } = make(() =>
+      sse(chunk({ choices: [{ delta: { content: 'Hello' }, finish_reason: 'stop' }] })),
+    );
+    const got: string[] = [];
+    const text: string[] = [];
+    await client.complete(
+      req,
+      sig(),
+      (d) => text.push(d),
+      undefined,
+      (d) => got.push(d),
+    );
+    expect(text).toEqual(['Hello']);
+    expect(got).toEqual([]);
+  });
+
+  it('asks for a stream when only onAnswer is given', async () => {
+    const { client, seen } = make(() => sse(finishChunks('{"answer":"ok"}')));
+    await client.complete(req, sig(), undefined, undefined, () => {});
+    expect(JSON.parse(String(seen[0]?.body)).stream).toBe(true);
+  });
+});

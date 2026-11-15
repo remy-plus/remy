@@ -28,6 +28,8 @@ export class ScriptedModelClient implements ModelClient {
     req: ModelRequest,
     _signal?: AbortSignal,
     onText?: (delta: string) => void,
+    _onReasoning?: (delta: string) => void,
+    onAnswer?: (delta: string) => void,
   ): Promise<ModelResponse> {
     this.requests.push(req);
     const step = this.#steps.shift();
@@ -38,6 +40,10 @@ export class ScriptedModelClient implements ModelClient {
     if (step instanceof Error) throw step;
     const res = typeof step === 'function' ? step(req) : step;
     if (res.text) onText?.(res.text);
+    for (const c of res.calls) {
+      const a = (c.args as { answer?: unknown } | null)?.answer;
+      if (c.tool === 'finish' && typeof a === 'string') onAnswer?.(a);
+    }
     return res;
   }
 }
@@ -60,8 +66,9 @@ export class RecordingModelClient implements ModelClient {
     signal: AbortSignal,
     onText?: (delta: string) => void,
     onReasoning?: (delta: string) => void,
+    onAnswer?: (delta: string) => void,
   ): Promise<ModelResponse> {
-    const res = await this.#inner.complete(req, signal, onText, onReasoning);
+    const res = await this.#inner.complete(req, signal, onText, onReasoning, onAnswer);
     this.cassette.set(argsHash(req), res);
     return res;
   }
