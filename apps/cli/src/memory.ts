@@ -302,7 +302,7 @@ export function plainMemory(file: MemoryFile, personalise: boolean): string {
   const flagged = file.entries.filter((e) => e.conflictsWith?.length).length;
   const head = file.entries.length
     ? `Remy remembers ${file.entries.length} thing${file.entries.length === 1 ? '' : 's'} about you.`
-    : 'Remy has not saved anything about you yet. When you tell it a lasting preference, it asks before saving it.';
+    : 'Remy has not saved anything about you yet. When you tell it a lasting fact about yourself, it saves it in your words and says so.';
   const tail = [
     flagged
       ? `${flagged} notes may contradict each other. Remy keeps both until you forget the one that is out of date.`
