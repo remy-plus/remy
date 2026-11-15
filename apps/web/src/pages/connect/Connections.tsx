@@ -11,6 +11,7 @@ import {
   Page,
   primary,
   quiet,
+  revealAside,
   Switch,
   Unavailable,
   useLoad,
@@ -147,7 +148,10 @@ export function Connections() {
                 app={a}
                 selected={current?.kind === 'app' && current.id === a.id}
                 said={saidAt('row', a.id)}
-                onManage={() => setSelected({ kind: 'app', id: a.id })}
+                onManage={() => {
+                  setSelected({ kind: 'app', id: a.id });
+                  revealAside();
+                }}
                 onSignIn={() =>
                   act(() => api.signInApp(a.id), `${a.name} is connected.`, 'row', a.id)
                 }
@@ -204,7 +208,10 @@ export function Connections() {
                   type="button"
                   className={quiet}
                   aria-pressed={current?.kind === 'machine' && current.name === m.name}
-                  onClick={() => setSelected({ kind: 'machine', name: m.name })}
+                  onClick={() => {
+                    setSelected({ kind: 'machine', name: m.name });
+                    revealAside();
+                  }}
                 >
                   Manage {m.name}
                 </button>

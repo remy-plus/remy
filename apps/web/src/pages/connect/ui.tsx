@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { type RemyApi, useApi } from '../../api/index.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
 import { describeError } from '../../lib/errors.ts';
+import { scrollBehavior } from '../../lib/motion.ts';
 
 export const mono = 'font-mono';
 const base = `cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50 no-underline`;
@@ -31,6 +32,20 @@ export function useLoad<T>(load: (api: RemyApi) => Promise<T>) {
   }, [api]);
   useEffect(reload, [reload]);
   return { api, data, setData, error, reload };
+}
+
+/**
+ * Under 1024 px the side column sits below the whole main column, so choosing something there ("Manage
+ * Gmail") would seem to do nothing. This takes the person to it and puts focus on it, so a screen reader
+ * starts reading there too. On a wide screen both are in view and nothing moves.
+ */
+export function revealAside() {
+  if (window.matchMedia?.('(min-width: 1024px)').matches !== false) return;
+  setTimeout(() => {
+    const el = document.querySelector<HTMLElement>('[data-aside]');
+    el?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    el?.focus({ preventScroll: true });
+  }, 0);
 }
 
 /** The page frame: a title block, then the main column and a side column with a rule on its left. */
@@ -69,7 +84,11 @@ export function Page({
         {children}
       </div>
       {aside && (
-        <aside className="min-w-0 border-t border-edge px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l">
+        <aside
+          data-aside
+          tabIndex={-1}
+          className="min-w-0 border-t border-edge px-5 py-8 outline-none sm:px-8 lg:border-t-0 lg:border-l"
+        >
           {aside}
         </aside>
       )}

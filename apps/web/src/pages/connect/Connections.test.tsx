@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../App.tsx';
 import { ApiError } from '../../api/http.ts';
 import { ApiProvider, type RemyApi } from '../../api/index.tsx';
@@ -19,6 +19,37 @@ const open = (hash = '#/connections', api: RemyApi = createMockApi()) => {
     </ApiProvider>,
   );
 };
+
+describe('Connections on a phone', () => {
+  it('Manage takes the person to the panel that sits below the list, and puts focus there', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    try {
+      open();
+      fireEvent.click(await screen.findByRole('button', { name: 'Manage Gmail' }));
+      const panel = document.querySelector('[data-aside]');
+      await waitFor(() => expect(document.activeElement).toBe(panel));
+      expect(scroll).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('on a wide screen Manage moves nothing', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    try {
+      open();
+      fireEvent.click(await screen.findByRole('button', { name: 'Manage Gmail' }));
+      await new Promise((r) => setTimeout(r, 10));
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
 
 describe('Connections', () => {
   it('lists apps and machines, with statuses as text', async () => {
