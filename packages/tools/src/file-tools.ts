@@ -116,6 +116,14 @@ export const listFiles = defineTool({
   },
 });
 
+/**
+ * Tool-call markup a model sometimes leaves around its answer ("...$248.</answer>\n</invoke>",
+ * seen live on Claude Haiku 5.5): stripped at the ends only, so an answer about XML keeps its tags.
+ */
+const MARKUP_EDGE =
+  /^(?:\s*<\/?(?:answer|invoke|parameter|function_calls)\b[^>]*>)+|(?:<\/?(?:answer|invoke|parameter|function_calls)\b[^>]*>\s*)+$/gi;
+export const cleanAnswer = (answer: string) => answer.trim().replace(MARKUP_EDGE, '').trim();
+
 export const finish = defineTool({
   name: 'finish',
   description: 'Give the final answer and end the task. Call this once the work is done.',
@@ -127,6 +135,6 @@ export const finish = defineTool({
   maxOutputChars: 50_000,
   preview: ({ answer }) => `Finish with: ${answer.slice(0, 200)}`,
   async execute({ answer }) {
-    return ok(answer);
+    return ok(cleanAnswer(answer) || answer);
   },
 });
