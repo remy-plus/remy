@@ -202,6 +202,7 @@ import { createBrainMount } from './serve-brain.ts';
 import { createBrowserMount } from './serve-browser.ts';
 import { chatRoutes } from './serve-chats.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
+import { createFilesMount } from './serve-files.ts';
 import { homeRoutes } from './serve-home.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
@@ -2747,6 +2748,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 onKey: (k) => addSecret('FISH_API_KEY', k),
               }),
               createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
+              createFilesMount({ store }),
               createSchedulesMount({
                 schedules: openSchedules(home),
                 hooks: openHooks(home),
