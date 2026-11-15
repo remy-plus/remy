@@ -313,7 +313,7 @@ export function Brain() {
         ref={details}
         tabIndex={-1}
         aria-label="Selected note"
-        className="min-w-0 border-t border-edge px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l"
+        className="min-w-0 scroll-mt-20 border-t border-edge px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l"
       >
         {selected ? (
           <div>

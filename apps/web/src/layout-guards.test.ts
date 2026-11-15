@@ -22,6 +22,11 @@ describe('phone layout guards', () => {
     expect(skipZ).toBeGreaterThan(dockZ);
   });
 
+  it('keyboard focus is scrolled clear of the floating dock and composer', () => {
+    expect(css).toMatch(/html \{[^}]*scroll-padding-top:\s*\d+px/);
+    expect(css).toMatch(/html \{[^}]*scroll-padding-bottom:\s*\d+px/);
+  });
+
   it('screens are as tall as the visible window, not the taller one under a phone address bar', () => {
     for (const file of sources(root)) {
       const text = readFileSync(file, 'utf8');

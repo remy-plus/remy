@@ -85,6 +85,12 @@ html {
 [data-theme="light"] {
   color-scheme: light;
 }
+/* The dock floats at the top and the composer at the bottom. When the keyboard moves focus to something,
+   the browser scrolls it clear of both instead of leaving it underneath (WCAG 2.4.11). */
+html {
+  scroll-padding-top: 80px;
+  scroll-padding-bottom: 96px;
+}
 body {
   margin: 0;
   background: var(--bg);

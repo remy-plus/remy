@@ -87,7 +87,7 @@ export function Page({
         <aside
           data-aside
           tabIndex={-1}
-          className="min-w-0 border-t border-edge px-5 py-8 outline-none sm:px-8 lg:border-t-0 lg:border-l"
+          className="min-w-0 scroll-mt-20 border-t border-edge px-5 py-8 outline-none sm:px-8 lg:border-t-0 lg:border-l"
         >
           {aside}
         </aside>
