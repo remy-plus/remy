@@ -215,8 +215,10 @@ describe('chat view', () => {
     });
     show(withChat([turn({ answer: 'All set.' })], { task_x: job }), 'c1');
     fireEvent.click(await screen.findByRole('button', { name: 'What I did (2 steps)' }));
-    const log = screen.getByRole('log', { name: 'What Remy is doing' });
-    expect(log.getAttribute('aria-live')).toBe('polite');
+    const log = screen.getByRole('list', { name: 'What Remy is doing' });
+    // The step list is not a live region: a settled feed is never read out again.
+    expect(log.getAttribute('aria-live')).toBeNull();
+    expect(log.getAttribute('role')).toBeNull();
     expect(screen.getByText('Read quotes/acme.md')).toBeTruthy();
     expect(screen.getByText('Opened northwind.com')).toBeTruthy();
     expect(log.textContent).not.toMatch(/read_file|fetch_url|hash_abc/);
@@ -255,6 +257,15 @@ describe('waiting for approval', () => {
     await screen.findByText('Send the corrected total to Dana');
     return approve;
   };
+
+  it('tells a screen reader, politely and once, that Remy needs an OK', async () => {
+    await setup();
+    const said = screen
+      .getAllByRole('status')
+      .find((el) => /Remy needs your OK/.test(el.textContent ?? ''));
+    expect(said?.textContent).toBe('Remy needs your OK. Send the corrected total to Dana');
+    expect(said?.classList.contains('sr-only')).toBe(true);
+  });
 
   it('Approve sends the card hash', async () => {
     const approve = await setup();

@@ -4,6 +4,7 @@ import { type ChatSummary, type ChatView, type ConnectedApp, useApi } from '../.
 import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
+import { useEndedAnnouncement } from '../../lib/announce.ts';
 import { announceChatsChanged } from '../../lib/chat-events.ts';
 import { describeError } from '../../lib/errors.ts';
 import type { MindState } from '../../lib/mind.ts';
@@ -207,6 +208,7 @@ function OpenChat({ id }: { id: string }) {
     };
   }, [busy, streamed, load]);
 
+  const ended = useEndedAnnouncement(chat?.turns);
   const turnCount = chat?.turns.length ?? 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when a turn is added
   useEffect(() => {
@@ -309,6 +311,10 @@ function OpenChat({ id }: { id: string }) {
     <div className="flex min-h-[calc(100dvh-80px)] flex-col">
       <div className="mx-auto w-full max-w-[720px] flex-1 px-4 pt-4 pb-8">
         <h1 className="sr-only">{chat.title}</h1>
+        {/* One polite sentence when a job ends in front of the person: the answer, or why it did not. */}
+        <p role="status" className="sr-only">
+          {ended}
+        </p>
         {chat.turns.map((t, i) => (
           <Turn
             key={t.taskId}

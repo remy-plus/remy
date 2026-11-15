@@ -4,8 +4,9 @@ import { AnswerText } from '../../components/AnswerText.tsx';
 import { BrowserPane } from '../../components/BrowserPane.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
+import { currentStep, useThrottled } from '../../lib/announce.ts';
 import { describeError } from '../../lib/errors.ts';
-import { type FeedLine, feedLines } from '../../lib/feed.ts';
+import { approvalSentence, type FeedLine, feedLines } from '../../lib/feed.ts';
 import type { MindState } from '../../lib/mind.ts';
 import { ago } from '../../lib/when.ts';
 import { useTask } from '../tasks/useTask.ts';
@@ -58,12 +59,7 @@ const WORD: Record<FeedLine['state'], string> = {
 export function FeedList({ lines }: { lines: FeedLine[] }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
-    <ul
-      role="log"
-      aria-live="polite"
-      aria-label="What Remy is doing"
-      className="m-0 flex list-none flex-col gap-0 p-0"
-    >
+    <ul aria-label="What Remy is doing" className="m-0 flex list-none flex-col gap-0 p-0">
       {lines.map((l, i) => {
         const when = l.at ? ago(l.at) : '';
         const expanded = open === l.id;
@@ -261,27 +257,30 @@ function LiveBlock({
         : 'thinking';
 
   const lines = view ? feedLines(view.calls, card?.callId) : [];
+  // The step list is not a live region (every change would be read again). This one sentence is:
+  // the step Remy is on, at most every few seconds, and an approval or question at once.
+  const step = useThrottled(currentStep(lines), 6000);
+  const said = card
+    ? `Remy needs your OK. ${approvalSentence(card.preview, card.risk)}`
+    : question
+      ? `Remy has a question. ${question.question}`
+      : step;
   const resolved = () => {
     reload();
     onChanged();
   };
   return (
     <Shell mind={phase}>
+      {/* One polite sentence for screen readers: the step, an approval or question at once, or that
+          the answer is being written (the words themselves are for the eyes, read once when done). */}
+      <p role="status" className="sr-only">
+        {hasWords && !card && !question ? 'Remy is writing the answer' : said}
+      </p>
       {lines.length > 0 && <FeedList lines={lines} />}
       {hasWords ? (
-        <>
-          {/* The words are for the eyes: a screen reader is told once, in plain words, and gets the
-              finished answer once when it is there, not every piece. */}
-          <p role="status" className="sr-only">
-            Remy is writing the answer
-          </p>
-          <div
-            aria-hidden="true"
-            className={`answer-block${lines.length > 0 ? ' mt-2' : ' mt-0.5'}`}
-          >
-            <AnswerText text={words} streaming />
-          </div>
-        </>
+        <div aria-hidden="true" className={`answer-block${lines.length > 0 ? ' mt-2' : ' mt-0.5'}`}>
+          <AnswerText text={words} streaming />
+        </div>
       ) : (
         lines.length === 0 && (
           <p role="status" className="m-0 py-0.5 text-[14px] leading-6 text-muted">
