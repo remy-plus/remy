@@ -75,6 +75,21 @@ describe('adapter choice', () => {
     expect(chooseApi('?x=1').kind).toBe('http');
   });
 
+  it('with no token, goes to sign-in without calling a protected route', async () => {
+    const fetcher = vi.fn(async () => new Response('{}', { status: 200 }));
+    const again = vi.fn();
+    const api = createHttpApi({
+      token: () => null,
+      onUnauthorized: again,
+      fetch: fetcher as unknown as typeof fetch,
+    });
+    await expect(api.listChats()).rejects.toMatchObject({ status: 401 });
+    expect(again).toHaveBeenCalledOnce();
+    expect(fetcher).not.toHaveBeenCalled();
+    await api.health();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
   it('asks to sign in again when the server answers 401', async () => {
     const again = vi.fn();
     const api = createHttpApi({
@@ -116,7 +131,7 @@ describe('http adapter', () => {
     const fetcher = vi.fn(
       async () => new Response('{"error":"A valid bearer token is required."}', { status: 401 }),
     );
-    const api = createHttpApi({ token: () => null, fetch: fetcher as unknown as typeof fetch });
+    const api = createHttpApi({ token: () => 'stale', fetch: fetcher as unknown as typeof fetch });
     const err = await api.getTask('x').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 401, message: 'A valid bearer token is required.' });

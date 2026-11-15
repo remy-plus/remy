@@ -91,6 +91,12 @@ export function createHttpApi(opts: {
 
   async function call(path: string, init: RequestInit = {}): Promise<Response> {
     const token = opts.token();
+    // With no token yet, a protected route can only answer 401: go to sign-in without asking,
+    // so opening the app signed out does not fill the console with failed requests.
+    if (!token && path !== '/api/health') {
+      opts.onUnauthorized?.();
+      throw new ApiError(401, statusMessage(401) ?? GENERIC);
+    }
     const headers = new Headers(init.headers);
     if (token) headers.set('authorization', `Bearer ${token}`);
     if (init.body) headers.set('content-type', 'application/json');
