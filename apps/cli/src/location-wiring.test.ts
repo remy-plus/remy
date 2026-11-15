@@ -3,7 +3,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ModelClient, ModelRequest } from '@remy/core';
+import type { ModelClient } from '@remy/core';
 import { ScriptedModelClient } from '@remy/models';
 import { MemoryEventStore } from '@remy/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -27,9 +27,9 @@ async function firstMessage(): Promise<string> {
   const model: ModelClient = {
     id: inner.id,
     caps: inner.caps,
-    complete: (req: ModelRequest, ...a) => {
-      seen.push(req.messages.map((m) => m.content).join('\n'));
-      return inner.complete(req, ...a);
+    complete: (...args: Parameters<ModelClient['complete']>) => {
+      seen.push(args[0].messages.map((m) => m.content).join('\n'));
+      return inner.complete(...args);
     },
   };
   const deps: CliDeps = {

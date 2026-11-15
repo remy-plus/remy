@@ -98,9 +98,9 @@ describe('memory suite', () => {
           c,
           model: {
             ...inner,
-            complete: (req: ModelRequest, ...a: never[]) => {
-              seen.push(req.messages.map((m) => m.content).join('\n'));
-              return inner.complete(req, ...a);
+            complete: (...args: Parameters<ModelClient['complete']>) => {
+              seen.push(args[0].messages.map((m) => m.content).join('\n'));
+              return inner.complete(...args);
             },
           } as ModelClient,
         };
