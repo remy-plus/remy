@@ -39,6 +39,7 @@ export function toolCalls(state: TaskState): ToolCallRecord[] {
       started: c.attempts > 0,
       ...(approved !== undefined && { approved }),
       outcome,
+      ...(c.result?.ok && c.result.sources?.length && { sources: c.result.sources }),
     };
   });
 }

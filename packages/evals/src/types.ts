@@ -195,6 +195,8 @@ export interface ToolCallRecord {
   /** Whether a human approved these exact arguments. Undefined when no approval was asked. */
   approved?: boolean;
   outcome: 'ok' | 'error' | 'denied' | 'declined' | 'none';
+  /** Addresses the result came from, such as the page a redirect ended on. */
+  sources?: string[];
   /** True when a helper task made this call, not the task the person started. */
   byHelper?: boolean;
 }

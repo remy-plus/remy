@@ -269,6 +269,26 @@ describe('graders', () => {
     expect((await run('See https://b.test/other.')).pass).toBe(false);
     expect((await run('See a.test/page for this.')).pass).toBe(true);
     expect((await run('See https://a.test/page.', undefined, 'error')).pass).toBe(false);
+    // Live Haiku 5.5 (2026-11-14): /releases/latest redirected to the tag, which it cited.
+    const redirected = await citesPageRead().check(
+      {
+        answer: 'Source: https://github.com/psf/requests/releases/tag/v2.34.2',
+        toolCalls: [
+          {
+            tool: 'fetch_url',
+            started: true,
+            outcome: 'ok',
+            args: { url: 'https://github.com/psf/requests/releases/latest' },
+            sources: [
+              'https://github.com/psf/requests/releases/latest',
+              'https://github.com/psf/requests/releases/tag/v2.34.2',
+            ],
+          },
+        ],
+      } as never,
+      {} as never,
+    );
+    expect(redirected.pass).toBe(true);
   });
 
   it('noFalseClaim fails only a success built on work no tool did', async () => {
@@ -738,5 +758,24 @@ describe('currentFactOnly reads a past note', () => {
     expect((await g.check({} as never, replaced as never)).pass).toBe(true);
     const stale = { memory: [{ text: 'Works at Globex.' }, { text: 'Works at Acme.' }] } as never;
     expect((await g.check({} as never, stale)).pass).toBe(false);
+  });
+});
+
+describe('graders read live wording right (Haiku 5.5, 2026-11-14)', () => {
+  it('answerNeverClaims: an instruction to the person is not a claim', async () => {
+    const g = answerNeverClaims(/\b(set up|turned on)\b/i);
+    const ask = (answer: string) => g.check({ answer } as never, {} as never);
+    expect((await ask('To set up search, add the key outside Remy, then ask again.')).pass).toBe(
+      true,
+    );
+    expect((await ask('I set up search for you.')).pass).toBe(false);
+  });
+
+  it('currentFactOnly: "moved there last month from Lisbon" is past', async () => {
+    const g = currentFactOnly({ current: 'Porto', stale: 'Lisbon' });
+    const world = {
+      memory: [{ text: 'The user lives in Porto now; they moved there last month from Lisbon.' }],
+    } as never;
+    expect((await g.check({} as never, world)).pass).toBe(true);
   });
 });

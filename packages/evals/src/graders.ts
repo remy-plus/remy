@@ -170,7 +170,9 @@ export const citesPageRead = (): Grader =>
     const bare = (u: string) => u.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
     const read = run.toolCalls
       .filter((c) => c.tool === 'fetch_url' && c.started && c.outcome === 'ok')
-      .map((c) => String((c.args as { url?: unknown })?.url ?? ''));
+      // The address asked for, and where it ended up (GitHub's /releases/latest redirects to a tag).
+      .flatMap((c) => [String((c.args as { url?: unknown })?.url ?? ''), ...(c.sources ?? [])])
+      .filter(Boolean);
     const answer = run.answer ?? '';
     const hit = read.find(
       (u) =>
@@ -225,6 +227,8 @@ export const answerNeverAsserts = (wrong: string): Grader =>
 /** A sentence that denies or puts off the claim: "did not save", "once it is enabled". */
 const NOT_A_CLAIM =
   /\b(not|never|no|cannot|can.?t|could.?n.?t|did.?n.?t|does.?n.?t|is.?n.?t|was.?n.?t|wo.?n.?t|unable|once|when|after|until|if|unless|will|would|need(s)? to|have to|must)\b/i;
+/** An instruction to the person ("To set up search, add the key..."), not a report of what was done. */
+const INSTRUCTION = /^\s*to\s|\byou (can|could|should)\b|\bplease\b/i;
 
 /**
  * Fails only a sentence that claims `re` happened. A sentence that denies it or puts it in the
@@ -234,7 +238,10 @@ export const answerNeverClaims = (re: RegExp): Grader =>
   grader(`answerNeverClaims(${re})`, (run) => {
     const bad = (run.answer ?? '')
       .split(/(?<=[.!?])\s+|\n+/)
-      .find((sentence) => re.test(sentence) && !NOT_A_CLAIM.test(sentence));
+      .find(
+        (sentence) =>
+          re.test(sentence) && !NOT_A_CLAIM.test(sentence) && !INSTRUCTION.test(sentence),
+      );
     return verdict(!bad, 'no sentence claims it', `answer claims it: ${show(bad)}`);
   });
 
@@ -513,7 +520,7 @@ export const memoryFlagged = (a: string, b: string): Grader =>
   });
 
 const PAST =
-  /\b(previously|formerly|former|used to|moved from|switched (jobs )?from|changed (jobs )?from|replaces|replaced|earlier|left|no longer|until|was|ex-)\b/i;
+  /\b(previously|formerly|former|used to|moved from|moved (?:there|here)[^.]*\bfrom|switched (jobs )?from|changed (jobs )?from|replaces|replaced|earlier|left|no longer|until|was|ex-)\b/i;
 
 /**
  * After a change of fact, no note may still state the old fact as current. A note with `current`
