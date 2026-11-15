@@ -28,6 +28,19 @@ describe('the published bin', () => {
     expect(r.stderr).not.toMatch(/SQLite/);
   });
 
+  it('stops with one plain sentence on a Node that is too old, without loading the app', () => {
+    const src = header
+      .binSource('./main.mjs')
+      .replace("process.versions.node.split('.')", "'20.20.2'.split('.')");
+    writeFileSync(join(dir, 'main.mjs'), "console.log('loaded');");
+    writeFileSync(join(dir, 'old.mjs'), src);
+    const r = spawnSync(process.execPath, [join(dir, 'old.mjs')], { encoding: 'utf8' });
+    expect(r.status).toBe(1);
+    expect(r.stdout).not.toContain('loaded');
+    expect(r.stderr).toMatch(/^Remy needs Node 22\.18 or newer, and this computer has Node/);
+    expect(r.stderr).not.toMatch(/at |node:internal/);
+  });
+
   it('still shows every other warning', () => {
     const r = run(
       "process.emitWarning('Something else', 'ExperimentalWarning'); process.emitWarning('legacy thing', 'DeprecationWarning'); await new Promise((r) => setTimeout(r, 50));",
