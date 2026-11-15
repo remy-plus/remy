@@ -832,7 +832,7 @@ function TaskScreen({ id }: { id: string }) {
               ? 'Type your answer'
               : view.final
                 ? 'Ask a follow-up'
-                : 'Add a note while it works'
+                : 'Add a note'
           }
           onSend={async (t) => {
             if (view.final) return start(t);
