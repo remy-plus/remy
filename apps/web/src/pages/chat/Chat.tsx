@@ -9,6 +9,7 @@ import { announceChatsChanged } from '../../lib/chat-events.ts';
 import { describeError } from '../../lib/errors.ts';
 import { useKeyboardInset } from '../../lib/keyboard.ts';
 import type { MindState } from '../../lib/mind.ts';
+import { scrollBehavior } from '../../lib/motion.ts';
 import { suggestionsFor } from '../../lib/suggestions.ts';
 import { ago, greeting } from '../../lib/when.ts';
 import { useSetting } from '../../settings.ts';
@@ -217,7 +218,7 @@ function OpenChat({ id }: { id: string }) {
   const turnCount = chat?.turns.length ?? 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when a turn is added
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: 'end', behavior: 'smooth' });
+    end.current?.scrollIntoView?.({ block: 'end', behavior: scrollBehavior() });
   }, [turnCount]);
 
   // New lines, an approval card or an answer make the chat taller: follow them, but only when the
@@ -228,7 +229,7 @@ function OpenChat({ id }: { id: string }) {
     if (!col || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => {
       const gap = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
-      if (gap < 420) end.current?.scrollIntoView?.({ block: 'end', behavior: 'smooth' });
+      if (gap < 420) end.current?.scrollIntoView?.({ block: 'end', behavior: scrollBehavior() });
     });
     ro.observe(col);
     return () => ro.disconnect();

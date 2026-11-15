@@ -2,6 +2,7 @@ import { type ComponentType, useCallback, useEffect, useRef, useState } from 're
 import { type SettingsData, useApi } from '../../api/index.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { describeError } from '../../lib/errors.ts';
+import { scrollBehavior } from '../../lib/motion.ts';
 import { useSaveState } from '../../settings.ts';
 import { Budget, Trust } from './basics.tsx';
 import { DockSection } from './dock.tsx';
@@ -83,8 +84,7 @@ export function Settings({ section = 'dock' }: { section?: string }) {
     const row = document.getElementById(section);
     if (!row) return;
     landed.current = true;
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    row.scrollIntoView?.({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+    row.scrollIntoView?.({ block: 'start', behavior: scrollBehavior() });
   });
 
   return (
