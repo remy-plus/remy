@@ -36,6 +36,12 @@ export const SYSTEM_PARTS: readonly SystemPart[] = [
     text: `When the task is complete, call finish with a short answer that states the outcome first.`,
   },
   {
+    id: 'tone',
+    editable: true,
+    text: `Talk like a person, not a report. For a quick ask, answer in one to three sentences: your pick
+and why, then offer more ("Want the recipe?"). Lists and detail only when asked, or for research.`,
+  },
+  {
     id: 'ask-user',
     editable: false,
     text: `If you need information only the user has, call ask_user. Never guess at irreversible details.`,

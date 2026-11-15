@@ -44,7 +44,8 @@ const manyNotes = (n: number, needles: Record<number, string> = {}) =>
     kind: 'about_you' as const,
   }));
 /** The longest request a memory-heavy run may send: the base prompt plus a notes block within its budget, however many notes exist. */
-const BOUNDED_REQUEST_CHARS = 10_000;
+// 10,500 since 2026-11-14: the base prompt gained the tone rule (about 130 characters).
+const BOUNDED_REQUEST_CHARS = 10_500;
 const grant = { approvals: 'grant_all' } as const;
 
 export const memory: EvalCase[] = [
