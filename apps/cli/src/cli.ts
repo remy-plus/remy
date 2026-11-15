@@ -202,7 +202,7 @@ import {
 } from './search-vm.ts';
 import { HttpError, listenServe } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
-import { reachableUrls, resolveServeBind } from './serve-bind.ts';
+import { phoneUrls, reachableUrls, resolveServeBind } from './serve-bind.ts';
 import { createBrainMount } from './serve-brain.ts';
 import { createBrowserMount } from './serve-browser.ts';
 import { chatRoutes } from './serve-chats.ts';
@@ -212,6 +212,7 @@ import { homeRoutes } from './serve-home.ts';
 import { createLiveBus } from './serve-live.ts';
 import { createLocationMount } from './serve-location.ts';
 import { createModelSetupMount } from './serve-model-setup.ts';
+import { phoneSignInLines } from './serve-phone.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
 import {
@@ -2720,10 +2721,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             onTurnEnd: () => lastSeen().touch(),
             tokenHash: () => serveTokenHash(home),
             sessionHashes: () => sessionHashes(home),
-            // One-time sign-in links exist only on a loopback address (the same machine).
-            ...(isLoopback(bind.host) && {
-              signIn: { codes: signInCodes, session: () => makeSession(home) },
-            }),
+            // One-time sign-in links, on any address. A code exists only when this terminal printed
+            // it or `remy serve link` made one, so a server nobody asked has none to guess.
+            signIn: { codes: signInCodes, session: () => makeSession(home) },
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),
             log: (line) => out(st.dim(line)),
@@ -2874,8 +2874,16 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           `remy serve listens on http://${listening.host}:${listening.port}. Press Ctrl+C to stop.`,
         );
         // Listening on every interface: say the address a phone on the same network can type.
+        const networkUrls = phoneUrls(listening.host, listening.port, networkInterfaces());
         for (const url of reachableUrls(listening.host, listening.port, networkInterfaces()))
           out(`On this network, open ${url} on your phone or another computer.`);
+        // A QR code and a one-time link for each address a phone can reach. Terminal only: a log
+        // that is kept must never hold a code.
+        if (deps.isTTY)
+          for (const line of phoneSignInLines(networkUrls, signInCodes, {
+            color: level !== 'none',
+          }))
+            out(line);
         // A one-time sign-in link for this machine. It is printed only on a terminal (a log that is
         // kept must never hold it) and opened in the browser with --open; it works once, for 10 minutes.
         if (isLoopback(listening.host) && (deps.isTTY || flags.open)) {

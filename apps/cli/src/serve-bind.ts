@@ -48,3 +48,15 @@ export function reachableUrls(host: string, port: number, interfaces: Interfaces
         out.push(`http://${a.address}:${port}`);
   return [...new Set(out)];
 }
+
+/**
+ * The addresses a phone can open and sign in on: every reachable address when the server listens
+ * on every interface, the one address when it listens on a single non-loopback address (a home
+ * network or a Tailscale address), and none on loopback, where a phone cannot reach it.
+ */
+export function phoneUrls(host: string, port: number, interfaces: Interfaces): string[] {
+  if (host === '0.0.0.0' || host === '::') return reachableUrls(host, port, interfaces);
+  if (isLoopback(host)) return [];
+  const name = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
+  return [`http://${name}:${port}`];
+}
