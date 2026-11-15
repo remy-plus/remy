@@ -6,6 +6,7 @@ import {
   type Effect,
   type EventStore,
   fold,
+  type LiveEvent,
   ModelError,
   type RemyRuntime,
   type Risk,
@@ -223,6 +224,8 @@ export interface RuntimeHooks {
   onText: (delta: string) => void;
   onModelStart: () => void;
   onReasoning: (delta: string) => void;
+  /** What a task's model is writing, per task (the web app's words on their way). */
+  onLive?: (taskId: string, e: LiveEvent) => void;
 }
 
 export interface ChatDeps {

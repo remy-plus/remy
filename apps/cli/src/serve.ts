@@ -34,6 +34,7 @@ import {
 } from '@remy/core';
 import { z } from 'zod';
 import type { ServeBind } from './serve-bind.ts';
+import { type LiveBus, liveWriter } from './serve-live.ts';
 import type { Mount } from './serve-mount.ts';
 import type { SignInCodes } from './serve-signin.ts';
 import { createStaticHandler } from './serve-static.ts';
@@ -126,6 +127,8 @@ export interface ServeDeps {
   maxRunning?: number;
   /** Most open event streams (default 32). */
   maxStreams?: number;
+  /** Words on their way (never stored): forwarded to event streams as they are written. */
+  live?: LiveBus;
   /** How many finished-task outcomes are kept (default 500), and for how long (default 10 minutes). */
   maxOutcomes?: number;
   outcomeTtlMs?: number;
@@ -353,7 +356,10 @@ export function createServe(deps: ServeDeps) {
           return;
         }
       }
-    })().finally(() => runs.delete(id));
+    })().finally(() => {
+      runs.delete(id);
+      deps.live?.clear(id);
+    });
     runs.set(id, p);
   }
 
@@ -724,6 +730,15 @@ export function createServe(deps: ServeDeps) {
     });
     res.write('retry: 2000\n\n');
     if (over) return void res.end();
+    // Words on their way go out the moment they are written. They carry no `id:`, so a
+    // reconnecting screen asks for stored events only and never counts them.
+    const unlive = deps.live?.subscribe(
+      id,
+      liveWriter(redact, (m) => {
+        if (!gone && !res.writableEnded) res.write(`data: ${JSON.stringify(m)}\n\n`);
+      }),
+    );
+    res.on('close', () => unlive?.());
     let quiet = 0;
     while (!gone && !closed) {
       const events: StoredEvent[] = pending ?? (await store.read(id, next));

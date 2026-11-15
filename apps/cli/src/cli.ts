@@ -204,6 +204,7 @@ import { chatRoutes } from './serve-chats.ts';
 import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { createFilesMount } from './serve-files.ts';
 import { homeRoutes } from './serve-home.ts';
+import { createLiveBus } from './serve-live.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
 import {
@@ -1310,6 +1311,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       },
       ...(opts.hooks?.onText && { onText: opts.hooks.onText }),
       ...(opts.hooks?.onReasoning && { onReasoning: opts.hooks.onReasoning }),
+      ...(opts.hooks?.onLive && { onLive: opts.hooks.onLive }),
       ...(opts.hooks?.onModelStart && { onModelStart: opts.hooks.onModelStart }),
     });
     return { runtime, timeline, tools };
@@ -2522,7 +2524,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const bind = resolveServeBind({ host: flags.host, port: flags.port }, env);
         const file = cfg();
         const model = deps.model ?? modelFor(file);
-        const { runtime } = makeRuntime(file, { model: true, hooks: {} });
+        const live = createLiveBus();
+        const { runtime } = makeRuntime(file, {
+          model: true,
+          hooks: { onLive: (id, e) => live.publish(id, e) },
+        });
         await mcp?.ready;
         if (!serveTokenHash(home)) {
           announceFirstRunToken(home, makeServeToken(home), deps.isTTY, (line) =>
@@ -2613,6 +2619,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             ],
             store,
             runtime,
+            live,
             home,
             version: version(),
             config: (id, trust) => {
