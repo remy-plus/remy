@@ -3,6 +3,7 @@ import { useApi } from './api/index.tsx';
 import { CommandPalette } from './components/CommandPalette.tsx';
 import { Dock } from './components/Dock.tsx';
 import { PushToTalk } from './components/PushToTalk.tsx';
+import { useDocumentTitle } from './lib/title.ts';
 import { Activity } from './pages/activity/Activity.tsx';
 import { Browser } from './pages/browser/Browser.tsx';
 import { Chat } from './pages/chat/Chat.tsx';
@@ -90,6 +91,7 @@ export function App() {
   const bare = BARE.has(matchRoute(path).name);
   const main = useRef<HTMLElement>(null);
   const shown = useRef(path);
+  useDocumentTitle(main, path);
   // With a real server, copy its saved settings in once, then write each change back.
   useEffect(() => {
     if (api.kind !== 'http') return;

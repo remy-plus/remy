@@ -94,7 +94,10 @@ function EmptyChat() {
   return (
     <div className="page-in mx-auto flex min-h-[calc(100dvh-80px)] w-full max-w-[560px] flex-col items-center justify-center px-4 pb-16 text-center">
       <MindGlyph state={voice.state ?? 'rest'} level={voice.level} size={128} />
-      <h1 className="m-0 mt-4 text-[28px] leading-[1.2] font-medium tracking-tight">
+      <h1
+        data-doc-title="New chat"
+        className="m-0 mt-4 text-[28px] leading-[1.2] font-medium tracking-tight"
+      >
         {greeting()}
       </h1>
       <p className="mt-1 mb-6 text-[15px] text-muted">What do you need?</p>

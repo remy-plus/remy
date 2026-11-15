@@ -61,7 +61,7 @@ export function ApprovalInline({
       aria-label="Is this OK?"
       className="rise mt-3 rounded-[16px] border border-edge bg-surface p-4"
     >
-      <h3 className="m-0 text-[14px] font-medium text-muted">Is this OK?</h3>
+      <h2 className="m-0 text-[14px] font-medium text-muted">Is this OK?</h2>
       <p className="mt-1 mb-0 text-[15px] leading-6 text-text">
         {approvalSentence(card.preview, card.risk)}
       </p>
