@@ -25,6 +25,7 @@ import {
   addNote,
   askUser,
   calculate,
+  createAwayTool,
   createDelegate,
   createHowtoTool,
   createMemoryTools,
@@ -350,6 +351,7 @@ export async function createWorld(c: EvalCase, prompts: PromptOverrides = {}): P
       : []),
     ...(c.world.inbox ? ['email_read', 'email_send'] : []),
     ...(c.world.memory && !c.world.memoryOff ? ['remember', 'forget', 'recall'] : []),
+    ...(c.world.away ? ['whats_new'] : []),
     'calculate',
     'update_plan',
   ];
@@ -386,6 +388,17 @@ export async function createWorld(c: EvalCase, prompts: PromptOverrides = {}): P
       tainted: h.tainted ?? false,
     }));
     tools.push(createRecallTool(memoryPort, async () => history));
+  }
+
+  if (c.world.away) {
+    const away = c.world.away;
+    // The last visit is fixed in the fake world, so the text is the same on every run.
+    tools.push(
+      createAwayTool(
+        { since: () => new Date('2026-02-01T08:00:00Z'), items: async () => away },
+        () => new Date('2026-02-01T12:00:00Z'),
+      ),
+    );
   }
 
   if (c.world.skills) {

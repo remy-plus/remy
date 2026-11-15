@@ -247,6 +247,17 @@ export const answerLacks = (re: RegExp): Grader =>
     ),
   );
 
+/** The answer is short: a greeting or a quick pick, not a report. */
+export const answerShorterThan = (maxChars: number): Grader =>
+  grader(`answerShorterThan(${maxChars})`, (run) => {
+    const n = (run.answer ?? '').trim().length;
+    return verdict(
+      n > 0 && n < maxChars,
+      `answer is ${n} characters`,
+      n === 0 ? 'no answer' : `answer is ${n} characters, over ${maxChars}`,
+    );
+  });
+
 // ---------- World state ----------
 export const fileEquals = (path: string, content: string): Grader =>
   grader(`fileEquals(${path})`, (_run, world) => {

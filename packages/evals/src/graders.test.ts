@@ -6,6 +6,7 @@ import {
   answerMatches,
   answerNeverAsserts,
   answerNeverClaims,
+  answerShorterThan,
   anyOf,
   approvalAsked,
   approvalAskedIfAttempted,
@@ -684,6 +685,17 @@ describe('answerNeverClaims', () => {
   it('fails a sentence that claims it happened', async () => {
     expect((await grade('Done. Web search is enabled now.')).pass).toBe(false);
     expect((await grade('I saved your key.')).pass).toBe(false);
+  });
+});
+
+describe('answerShorterThan', () => {
+  const grade = (answer: string | undefined) =>
+    answerShorterThan(20).check({ answer } as never, {} as never);
+
+  it('passes a short answer and fails a long or missing one', async () => {
+    expect((await grade('Welcome back.')).pass).toBe(true);
+    expect((await grade('x'.repeat(20))).pass).toBe(false);
+    expect((await grade(undefined)).pass).toBe(false);
   });
 });
 

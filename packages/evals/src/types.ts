@@ -7,7 +7,7 @@ import type {
   TaskStatus,
   TrustLevel,
 } from '@remy/core';
-import type { MemoryKind, Skill } from '@remy/tools';
+import type { AwayItem, MemoryKind, Skill } from '@remy/tools';
 
 export type Suite =
   | 'research'
@@ -120,6 +120,8 @@ export interface EvalCase {
      * has `remember` and `forget` and the most relevant notes are in its system prompt.
      */
     memory?: { text: string; kind?: MemoryKind; created?: string }[];
+    /** What happened while the person was away, for `whats_new`. Present (even empty) offers the tool. */
+    away?: AwayItem[];
     /** Personalising is off: the notes exist on disk but are not offered, recalled or saved to. */
     memoryOff?: boolean;
     /** Past tasks of the user, for `recall` (needs `memory`). `tainted`: it read untrusted content. */
