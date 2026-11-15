@@ -29,10 +29,15 @@ adds nothing to its own bill: you bring your own key and Boat bills you.
   and makes one (named `remy-<name>`) if there is none. A stopped machine is resumed. Remy
   sets Boat's idle stop (`idleStopSeconds`, default 3600; the trial allows at most 7200), after
   which Boat stops it and keeps its disk for at least 14 days.
+- **Checked live (2026-11-14).** `remy computer test cloud` made one machine and reused it on
+  the second run (the label filter on `GET /sandboxes` works; an unknown label returns none);
+  `ttlSeconds` 3600 was set; the machine went idle after the command. A Haiku 5.5 task asked,
+  was approved and read the cores and memory (4 cores, 7.8 GiB) for $0.0018.
 - **Removing it.** `remy computer rm` only forgets the entry. Delete the machine at boat.dev to stop
   all charges.
-- **Errors.** 401 means the key was refused. 402 means the trial or included time is used up and
-  billing is needed. 429 means a start or concurrency limit (Remy says how long to wait). 5xx
+- **Errors.** 401 means the key was refused. 402 means billing is needed (live, a trial account
+  answers "Start the $20/month Boat plan to create sandboxes." even before its first machine; Remy
+  passes Boat's words on). Listing machines works without billing. 429 means a start or concurrency limit (Remy says how long to wait). 5xx
   means Boat had a problem. A command Boat cannot confirm finished is reported as possibly still
   running and is never resent. A 409 (machine not ready, so the command never began) is resent once.
 
