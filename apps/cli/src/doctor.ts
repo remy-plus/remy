@@ -40,6 +40,7 @@ export interface Probes {
   node: string;
   platform: string;
   model?: string | undefined;
+  /** A browser Remy can drive is installed (the CLI's probe looks per platform; see browser-found.ts). */
   hasChromeApp: () => boolean;
   daemonOn: () => boolean;
   schedules: () => number;
@@ -58,7 +59,7 @@ export function gatherFacts(p: Probes): Facts {
   return {
     node: p.node,
     ...(p.model !== undefined && { model: p.model }),
-    browser: p.hasChromeApp() || p.platform !== 'darwin',
+    browser: p.hasChromeApp(),
     docker: p.search.order.includes('vm'),
     daemon: (p.platform === 'darwin' || p.service !== undefined) && p.daemonOn(),
     schedules: p.schedules(),

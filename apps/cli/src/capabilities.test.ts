@@ -121,9 +121,12 @@ describe('gatherFacts', () => {
     expect(gatherFacts(b.p).docker).toBe(true);
   });
 
-  it('treats a non-Mac as having a browser and no launchd daemon', () => {
-    const f = gatherFacts(probes({ platform: 'linux' }).p);
-    expect(f.browser).toBe(true);
-    expect(f.daemon).toBe(false);
+  it('takes the browser answer from the probe on any platform, and has no launchd daemon off a Mac', () => {
+    const none = gatherFacts(probes({ platform: 'linux' }).p);
+    expect(none.browser).toBe(false);
+    expect(none.daemon).toBe(false);
+    expect(gatherFacts(probes({ platform: 'linux', hasChromeApp: () => true }).p).browser).toBe(
+      true,
+    );
   });
 });

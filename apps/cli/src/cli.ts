@@ -1039,10 +1039,13 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       node: process.version,
       platform: process.platform,
       model: credentials().defaultProvider() ?? env.REMY_PROFILE ?? file.profile,
+      // REMY_BROWSER=off is not "no browser installed", so it is left out of what the probe sees.
       hasChromeApp: () =>
-        ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
-          existsSync(p),
-        ),
+        hasBrowser({
+          platform: process.platform,
+          env: { ...env, REMY_BROWSER: undefined },
+          home: deps.homeDir ?? homedir(),
+        }),
       daemonOn: () => daemonInstaller()?.isOn() ?? false,
       service: () => {
         const s = daemonInstaller();
