@@ -304,6 +304,16 @@ export interface SettingsData {
   about: { version: string; licences: string; dataDir: string };
 }
 
+/** GET /api/location: the rough place Remy keeps. The coordinates never come back. */
+export interface LocationState {
+  /** "Philadelphia, Pennsylvania, US", or "near 39.95, -75.16" when no name was found; null when not set. */
+  place: string | null;
+  /** When it was set (ISO). */
+  setAt: string | null;
+  /** The person said no or turned it off: the chat does not ask again until Settings turns it on. */
+  declined: boolean;
+}
+
 /** Everything the screens may ask of the server. Components use this and nothing else. */
 // ---- Browser ----
 /** Remy's own browser, from GET /api/browser/state. */
@@ -375,6 +385,14 @@ export interface RemyApi {
    * ApiError whose status says why (503: no voice key). Not on the mock, which has no voice.
    */
   speakAudio?(text: string, signal?: AbortSignal): Promise<Blob>;
+  /** The rough location Remy keeps (GET /api/location). Absent on an older server and on the mock's older paths. */
+  location?(): Promise<LocationState>;
+  /** Saves a position (rounded to two decimals here and on the server); the server names the place. */
+  setLocation?(lat: number, lon: number): Promise<LocationState>;
+  /** The person refused the browser's question: do not ask again. */
+  declineLocation?(): Promise<LocationState>;
+  /** Turns location off and deletes the place. */
+  clearLocation?(): Promise<LocationState>;
   /** Saves some of the values in `ServerPrefs`. Rejects with a message safe to show. */
   updateSettings(patch: SettingsPatch): Promise<void>;
   /** Web search status and choices (GET /api/search). Absent on an older server. */

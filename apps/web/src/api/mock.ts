@@ -7,6 +7,7 @@ import type {
   ApprovalDetail,
   Health,
   HomeData,
+  LocationState,
   NeedCard,
   RemyApi,
   ReviewData,
@@ -643,6 +644,7 @@ export function createMockApi(): RemyApi {
   let notes = SETTINGS.notes;
   let workspace: WorkspaceInfo = { path: null, source: 'task', saved: null };
   let searchPrefer: string | null = null;
+  let mockLocation: LocationState = { place: null, setAt: null, declined: false };
   const searchView = (): SearchStatus => {
     const want = MOCK_SEARCH.find((s) => s.id === searchPrefer && s.key !== 'none');
     const first = MOCK_SEARCH.find((s) => s.kind === 'search' && s.key !== 'none');
@@ -853,6 +855,26 @@ export function createMockApi(): RemyApi {
         const path = patch.workspace;
         workspace = { path, source: path ? 'setting' : 'task', saved: path };
       }
+    },
+    // The demo keeps a place in memory; the real name lookup happens on the server.
+    async location() {
+      return { ...mockLocation };
+    },
+    async setLocation(lat, lon) {
+      mockLocation = {
+        place: `near ${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+        setAt: new Date().toISOString(),
+        declined: false,
+      };
+      return { ...mockLocation };
+    },
+    async declineLocation() {
+      if (!mockLocation.place) mockLocation = { place: null, setAt: null, declined: true };
+      return { ...mockLocation };
+    },
+    async clearLocation() {
+      mockLocation = { place: null, setAt: null, declined: true };
+      return { ...mockLocation };
     },
     async deleteNotes(confirm) {
       if (confirm !== notes)

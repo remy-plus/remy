@@ -16,6 +16,7 @@ import type {
   Health,
   HomeData,
   LiveMessage,
+  LocationState,
   MachineInput,
   MachineTest,
   RegistrySearch,
@@ -261,6 +262,12 @@ export function createHttpApi(opts: {
       });
       return res.blob();
     },
+    location: () => json<LocationState>('/api/location'),
+    setLocation: (lat, lon) =>
+      json<LocationState>('/api/location', { method: 'PUT', body: JSON.stringify({ lat, lon }) }),
+    declineLocation: () =>
+      json<LocationState>('/api/location/decline', { method: 'POST', body: '{}' }),
+    clearLocation: () => json<LocationState>('/api/location', { method: 'DELETE' }),
     searchStatus: () => json<SearchStatus>('/api/search'),
     setSearchPrefer: (prefer) =>
       json<SearchStatus>('/api/search', { method: 'PUT', body: JSON.stringify({ prefer }) }),

@@ -5,6 +5,7 @@ import { describeError } from '../../lib/errors.ts';
 import { useSaveState } from '../../settings.ts';
 import { Budget, Trust } from './basics.tsx';
 import { DockSection } from './dock.tsx';
+import { LocationSection } from './location.tsx';
 import { Memory } from './memory.tsx';
 import { Model } from './model.tsx';
 import { Notifications } from './notifications.tsx';
@@ -23,6 +24,7 @@ const VIEWS: Partial<Record<SectionId, ComponentType<SectionProps>>> = {
   trust: Trust,
   budget: Budget,
   memory: Memory,
+  location: LocationSection,
   computer: Computer,
   model: Model,
   search: SearchSection,

@@ -12,6 +12,7 @@ import { ago, greeting } from '../../lib/when.ts';
 import { useSetting } from '../../settings.ts';
 import { Composer } from './Composer.tsx';
 import { Turn } from './Feed.tsx';
+import { useLocationAsk } from './useLocationAsk.ts';
 
 /** How often to ask for the chat when no stream is carrying updates. */
 const POLL_MS = 2000;
@@ -70,12 +71,14 @@ function EmptyChat() {
   const [sending, setSending] = useState(false);
   const [voice, setVoice] = useState<VoiceNow>(IDLE);
   const last = useLastChat();
+  const place = useLocationAsk();
   const send = async () => {
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
     setProblem(null);
     try {
+      await place.beforeSend(t);
       const { chatId } = await api.sendMessage(t, undefined);
       announceChatsChanged();
       setText('');
@@ -99,6 +102,14 @@ function EmptyChat() {
       <p className="mt-2.5 mb-0 w-full px-4 text-left text-[13px] leading-snug text-muted">
         Remy asks before it sends anything as you or spends money.
       </p>
+      {place.notice && (
+        <p
+          role="status"
+          className="mt-3 mb-0 w-full px-4 text-left text-[13px] leading-snug text-muted"
+        >
+          {place.notice}
+        </p>
+      )}
       {problem && (
         <p role="alert" className="mt-3 mb-0 text-[14px] text-muted">
           {problem}
@@ -216,17 +227,20 @@ function OpenChat({ id }: { id: string }) {
     return () => ro.disconnect();
   }, [chat?.id]);
 
+  const place = useLocationAsk();
+  const { beforeSend } = place;
   const post = useCallback(
     async (t: string) => {
       setProblem(null);
       try {
+        await beforeSend(t);
         await api.sendMessage(t, id);
         await load();
       } catch (e) {
         setProblem(problemOf(e, 'Remy could not send that. Try again.'));
       }
     },
-    [api, id, load],
+    [api, id, load, beforeSend],
   );
 
   // The queued message goes as soon as the current job ends.
@@ -314,6 +328,11 @@ function OpenChat({ id }: { id: string }) {
           className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-[linear-gradient(to_top,var(--bg),transparent)]"
         />
         <div className="mx-auto max-w-[688px]">
+          {place.notice && (
+            <p role="status" className="m-0 mb-2 px-4 text-[13px] text-muted">
+              {place.notice}
+            </p>
+          )}
           {problem && (
             <p role="alert" className="m-0 mb-2 px-4 text-[13px] text-muted">
               {problem}

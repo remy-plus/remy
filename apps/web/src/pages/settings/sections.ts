@@ -15,6 +15,7 @@ export const SECTIONS = [
   { id: 'model', label: 'Model and keys' },
   { id: 'search', label: 'Search and browsing' },
   { id: 'memory', label: 'Memory and privacy' },
+  { id: 'location', label: 'Location' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'computer', label: 'This computer' },
 ] as const;
