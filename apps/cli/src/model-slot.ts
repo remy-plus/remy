@@ -31,10 +31,11 @@ export function createModelSlot(initial?: ModelClient): ModelSlot {
     get caps() {
       return current?.caps ?? DEFAULT_CAPS;
     },
-    complete(req, signal, onText, onReasoning) {
+    complete(...args) {
       if (!current)
         return Promise.reject(new ModelError(EMPTY_SLOT_MESSAGE, false, { unreachable: true }));
-      return current.complete(req, signal, onText, onReasoning);
+      // Every argument, so later ones (the streamed finish answer) are never dropped.
+      return current.complete(...args);
     },
   };
   return {

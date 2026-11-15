@@ -29,6 +29,22 @@ describe('model slot', () => {
     expect(handedOut.id).toBe('second');
   });
 
+  it('passes every argument through, so streamed answers still reach the screen', async () => {
+    const seen: unknown[][] = [];
+    const slot = createModelSlot({
+      id: 'spy',
+      caps: new ScriptedModelClient([]).caps,
+      complete: async (...args) => {
+        seen.push(args);
+        return answer;
+      },
+    });
+    const onAnswer = () => {};
+    const signal = new AbortController().signal;
+    await slot.client.complete(req, signal, undefined, undefined, onAnswer);
+    expect(seen[0]?.[4]).toBe(onAnswer);
+  });
+
   it('can start filled', () => {
     expect(createModelSlot(new ScriptedModelClient([], { id: 'x' })).ready()).toBe(true);
   });
