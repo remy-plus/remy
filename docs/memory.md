@@ -45,4 +45,4 @@ A note that cannot be true next to an older one of the same kind is saved, and b
 
 ## Switching it off
 
-Turn off "Personalise replies" in `/profile` and nothing is saved or recalled. Your notes stay on disk until you forget them with `/memory` or `remy memory clear`.
+Notes are on by default. Turn off "Personalise replies" in `/profile`, or "Remember things about me" in the web app's Settings, and nothing is saved or recalled. Your notes stay on disk until you forget them with `/memory` or `remy memory clear`.

@@ -18,6 +18,8 @@ import type { EventStore, TaskConfig, TrustLevel } from '@remy/core';
 import { fold } from '@remy/core';
 import { z } from 'zod';
 import { type Currency, formatMoney, isCurrencyCode, symbolOf, USD } from './currency.ts';
+import { personaliseOn } from './memory.ts';
+import { loadProfile, saveProfile } from './profile.ts';
 import { type ApiCtx, type ApiResult, type ApiRoute, HttpError } from './serve.ts';
 import { DEFAULT_VOICE_ID, VOICE_ID_RE } from './serve-voice.ts';
 
@@ -392,7 +394,8 @@ export function settingsView(d: SettingsDeps, spentMonth: number) {
       licences: 'Apache-2.0, with the open-source licences of what it bundles',
       dataDir: d.home,
     },
-    prefs: d.prefs.get(),
+    // Whether notes are in use is decided by personaliseOn (profile first, then the saved setting).
+    prefs: { ...d.prefs.get(), remember: personaliseOn(d.home) },
   };
 }
 
@@ -408,6 +411,12 @@ export function settingsRoutes(d: SettingsDeps, spend: Spend): ApiRoute {
         d.prefs.update(patch);
       } catch {
         throw new HttpError(500, 'The settings could not be saved.');
+      }
+      // A person with a terminal profile has one switch for notes; keep it in step.
+      if (patch.remember !== undefined) {
+        const profile = loadProfile(d.home);
+        if (profile && profile.personalise !== patch.remember)
+          saveProfile(d.home, { ...profile, personalise: patch.remember });
       }
       return { status: 200, body: settingsView(d, await spend()) };
     }

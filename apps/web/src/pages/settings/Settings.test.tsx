@@ -182,6 +182,7 @@ describe('Settings', () => {
     await open('memory', 'Memory and privacy');
     const remember = screen.getByRole('switch', { name: 'Learn from corrections and routines' });
     expect(remember.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByText(/See and remove them any time in Brain/)).toBeTruthy();
     fireEvent.click(remember);
     expect(remember.getAttribute('aria-checked')).toBe('false');
     expect(stored('memory')).toBe('false');

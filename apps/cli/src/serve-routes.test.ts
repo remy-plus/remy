@@ -18,6 +18,8 @@ import { askUser, finish } from '@remy/tools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { writeMarker } from './background.ts';
+import { personaliseOn } from './memory.ts';
+import { loadProfile, saveProfile } from './profile.ts';
 import { listenServe, type ServeListening } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
 import { homeRoutes } from './serve-home.ts';
@@ -273,6 +275,34 @@ describe('settings', () => {
     // A new server on the same folder reads it back.
     const again = await serve([]);
     expect((await again.api('/api/settings')).json.prefs.trust).toBe('away');
+  });
+
+  it('turns notes on by default for a web-only person and the switch decides after', async () => {
+    const { api } = await serve([]);
+    expect(personaliseOn(home)).toBe(true);
+    expect((await api('/api/settings')).json.prefs.remember).toBe(true);
+    await api('/api/settings', { method: 'PUT', body: { remember: false } });
+    expect(personaliseOn(home)).toBe(false);
+    expect((await api('/api/settings')).json.prefs.remember).toBe(false);
+    await api('/api/settings', { method: 'PUT', body: { remember: true } });
+    expect(personaliseOn(home)).toBe(true);
+  });
+
+  it('keeps the terminal profile switch and the web switch as one', async () => {
+    saveProfile(home, {
+      name: '',
+      goals: [],
+      createdAt: new Date().toISOString(),
+      personalise: false,
+    });
+    const { api } = await serve([]);
+    expect((await api('/api/settings')).json.prefs.remember).toBe(false);
+    await api('/api/settings', { method: 'PUT', body: { remember: true } });
+    expect(loadProfile(home)?.personalise).toBe(true);
+    expect(personaliseOn(home)).toBe(true);
+    await api('/api/settings', { method: 'PUT', body: { remember: false } });
+    expect(loadProfile(home)?.personalise).toBe(false);
+    expect((await api('/api/settings')).json.prefs.remember).toBe(false);
   });
 
   it('saves the voice id and keeps the default for the rest', async () => {

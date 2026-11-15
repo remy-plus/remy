@@ -323,8 +323,8 @@ Usage
                                   See the tools you always allow, or stop allowing one
   remy memory [list|forget <id>|clear]
                                   See what Remy remembers about you, forget one note
-                                  or all of them (notes are used only while
-                                  "Personalise replies" is on in /profile)
+                                  or all of them (notes are on unless you turn off
+                                  "Personalise replies" in /profile)
   remy improve propose|check|apply|list
                                   Remy proposes edits to its own prompts from failed eval runs;
                                   nothing changes until you apply a checked proposal

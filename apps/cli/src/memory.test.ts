@@ -185,8 +185,13 @@ describe('memory store', () => {
 });
 
 describe('use follows the profile', () => {
-  it('is on only with a profile that has personalising on', () => {
+  it('is on by default and off only when the person switched it off', () => {
+    expect(personaliseOn(home)).toBe(true);
+    writeFileSync(join(home, 'web-prefs.json'), '{"remember":false}');
     expect(personaliseOn(home)).toBe(false);
+    writeFileSync(join(home, 'web-prefs.json'), 'not json');
+    expect(personaliseOn(home)).toBe(true);
+    rmSync(join(home, 'web-prefs.json'));
     saveProfile(home, {
       name: '',
       goals: [],
@@ -264,11 +269,14 @@ describe('the system prompt and tools', () => {
     expect(req?.tools.map((t) => t.name)).toEqual(expect.arrayContaining(['remember', 'forget']));
   });
 
-  it('leave both out with personalising off or no profile', async () => {
+  it('leave both out with personalising off', async () => {
     seed();
     for (const setup of [
       () => on(false),
-      () => rmSync(join(home, 'profile.json'), { force: true }),
+      () => {
+        rmSync(join(home, 'profile.json'), { force: true });
+        writeFileSync(join(home, 'web-prefs.json'), '{"remember":false}');
+      },
     ]) {
       setup();
       const model = new ScriptedModelClient([finish]);

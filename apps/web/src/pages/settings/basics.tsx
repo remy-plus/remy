@@ -230,11 +230,11 @@ export function RememberRow() {
   return (
     <Row
       title="Remember things about me"
-      help="Notes stay on this machine and are never sent anywhere but the model you chose."
+      help="Remy keeps short notes about you on this machine and shares them only with the model you chose. See and remove them any time in Brain."
     >
       <Toggle
         label="Learn from corrections and routines"
-        help="Turn off to stop saving notes. Existing notes stay until you delete them."
+        help="Turn off and Remy stops saving and using notes. Notes you already have stay until you remove them in Brain."
         checked={memory}
         onChange={setMemory}
       />

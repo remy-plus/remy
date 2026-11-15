@@ -290,8 +290,23 @@ export function openMemory(
   };
 }
 
-/** Notes are used only when the user has a profile and has not switched personalising off. */
-export const personaliseOn = (home: string): boolean => loadProfile(home)?.personalise === true;
+/**
+ * Notes are on unless the person switched them off. With a profile (made in the terminal) its
+ * "Personalise replies" switch decides. Without one (a web-only person) the web app's
+ * "Remember things about me" setting in web-prefs.json decides, and it is on until turned off.
+ */
+export function personaliseOn(home: string): boolean {
+  const profile = loadProfile(home);
+  if (profile) return profile.personalise;
+  try {
+    const raw = JSON.parse(readFileSync(join(home, 'web-prefs.json'), 'utf8')) as {
+      remember?: unknown;
+    };
+    return raw.remember !== false;
+  } catch {
+    return true; // no file or a damaged one means the default: on
+  }
+}
 
 /** The plain-text list used by `remy memory list`, `/memory list` and the minimal screen. */
 export function plainMemory(file: MemoryFile, personalise: boolean): string {
@@ -310,7 +325,7 @@ export function plainMemory(file: MemoryFile, personalise: boolean): string {
     file.note,
     personalise
       ? undefined
-      : 'Notes are not used right now. Turn on "Personalise replies" in /profile to use them.',
+      : 'Notes are switched off. Turn on "Personalise replies" in /profile (or "Remember things about me" in the web app\'s Settings) to use them.',
   ].filter((l): l is string => Boolean(l));
   return [head, ...lines, ...tail].join('\n');
 }
