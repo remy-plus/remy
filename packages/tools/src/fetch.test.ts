@@ -36,6 +36,14 @@ beforeAll(async () => {
       res.end(
         `<html><body><script>${'x'.repeat(50000)}</script><p>${'word '.repeat(4000)}</p></body></html>`,
       );
+    } else if (req.url === '/review') {
+      res.setHeader('content-type', 'text/html');
+      const menu = '<li><a href="/">Menu entry</a></li>'.repeat(300);
+      res.end(
+        `<html><head><title>Best Widgets</title></head><body><nav><ul>${menu}</ul></nav><div class="cookie-banner">We use cookies</div>` +
+          `<main><h1>Best Widgets</h1><p>${'The Acme Widget is the best pick, with a long battery, a solid build, and a fair price. '.repeat(8)}</p>` +
+          '<table><tr><td>Acme Widget</td><td>$49</td></tr></table></main><footer>Copyright Acme</footer></body></html>',
+      );
     } else if (req.url === '/big') {
       res.end('x'.repeat(5000));
     } else if (req.url === '/loop') {
@@ -186,6 +194,15 @@ describe('fetch_url', () => {
     expect(r).toMatchObject({ ok: true, trust: 'untrusted' });
     expect(r.ok && r.content).toContain('Hello & welcome');
     expect(r.ok && r.content).not.toContain('evil()');
+  });
+
+  it('returns the article first, not the menus that come before it', async () => {
+    const r = await fetchUrl.execute({ url: url('/review') }, ctx());
+    expect(r).toMatchObject({ ok: true, trust: 'untrusted' });
+    const body = r.ok ? r.content.split('\n\n').slice(1).join('\n\n') : '';
+    expect(body.startsWith('Best Widgets')).toBe(true);
+    expect(body).toContain('Acme Widget | $49');
+    expect(body).not.toMatch(/Menu entry|cookies|Copyright/);
   });
 
   it('caps long pages with a marker, ignoring script weight', async () => {

@@ -1,6 +1,6 @@
 import { defineTool, type Tool, type ToolResult } from '@remy/core';
 import { z } from 'zod';
-import { htmlToText } from './html.ts';
+import { articleText } from './article.ts';
 import { looksUnreadable, type PageReader, READER_STATUSES, vetPublicUrl } from './readers.ts';
 import { NetError } from './scoped-fetch.ts';
 
@@ -103,7 +103,7 @@ export function createFetchUrl(opts: FetchUrlOptions = {}) {
         const r = await ctx.net.get(url, { signal: ctx.signal });
         const ok = r.status >= 200 && r.status < 300;
         const isHtml = /html/i.test(r.contentType) || /^\s*(<!doctype html|<html)/i.test(r.body);
-        const text = ok ? (isHtml ? htmlToText(r.body) : r.body) : '';
+        const text = ok ? (isHtml ? articleText(r.body) : r.body) : '';
         const stuck = ok
           ? looksUnreadable({ body: r.body, text, isHtml })
           : READER_STATUSES.has(r.status);

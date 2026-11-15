@@ -1,3 +1,4 @@
+export { articleText } from './article.ts';
 export * from './away-tools.ts';
 export * from './boat-computer.ts';
 export * from './builtin-skills.ts';
