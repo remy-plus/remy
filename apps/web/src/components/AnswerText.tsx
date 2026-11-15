@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { isBareUrl, siteName } from '../lib/links.ts';
-import { type Block, type Inline, parseAnswer } from '../lib/markdown.ts';
+import { type Block, type Inline, parseAnswer, stabilize } from '../lib/markdown.ts';
 
 const link =
   'text-text underline decoration-edge-hi decoration-1 underline-offset-[3px] transition-colors duration-300 hover:decoration-signal';
@@ -155,10 +155,19 @@ function BlockView({ block }: { block: Block }) {
 }
 
 /** Remy's answer, with the links, lists and code it writes rendered as such. */
-export function AnswerText({ text }: { text: string }) {
+export function AnswerText({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  // While the words are still coming, a block keeps its place, so the page updates it in place
+  // instead of drawing it again at every token. A finished answer is keyed by what it says.
+  const blocks = streaming
+    ? parseAnswer(stabilize(text)).map((item, i) => ({ key: `at${i}`, item }))
+    : keyed(parseAnswer(text), blockKey);
   return (
-    <div className="max-w-[68ch] text-[15px] leading-[1.7] break-words text-text">
-      {keyed(parseAnswer(text), blockKey).map(({ key, item }) => (
+    <div
+      className={`max-w-[68ch] text-[15px] leading-[1.7] break-words text-text${
+        streaming ? ' stream-caret' : ''
+      }`}
+    >
+      {blocks.map(({ key, item }) => (
         <BlockView key={key} block={item} />
       ))}
     </div>

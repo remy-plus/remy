@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { type ChatTurn, type TaskView, useApi } from '../../api/index.tsx';
 import { AnswerText } from '../../components/AnswerText.tsx';
 import { BrowserPane } from '../../components/BrowserPane.tsx';
@@ -95,7 +95,7 @@ export function FeedList({ lines }: { lines: FeedLine[] }) {
   );
 }
 
-function Answer({ text }: { text: string }) {
+function Answer({ text, settled = false }: { text: string; settled?: boolean }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -107,7 +107,11 @@ function Answer({ text }: { text: string }) {
     }
   };
   return (
-    <div className="rise answer-block mt-0.5" style={rise(1)}>
+    // After words were shown as they came, the answer is already on screen: no entrance, no flash.
+    <div
+      className={`${settled ? '' : 'rise '}answer-block mt-0.5`}
+      style={settled ? undefined : rise(1)}
+    >
       <AnswerText text={text} />
       <button
         type="button"
@@ -221,12 +225,20 @@ function LiveBlock({
   turn,
   onChanged,
   onStreaming,
+  onWords,
 }: {
   turn: ChatTurn;
   onChanged: () => void;
   onStreaming: (taskId: string, open: boolean) => void;
+  /** Called once, when the first words show. */
+  onWords: () => void;
 }) {
-  const { view, reload, streaming } = useTask(turn.taskId);
+  const { view, reload, streaming, live } = useTask(turn.taskId);
+  const words = live?.text.trim() ? live.text : '';
+  const hasWords = words !== '';
+  useEffect(() => {
+    if (hasWords) onWords();
+  }, [hasWords, onWords]);
   // Tell the chat whether this turn's stream is carrying updates, so it only polls when it is not.
   useEffect(() => {
     onStreaming(turn.taskId, streaming);
@@ -255,12 +267,27 @@ function LiveBlock({
   };
   return (
     <Shell mind={phase}>
-      {lines.length > 0 ? (
-        <FeedList lines={lines} />
+      {lines.length > 0 && <FeedList lines={lines} />}
+      {hasWords ? (
+        <>
+          {/* The words are for the eyes: a screen reader is told once, in plain words, and gets the
+              finished answer once when it is there, not every piece. */}
+          <p role="status" className="sr-only">
+            Remy is writing the answer
+          </p>
+          <div
+            aria-hidden="true"
+            className={`answer-block${lines.length > 0 ? ' mt-2' : ' mt-0.5'}`}
+          >
+            <AnswerText text={words} streaming />
+          </div>
+        </>
       ) : (
-        <p role="status" className="m-0 py-0.5 text-[14px] leading-6 text-muted">
-          {phase === 'waiting' ? 'Waiting for you' : 'Thinking it through'}
-        </p>
+        lines.length === 0 && (
+          <p role="status" className="m-0 py-0.5 text-[14px] leading-6 text-muted">
+            {phase === 'waiting' ? 'Waiting for you' : 'Thinking it through'}
+          </p>
+        )
       )}
       {view?.calls.some((c) => c.inFlight && c.tool.startsWith('browser')) && (
         <div className="mt-2">
@@ -279,7 +306,16 @@ function LiveBlock({
 }
 
 /** A turn that has ended: the feed folds into one line, then the answer or the reason. */
-function EndedBlock({ turn, onRetry }: { turn: ChatTurn; onRetry: (prompt: string) => void }) {
+function EndedBlock({
+  turn,
+  onRetry,
+  typed,
+}: {
+  turn: ChatTurn;
+  onRetry: (prompt: string) => void;
+  /** The words were shown as they came, so the answer takes their place without a flash. */
+  typed: boolean;
+}) {
   const api = useApi();
   const [view, setView] = useState<TaskView | null>(null);
   const [shown, setShown] = useState(false);
@@ -327,7 +363,7 @@ function EndedBlock({ turn, onRetry }: { turn: ChatTurn; onRetry: (prompt: strin
       ) : (
         answer && (
           <>
-            <Answer text={answer} />
+            <Answer text={answer} settled={typed} />
             {turn.state === 'done' && <Files taskId={turn.taskId} />}
           </>
         )
@@ -351,6 +387,15 @@ export function Turn({
   onStreaming: (taskId: string, open: boolean) => void;
 }) {
   const live = turn.state === 'working' || turn.state === 'waiting';
+  // Words shown while the turn ran: remembered, so the answer replaces them quietly, and a
+  // screen reader hears the finished answer once.
+  const [typed, setTyped] = useState(false);
+  const onWords = useCallback(() => setTyped(true), []);
+  const [wasLive, setWasLive] = useState(live);
+  useEffect(() => {
+    if (live) setWasLive(true);
+  }, [live]);
+  const announce = !live && wasLive && turn.state === 'done' ? (turn.answer ?? '') : '';
   return (
     <article className="mb-6" aria-label={`You asked: ${turn.prompt}`}>
       <div className="rise flex justify-end" style={rise(index === 0 ? 0 : 1)}>
@@ -359,10 +404,13 @@ export function Turn({
         </p>
       </div>
       {live ? (
-        <LiveBlock turn={turn} onChanged={onChanged} onStreaming={onStreaming} />
+        <LiveBlock turn={turn} onChanged={onChanged} onStreaming={onStreaming} onWords={onWords} />
       ) : (
-        <EndedBlock turn={turn} onRetry={onRetry} />
+        <EndedBlock turn={turn} onRetry={onRetry} typed={typed} />
       )}
+      <div role="status" aria-live="polite" className="sr-only">
+        {announce}
+      </div>
     </article>
   );
 }

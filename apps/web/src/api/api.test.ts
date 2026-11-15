@@ -527,3 +527,34 @@ describe('chats, mock adapter', () => {
     await expect(api.sendMessage('x', 'chat_nope')).rejects.toThrow('There is no such chat.');
   });
 });
+
+describe('words on their way in the event stream', () => {
+  it('hands live messages to onLive and keeps them out of the events', () => {
+    const events: StreamEvent[] = [];
+    const live: unknown[] = [];
+    createSseParser(
+      (e) => events.push(e),
+      (m) => live.push(m),
+    )(
+      'retry: 2000\n\n' +
+        'data: {"live":{"kind":"start"}}\n\n' +
+        'data: {"live":{"kind":"answer","delta":"Hel"}}\n\n' +
+        'id: 1\ndata: {"seq":1,"at":"t","event":{"type":"x"}}\n\n' +
+        'data: {"live":{"kind":"set","of":"answer","text":"Hello"}}\n\n',
+    );
+    expect(events.map((e) => e.seq)).toEqual([1]);
+    expect(live).toEqual([
+      { kind: 'start' },
+      { kind: 'answer', delta: 'Hel' },
+      { kind: 'set', of: 'answer', text: 'Hello' },
+    ]);
+  });
+
+  it('works across chunk boundaries and ignores live messages when nobody listens', () => {
+    const events: StreamEvent[] = [];
+    const feed = createSseParser((e) => events.push(e));
+    feed('data: {"live":{"kind":"ans');
+    feed('wer","delta":"x"}}\n\ndata: {"seq":2,"at":"t","event":{"type":"y"}}\n\n');
+    expect(events.map((e) => e.seq)).toEqual([2]);
+  });
+});

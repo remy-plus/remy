@@ -143,3 +143,34 @@ export function parseAnswer(text: string): Block[] {
   }
   return blocks;
 }
+
+/**
+ * Text that is still being written, made safe to draw as it is. A marker that has not found its
+ * partner yet (`**bold` before the closing `**`, a link before its `)`) would show as stray
+ * punctuation and then jump into shape; here the opening marker is left out until it closes, so the
+ * words never shift. Only the last line is touched, and nothing inside an open code fence.
+ */
+export function stabilize(text: string): string {
+  const lines = text.split('\n');
+  const fences = lines.filter((l) => FENCE.test(l)).length;
+  if (fences % 2 === 1) return text; // inside code: shown exactly as written
+  let last = lines.at(-1) ?? '';
+  // An unfinished link shows its label: `[docs](https://exa` becomes `docs`.
+  last = last.replace(/\[([^\]\n]*)\]\([^)\n]*$/, '$1').replace(/\[([^\]\n]*)$/, '$1');
+  // A lone backtick opens code that has not closed.
+  if ((last.match(/`/g)?.length ?? 0) % 2 === 1) last = removeLast(last, '`');
+  // Bold, then italics. A bullet marker at the start of a line is not italics.
+  if ((last.match(/\*\*/g)?.length ?? 0) % 2 === 1) last = removeLast(last, '**');
+  const body = last.replace(/^(\s*)\*(\s)/, '$1-$2');
+  if ((body.replaceAll('**', '').match(/\*/g)?.length ?? 0) % 2 === 1)
+    last = removeLast(last, '*', /^\s*\*\s/.test(last));
+  lines[lines.length - 1] = last;
+  return lines.join('\n');
+}
+
+/** Drops the last occurrence of `mark`, skipping a bullet marker at the start when asked. */
+function removeLast(s: string, mark: string, keepBullet = false): string {
+  let at = s.lastIndexOf(mark);
+  if (keepBullet && at === s.indexOf(mark) && /^\s*\*\s/.test(s)) at = -1;
+  return at < 0 ? s : s.slice(0, at) + s.slice(at + mark.length);
+}

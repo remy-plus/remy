@@ -15,6 +15,7 @@ import type {
   ExtendBody,
   Health,
   HomeData,
+  LiveMessage,
   MachineInput,
   MachineTest,
   RegistrySearch,
@@ -44,7 +45,10 @@ export class ApiError extends Error {
 }
 
 /** Splits a server-sent-events stream into events. Keeps the partial tail between chunks. */
-export function createSseParser(onEvent: (e: StreamEvent) => void) {
+export function createSseParser(
+  onEvent: (e: StreamEvent) => void,
+  onLive?: (m: LiveMessage) => void,
+) {
   let buffer = '';
   return (chunk: string) => {
     buffer += chunk.replaceAll('\r\n', '\n');
@@ -58,7 +62,10 @@ export function createSseParser(onEvent: (e: StreamEvent) => void) {
         .join('\n');
       if (!data) continue; // a comment, a retry hint or a keepalive
       try {
-        onEvent(JSON.parse(data) as StreamEvent);
+        const parsed = JSON.parse(data) as StreamEvent | { live?: LiveMessage };
+        // Words on their way have a `live` field and no `seq`; they never reach the event list.
+        if ('live' in parsed && parsed.live) onLive?.(parsed.live);
+        else if ('seq' in parsed) onEvent(parsed);
       } catch {
         // A damaged line is skipped; the next event carries on.
       }
@@ -147,7 +154,7 @@ export function createHttpApi(opts: {
       const res = await call(`${task(id)}/stream`, { headers, signal: o?.signal ?? null });
       if (!res.body) return;
       o?.onOpen?.();
-      const feed = createSseParser(onEvent);
+      const feed = createSseParser(onEvent, o?.onLive);
       const decoder = new TextDecoder();
       const reader = res.body.getReader(); // not `for await`: Safari cannot iterate a stream
       try {

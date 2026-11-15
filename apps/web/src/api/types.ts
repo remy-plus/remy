@@ -98,6 +98,15 @@ export interface StreamEvent {
   event: { type: string; [key: string]: unknown };
 }
 
+/**
+ * Words on their way: sent on the same stream as the events, but never stored and with no `seq`.
+ * A screen shows them while a model writes, and swaps to the stored answer when the task ends.
+ */
+export type LiveMessage =
+  | { kind: 'start' }
+  | { kind: 'text' | 'answer'; delta: string }
+  | { kind: 'set'; of: 'text' | 'answer'; text: string };
+
 export interface ApproveBody {
   callId: string;
   argsHash: string;
@@ -344,7 +353,13 @@ export interface RemyApi {
     id: string,
     onEvent: (e: StreamEvent) => void,
     /** `onOpen` runs once the connection is up, so a caller knows the stream (not a poll) is carrying updates. */
-    opts?: { lastEventId?: number; signal?: AbortSignal; onOpen?: () => void },
+    opts?: {
+      lastEventId?: number;
+      signal?: AbortSignal;
+      onOpen?: () => void;
+      /** Words on their way (see `LiveMessage`); a server that sends none just never calls it. */
+      onLive?: (m: LiveMessage) => void;
+    },
   ): Promise<void>;
   /** The files a task wrote in its workspace and that are still there. */
   taskFiles(id: string): Promise<TaskFile[]>;
