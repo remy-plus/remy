@@ -113,6 +113,7 @@ async function serve(
     redact?: (t: string) => string;
     lockout?: ReturnType<typeof createLockout>;
     webRoot?: string;
+    onTurnEnd?: () => void;
     limits?: {
       maxRunning?: number;
       maxStreams?: number;
@@ -147,6 +148,7 @@ async function serve(
       ...(p.redact && { redact: p.redact }),
       ...(p.lockout && { lockout: p.lockout }),
       ...(p.webRoot && { webRoot: p.webRoot }),
+      ...(p.onTurnEnd && { onTurnEnd: p.onTurnEnd }),
       ...p.limits,
       log: (l) => logs.push(l),
       pollMs: 20,
@@ -305,6 +307,20 @@ describe('tasks', () => {
         costUsd: expect.any(Number),
       }),
     ]);
+  });
+
+  it('tells the host when a task the web app started has finished', async () => {
+    let ended = 0;
+    const { api } = await serve([done('All set.')], {
+      onTurnEnd: () => {
+        ended++;
+        throw new Error('a failing host hook must not matter');
+      },
+    });
+    const started = await api('/api/tasks', { body: { prompt: 'say hi' } });
+    await api(`/api/tasks/${started.json.taskId}/stream`);
+    await until(async () => ended === 1);
+    expect((await api(`/api/tasks/${started.json.taskId}`)).json.status).toBe('succeeded');
   });
 
   it('truncates the listed prompt and rejects bad requests', async () => {

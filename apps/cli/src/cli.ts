@@ -53,6 +53,7 @@ import {
   type BoatDeps,
   calculate,
   computerFromConfig,
+  createAwayTool,
   createComputerTools,
   createDelegate,
   createFetchUrl,
@@ -137,6 +138,7 @@ import { readServiceKey } from './service-keys.ts';
 /** Past tasks `recall` searches. */
 const MAX_EPISODES = 300;
 
+import { createAwayPort } from './away.ts';
 import { capabilitiesBlock, onceCapabilities } from './capabilities.ts';
 import { type Credentials, keychainOff, openCredentials } from './credentials.ts';
 import { TICK_MS, tick } from './daemon.ts';
@@ -153,6 +155,7 @@ import {
 import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.ts';
 import { loadHelperRoles } from './helper-roles.ts';
 import { improve } from './improve.ts';
+import { type LastSeen, openLastSeen } from './last-seen.ts';
 import {
   defaultModelFor,
   listLogins,
@@ -626,6 +629,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     memoryStore ??= openMemory(home, { enabled: () => personaliseOn(home) });
     return memoryStore;
   };
+  let lastSeenStore: LastSeen | undefined;
+  const lastSeen = () => (lastSeenStore ??= openLastSeen(home));
   let embedder: ReturnType<typeof createNoteEmbedder> | undefined;
   /** Embeddings for recall: off unless REMY_EMBEDDINGS=on, and then only to the chat provider. */
   const noteEmbedder = () =>
@@ -1167,6 +1172,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       list: () => schedules.list(),
     }))
       tools.add(t);
+    // "I'm back": what finished, waits or paused since the last chat turn here.
+    tools.add(
+      createAwayTool(
+        createAwayPort({ store, home, seen: lastSeen(), schedules: () => schedules.list() }),
+      ),
+    );
     // Probes can be slow, so the block is built once per process, at the first message.
     const capabilities = onceCapabilities(() =>
       capabilitiesBlock({
@@ -1821,7 +1832,10 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       }),
       conversation: {
         turns: resumed ?? [],
-        onTurn: (id) => conversation.add(id),
+        onTurn: (id) => {
+          conversation.add(id);
+          lastSeen().touch();
+        },
         onNew: () => conversation.reset(workspace),
         onSummary: (text, upTo) => conversation.summarise(text, upTo),
       },
@@ -2609,6 +2623,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               await assertUnderMonthlyCap(webPrefs, spend);
               monthLeft = await monthRemaining(webPrefs, spend);
             },
+            onTurnEnd: () => lastSeen().touch(),
             tokenHash: () => serveTokenHash(home),
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),

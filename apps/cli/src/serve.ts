@@ -86,6 +86,8 @@ export interface ServeDeps {
   version: string;
   /** The config a new task starts with (the same one `remy run` builds); `trust` overrides the saved level. */
   config(taskId: string, trust?: TrustLevel): TaskConfig;
+  /** A task the web app started has finished: the person has just been here (the last-visit time). */
+  onTurnEnd?: () => void;
   /** Runs before a task is created; throw an HttpError to refuse (the monthly cap). */
   beforeStart?: () => Promise<void>;
   /** The saved SHA-256 of the token, read on every request so a rotation takes effect at once. */
@@ -322,7 +324,14 @@ export function createServe(deps: ServeDeps) {
           // `advance` runs until the task needs the user, pauses or finishes, so one call is a whole run.
           const outcome = await runtime.advance(id);
           remember(id, outcome);
-          if (isFinal(outcome)) untrack(id);
+          if (isFinal(outcome)) {
+            untrack(id);
+            try {
+              deps.onTurnEnd?.();
+            } catch {
+              // Recording a visit never changes how a task ends.
+            }
+          }
           return;
         } catch (e) {
           if (e instanceof TaskBusyError && tries < busyTries) {
