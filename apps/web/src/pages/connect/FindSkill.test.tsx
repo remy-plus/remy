@@ -52,7 +52,7 @@ describe('Find a skill', () => {
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toBe('noreferrer');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Ready-made bots' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ready-made bots' }));
     expect(await screen.findByText('No results', { exact: false }).catch(() => null)).toBeNull();
     type('inbox');
     expect(await screen.findByText('Inbox triage')).toBeTruthy();
@@ -121,7 +121,7 @@ describe('Find a skill', () => {
   it('shows the prompt for a bot before it is installed', async () => {
     open();
     await screen.findByRole('searchbox');
-    fireEvent.click(screen.getByRole('tab', { name: 'Ready-made bots' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ready-made bots' }));
     type('inbox');
     fireEvent.click(await screen.findByRole('button', { name: 'Install Inbox triage' }));
     expect(await screen.findByLabelText('Prompt preview')).toBeTruthy();

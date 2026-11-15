@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../App.tsx';
 import { ApiError } from '../../api/http.ts';
 import { ApiProvider, type RemyApi } from '../../api/index.tsx';
@@ -39,6 +39,40 @@ describe('Skills', () => {
     expect(screen.getByRole('button', { name: /^research/ }).getAttribute('aria-current')).toBe(
       'true',
     );
+  });
+
+  it('on a narrow screen a tap takes the person to the steps, and a button back to the list', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    try {
+      open();
+      await screen.findByRole('article', { name: 'monthly-report' });
+      fireEvent.click(screen.getByRole('button', { name: /^research/ }));
+      const article = await screen.findByRole('article', { name: 'research' });
+      await waitFor(() => expect(document.activeElement).toBe(article));
+      expect(scroll).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: 'All skills' }));
+      expect(scroll).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('on a wide screen picking a skill moves nothing: both are in view', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    try {
+      open();
+      await screen.findByRole('article', { name: 'monthly-report' });
+      fireEvent.click(screen.getByRole('button', { name: /^research/ }));
+      await screen.findByRole('article', { name: 'research' });
+      await new Promise((r) => setTimeout(r, 10));
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('turns a skill off and on, saying so, and runs it', async () => {

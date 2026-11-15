@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { SkillItem } from '../../api/index.tsx';
 import { BrainTabs } from '../../components/BrainTabs.tsx';
 import { describeError } from '../../lib/errors.ts';
+import { scrollBehavior } from '../../lib/motion.ts';
 import { Eyebrow, Loading, mono, Notice, primary, quiet, Unavailable, useLoad } from './ui.tsx';
 
 const TAG: Record<SkillItem['source'], string> = {
@@ -19,6 +20,8 @@ export function Skills() {
   const { api, data, setData, error, reload } = useLoad((a) => a.skills());
   const [name, setName] = useState<string | null>(null);
   const [said, setSaid] = useState<Said | null>(null);
+  const detail = useRef<HTMLElement>(null);
+  const top = useRef<HTMLDivElement>(null);
   if (error) return <Unavailable message={error} onRetry={reload} />;
   if (!data) return <Loading label="Loading your skills" />;
 
@@ -26,6 +29,21 @@ export function Skills() {
   const builtin = data.skills.filter((s) => s.source === 'builtin');
   const skill = data.skills.find((s) => s.name === name) ?? data.skills[0];
   const refresh = async () => setData(await api.skills());
+  // Under 1024 px the steps sit below the whole list, so a tap would seem to do nothing. Take the person to
+  // them, and let them come back to the list. On a wide screen both are in view and nothing moves.
+  const stacked = () => window.matchMedia?.('(min-width: 1024px)').matches === false;
+  const pick = (n: string) => {
+    setName(n);
+    if (!stacked()) return;
+    setTimeout(() => {
+      detail.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+      detail.current?.focus({ preventScroll: true });
+    }, 0);
+  };
+  const toList = () => {
+    top.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    top.current?.focus({ preventScroll: true });
+  };
   const fail = (e: unknown, where: Said['where']) =>
     setSaid({ text: describeError(e, FALLBACK), where });
 
@@ -69,7 +87,11 @@ export function Skills() {
 
   return (
     <div className="grid min-h-[calc(100dvh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">
-      <div className="min-w-0 border-b border-edge px-5 py-8 sm:px-8 lg:border-r lg:border-b-0 lg:pr-8 lg:pl-14">
+      <div
+        ref={top}
+        tabIndex={-1}
+        className="min-w-0 border-b border-edge px-5 py-8 outline-none sm:px-8 lg:border-r lg:border-b-0 lg:pr-8 lg:pl-14"
+      >
         <BrainTabs current="skills" />
         <h1 className="m-0 text-[30px] font-normal leading-tight">Skills</h1>
         <p className="mt-3 mb-6 text-base text-muted">
@@ -83,8 +105,8 @@ export function Skills() {
         {data.skills.length === 0 && (
           <p className="m-0 text-[14px] text-muted">Nothing is saved yet.</p>
         )}
-        <SkillGroup title="Yours" skills={mine} current={skill?.name} onPick={setName} />
-        <SkillGroup title="Built in" skills={builtin} current={skill?.name} onPick={setName} />
+        <SkillGroup title="Yours" skills={mine} current={skill?.name} onPick={pick} />
+        <SkillGroup title="Built in" skills={builtin} current={skill?.name} onPick={pick} />
         {data.suggestion && (
           <section
             aria-labelledby="suggested-h"
@@ -115,7 +137,14 @@ export function Skills() {
 
       <div className="min-w-0 px-5 py-8 sm:px-8 lg:px-14">
         {skill ? (
-          <article aria-labelledby="skill-h">
+          <article ref={detail} tabIndex={-1} aria-labelledby="skill-h" className="outline-none">
+            <button
+              type="button"
+              onClick={toList}
+              className={`${quiet} mb-5 px-4 py-2 text-[13px] lg:hidden`}
+            >
+              All skills
+            </button>
             <h2 id="skill-h" className={`${mono} m-0 text-[26px] font-bold leading-tight`}>
               {skill.name}
             </h2>

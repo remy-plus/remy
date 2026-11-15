@@ -161,20 +161,21 @@ export function FindSkill() {
           <h2 id={`${id}-title`} className="sr-only">
             Search {tab.where}
           </h2>
-          <div role="tablist" aria-label="Where to look" className="mb-3 flex flex-wrap gap-2">
+          {/* Two choices that switch the list below, not panels of a tab set: toggle buttons need no arrow-key rules. */}
+          <fieldset className="m-0 mb-3 flex min-w-0 flex-wrap gap-2 border-0 p-0">
+            <legend className="sr-only">Where to look</legend>
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                role="tab"
-                aria-selected={t.id === from}
+                aria-pressed={t.id === from}
                 className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-[14px] ${t.id === from ? 'border-text text-text' : 'border-edge bg-transparent text-muted hover:text-text'}`}
                 onClick={() => setFrom(t.id)}
               >
                 {t.label}
               </button>
             ))}
-          </div>
+          </fieldset>
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor={`${id}-search`} className="sr-only">
               Search {tab.where}
