@@ -8,7 +8,7 @@ import { QuietRow } from './basics.tsx';
 import { Row, Toggle } from './controls.tsx';
 
 const time =
-  'h-[38px] w-[130px] rounded-md border border-edge-hi bg-surface px-3 text-[14px] text-text outline-none focus-visible:border-text [color-scheme:dark]';
+  'h-[38px] w-[130px] rounded-md border border-control bg-surface px-3 text-[14px] text-text outline-none focus-visible:border-text [color-scheme:dark]';
 
 /** "11:00 PM" for a stored "23:00". A clock is unavoidable here, so it is a 12-hour one. */
 const plain = (hhmm: string) => {

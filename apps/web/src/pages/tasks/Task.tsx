@@ -15,6 +15,7 @@ import { Skeleton } from '../../components/Skeleton.tsx';
 import { buildSteps, Trace } from '../../components/Trace.tsx';
 import { describeError } from '../../lib/errors.ts';
 import { useFocusWhenSet } from '../../lib/focus.ts';
+import { useKeyboardInset } from '../../lib/keyboard.ts';
 import { ago } from '../../lib/when.ts';
 import { money, plainTime, primaryButton, quietButton, RISK } from './format.ts';
 import { useTask } from './useTask.ts';
@@ -472,6 +473,7 @@ function Composer({
 }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  useKeyboardInset();
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const t = text.trim();
@@ -485,10 +487,13 @@ function Composer({
     }
   };
   return (
-    <div className="sticky bottom-0 bg-bg px-5 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] sm:px-14">
+    <div
+      style={{ bottom: 'var(--kb-inset, 0px)' }}
+      className="sticky bg-bg px-5 pt-3 pb-[max(20px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))] sm:px-14"
+    >
       <form
         onSubmit={submit}
-        className="flex items-center gap-3 rounded-[14px] border border-edge-hi bg-surface py-2.5 pr-2.5 pl-5"
+        className="flex items-center gap-3 rounded-[14px] border border-control bg-surface py-2.5 pr-2.5 pl-5"
       >
         <input
           id="task-composer"

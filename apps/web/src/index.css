@@ -16,6 +16,7 @@
   --color-edge-hi: var(--edge-hi);
   --color-signal: var(--signal);
   --color-signal-ink: var(--signal-ink);
+  --color-control: var(--control);
 }
 
 /* Self-hosted, latin subset only, so the app works offline on a home server. */
@@ -66,6 +67,15 @@
   font-display: swap;
   src: url("../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-600-normal.woff2")
     format("woff2");
+}
+
+/* The edge of a field, a switch or a composer: 3:1 against the page and the card (WCAG 1.4.11), where the
+   faint --edge tones are 1.1:1. Stone mixed a little back into ink. Buttons with words need no such edge. */
+:root {
+  --control: #6b6964;
+}
+[data-theme="light"] {
+  --control: #858379;
 }
 
 html {

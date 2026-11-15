@@ -4,4 +4,4 @@ const base =
 export const buttonQuiet = `${base} border-edge-hi bg-transparent text-text hover:bg-raise`;
 export const buttonPrimary = `${base} border-text btn-solid`;
 export const field =
-  'rounded-md border border-edge-hi bg-surface px-3 py-[9px] text-[14px] text-text outline-none placeholder:text-muted focus-visible:border-text';
+  'rounded-md border border-control bg-surface px-3 py-[9px] text-[14px] text-text outline-none placeholder:text-muted focus-visible:border-text';

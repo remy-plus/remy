@@ -149,7 +149,7 @@ export function NewSchedule() {
       </p>
     );
   const label = `${mono} mb-2 block text-[12px] text-muted`;
-  const small = `${mono} rounded-[10px] border border-edge bg-bg px-3.5 py-2 text-[14px] text-text aria-[invalid=true]:border-[#d98b7a]`;
+  const small = `${mono} rounded-[10px] border border-control bg-bg px-3.5 py-2 text-[14px] text-text aria-[invalid=true]:border-[#d98b7a]`;
   const words = whenWords({ often, day, monthDay, time, custom });
 
   if (created)

@@ -82,7 +82,7 @@ export function Switch({
       aria-labelledby={labelledBy}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`tap relative mt-0.5 h-6 w-10 shrink-0 cursor-pointer rounded-full border p-0 disabled:cursor-default disabled:opacity-60 ${checked ? 'border-signal bg-signal' : 'border-edge-hi bg-transparent'}`}
+      className={`tap relative mt-0.5 h-6 w-10 shrink-0 cursor-pointer rounded-full border p-0 disabled:cursor-default disabled:opacity-60 ${checked ? 'border-signal bg-signal' : 'border-control bg-transparent'}`}
     >
       <span
         aria-hidden="true"
@@ -115,7 +115,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex max-w-full flex-wrap overflow-hidden rounded-md border border-edge-hi"
+      className="inline-flex max-w-full flex-wrap overflow-hidden rounded-md border border-control"
     >
       {options.map((o, i) => (
         <label key={o.value} className={`relative flex ${i > 0 ? 'border-l border-l-stone' : ''}`}>
@@ -151,7 +151,7 @@ export function Money({
 }) {
   const [text, setText] = useState(String(value)); // free text while typing, so the box can be emptied
   return (
-    <label className="flex h-[38px] w-[140px] items-center [@media(pointer:coarse)]:h-11 gap-2 rounded-md border border-edge-hi bg-surface px-3 text-[13px] text-text focus-within:border-text">
+    <label className="flex h-[38px] w-[140px] items-center [@media(pointer:coarse)]:h-11 gap-2 rounded-md border border-control bg-surface px-3 text-[13px] text-text focus-within:border-text">
       <span aria-hidden="true">{symbol}</span>
       <input
         type="number"

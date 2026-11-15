@@ -257,7 +257,7 @@ function StepTwo() {
       title="You are set. What do you need done?"
       lead={`I can search the web, read pages and work with files in my own folder. ${oneLine(connected)} Add Gmail, Calendar and more any time in Connections.`}
     >
-      <div className="flex gap-3 rounded-[14px] border border-edge-hi bg-surface p-3.5 focus-within:border-text">
+      <div className="flex gap-3 rounded-[14px] border border-control bg-surface p-3.5 focus-within:border-text">
         <textarea
           aria-label="What you need done"
           placeholder="Ask anything you would do on a computer"

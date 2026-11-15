@@ -9,7 +9,7 @@ const base = `cursor-pointer rounded-full border px-4 py-[8px] text-[14px] font-
 export const quiet = `${base} inline-block border-edge-hi bg-transparent text-text hover:bg-raise`;
 export const primary = `${base} inline-block border-text btn-solid`;
 export const field =
-  'w-full rounded-[10px] border border-edge bg-surface px-4 py-2.5 text-[15px] text-text placeholder:text-muted aria-[invalid=true]:border-[#d98b7a]';
+  'w-full rounded-[10px] border border-control bg-surface px-4 py-2.5 text-[15px] text-text placeholder:text-muted aria-[invalid=true]:border-[#d98b7a]';
 
 /** Loads once from the adapter. A server that cannot answer yields a plain sentence in `error`. */
 export function useLoad<T>(load: (api: RemyApi) => Promise<T>) {
@@ -114,7 +114,7 @@ export function Switch({
       aria-checked={checked}
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="tap relative m-0 h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-edge-hi bg-transparent transition-colors before:absolute before:top-[3px] before:left-[3px] before:size-4 before:rounded-full before:bg-text before:transition-transform checked:border-signal checked:bg-signal checked:before:translate-x-4 checked:before:bg-signal-ink"
+      className="tap relative m-0 h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-control bg-transparent transition-colors before:absolute before:top-[3px] before:left-[3px] before:size-4 before:rounded-full before:bg-text before:transition-transform checked:border-signal checked:bg-signal checked:before:translate-x-4 checked:before:bg-signal-ink"
     />
   );
 }

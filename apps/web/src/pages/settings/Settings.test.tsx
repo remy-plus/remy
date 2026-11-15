@@ -606,7 +606,7 @@ describe('Settings', () => {
 
     it('moves a place up and down and keeps the order', async () => {
       await open('dock', 'Your dock');
-      fireEvent.click(screen.getByRole('button', { name: 'Move Brain up' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Move up, Brain' }));
       expect(savedDock()).toEqual([
         'chat',
         'activity',
@@ -615,14 +615,14 @@ describe('Settings', () => {
         'connections',
         'settings',
       ]);
-      fireEvent.click(screen.getByRole('button', { name: 'Move Chat down' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Move down, Chat' }));
       expect(savedDock().slice(0, 2)).toEqual(['activity', 'chat']);
       expect(order()[0]).toBe('Show Activity');
       expect(
-        (screen.getByRole('button', { name: 'Move Activity up' }) as HTMLButtonElement).disabled,
+        (screen.getByRole('button', { name: 'Move up, Activity' }) as HTMLButtonElement).disabled,
       ).toBe(true);
       expect(
-        (screen.getByRole('button', { name: 'Move Settings down' }) as HTMLButtonElement).disabled,
+        (screen.getByRole('button', { name: 'Move down, Settings' }) as HTMLButtonElement).disabled,
       ).toBe(true);
     });
 
@@ -634,7 +634,7 @@ describe('Settings', () => {
       expect(savedDock()).not.toContain('browser');
       expect(within(dock).queryByRole('link', { name: 'Browser' })).toBeNull();
       expect(
-        (screen.getByRole('button', { name: 'Move Browser up' }) as HTMLButtonElement).disabled,
+        (screen.getByRole('button', { name: 'Move up, Browser' }) as HTMLButtonElement).disabled,
       ).toBe(true); // a hidden place cannot move
       fireEvent.click(screen.getByRole('switch', { name: 'Show Browser' }));
       expect(savedDock()).toContain('browser');
@@ -657,7 +657,7 @@ describe('Settings', () => {
       }) as HTMLButtonElement;
       expect(reset.disabled).toBe(true);
       fireEvent.click(screen.getByRole('switch', { name: 'Show Brain' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Move Connections up' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Move up, Connections' }));
       expect(reset.disabled).toBe(false);
       fireEvent.click(reset);
       expect(stored('dock')).toBeNull();

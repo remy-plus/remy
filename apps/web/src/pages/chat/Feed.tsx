@@ -161,7 +161,7 @@ function Question({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type your answer"
-          className="min-w-0 flex-1 h-9 rounded-full border border-edge bg-transparent px-4 text-[15px] text-text outline-none placeholder:text-muted focus:border-edge-hi"
+          className="min-w-0 flex-1 h-9 rounded-full border border-control bg-transparent px-4 text-[15px] text-text outline-none placeholder:text-muted focus:border-text"
         />
         <button type="submit" disabled={!text.trim()} className={`${pill} border-text btn-solid`}>
           Answer

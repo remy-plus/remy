@@ -141,7 +141,7 @@ export function Composer({
         onClick={(e) => {
           if (e.target === e.currentTarget) area.current?.focus();
         }}
-        className="flex items-end gap-1 rounded-[24px] border border-edge bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-text/30 focus-within:bg-raise"
+        className="flex items-end gap-1 rounded-[24px] border border-control bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-text focus-within:bg-raise"
       >
         <label htmlFor={id} className="sr-only">
           Ask Remy to do anything

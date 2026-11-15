@@ -68,10 +68,10 @@ export function DockSection() {
                   />
                   {locked && <span className="text-[13px] text-muted">Always here</span>}
                 </span>
-                <span className="ml-auto flex gap-2">
+                <span className="flex w-full gap-2 sm:ml-auto sm:w-auto">
                   <button
                     type="button"
-                    aria-label={`Move ${item.label} up`}
+                    aria-label={`Move up, ${item.label}`}
                     disabled={!on || at === 0}
                     onClick={() => setSaved(moved(shown, item.id, -1))}
                     className={move}
@@ -80,7 +80,7 @@ export function DockSection() {
                   </button>
                   <button
                     type="button"
-                    aria-label={`Move ${item.label} down`}
+                    aria-label={`Move down, ${item.label}`}
                     disabled={!on || at === shown.length - 1}
                     onClick={() => setSaved(moved(shown, item.id, 1))}
                     className={move}
