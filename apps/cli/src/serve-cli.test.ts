@@ -142,4 +142,76 @@ describe('remy serve', () => {
     stop();
     expect((await running).code).toBe(0);
   }, 15_000);
+
+  describe('one-time sign-in link', () => {
+    const boot = async (extra: Partial<CliDeps>, ...flags: string[]) => {
+      let stop: () => void = () => {};
+      const serveStop = new Promise<void>((r) => {
+        stop = r;
+      });
+      const h = harness({ model: new ScriptedModelClient([]), serveStop, ...extra });
+      const running = h.run('serve', '--port', '0', ...flags);
+      for (let i = 0; i < 200 && !/listens on/.test(h.o.out); i++)
+        await new Promise((r) => setTimeout(r, 10));
+      const port = Number(/listens on http:\/\/127\.0\.0\.1:(\d+)/.exec(h.o.out)?.[1]);
+      return {
+        h,
+        port,
+        stop: async () => {
+          stop();
+          return running;
+        },
+      };
+    };
+    const exchange = (port: number, code: string) =>
+      fetch(`http://127.0.0.1:${port}/api/session/exchange`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+    it('is printed on a terminal, works once, and gives a session', async () => {
+      const { h, port, stop } = await boot({ isTTY: true });
+      const link = /http:\/\/127\.0\.0\.1:\d+\/#\/sign-in\?code=([\w-]+)/.exec(h.o.out);
+      expect(link?.[1]).toBeTruthy();
+      const code = link?.[1] as string;
+      const r = await exchange(port, code);
+      expect(r.status).toBe(200);
+      const { token } = (await r.json()) as { token: string };
+      const ok = await fetch(`http://127.0.0.1:${port}/api/tasks`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(ok.status).toBe(200);
+      expect((await exchange(port, code)).status).toBe(401);
+      await stop();
+    }, 15_000);
+
+    it('is not printed off a terminal, where a log may keep it', async () => {
+      const { h, port, stop } = await boot({ isTTY: false });
+      expect(h.o.out).not.toContain('#/sign-in');
+      expect(h.o.out).not.toContain('code=');
+      expect((await exchange(port, 'anything')).status).toBe(401);
+      await stop();
+    }, 15_000);
+
+    it('is opened in the browser with --open and not printed off a terminal', async () => {
+      const opened: string[] = [];
+      const { h, port, stop } = await boot(
+        {
+          isTTY: false,
+          openUrl: async (url) => {
+            opened.push(url);
+            return true;
+          },
+        },
+        '--open',
+      );
+      expect(opened).toHaveLength(1);
+      const code = /#\/sign-in\?code=([\w-]+)$/.exec(opened[0] as string)?.[1] as string;
+      expect(code).toBeTruthy();
+      expect(h.o.out).not.toContain(code);
+      expect((await exchange(port, code)).status).toBe(200);
+      await stop();
+    }, 15_000);
+  });
 });

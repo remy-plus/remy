@@ -167,6 +167,7 @@ import { forBudget, forNotice, parseDuration } from './long-run.ts';
 import { CATALOG, findCatalog } from './mcp-catalog.ts';
 import { type McpHost, startMcp } from './mcp-host.ts';
 import { importSources } from './mcp-import.ts';
+import { openInBrowser } from './mcp-oauth.ts';
 import { type RegistryApp, searchRegistry } from './mcp-registry.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { type MemoryStore, openMemory, personaliseOn, plainMemory } from './memory.ts';
@@ -214,8 +215,15 @@ import {
   openWebPrefs,
   settingsRoutes,
 } from './serve-settings.ts';
+import { createSignInCodes, signInLink } from './serve-signin.ts';
 import { createSkillsMount } from './serve-skills.ts';
-import { announceFirstRunToken, makeServeToken, serveTokenHash } from './serve-token.ts';
+import {
+  announceFirstRunToken,
+  makeServeToken,
+  makeSession,
+  serveTokenHash,
+  sessionHashes,
+} from './serve-token.ts';
 import {
   type AsyncExec,
   createFishKeySource,
@@ -237,7 +245,7 @@ import { stdoutGate } from './stream.ts';
 import { createTheme, detectColor } from './theme.ts';
 import { isTrustLevel, type TrustLevel, trustChanged, trustSummary } from './trust.ts';
 import { createVoice, realVoiceEnv } from './voice-local.ts';
-import { DEFAULT_PORT as DEFAULT_WEBHOOK_PORT } from './webhook-bind.ts';
+import { DEFAULT_PORT as DEFAULT_WEBHOOK_PORT, isLoopback } from './webhook-bind.ts';
 import { BODY_MAX_BYTES, webhookConfig, webhookPrompt } from './webhook-payload.ts';
 import { daemonWebhooks, processStarter, startWebhooks } from './webhook-service.ts';
 import { openHooks } from './webhook-store.ts';
@@ -366,9 +374,10 @@ Usage
   remy webhook [list|add <name> "<prompt>"|rm <name>|token [<name>] [--rotate]|enable|disable|start|test <name> [--data <file>]]
                                   Start a saved task from an outside call. Off until enable;
                                   listens on 127.0.0.1 only; the payload is data, not orders
-  remy serve [--port 7790] [--host 127.0.0.1]
+  remy serve [--port 7790] [--host 127.0.0.1] [--open]
                                   Serve Remy over HTTP for the web app: tasks, approvals and a
-                                  live event stream. 127.0.0.1 only unless REMY_SERVE_ALLOW_REMOTE=on
+                                  live event stream. 127.0.0.1 only unless REMY_SERVE_ALLOW_REMOTE=on.
+                                  Prints a one-time sign-in link for this machine; --open opens it
   remy serve token [--rotate]     Make the access token (shown once; only its hash is kept)
   remy doctor                     See what is set up and the next step for each
   remy voice test                 Check local voice: whisper.cpp, the speech model, ffmpeg, say
@@ -463,6 +472,7 @@ const OPTIONS = {
   port: { type: 'string' },
   data: { type: 'string' },
   rotate: { type: 'boolean' },
+  open: { type: 'boolean' },
   shared: { type: 'boolean' },
   since: { type: 'string' },
   'net-allow': { type: 'string' },
@@ -2519,6 +2529,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           );
         }
         const webPrefs = openWebPrefs(home, () => loadPrefs(home).trust);
+        const signInCodes = createSignInCodes();
         // Only for the Settings screen's provider line; a model passed in by a test has no profile.
         const provider = (() => {
           try {
@@ -2625,6 +2636,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             },
             onTurnEnd: () => lastSeen().touch(),
             tokenHash: () => serveTokenHash(home),
+            sessionHashes: () => sessionHashes(home),
+            // One-time sign-in links exist only on a loopback address (the same machine).
+            ...(isLoopback(bind.host) && {
+              signIn: { codes: signInCodes, session: () => makeSession(home) },
+            }),
             redact,
             alwaysAllow: (tool, risk) => standing().add(tool, risk),
             log: (line) => out(st.dim(line)),
@@ -2745,6 +2761,20 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         out(
           `remy serve listens on http://${listening.host}:${listening.port}. Press Ctrl+C to stop.`,
         );
+        // A one-time sign-in link for this machine. It is printed only on a terminal (a log that is
+        // kept must never hold it) and opened in the browser with --open; it works once, for 10 minutes.
+        if (isLoopback(listening.host) && (deps.isTTY || flags.open)) {
+          const link = signInLink(listening.host, listening.port, signInCodes.mint());
+          if (deps.isTTY) {
+            out('To sign in on this machine, open this link (it works once, for 10 minutes):');
+            out(link);
+          }
+          if (flags.open) {
+            const opened = await (deps.openUrl ?? openInBrowser)(link);
+            if (!opened)
+              out(st.dim('The browser could not be opened. Paste your access token instead.'));
+          }
+        }
         await (deps.serveStop ?? new Promise<void>(() => {}));
         await listening.close();
         return 0;

@@ -35,6 +35,7 @@ import {
 import { z } from 'zod';
 import type { ServeBind } from './serve-bind.ts';
 import type { Mount } from './serve-mount.ts';
+import type { SignInCodes } from './serve-signin.ts';
 import { createStaticHandler } from './serve-static.ts';
 import { listItem, type Redact, redactDeep, taskView } from './serve-view.ts';
 import { bearer, safeEqual } from './webhook-auth.ts';
@@ -92,6 +93,13 @@ export interface ServeDeps {
   beforeStart?: () => Promise<void>;
   /** The saved SHA-256 of the token, read on every request so a rotation takes effect at once. */
   tokenHash(): string | undefined;
+  /** SHA-256 hashes of session tokens made by one-time sign-in links; also read on every request. */
+  sessionHashes?(): string[];
+  /**
+   * One-time sign-in: POST /api/session/exchange trades a code from `codes` for a session token
+   * from `session()`. Left out, the route does not exist.
+   */
+  signIn?: { codes: SignInCodes; session(): string };
   redact?: Redact;
   /** The built web app to serve at every non-API path (default: found next to the bundle or in apps/web/dist). */
   webRoot?: string;
@@ -227,6 +235,7 @@ const STATUSES: TaskStatus[] = [
 const startBody = z
   .object({ prompt: z.string().trim().min(1).max(PROMPT_MAX), trust: z.string().optional() })
   .strict();
+const exchangeBody = z.object({ code: z.string().min(1).max(200) }).strict();
 const approveBody = z
   .object({
     callId: z.string().min(1).max(200),
@@ -542,9 +551,35 @@ export function createServe(deps: ServeDeps) {
         { error: 'Too many wrong tokens. Try again in a minute.' },
         { 'retry-after': '60' },
       );
+    if (path === '/api/session/exchange' && deps.signIn) {
+      // The one route that needs no token: it trades a one-time code for a session. It sits after
+      // the Host, cross-site and lockout checks, and a wrong code counts toward the lockout.
+      if (method !== 'POST') return reply(405, undefined, { allow: 'POST' });
+      try {
+        const { code } = await bodyOf(req, exchangeBody);
+        if (!deps.signIn.codes.redeem(code)) {
+          lockout.fail(from);
+          return reply(401, {
+            error:
+              'That sign-in link has expired or was already used. Paste your access token instead.',
+          });
+        }
+        return reply(200, { token: deps.signIn.session() });
+      } catch (e) {
+        if (e instanceof HttpError) return reply(e.status, { error: e.message });
+        deps.log('serve error: sign-in failed');
+        return reply(500, { error: 'Something went wrong.' });
+      }
+    }
     const given = bearer(req.headers.authorization);
     const hash = deps.tokenHash();
-    if (given === undefined || hash === undefined || !safeEqual(sha256Hex(given), hash)) {
+    const givenHash = given === undefined ? undefined : sha256Hex(given);
+    const valid =
+      givenHash !== undefined &&
+      [...(hash === undefined ? [] : [hash]), ...(deps.sessionHashes?.() ?? [])].some((h) =>
+        safeEqual(givenHash, h),
+      );
+    if (!valid) {
       // Only a token that was offered and is wrong counts; no Authorization header is just a 401.
       if (req.headers.authorization !== undefined) lockout.fail(from);
       return reply(
