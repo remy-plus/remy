@@ -201,7 +201,8 @@ export function checkWorkspace(input: string, home: string, userHome: string = h
   if (!inside(fold(hereHome), fold(path)))
     throw new HttpError(400, 'Pick a folder inside your home folder, such as one in Documents.');
   const top = fold(relative(hereHome, path)).split(sep)[0] ?? '';
-  const sensitive = top.startsWith('.') || top === 'library';
+  // `Library` is refused by name on every system, whatever the disk does with letter case.
+  const sensitive = top.startsWith('.') || top.toLowerCase() === 'library';
   if (sensitive) throw new HttpError(400, SENSITIVE_FOLDER);
   return path;
 }
