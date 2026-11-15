@@ -99,6 +99,7 @@ import {
   startedLine,
   writeMarker,
 } from './background.ts';
+import { machineHasBrowser as hasBrowser } from './browser-found.ts';
 import { makeKeyReader, remoteBrowserStatus, resolveRemoteBrowser } from './browser-remote.ts';
 import {
   type ConnectApi,
@@ -956,11 +957,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   const browserDir = () => join(home, 'browser');
   const vmFile = () => join(home, 'search-vm.json');
   const machineHasBrowser = () =>
-    browserOn() &&
-    (process.platform !== 'darwin' ||
-      ['/Applications/Google Chrome.app', '/Applications/Microsoft Edge.app'].some((p) =>
-        existsSync(p),
-      ));
+    browserOn() && hasBrowser({ platform: process.platform, env, home: deps.homeDir ?? homedir() });
   // The person's own Boat key, read only when a Boat computer first runs a command.
   const boatDeps = (): BoatDeps => ({
     getKey: async () => (await readServiceKey('BOAT_API_KEY', 'boat', env)).value,
