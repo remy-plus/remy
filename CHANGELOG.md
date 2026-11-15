@@ -1,6 +1,30 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-11-16)
+
+Remy has a web app. `remy serve --open` starts it on your own computer, signs you in with a one-time link and, with no model set up yet, asks for a key right in the browser.
+
+### The web app
+
+- **One chat, like talking to a person.** Quick asks get a short answer with a pick and a reason, then one question: about you when the answer depends on something Remy does not know yet ("Anything you avoid or are allergic to?"), otherwise an offer ("Want the recipe?"). Research still gets the full detail and its sources, shown as short site names you can click.
+- **Words appear as they are written.** A greeting is answered in one model call, and the answer streams into the chat. Measured on Claude Haiku 5.5 through 0G: first word in 2.6 s for "yo I'm back" (was about 5 s with nothing shown until the end).
+- **It remembers you, without asking twice.** A lasting fact you mention in passing ("I'm vegetarian") is saved in your own words and Remy says so; notes are on by default and live in Brain, where you can remove any of them. A page, something you pasted or a webhook can never plant one: every meaningful word of a note must be one you typed.
+- **"Yo, I'm back."** Remy tells you what finished, what waits for your OK and what paused while you were away.
+- **Nearby means near you.** The first time it matters, the browser asks once for your rough location; Remy keeps only the place name (from rounded coordinates) and uses it for "ramen nearby". Settings turns it off and deletes it.
+- **Files Remy makes download from the chat**, as chips under the answer.
+- **Plain approvals.** Anything that changes something, sends as you or spends money shows an "Is this OK?" card with the exact text; the reasons are in plain words.
+- **Phones and screen readers.** Every screen was checked at 320, 390 and 1440 px, by keyboard and for contrast: 44 px touch targets, the composer stays above the phone keyboard, a screen reader hears one short status line rather than every word, and focus is never lost. `remy serve --host 0.0.0.0` (with `REMY_SERVE_ALLOW_REMOTE=on`) prints the address a phone on the same Wi-Fi can open.
+- **Activity, Brain, Connections, Schedules, Skills and Settings** are screens of their own, with a floating dock, a living ASCII mind for Remy's state and spoken replies through Fish Audio's free voice.
+
+### Safety and reliability
+
+- **Red-team pass.** After untrusted content, opening an address nobody showed the task, or sending typed words through a page's form, now asks first; untrusted text can no longer close its own fence; a connected app's error text counts as untrusted; the file-write card shows the words. See `docs/reports/red-team-2026-11-13.md`.
+- **Earlier turns are carried one way everywhere.** A chat turn keeps which parts were pasted, which tools backed its answer and which cards you declined, so a later turn neither takes back what it checked nor redoes what you said no to.
+- **A lost model pauses the task instead of failing it**, and `remy continue` picks it up; a wrong key, an empty account and an unknown model each get one plain sentence.
+- **Private by default on shared machines.** Your Remy folder and database are readable only by you.
+- **Installs cleanly** on Node 22 and 24, Debian and Alpine, and in the Docker image. See `docs/reports/clean-install-2026-11-16.md`.
+
+### Also in this release
 
 - **First run in the browser.** `remy serve --open` is now the one command to start. It no longer stops when no model is set up: Remy opens, signs you in, and asks for a model right there. Pick a provider from a short list (the cheapest first), paste the key into a password field, and Remy checks it with one tiny real request before saving it (macOS Keychain, or a private file in `REMY_HOME` elsewhere). The key goes up once and never comes back; the server only ever sends it to the chosen provider's own address, and nothing is saved unless it passed. The same form is in Settings, Model and keys. A wrong key, an account with no credit and no network each get one plain sentence with the next step. After the model, a welcome screen offers three ideas that need no app and says the monthly cap and the display currency in one line each.
 - **Webhooks.** `remy webhook add <name> "<prompt>"` saves a prompt that another program can start with `POST /hook/<name>` and a bearer token. Listening is off until `remy webhook enable`, runs inside the daemon (or `remy webhook start`), and binds to 127.0.0.1 only unless `REMY_WEBHOOK_ALLOW_REMOTE=on` is set. The answer is `202` and a run id, never task output. Bodies over 64 KB, slow bodies, more than one run per hook every 10 seconds, more than 3 at once, and five wrong tokens in a minute are all refused. What a webhook sends is untrusted data: it is cleaned, cut short and placed after your saved prompt, and the run starts tainted at trust level `ask` with read-only auto-approval, so anything that changes something waits for a card. The log keeps a payload's size and a short hash, never the payload or the token. `remy review` labels webhook runs. Not yet exposed beyond loopback or tested against a real sender. See `docs/webhooks.md`.
