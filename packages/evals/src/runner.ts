@@ -1,6 +1,5 @@
 // Runs cases against a model and records what happened, from the event log.
 import {
-  BOOKKEEPING_TOOLS,
   type ConversationTurn,
   createRuntime,
   DEFAULT_BUDGET,
@@ -12,6 +11,7 @@ import {
   type TaskConfig,
   type Tool,
   ToolRegistry,
+  turnFromState,
 } from '@remy/core';
 import { MemoryEventStore } from '@remy/store';
 import { awayLine } from '@remy/tools';
@@ -321,21 +321,23 @@ export async function runCase(
     const taskIds: string[] = [];
     const context: ConversationTurn[] = [...(c.context ?? [])];
     let prompt = c.prompt;
+    let earlierTainted = false;
     for (let turn = 0; ; turn++) {
       const taskId = await rt.start(prompt, {
         ...base,
         ...(context.length && { context: [...context] }),
         ...(turn === 0 && c.pasted && { pasted: c.pasted }),
+        // Like the chat in the app: after a turn that read untrusted content, the next one starts tainted.
+        ...(turn > 0 && earlierTainted && { startTainted: true }),
       });
       taskIds.push(taskId);
       const outcome = await drive(taskId);
       const answer = outcome?.status === 'succeeded' ? (outcome.answer ?? '') : '';
       if (!answer.trim().endsWith('?') || turn >= MAX_FOLLOW_UPS) break;
-      // Like the chat, the turn records which tools backed its answer.
-      const ran = Object.values((await rt.state(taskId)).calls)
-        .filter((x) => x.result?.ok && !BOOKKEEPING_TOOLS.has(x.tool))
-        .map((x) => x.tool);
-      context.push({ prompt, answer, ...(ran.length && { tools: [...new Set(ran)] }) });
+      // Like the chat, the turn records its pasted parts, the tools behind its answer and declined cards.
+      const done = await rt.state(taskId);
+      if (done.tainted) earlierTainted = true;
+      context.push(turnFromState(done, answer));
       prompt = answers.shift() ?? NO_MORE_ANSWERS;
     }
 
