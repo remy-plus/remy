@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Switch as ConnectSwitch } from './pages/connect/ui.tsx';
@@ -7,7 +8,8 @@ import { Switch as SettingsSwitch } from './pages/settings/controls.tsx';
 // CSS is not applied in these tests, so this guards the hooks the touch rules depend on.
 describe('touch targets', () => {
   it('keeps a 44 px rule for coarse pointers, and a hit area for small shapes', () => {
-    const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8');
+    // The tests run from apps/web (`pnpm --filter @remy/web test`).
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
     const coarse = css.slice(css.indexOf('@media (pointer: coarse)'));
     expect(coarse).toMatch(/min-height:\s*44px/);
     expect(coarse).toMatch(/\.tap::after/);
