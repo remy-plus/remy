@@ -176,6 +176,8 @@ describe('Welcome step 1: connect a model', () => {
     openWith(api, '#/welcome/1');
     fireEvent.click(await screen.findByRole('button', { name: 'Check and save' }));
     expect((await screen.findByRole('alert')).textContent).toMatch(/Paste the key first/);
+    // Focus moves to the key field, so the next thing typed is the key.
+    expect(document.activeElement).toBe(screen.getByLabelText('Your OpenAI key'));
     expect(sent).toEqual([]);
   });
 

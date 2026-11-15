@@ -2,7 +2,7 @@
 // key, and Remy checks it with one small real request before saving it on the machine that runs Remy.
 // The key lives in this component's state only until the server says yes (or no), is cleared either
 // way, and is never shown again: the server never sends a key back.
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { type ModelChoice, type ModelSaved, type ModelSetup, useApi } from '../api/index.tsx';
 import { describeError } from '../lib/errors.ts';
 import { Icon } from './Icon.tsx';
@@ -18,6 +18,7 @@ export function ModelKeyForm({
   const api = useApi();
   const group = useId();
   const keyId = useId();
+  const keyField = useRef<HTMLInputElement>(null);
   const [choice, setChoice] = useState<ModelChoice | undefined>(setup.choices[0]);
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,6 +43,7 @@ export function ModelKeyForm({
       setError(
         'Paste the key first. It is the long line of letters and digits from your provider.',
       );
+      keyField.current?.focus(); // so the next thing typed is the key, not a press on the button
       return;
     }
     setBusy(true);
@@ -61,6 +63,7 @@ export function ModelKeyForm({
           'Remy could not check that key. Check your internet connection, then try again.',
         ),
       );
+      keyField.current?.focus();
     } finally {
       setKey(''); // gone from this page whatever happened
       setBusy(false);
@@ -131,6 +134,7 @@ export function ModelKeyForm({
           </p>
           <input
             id={keyId}
+            ref={keyField}
             type="password"
             name="model-key"
             autoComplete="off"

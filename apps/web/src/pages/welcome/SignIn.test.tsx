@@ -64,6 +64,7 @@ describe('SignIn', () => {
     const field = screen.getByLabelText('Access token');
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(field.getAttribute('aria-describedby')).toContain(alert.id);
+    expect(document.activeElement).toBe(field);
     expect(saved()).toBeNull();
     expect(onSignedIn).not.toHaveBeenCalled();
   });
@@ -103,6 +104,8 @@ describe('SignIn', () => {
     await screen.findByText('Remy 0.10.1');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Enter the token first.');
+    // Focus goes to the field to fix, not left on the button.
+    expect(document.activeElement).toBe(screen.getByLabelText('Access token'));
     expect(fetch.mock.calls.filter(([u]) => String(u).includes('/api/tasks'))).toHaveLength(0);
   });
 

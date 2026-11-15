@@ -62,6 +62,7 @@ export function SignIn({
   const [running, setRunning] = useState<number | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const linkTried = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
 
   // A one-time link from `remy serve`: trade the code once, keep the session, drop the code.
   useEffect(() => {
@@ -104,6 +105,7 @@ export function SignIn({
     const given = token.trim();
     if (!given) {
       setError('Enter the token first.');
+      input.current?.focus(); // the button that was pressed is no place to read an error from
       return;
     }
     setBusy(true);
@@ -123,6 +125,7 @@ export function SignIn({
       setError(
         describeError(err, 'That did not work. Check that Remy is still running, then try again.'),
       );
+      input.current?.focus();
     } finally {
       setBusy(false);
     }
@@ -142,11 +145,10 @@ export function SignIn({
           Your assistant, anywhere. This one runs on your home server.
         </p>
 
-        {signingIn && (
-          <p role="status" className="mt-7 mb-0 text-[14px] text-muted">
-            Signing you in.
-          </p>
-        )}
+        {/* Always in the page, so a screen reader hears the text arrive. */}
+        <p role="status" className={signingIn ? 'mt-7 mb-0 text-[14px] text-muted' : 'sr-only'}>
+          {signingIn && 'Signing you in.'}
+        </p>
         <form onSubmit={submit} noValidate className="mt-7">
           <label htmlFor={`${id}-token`} className="font-mono block text-[12px] text-muted">
             Access token
@@ -158,6 +160,7 @@ export function SignIn({
           </p>
           <input
             id={`${id}-token`}
+            ref={input}
             type="password"
             autoComplete="current-password"
             value={token}
