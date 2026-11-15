@@ -228,7 +228,21 @@ export function Brain() {
               </button>
             );
           })}
-          {visible.length === 0 && (
+          {visible.length === 0 && data.notes.length === 0 && (
+            <div
+              role="status"
+              className="absolute inset-0 grid place-items-center px-6 text-center"
+            >
+              <div className="max-w-[44ch]">
+                <p className="m-0 text-[15px] text-text">Remy has not kept any notes yet.</p>
+                <p className="mt-1 mb-0 text-[13px] leading-snug text-muted">
+                  Brain is what Remy remembers about you and your work. Tell Remy something about
+                  yourself, like "I'm vegetarian", and it keeps it here.
+                </p>
+              </div>
+            </div>
+          )}
+          {visible.length === 0 && data.notes.length > 0 && (
             <div
               role="status"
               className="absolute inset-0 grid place-items-center px-6 text-center"

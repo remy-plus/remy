@@ -20,6 +20,29 @@ const node = (name: RegExp | string) =>
   screen.getByRole('button', { name: new RegExp(`^${name}, `) });
 const panel = () => screen.getByRole('complementary', { name: 'Selected note' });
 
+describe('Brain with no notes', () => {
+  it('says what Brain is for, with no search to clear', async () => {
+    window.location.hash = '#/brain';
+    const api = createMockApi();
+    const empty = {
+      total: 0,
+      newToday: 0,
+      counts: { person: 0, project: 0, fact: 0, 'how-to': 0 },
+      notes: [],
+      selected: '',
+    };
+    render(
+      <ApiProvider api={{ ...api, brain: async () => empty as never }}>
+        <App />
+      </ApiProvider>,
+    );
+    expect(await screen.findByText('Remy has not kept any notes yet.')).toBeTruthy();
+    expect(screen.getByText(/I'm vegetarian/)).toBeTruthy();
+    expect(screen.queryByText('No note matches that.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear the search' })).toBeNull();
+  });
+});
+
 describe('Brain', () => {
   it('selects Dana first and shows her note and her links', async () => {
     open();
