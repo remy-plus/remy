@@ -4,6 +4,7 @@ import { ApprovalDialog } from '../../components/ApprovalDialog.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
 import { describeError } from '../../lib/errors.ts';
+import { useFocusWhenSet } from '../../lib/focus.ts';
 import { plainTime, primaryButton, quietButton, trustWords } from './format.ts';
 
 const mono = 'font-mono';
@@ -30,6 +31,7 @@ export function Review() {
   const [reviewing, setReviewing] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
+  const saidRef = useFocusWhenSet(said);
   const [n, setN] = useState(0);
   const reload = useCallback(() => setN((x) => x + 1), []);
 
@@ -151,6 +153,8 @@ export function Review() {
         </div>
         {said && (
           <p
+            ref={saidRef}
+            tabIndex={-1}
             role="status"
             className="mb-3 flex items-start gap-2 text-[14px] leading-snug text-text"
           >

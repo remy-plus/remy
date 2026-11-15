@@ -14,6 +14,7 @@ import { Icon } from '../../components/Icon.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
 import { buildSteps, Trace } from '../../components/Trace.tsx';
 import { describeError } from '../../lib/errors.ts';
+import { useFocusWhenSet } from '../../lib/focus.ts';
 import { ago } from '../../lib/when.ts';
 import { money, plainTime, primaryButton, quietButton, RISK } from './format.ts';
 import { useTask } from './useTask.ts';
@@ -521,6 +522,7 @@ function TaskScreen({ id }: { id: string }) {
   const [reviewing, setReviewing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
+  const saidRef = useFocusWhenSet(said);
   const draft = useRef<HTMLElement>(null);
 
   if (error && !view)
@@ -658,7 +660,12 @@ function TaskScreen({ id }: { id: string }) {
           </div>
 
           {said && (
-            <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-text">
+            <p
+              ref={saidRef}
+              tabIndex={-1}
+              role="status"
+              className="mb-4 flex items-center gap-2 text-[14px] text-text"
+            >
               <Icon name="check" className="shrink-0 text-signal" />
               {said}
             </p>

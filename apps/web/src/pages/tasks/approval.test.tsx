@@ -55,6 +55,14 @@ describe('Approval dialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
+  it('moves focus to the confirmation once the card is answered, so it is not lost', async () => {
+    const api = createMockApi();
+    const dialog = await openFromTask(api);
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Send as you/ }));
+    const said = await screen.findByText(/^Approved\./);
+    await waitFor(() => expect(document.activeElement).toBe(said.closest('[role=status]')));
+  });
+
   it('treats Esc as "Not now"', async () => {
     const api = createMockApi();
     const approve = vi.spyOn(api, 'approve');

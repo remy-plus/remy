@@ -151,6 +151,18 @@ describe('Dock', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull());
   });
 
+  it('gives focus back to Menu when History, opened from the sheet, is closed', async () => {
+    phone(true);
+    show('/');
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    fireEvent.click(menu);
+    const sheet = await screen.findByRole('dialog', { name: 'Menu' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'History' }));
+    const drawer = await screen.findByRole('dialog', { name: 'History' });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(document.activeElement).toBe(menu));
+  });
+
   it.each(['/brain', '/skills', '/schedules', '/schedules/new'])(
     'marks Brain, not Activity, on %s',
     (path) => {

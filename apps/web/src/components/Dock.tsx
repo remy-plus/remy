@@ -129,6 +129,8 @@ export function Dock({ path }: { path: string }) {
   const [history, setHistory] = useState(false);
   const [menu, setMenu] = useState(false);
   const sheet = useRef<HTMLDialogElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const historyButton = useRef<HTMLButtonElement>(null);
   const current = items.find((i) => i.match(path)) ?? DOCK_ITEMS.find((i) => i.match(path));
   const mind = mindOf(chats);
 
@@ -147,6 +149,11 @@ export function Dock({ path }: { path: string }) {
     setMenu(false);
     setHistory(true);
   }, []);
+  // History opens from the menu sheet, which closes with it: give focus back to what is still on screen.
+  const closeHistory = useCallback(() => {
+    setHistory(false);
+    (compact ? menuButton : historyButton).current?.focus();
+  }, [compact]);
 
   return (
     <>
@@ -163,6 +170,7 @@ export function Dock({ path }: { path: string }) {
               {current?.label ?? 'Remy'}
             </span>
             <button
+              ref={menuButton}
               type="button"
               aria-haspopup="dialog"
               aria-expanded={menu}
@@ -233,7 +241,12 @@ export function Dock({ path }: { path: string }) {
               })}
             </ul>
             <span aria-hidden="true" className="mx-1 h-4 w-px bg-edge-hi" />
-            <button type="button" onClick={openHistory} className={`${pill} ${idle}`}>
+            <button
+              ref={historyButton}
+              type="button"
+              onClick={openHistory}
+              className={`${pill} ${idle}`}
+            >
               History
             </button>
             <a
@@ -247,7 +260,7 @@ export function Dock({ path }: { path: string }) {
           </>
         )}
       </nav>
-      <HistoryDrawer open={history} onClose={() => setHistory(false)} />
+      <HistoryDrawer open={history} onClose={closeHistory} />
     </>
   );
 }
