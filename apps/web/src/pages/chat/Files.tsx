@@ -59,10 +59,10 @@ export function Files({ taskId }: { taskId: string }) {
               onClick={() => void download(f)}
               title={f.path}
               aria-label={`Download ${f.name}, ${fileSize(f.size)}`}
-              className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full border border-edge bg-surface py-1 pr-3 pl-3 text-[13px] leading-[1.6] text-text transition-colors duration-300 hover:border-edge-hi disabled:cursor-default disabled:opacity-60"
+              className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-[18px] border border-edge-hi bg-surface py-1 pr-3 pl-3 text-left text-[13px] leading-[1.6] text-text transition-colors duration-300 hover:border-stone disabled:cursor-default disabled:opacity-60"
             >
               <Icon name="download" size={14} className="shrink-0 text-muted" />
-              <span className="min-w-0 truncate">{f.name}</span>
+              <span className="min-w-0 break-all">{f.name}</span>
               <span className="shrink-0 text-muted">{fileSize(f.size)}</span>
             </button>
           </li>

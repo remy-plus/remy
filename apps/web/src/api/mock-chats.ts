@@ -63,7 +63,8 @@ const seeds = (): MockChat[] => [
         taskId: 'task_mockchat3',
         prompt: 'Find flights to Lisbon in March under 200 pounds',
         state: 'done',
-        answer: 'The cheapest direct return is 142 pounds on 14 March, back on 18 March.',
+        answer:
+          'The cheapest direct return is 142 pounds on 14 March, back on 18 March. I put the three best options side by side in a file.\n\nSources\n\n- [kayak.com](https://www.kayak.com/flights/LON-LIS/2027-03-14)\n- [skyscanner.net](https://www.skyscanner.net/transport/flights/lon/lis/270314/)\n- [flytap.com](https://www.flytap.com/en-gb/)',
         at: ago(26 * 60),
       },
     ],

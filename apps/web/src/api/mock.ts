@@ -707,11 +707,20 @@ export function createMockApi(): RemyApi {
       }
     },
     async taskFiles(id) {
-      get(id);
+      if (id !== 'task_mockchat3') get(id);
+      if (id === 'task_mockchat3')
+        return [
+          {
+            path: 'lisbon-flights-march-compared.csv',
+            name: 'lisbon-flights-march-compared.csv',
+            size: 2048,
+          },
+          { path: 'notes.md', name: 'notes.md', size: 612 },
+        ];
       return id === 'task_correction' ? [{ path: 'reply.md', name: 'reply.md', size: 214 }] : [];
     },
     async downloadTaskFile(id, path) {
-      get(id);
+      if (id !== 'task_mockchat3') get(id);
       return { blob: new Blob(['Hello, Dana.\n']), name: path.split('/').at(-1) ?? path };
     },
     async approve(id, body) {

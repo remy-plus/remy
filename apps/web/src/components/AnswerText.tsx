@@ -48,7 +48,7 @@ function Anchor({ span, className }: { span: LinkSpan; className: string }) {
 }
 
 const chip =
-  'inline-flex max-w-full items-center rounded-full border border-edge bg-surface px-2.5 py-0.5 text-[13px] leading-[1.6] text-text no-underline transition-colors duration-300 hover:border-edge-hi';
+  'inline-flex max-w-full items-center rounded-full border border-edge-hi bg-surface px-2.5 py-0.5 text-[13px] leading-[1.6] text-text no-underline transition-colors duration-300 hover:border-stone';
 
 const onlyLinks = (spans: Inline[]): LinkSpan[] | null => {
   const links = spans.filter((s): s is LinkSpan => s.kind === 'link');
