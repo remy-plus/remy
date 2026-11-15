@@ -100,7 +100,7 @@ export function Settings({ section = 'dock' }: { section?: string }) {
               <li key={s.id} className="list-none">
                 <a
                   href={`#/settings/${s.id}`}
-                  aria-current={on ? 'true' : undefined} // the main bar already marks Settings as the page
+                  aria-current={on ? 'page' : undefined}
                   className={`block rounded-xl border px-3.5 py-2.5 text-[15px] font-medium no-underline transition-colors duration-300 ${on ? 'border-edge bg-surface text-text' : 'border-transparent text-muted hover:text-text'}`}
                 >
                   {s.label}
@@ -116,18 +116,21 @@ export function Settings({ section = 'dock' }: { section?: string }) {
           <h2 className="m-0 mb-7 text-[32px] leading-tight font-normal tracking-tight">
             {label ?? 'Settings'}
           </h2>
-          {save !== 'idle' && (
-            <p
-              role="status"
-              className={`-mt-5 mb-6 flex items-center gap-2 text-[13px] ${save === 'failed' ? 'text-text' : 'text-muted'}`}
-            >
-              {save === 'saved' && <Icon name="check" className="shrink-0 text-signal" />}
-              {save === 'saving' && 'Saving your change'}
-              {save === 'saved' && 'Saved'}
-              {save === 'failed' &&
-                'That did not save. Check that Remy is running, then try again.'}
-            </p>
-          )}
+          {/* The one place a save is announced; the note under a control shows the same thing without
+              speaking it a second time. It stays in the page, so the words are heard when they arrive. */}
+          <p
+            role="status"
+            className={
+              save === 'idle'
+                ? 'sr-only'
+                : `-mt-5 mb-6 flex items-center gap-2 text-[13px] ${save === 'failed' ? 'text-text' : 'text-muted'}`
+            }
+          >
+            {save === 'saved' && <Icon name="check" className="shrink-0 text-signal" />}
+            {save === 'saving' && 'Saving your change'}
+            {save === 'saved' && 'Saved'}
+            {save === 'failed' && 'That did not save. Check that Remy is running, then try again.'}
+          </p>
           {View ? (
             <View data={data} error={error} reload={reload} />
           ) : (

@@ -185,11 +185,14 @@ export function useOwnSave(): { state: SaveState; touch: () => void } {
   return { state: touched ? save : 'idle', touch: () => setTouched(true) };
 }
 
-/** One line under a control that writes to the server: saving, saved, or what to do about a failure. */
+/**
+ * One line under a control that writes to the server: saving, saved, or what to do about a failure. It is
+ * not a live region: the page's own status line speaks, and two lines saying it would read it twice.
+ */
 export function SaveNote({ state, what }: { state: SaveState; what: string }) {
   if (state === 'idle') return null;
   return (
-    <p role="status" className="mt-3 mb-0 flex items-center gap-2 text-[13px] text-muted">
+    <p className="mt-3 mb-0 flex items-center gap-2 text-[13px] text-muted">
       {state === 'saved' && <Icon name="check" className="shrink-0 text-signal" />}
       {state === 'saving' && `Saving the ${what}`}
       {state === 'saved' && `The ${what} is saved.`}

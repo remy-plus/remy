@@ -255,6 +255,17 @@ describe('Settings', () => {
     expect(await screen.findByText('The monthly cap is saved.')).toBeTruthy();
   });
 
+  it('speaks a save once: the top line is the live region, the note beside the box is not', async () => {
+    bindServerSettings(async () => undefined);
+    await open('budget', 'Spending');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Monthly cap' }), {
+      target: { value: '30' },
+    });
+    await screen.findByText('The monthly cap is saved.');
+    const spoken = screen.getAllByRole('status').map((s) => s.textContent);
+    expect(spoken.filter((t) => /saved/i.test(t ?? ''))).toEqual(['Saved']);
+  });
+
   it('says a budget change did not save, beside the box', async () => {
     bindServerSettings(async () => {
       throw new Error('the server said no');
