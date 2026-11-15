@@ -57,3 +57,5 @@ export function htmlToText(html: string): string {
     .trim();
   return [title, body].filter(Boolean).join('\n\n');
 }
+
+export { decode as decodeEntities };
