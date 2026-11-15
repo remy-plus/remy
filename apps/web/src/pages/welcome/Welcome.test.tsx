@@ -24,77 +24,245 @@ const openWith = (api: ReturnType<typeof createMockApi>, hash: string) => {
 
 const open = (hash: string) => openWith(createMockApi(), hash);
 
-describe('Welcome', () => {
-  it('step 1 offers three ways to think, marks the step and goes on', async () => {
-    open('#/welcome/1');
+const KEY = 'sk-test-ABCDEF1234567890abcdef';
+const CHOICES = [
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    model: 'gpt-5-nano',
+    note: 'Pay as you go. The cheapest way to start.',
+    needsKey: true,
+    keyUrl: 'platform.openai.com/api-keys',
+  },
+  {
+    id: 'anthropic',
+    label: 'Anthropic',
+    model: 'claude-haiku-5-5',
+    note: 'Claude models.',
+    needsKey: true,
+    keyUrl: 'console.anthropic.com/settings/keys',
+  },
+  {
+    id: 'ollama',
+    label: 'Ollama (on this computer, no key)',
+    model: 'llama3.1',
+    note: 'Free and private.',
+    needsKey: false,
+  },
+];
+const NO_MODEL = { ready: false, current: null, choices: CHOICES };
+
+/** A mock server that starts with no model, and records every key it is sent. */
+const withoutModel = (over: Partial<ReturnType<typeof createMockApi>> = {}) => {
+  const sent: { provider: string; key: string }[] = [];
+  const api = {
+    ...createMockApi(),
+    modelSetup: async () => NO_MODEL,
+    saveModelKey: async (provider: string, key: string) => {
+      sent.push({ provider, key });
+      return {
+        ok: true as const,
+        current: { provider, label: 'OpenAI', model: 'gpt-5-nano' },
+        saved: 'in the macOS Keychain on this computer',
+      };
+    },
+    ...over,
+  };
+  return { api, sent };
+};
+
+const typeKey = async (text: string) => {
+  const input = (await screen.findByLabelText(/Your .* key/)) as HTMLInputElement;
+  fireEvent.change(input, { target: { value: text } });
+  return input;
+};
+
+describe('Welcome step 1: connect a model', () => {
+  it('says what it needs, lists the providers cheapest first and marks the step', async () => {
+    openWith(withoutModel().api, '#/welcome/1');
     expect(await screen.findByRole('heading', { level: 1, name: "Hi, I'm Remy." })).toBeTruthy();
     const trace = screen.getByRole('list', { name: 'Setup steps' });
-    expect(within(trace).getAllByRole('listitem')).toHaveLength(3);
     expect(
       within(trace)
         .getAllByRole('listitem')
         .map((li) => li.getAttribute('aria-current')),
-    ).toEqual(['step', null, null]);
-    expect(screen.getAllByRole('radio')).toHaveLength(3);
-    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
-    // No bar across the top on a full-page screen.
+    ).toEqual(['step', null]);
+    expect((await screen.findAllByRole('radio')).map((r) => r.getAttribute('value'))).toEqual([
+      'openai',
+      'anthropic',
+      'ollama',
+    ]);
+    expect((screen.getByRole('radio', { name: /OpenAI/ }) as HTMLInputElement).checked).toBe(true);
+    // The key goes in a password field, never one the browser fills or remembers.
+    const input = screen.getByLabelText('Your OpenAI key') as HTMLInputElement;
+    expect(input.type).toBe('password');
+    expect(input.autocomplete).toBe('off');
+    expect(
+      screen.getByRole('link', { name: 'platform.openai.com/api-keys' }).getAttribute('href'),
+    ).toBe('https://platform.openai.com/api-keys');
+    expect(screen.getByRole('button', { name: 'Check and save' })).toBeTruthy();
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
 
-  it('never asks for a key in the browser: it names the command that stores one', async () => {
-    open('#/welcome/1');
-    expect(await screen.findByText('remy login')).toBeTruthy();
-    // A key typed into this page could not be stored, so there is no field to type one into.
-    expect(document.querySelector('input[type="password"]')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Copy the command to run sign in' })).toBeTruthy();
-    // The button moves to the next step. It does not save anything, so it does not say it does.
-    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
-    expect(screen.queryByText(/Save and continue/)).toBeNull();
-  });
-
-  it('checks the model Remy is already set up with', async () => {
-    open('#/welcome/1');
-    fireEvent.click(await screen.findByRole('button', { name: 'Check the model' }));
-    expect(await screen.findByText('Both models answered.')).toBeTruthy();
-  });
-
-  it('shows other ways in step 1', async () => {
-    open('#/welcome/1');
-    fireEvent.click(await screen.findByRole('radio', { name: /Use my home server/ }));
+  it('saves a key, says where it went, clears the field and offers Continue', async () => {
+    const { api, sent } = withoutModel();
+    openWith(api, '#/welcome/1');
+    await typeKey(`  ${KEY}  `);
+    fireEvent.click(screen.getByRole('button', { name: 'Check and save' }));
     expect(
-      screen.getByRole('link', { name: 'Sign in to a home server' }).getAttribute('href'),
-    ).toBe('#/sign-in');
-    expect(screen.queryByText('Your OpenRouter key')).toBeNull();
+      await screen.findByText(/Connected\. Remy will think with gpt-5-nano from OpenAI/),
+    ).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain(
+      'in the macOS Keychain on this computer',
+    );
+    expect(sent).toEqual([{ provider: 'openai', key: KEY }]);
+    // The key is gone from the page: no field, and no text that holds it.
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    expect(document.body.textContent).not.toContain(KEY);
+    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
   });
 
-  it('step 2 claims nothing is connected when the server says nothing is', async () => {
+  it('a wrong key shows the server’s sentence, keeps the person here and empties the field', async () => {
+    const { api } = withoutModel({
+      saveModelKey: async () => {
+        throw Object.assign(
+          new Error(
+            'OpenAI did not accept that key. Check that you copied all of it, then paste it again.',
+          ),
+          { status: 400 },
+        );
+      },
+    });
+    openWith(api, '#/welcome/1');
+    const input = await typeKey(KEY);
+    fireEvent.click(screen.getByRole('button', { name: 'Check and save' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('did not accept that key');
+    expect(input.value).toBe('');
+    expect(document.body.textContent).not.toContain(KEY);
+    expect(screen.queryByRole('link', { name: 'Continue' })).toBeNull();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('no network: one plain sentence, not "Failed to fetch"', async () => {
+    const { api } = withoutModel({
+      saveModelKey: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    openWith(api, '#/welcome/1');
+    await typeKey(KEY);
+    fireEvent.click(screen.getByRole('button', { name: 'Check and save' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "Remy's server is not answering. Check that it is running, then try again.",
+    );
+  });
+
+  it('no credit: the server’s sentence is shown as it is', async () => {
+    const said =
+      'That key works, but the OpenAI account has no credit left. Add some at platform.openai.com/api-keys, then try again.';
+    const { api } = withoutModel({
+      saveModelKey: async () => {
+        throw Object.assign(new Error(said), { status: 402 });
+      },
+    });
+    openWith(api, '#/welcome/1');
+    await typeKey(KEY);
+    fireEvent.click(screen.getByRole('button', { name: 'Check and save' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(said);
+  });
+
+  it('an empty key is caught before anything is sent', async () => {
+    const { api, sent } = withoutModel();
+    openWith(api, '#/welcome/1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Check and save' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Paste the key first/);
+    expect(sent).toEqual([]);
+  });
+
+  it('a key typed for one provider is dropped when another is picked', async () => {
+    const { api, sent } = withoutModel();
+    openWith(api, '#/welcome/1');
+    await typeKey(KEY);
+    fireEvent.click(screen.getByRole('radio', { name: /Anthropic/ }));
+    expect((screen.getByLabelText('Your Anthropic key') as HTMLInputElement).value).toBe('');
+    fireEvent.click(screen.getByRole('radio', { name: /Ollama/ }));
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
+    await screen.findByText(/Connected\./);
+    expect(sent).toEqual([{ provider: 'ollama', key: '' }]);
+  });
+
+  it('when Remy already has a model it says so and offers Continue or a change', async () => {
+    const { api } = withoutModel({
+      modelSetup: async () => ({
+        ready: true,
+        current: { provider: 'openai', label: 'OpenAI', model: 'gpt-5-nano' },
+        choices: CHOICES,
+      }),
+    });
+    openWith(api, '#/welcome/1');
+    expect(await screen.findByText(/already connected to OpenAI, using gpt-5-nano/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Continue' }).getAttribute('href')).toBe('#/welcome/2');
+    fireEvent.click(screen.getByRole('button', { name: 'Use a different one' }));
+    expect(await screen.findByLabelText('Your OpenAI key')).toBeTruthy();
+  });
+
+  it('a server that cannot say shows the problem and a way to ask again', async () => {
+    let calls = 0;
+    const { api } = withoutModel({
+      modelSetup: async () => {
+        calls++;
+        if (calls === 1) throw new TypeError('Failed to fetch');
+        return NO_MODEL;
+      },
+    });
+    openWith(api, '#/welcome/1');
+    expect((await screen.findByRole('alert')).textContent).toMatch(/not answering/);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByLabelText('Your OpenAI key')).toBeTruthy();
+  });
+
+  it('an older server that cannot take a key names the terminal command', async () => {
+    const { modelSetup: _a, saveModelKey: _b, ...old } = createMockApi();
+    openWith(old, '#/welcome/1');
+    expect(await screen.findByText('remy login')).toBeTruthy();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+  });
+});
+
+describe('Welcome step 2: the first answer', () => {
+  it('welcomes, names what is connected, offers three ideas that need no app, and explains the limits', async () => {
     signedIn();
     const api = createMockApi();
     openWith({ ...api, connections: async () => ({ apps: [], machines: [] }) }, '#/welcome/2');
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
+      await screen.findByRole('heading', { level: 1, name: 'You are set. What do you need done?' }),
     ).toBeTruthy();
-    // A suggestion is not a connection: the list must not say otherwise.
-    expect(screen.queryByText('Connected')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Connect Gmail' })).toBeTruthy();
+    expect(
+      screen.getByText(/Nothing is connected yet, so I start with the web and files\./),
+    ).toBeTruthy();
+    const ideas = within(
+      screen.getByRole('heading', { level: 2, name: 'Or try one of these' })
+        .nextElementSibling as HTMLElement,
+    ).getAllByRole('button');
+    expect(ideas).toHaveLength(3);
+    expect(ideas.map((b) => b.textContent).join(' ')).not.toMatch(
+      /email|calendar|folder|Documents/i,
+    );
+    // The cap and the currency, one line each, with the defaults and where to change them.
+    expect(screen.getByText(/Remy stops at \$25 a month and \$2 on any one task/)).toBeTruthy();
+    expect(screen.getByText(/Amounts show in US Dollar \(USD\)\./)).toBeTruthy();
+    for (const link of screen.getAllByRole('link', { name: 'Change it in Settings.' }))
+      expect(link.getAttribute('href')).toBe('#/settings/budget');
   });
 
-  it('step 2 lists apps and can be skipped', async () => {
+  it('names the apps that are connected, and only those', async () => {
     signedIn();
     open('#/welcome/2');
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
-    ).toBeTruthy();
-    // The mock server reports all three as connected, so all three say so.
-    expect(screen.getAllByText('Connected')).toHaveLength(3);
-    expect(screen.getByRole('link', { name: 'Skip for now' }).getAttribute('href')).toBe(
-      '#/welcome/3',
-    );
-    // Nothing is left to connect, so no row offers to.
-    expect(screen.queryByRole('link', { name: 'Connect Notion' })).toBeNull();
+    expect(await screen.findByText(/Connected: .*Gmail/)).toBeTruthy();
   });
 
-  it('step 2 asks the server nothing without a session, and claims nothing', async () => {
+  it('asks nothing of the server without a session, and claims nothing', async () => {
     let asked = false;
     const api = createMockApi();
     openWith(
@@ -107,27 +275,53 @@ describe('Welcome', () => {
       },
       '#/welcome/2',
     );
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Connect the apps you use.' }),
-    ).toBeTruthy();
-    // A 401 here would send the person to sign-in mid-setup, so the call is never made.
+    await screen.findByRole('heading', { level: 1 });
     expect(asked).toBe(false);
-    expect(screen.queryByText('Connected')).toBeNull();
+    expect(screen.queryByText(/^Connected:/)).toBeNull();
     expect(window.location.hash).toBe('#/welcome/2');
   });
 
-  it('step 3 starts a task and opens it', async () => {
+  it('an idea fills the box, and Ask Remy opens the chat and finishes setup', async () => {
     window.localStorage.removeItem('remy.onboarded');
-    open('#/welcome/3');
+    open('#/welcome/2');
     const start = (await screen.findByRole('button', { name: 'Ask Remy' })) as HTMLButtonElement;
     expect(start.disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: /Find three flights to Lisbon/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Write a short note asking my landlord/ }));
     expect((screen.getByLabelText('What you need done') as HTMLTextAreaElement).value).toBe(
-      'Find three flights to Lisbon under £350',
+      'Write a short note asking my landlord to fix a leaking tap',
     );
     fireEvent.click(start);
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/tasks\/task_mock/));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/chat\//));
     expect(window.localStorage.getItem('remy.onboarded')).toBe('true');
+  });
+
+  it('a failed start says why in one sentence and stays', async () => {
+    const api = createMockApi();
+    openWith(
+      {
+        ...api,
+        sendMessage: async () => {
+          throw Object.assign(
+            new Error('Remy needs a model before it can answer. Add a key to get started.'),
+            { status: 409 },
+          );
+        },
+      },
+      '#/welcome/2',
+    );
+    fireEvent.change(await screen.findByLabelText('What you need done'), {
+      target: { value: 'hi' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Remy' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/needs a model/);
+    expect(window.location.hash).toBe('#/welcome/2');
+  });
+
+  it('the old step 3 link lands here', async () => {
+    open('#/welcome/3');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'You are set. What do you need done?' }),
+    ).toBeTruthy();
   });
 
   it('skipping setup marks the visit as done and opens Home', async () => {
@@ -138,13 +332,72 @@ describe('Welcome', () => {
     expect(window.location.hash).toBe('#/');
   });
 
-  for (const step of ['1', '2', '3']) {
+  for (const step of ['1', '2']) {
     it(`has no basic accessibility problems in step ${step}`, async () => {
-      open(`#/welcome/${step}`);
+      openWith(withoutModel().api, `#/welcome/${step}`);
       await screen.findByRole('heading', { level: 1 });
+      if (step === '1') await screen.findByLabelText('Your OpenAI key');
       expect(a11yProblems()).toEqual([]);
     });
   }
+});
+
+describe('the model gate', () => {
+  const http = (over: Partial<ReturnType<typeof createMockApi>> = {}) =>
+    ({ ...withoutModel().api, kind: 'http' as const, ...over }) as ReturnType<typeof createMockApi>;
+
+  it('sends a signed-in visit with no model from the front door to setup', async () => {
+    signedIn();
+    openWith(http(), '#/');
+    await waitFor(() => expect(window.location.hash).toBe('#/welcome/1'));
+  });
+
+  it('leaves a visit alone when Remy has a model', async () => {
+    signedIn();
+    openWith(http({ modelSetup: async () => ({ ...NO_MODEL, ready: true, current: null }) }), '#/');
+    await screen.findByRole('navigation', { name: 'Main' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('leaves Settings and other pages reachable without a model', async () => {
+    signedIn();
+    openWith(http(), '#/settings');
+    await screen.findByRole('navigation', { name: 'Main' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(window.location.hash).toBe('#/settings');
+  });
+
+  it('asks once: after "Skip setup" the person is not sent back', async () => {
+    signedIn();
+    let asked = 0;
+    const counted = async () => {
+      asked++;
+      return NO_MODEL;
+    };
+    openWith(http({ modelSetup: counted }), '#/');
+    await waitFor(() => expect(window.location.hash).toBe('#/welcome/1'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip setup and open Remy' }));
+    await screen.findByRole('navigation', { name: 'Main' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(window.location.hash).toBe('#/');
+    expect(asked).toBeLessThanOrEqual(2); // the gate once, the setup screen once
+  });
+
+  it('does nothing when the server cannot be asked', async () => {
+    signedIn();
+    openWith(
+      http({
+        modelSetup: async () => {
+          throw new TypeError('Failed to fetch');
+        },
+      }),
+      '#/',
+    );
+    await screen.findByRole('navigation', { name: 'Main' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(window.location.hash).toBe('#/');
+  });
 });
 
 describe('first visit', () => {

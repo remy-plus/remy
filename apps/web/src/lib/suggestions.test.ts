@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { suggestionsFor } from './suggestions.ts';
+import { firstSuggestions, spendingLine, suggestionsFor } from './suggestions.ts';
 
 const usd = { code: 'USD', rate: 1 };
 const app = (id: string, name: string, status: 'connected' | 'not_connected' = 'connected') => ({
@@ -38,5 +38,35 @@ describe('suggestionsFor', () => {
 
   it('drops the price when the code is not a currency', () => {
     expect(suggestionsFor({ apps: [], currency: { code: 'nope', rate: 1 } })[1]).not.toMatch(/\d/);
+  });
+});
+
+describe('firstSuggestions', () => {
+  it('offers three that need no app, folder or account', () => {
+    const s = firstSuggestions({ code: 'USD', rate: 1 });
+    expect(s).toHaveLength(3);
+    expect(s.join(' ')).not.toMatch(/email|inbox|calendar|folder|Documents|Dana|Gmail|Notion/i);
+    expect(s[0]).toContain('$200');
+  });
+
+  it('follows the display currency', () => {
+    expect(firstSuggestions({ code: 'GBP', rate: 0.8 })[0]).toContain('£160');
+  });
+});
+
+describe('spendingLine', () => {
+  it('says the cap and the currency in one sentence each, with the defaults', () => {
+    const l = spendingLine({ monthly: 25, perTask: 2, code: 'USD', rate: 1 });
+    expect(l.cap).toBe(
+      'Remy stops at $25 a month and $2 on any one task, so a mistake cannot run up a bill.',
+    );
+    expect(l.currency).toBe('Amounts show in US Dollar (USD).');
+  });
+
+  it('shows the cap in the chosen currency', () => {
+    const l = spendingLine({ monthly: 25, perTask: 2, code: 'GBP', rate: 0.8 });
+    expect(l.cap).toContain('£20 a month');
+    expect(l.cap).toContain('£1.60 on any one task');
+    expect(l.currency).toBe('Amounts show in British Pound (GBP).');
   });
 });

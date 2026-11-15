@@ -1,31 +1,30 @@
-// First run: three steps, each with the orb on the right. Nothing is stored except `remy.onboarded`;
-// keys never go through the browser, so step 1 names the terminal command that stores one, and step
-// 2 suggests apps while the server decides which are actually connected.
-import { type ReactNode, useEffect, useId, useState } from 'react';
-import type { ConnectedApp } from '../../api/index.tsx';
+// First run: two steps, each with the orb on the right. Step 1 connects a model right here: pick a
+// provider, paste the key, and the server checks it and keeps it on the machine that runs Remy (the
+// key never comes back to this page). Step 2 welcomes the person and gets them to a first answer.
+import { type ReactNode, useEffect, useState } from 'react';
+import type { ConnectedApp, ModelSaved, ModelSetup } from '../../api/index.tsx';
 import { useApi } from '../../api/index.tsx';
 import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
 import { CopyCommand } from '../../components/CopyCommand.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { Logo } from '../../components/Logo.tsx';
+import { ModelKeyForm } from '../../components/ModelKeyForm.tsx';
 import { Orb } from '../../components/Orb.tsx';
+import { Skeleton } from '../../components/Skeleton.tsx';
 import { buttonPrimary, buttonQuiet } from '../../components/ui.ts';
+import { announceChatsChanged } from '../../lib/chat-events.ts';
 import { describeError } from '../../lib/errors.ts';
-import { setSetting } from '../../settings.ts';
+import { firstSuggestions, spendingLine } from '../../lib/suggestions.ts';
+import { setSetting, useSetting } from '../../settings.ts';
 import { hasToken } from './useFirstRun.ts';
 
-const STEPS = ['Pick a model', 'Connect your apps', 'Ask for something'];
+const STEPS = ['Connect a model', 'Ask for something'];
 const LABELS = [
   [{ label: 'you' }, { label: 'memory' }],
-  [{ label: 'files' }, { label: 'calendar' }],
   [{ label: 'you' }, { label: 'web' }],
 ];
 const CAPTION: [string, string][] = [
   ["I'm your assistant.", 'I ask before I send anything as you or spend money. Always.'],
-  [
-    'You stay in charge.',
-    'Each app gets only what you allow, and you can take it back in one click.',
-  ],
   ['Ready when you are.', 'Ask for anything you would do on a computer.'],
 ];
 
@@ -100,69 +99,44 @@ function Frame({
   );
 }
 
-const WAYS = [
-  {
-    id: 'own',
-    title: 'Use my own key',
-    text: 'OpenRouter, OpenAI, Groq, or any compatible service. Pay the provider directly.',
-  },
-  {
-    id: 'local',
-    title: 'Run a model on this machine',
-    text: 'Ollama. Free and private. Slower on a light laptop.',
-  },
-  {
-    id: 'server',
-    title: 'Use my home server',
-    text: 'Remy runs there and you reach it from any device.',
-  },
-] as const;
-
 function StepOne() {
   const api = useApi();
-  const name = useId();
-  const [way, setWay] = useState<(typeof WAYS)[number]['id']>('own');
-  const [note, setNote] = useState<{ text: string; ok: boolean } | null>(null);
-  const test = async () => {
-    try {
-      const { detail } = await api.testModels();
-      setNote({ text: detail, ok: true });
-    } catch (e) {
-      setNote({ text: describeError(e, 'The check did not run. Try again.'), ok: false });
-    }
-  };
+  const [setup, setSetup] = useState<ModelSetup | null>(null);
+  const [problem, setProblem] = useState('');
+  const [saved, setSaved] = useState<ModelSaved | null>(null);
+  const [changing, setChanging] = useState(false);
+  const [tries, setTries] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tries` asks again after a failure
+  useEffect(() => {
+    let live = true;
+    if (!api.modelSetup) return;
+    setProblem('');
+    api.modelSetup().then(
+      (d) => live && setSetup(d),
+      (e) =>
+        live &&
+        setProblem(
+          describeError(
+            e,
+            'Remy could not check its model. Check that it is running, then try again.',
+          ),
+        ),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, tries]);
+
+  const ready = setup?.ready === true;
   return (
     <Frame
       at={0}
       title="Hi, I'm Remy."
-      lead="First, pick the model I think with. You can change it any time. Your key is the password that lets me use it, and it goes in the Keychain on this computer."
+      lead="First I need a model to think with. Pick a provider and paste your key. I check it, keep it on this computer, and never show it again."
     >
-      <fieldset className="m-0 grid gap-2.5 border-0 p-0">
-        <legend className="sr-only">How Remy thinks</legend>
-        {WAYS.map((w) => (
-          <label
-            key={w.id}
-            className="flex cursor-pointer items-start gap-4 rounded-[10px] border border-edge bg-surface px-5 py-4 has-checked:border-text has-checked:bg-raise has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-text"
-          >
-            <input
-              type="radio"
-              name={name}
-              value={w.id}
-              checked={way === w.id}
-              onChange={() => setWay(w.id)}
-              className="mt-1.5 size-4 shrink-0 accent-signal"
-            />
-            <span>
-              <span className="block text-[16px] font-medium">{w.title}</span>
-              <span className="mt-1 block text-[14px] leading-snug text-muted">{w.text}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
-
-      {way === 'own' && (
-        <div className="mt-7">
-          <p className="font-mono m-0 text-[12px] text-muted">Your OpenRouter key</p>
+      {!api.modelSetup ? (
+        <div>
+          <p className="font-mono m-0 text-[12px] text-muted">Add your key in a terminal</p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <code className="font-mono rounded-[6px] border border-edge bg-raise px-3 py-2 text-[13px]">
               remy login
@@ -170,176 +144,145 @@ function StepOne() {
             <CopyCommand command="remy login" title="sign in" what="run" label="Copy" />
           </div>
           <p className="mt-2 mb-0 text-[13px] text-muted">
-            Run that in your terminal. The key goes in the Keychain on this computer, and this page
-            never sees it.
+            This server cannot take a key from the browser. The key goes in the Keychain on this
+            computer.
           </p>
         </div>
-      )}
-      {way === 'local' && (
-        <p className="mt-7 mb-0 text-[14px] text-muted">
-          Remy looks for Ollama on this machine and picks a model it finds.
-        </p>
-      )}
-      {way === 'server' && (
-        <p className="mt-7 mb-0 text-[14px] text-muted">
-          Sign in to your server with its address and token.{' '}
-          <a className="text-text underline" href="#/sign-in">
-            Sign in to a home server
-          </a>
-        </p>
-      )}
-
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/2">
-          Continue
-        </a>
-        <button type="button" className={`${buttonQuiet} px-5 py-3`} onClick={test}>
-          Check the model
-        </button>
-      </div>
-      {note && (
-        <p
-          role="status"
-          className="mt-3 mb-0 flex items-start gap-2 text-[13px] leading-snug text-text"
-        >
-          <Icon
-            name={note.ok ? 'check' : 'close'}
-            className={`mt-0.5 shrink-0 ${note.ok ? 'text-signal' : 'text-muted'}`}
-          />
-          <span className="min-w-0">{note.text}</span>
-        </p>
+      ) : problem ? (
+        <div>
+          <p role="alert" className="m-0 text-[14px] text-text">
+            {problem}
+          </p>
+          <button
+            type="button"
+            className={`${buttonQuiet} mt-4 px-5 py-3`}
+            onClick={() => setTries((n) => n + 1)}
+          >
+            Try again
+          </button>
+        </div>
+      ) : !setup ? (
+        <Skeleton label="Checking which model Remy has" lines={3} />
+      ) : ready && !changing && !saved ? (
+        <div>
+          <p
+            role="status"
+            className="m-0 flex items-start gap-2 text-[14px] leading-snug text-text"
+          >
+            <Icon name="check" className="mt-0.5 shrink-0 text-signal" />
+            <span>
+              Remy is already connected{setup.current?.label ? ` to ${setup.current.label}` : ''},
+              using {setup.current?.model}.
+            </span>
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/2">
+              Continue
+            </a>
+            <button
+              type="button"
+              className={`${buttonQuiet} px-5 py-3`}
+              onClick={() => setChanging(true)}
+            >
+              Use a different one
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <ModelKeyForm setup={setup} onSaved={setSaved} />
+          {saved && (
+            <div className="mt-5">
+              <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/2">
+                Continue
+              </a>
+            </div>
+          )}
+        </div>
       )}
       <SkipSetup />
     </Frame>
   );
 }
 
-// Suggestions, not claims: whether one is connected comes from the server, never from this list.
-const APPS = [
-  { name: 'Gmail', text: 'Read, draft, send with approval', action: 'Connect Gmail' },
-  { name: 'Google Calendar', text: 'See your day, hold time', action: 'Connect Calendar' },
-  { name: 'Notion', text: 'Read your pages', action: 'Connect Notion' },
-];
+const oneLine = (names: string[]) =>
+  names.length === 0
+    ? 'Nothing is connected yet, so I start with the web and files.'
+    : `Connected: ${names.join(', ')}.`;
 
 function StepTwo() {
   const api = useApi();
-  const [apps, setApps] = useState<ConnectedApp[] | null>(null);
+  const [monthly] = useSetting('budget.month');
+  const [perTask] = useSetting('budget.task');
+  const [code] = useSetting('currency.code');
+  const [rate] = useSetting('currency.rate');
+  const [apps, setApps] = useState<ConnectedApp[]>([]);
+  const [text, setText] = useState('');
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
   useEffect(() => {
     // Onboarding is reachable without a session, and a 401 here would send the person to sign-in
     // mid-setup. So ask only when there is a session to ask with; otherwise claim nothing.
     if (!hasToken()) return;
     let live = true;
     api.connections().then(
-      (d) => {
-        if (live) setApps(d.apps);
-      },
-      () => {
-        // A server that cannot answer is not evidence that anything is connected.
-        if (live) setApps([]);
-      },
+      (d) => live && setApps(d.apps),
+      () => {}, // a server that cannot answer is not evidence that anything is connected
     );
     return () => {
       live = false;
     };
   }, [api]);
-  const state = (name: string) =>
-    apps?.find((a) => a.name.toLowerCase() === name.toLowerCase())?.status;
+  const connected = apps.filter((a) => a.status === 'connected').map((a) => a.name);
+  const ask = async () => {
+    const prompt = text.trim();
+    if (!prompt || sending) return;
+    setSending(true);
+    setError('');
+    try {
+      const { chatId } = await api.sendMessage(prompt, undefined);
+      announceChatsChanged();
+      finish();
+      window.location.hash = `#/chat/${encodeURIComponent(chatId)}`;
+    } catch (e) {
+      setError(describeError(e, 'Remy could not start that. Try again.'));
+    } finally {
+      setSending(false);
+    }
+  };
+  const spending = spendingLine({ monthly, perTask, code, rate });
   return (
     <Frame
       at={1}
-      title="Connect the apps you use."
-      lead="Start with what you use every day. You can add or remove any of these later. Skip this and Remy still works with files and the web."
-    >
-      <ul className="m-0 grid gap-2.5 p-0">
-        {APPS.map((a) => (
-          <li
-            key={a.name}
-            className="flex list-none flex-wrap items-center gap-x-4 gap-y-3 rounded-[10px] border border-edge bg-surface px-4 py-4"
-          >
-            <span
-              aria-hidden="true"
-              className="font-mono grid size-[26px] shrink-0 place-items-center rounded-md border border-edge-hi text-[12px] text-muted"
-            >
-              {a.name[0]}
-            </span>
-            <span className="min-w-0 flex-1 basis-40">
-              <span className="block text-[16px] font-medium">{a.name}</span>
-              <span className="mt-0.5 block text-[14px] text-muted">{a.text}</span>
-            </span>
-            {state(a.name) === 'connected' ? (
-              <span className="font-mono text-[13px] text-muted">Connected</span>
-            ) : state(a.name) === 'needs_signin' ? (
-              <a className={`${buttonQuiet} px-4 py-2.5 no-underline`} href="#/connections">
-                Needs a sign-in
-              </a>
-            ) : (
-              <a className={`${buttonQuiet} px-4 py-2.5 no-underline`} href="#/connections/add">
-                {a.action}
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-6 flex flex-wrap gap-3">
-        <a className={`${buttonPrimary} px-5 py-3 no-underline`} href="#/welcome/3">
-          Next: ask for something
-        </a>
-        <a className={`${buttonQuiet} px-5 py-3 no-underline`} href="#/welcome/3">
-          Skip for now
-        </a>
-      </div>
-      <SkipSetup />
-    </Frame>
-  );
-}
-
-const TRY = [
-  'Find three flights to Lisbon under £350',
-  'What do I still owe Dana before the audit?',
-  'Tidy my Downloads folder, show me before moving anything',
-];
-
-function StepThree() {
-  const api = useApi();
-  const [text, setText] = useState('');
-  const [error, setError] = useState('');
-  const start = async () => {
-    const prompt = text.trim();
-    if (!prompt) return;
-    try {
-      const { taskId } = await api.startTask(prompt);
-      finish();
-      window.location.hash = `#/tasks/${encodeURIComponent(taskId)}`;
-    } catch (e) {
-      setError(describeError(e, 'Remy could not start that. Try again.'));
-    }
-  };
-  return (
-    <Frame
-      at={2}
-      title="What do you need done?"
-      lead="Anything you would do on a computer. Start small. Remy shows its work and asks before it sends or spends."
+      title="You are set. What do you need done?"
+      lead={`I can search the web, read pages and work with files in my own folder. ${oneLine(connected)} Add Gmail, Calendar and more any time in Connections.`}
     >
       <div className="flex gap-3 rounded-[14px] border border-edge-hi bg-surface p-3.5 focus-within:border-text">
         <textarea
           aria-label="What you need done"
-          placeholder="Summarise this week's emails from Dana"
+          placeholder="Ask anything you would do on a computer"
           rows={3}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              void ask();
+            }
+          }}
           className="min-w-0 flex-1 resize-none border-0 bg-transparent p-1.5 text-[17px] text-text outline-none placeholder:text-muted"
         />
         <button
           type="button"
           className={`${buttonPrimary} h-fit px-5 py-3`}
-          disabled={!text.trim()}
-          onClick={start}
+          disabled={!text.trim() || sending}
+          onClick={ask}
         >
           Ask Remy
         </button>
       </div>
       {error && (
-        <p role="alert" className="mt-3 mb-0 text-[13px] text-muted">
+        <p role="alert" className="mt-3 mb-0 text-[14px] text-text">
           {error}
         </p>
       )}
@@ -347,7 +290,7 @@ function StepThree() {
         Or try one of these
       </h2>
       <ul className="m-0 grid gap-2.5 p-0">
-        {TRY.map((t) => (
+        {firstSuggestions({ code, rate }).map((t) => (
           <li key={t} className="list-none">
             <button
               type="button"
@@ -358,6 +301,20 @@ function StepThree() {
             </button>
           </li>
         ))}
+      </ul>
+      <ul className="mt-6 mb-0 grid gap-1.5 p-0 text-[13px] leading-snug text-muted">
+        <li className="list-none">
+          {spending.cap}{' '}
+          <a className="text-text underline" href="#/settings/budget">
+            Change it in Settings.
+          </a>
+        </li>
+        <li className="list-none">
+          {spending.currency}{' '}
+          <a className="text-text underline" href="#/settings/budget">
+            Change it in Settings.
+          </a>
+        </li>
       </ul>
       <SkipSetup />
     </Frame>
@@ -382,7 +339,7 @@ function SkipSetup() {
 }
 
 export function Welcome({ step = '1' }: { step?: string }) {
-  if (step === '2') return <StepTwo />;
-  if (step === '3') return <StepThree />;
+  // Step 3 was the old "ask" step; an old link to it still lands on the right screen.
+  if (step === '2' || step === '3') return <StepTwo />;
   return <StepOne />;
 }

@@ -20,7 +20,7 @@ import { Review } from './pages/tasks/Review.tsx';
 import { Task } from './pages/tasks/Task.tsx';
 import { Quiet } from './pages/welcome/Quiet.tsx';
 import { SignIn } from './pages/welcome/SignIn.tsx';
-import { useFirstRun } from './pages/welcome/useFirstRun.ts';
+import { useFirstRun, useModelGate } from './pages/welcome/useFirstRun.ts';
 import { Welcome } from './pages/welcome/Welcome.tsx';
 import { matchRoute, useHashPath } from './router.ts';
 import { applyServerPrefs, bindServerSettings } from './settings.ts';
@@ -85,6 +85,7 @@ const BARE = new Set(['welcome', 'sign-in', 'quiet']);
 export function App() {
   const path = useHashPath();
   useFirstRun(path);
+  useModelGate(path);
   const api = useApi();
   const bare = BARE.has(matchRoute(path).name);
   const main = useRef<HTMLElement>(null);
