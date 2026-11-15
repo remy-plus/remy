@@ -453,3 +453,17 @@ describe('firstReplyOnly', () => {
     expect(r.grades.some((g) => g.ungradable)).toBe(true);
   });
 });
+
+describe('asksBack', () => {
+  it('waits for a reply to a real question, not to an offer', async () => {
+    const { asksBack } = await import('./runner.ts');
+    expect(asksBack('A chickpea curry. Anything you avoid or are allergic to?')).toBe(true);
+    expect(asksBack('Which city are you in?')).toBe(true);
+    expect(asksBack('Tonight, try a curry. Want the recipe?')).toBe(false);
+    expect(asksBack('The Lumen Riser fits. Should I check the stock?')).toBe(false);
+    expect(asksBack('Would you like the full list?')).toBe(false);
+    expect(asksBack('Hi. Nothing new. What can I help you with?')).toBe(false);
+    expect(asksBack('Is there anything else you need?')).toBe(false);
+    expect(asksBack('Done.')).toBe(false);
+  });
+});

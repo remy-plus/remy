@@ -31,6 +31,21 @@ const MAX_FOLLOW_UPS = 2;
 /** What the scripted human says once its answers run out, as a real person would. */
 const NO_MORE_ANSWERS = 'I have nothing more to add. Finish with what you have.';
 
+/**
+ * Whether an answer waits for a reply. An offer at the end ("Want the recipe?", "Should I check the
+ * stock?") does not: a person who does not want it says nothing, so the run ends there. A real
+ * question ("Anything you avoid or are allergic to?") does, and gets the case's next answer.
+ */
+export function asksBack(answer: string): boolean {
+  const text = answer.trim();
+  if (!text.endsWith('?')) return false;
+  const last = text.split(/(?<=[.!?])\s+/).at(-1) ?? text;
+  // Offers and open invitations ("What can I help you with?") ask for nothing the run needs.
+  return !/^(?:(?:do|would) you (?:want|like)|want (?:me|the|a|more|it)|shall i|should i|need anything else|anything else|is there anything|(?:what|how) (?:else )?(?:can|should|may) i\b|anything (?:else )?i can)\b/i.test(
+    last,
+  );
+}
+
 /** What the app says before each message. A fixed moment, so runs repeat and cassettes hold. */
 export const EVAL_SITUATION = `Situation when the user sent the next message (from Remy, not the user):
 - Local time: Friday, 6 November 2026 at 10:00 (UTC).`;
@@ -333,7 +348,7 @@ export async function runCase(
       taskIds.push(taskId);
       const outcome = await drive(taskId);
       const answer = outcome?.status === 'succeeded' ? (outcome.answer ?? '') : '';
-      if (!answer.trim().endsWith('?') || turn >= MAX_FOLLOW_UPS) break;
+      if (!asksBack(answer) || turn >= MAX_FOLLOW_UPS) break;
       // Like the chat, the turn records its pasted parts, the tools behind its answer and declined cards.
       const done = await rt.state(taskId);
       if (done.tainted) earlierTainted = true;
