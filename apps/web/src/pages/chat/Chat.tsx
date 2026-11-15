@@ -7,6 +7,7 @@ import { Skeleton } from '../../components/Skeleton.tsx';
 import { useEndedAnnouncement } from '../../lib/announce.ts';
 import { announceChatsChanged } from '../../lib/chat-events.ts';
 import { describeError } from '../../lib/errors.ts';
+import { useKeyboardInset } from '../../lib/keyboard.ts';
 import type { MindState } from '../../lib/mind.ts';
 import { suggestionsFor } from '../../lib/suggestions.ts';
 import { ago, greeting } from '../../lib/when.ts';
@@ -208,6 +209,7 @@ function OpenChat({ id }: { id: string }) {
     };
   }, [busy, streamed, load]);
 
+  useKeyboardInset();
   const ended = useEndedAnnouncement(chat?.turns);
   const turnCount = chat?.turns.length ?? 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when a turn is added
@@ -327,7 +329,10 @@ function OpenChat({ id }: { id: string }) {
         ))}
         <div ref={end} />
       </div>
-      <div className="sticky bottom-0 bg-bg px-4 pt-2 pb-[max(12px,env(safe-area-inset-bottom))]">
+      <div
+        style={{ bottom: 'var(--kb-inset, 0px)' }}
+        className="sticky bg-bg px-4 pt-2 pb-[max(12px,calc(env(safe-area-inset-bottom)-var(--kb-inset,0px)))]"
+      >
         {/* The feed fades under the composer instead of being sliced by its top edge. */}
         <div
           aria-hidden="true"
