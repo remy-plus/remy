@@ -97,6 +97,16 @@ export function ApprovalDialog({
     };
   }, []);
 
+  // Start on the main action, but at the top of the card: the browser scrolls a focused button into view,
+  // which on a small phone hides the title and who it goes to, the very things to read before deciding.
+  const ready = !loading && Boolean(card);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d || !ready) return;
+    d.querySelector<HTMLElement>('[data-approve]')?.focus({ preventScroll: true });
+    d.scrollTop = 0;
+  }, [ready]);
+
   const risk = card ? RISK[card.risk] : RISK.read;
   const detail = card?.detail;
   const effects = detail?.effects ?? [{ label: risk.kind, value: '' }];
@@ -209,8 +219,7 @@ export function ApprovalDialog({
                 <>
                   <button
                     type="button"
-                    // biome-ignore lint/a11y/noAutofocus: a dialog starts on its main action
-                    autoFocus
+                    data-approve
                     disabled={busy}
                     onClick={() => decide(true)}
                     className={`${primaryButton} flex items-center justify-center gap-3 px-5 py-3 text-[14px]`}

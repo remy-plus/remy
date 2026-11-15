@@ -31,6 +31,19 @@ describe('Approval dialog', () => {
       expect(b.textContent?.trim()).toBeTruthy();
   });
 
+  it('starts on the main action without scrolling the card away from its title', async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
+      const dialog = await openFromTask(createMockApi());
+      const send = within(dialog).getByRole('button', { name: /^Send as you/ });
+      await waitFor(() => expect(document.activeElement).toBe(send));
+      // A plain focus() would scroll a long card down to its buttons, past who it goes to.
+      expect(focus.mock.calls.some((c) => c[0]?.preventScroll === true)).toBe(true);
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
   it('says what happens after the answer, before it is given', async () => {
     const dialog = await openFromTask(createMockApi());
     expect(
