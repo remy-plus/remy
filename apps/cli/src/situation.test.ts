@@ -63,4 +63,39 @@ describe('situationBlock', () => {
     expect(lines[2]).toBe('- While the person was away (a minute ago): x.');
     expect(situationBlock(base)).not.toContain('away');
   });
+
+  it('says where the person is, with how long ago it was set, only when a location is set', () => {
+    const base = { now, timeZone: 'America/New_York', background: [], connections: [] };
+    const out = situationBlock({
+      ...base,
+      location: { place: 'Philadelphia, Pennsylvania, US', setAt: '2026-10-27T01:40:00Z' },
+    });
+    expect(out).toContain(
+      '- Where the person is: Philadelphia, Pennsylvania, US (approximate, set 2 days ago).',
+    );
+    expect(situationBlock(base)).not.toContain('Where the person is');
+    expect(situationBlock(base)).not.toContain('Philadelphia');
+  });
+
+  it('does not take the time zone for a location', () => {
+    const out = situationBlock({
+      now,
+      timeZone: 'America/New_York',
+      background: [],
+      connections: [],
+    });
+    expect(out).not.toMatch(/New York/);
+    expect(out).not.toContain('Where the person is');
+  });
+
+  it('leaves the line out when the stored time cannot be read', () => {
+    const out = situationBlock({
+      now,
+      timeZone: 'UTC',
+      background: [],
+      connections: [],
+      location: { place: 'Philadelphia', setAt: 'not a date' },
+    });
+    expect(out).not.toContain('Where the person is');
+  });
 });

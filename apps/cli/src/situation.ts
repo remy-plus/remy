@@ -3,6 +3,7 @@
 // like the moment the user spoke and does not disturb the prompt cache afterwards.
 import type { BgState } from './background.ts';
 import type { ConnectionRow } from './connections-view.ts';
+import { setAgo } from './location.ts';
 
 export interface BackgroundTask {
   id: string;
@@ -20,6 +21,8 @@ export interface SituationInput {
   capabilities?: string;
   /** What is new since the person was last here (`awayLine`); absent when nothing is. */
   away?: string;
+  /** Where the person is, when they turned location on; never guessed from the time zone. */
+  location?: { place: string; setAt: string };
 }
 
 /** Tasks read to build the away line: enough for the three it names, few enough to be quick. */
@@ -59,6 +62,11 @@ export function situationBlock(i: SituationInput): string {
   const signin = i.connections.filter((c) => c.status === 'needs_signin').map((c) => c.name);
   if (on.length) lines.push(`- Connected apps: ${on.join(', ')}.`);
   if (signin.length) lines.push(`- Need sign-in (remy connect auth <name>): ${signin.join(', ')}.`);
+  if (i.location) {
+    const at = new Date(i.location.setAt);
+    if (!Number.isNaN(at.getTime()))
+      lines.push(`- Where the person is: ${i.location.place} (approximate, ${setAgo(at, i.now)}).`);
+  }
   if (i.capabilities) lines.push(i.capabilities);
   return lines.join('\n');
 }

@@ -158,6 +158,7 @@ import { createTimeline, fmtCost, styler, totalsLine, truncate } from './format.
 import { loadHelperRoles } from './helper-roles.ts';
 import { improve } from './improve.ts';
 import { type LastSeen, openLastSeen } from './last-seen.ts';
+import { createGeocoder, GEOCODER_HOST, locationFor, openLocation } from './location.ts';
 import {
   defaultModelFor,
   listLogins,
@@ -207,6 +208,7 @@ import { createConnectMount, writeComputers } from './serve-connect.ts';
 import { createFilesMount } from './serve-files.ts';
 import { homeRoutes } from './serve-home.ts';
 import { createLiveBus } from './serve-live.ts';
+import { createLocationMount } from './serve-location.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
 import {
@@ -1244,6 +1246,8 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           connections: mcp?.list() ?? [],
           capabilities: capabilities(),
           ...(awayText && { away: awayText }),
+          // Read at each message, so turning it on or off in the web app applies at once.
+          ...locationFor(home),
         });
       },
       ...(env.REMY_TIMING === 'on' && {
@@ -2793,6 +2797,18 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                 ledger: voiceLedger,
                 assertBudget: () => assertUnderMonthlyCap(webPrefs, spend),
                 onKey: (k) => addSecret('FISH_API_KEY', k),
+              }),
+              createLocationMount({
+                store: openLocation(home),
+                // Only OpenStreetMap's reverse geocoder, through the same public-address guard as the fetch tool.
+                geocoder: createGeocoder(
+                  createScopedFetch({
+                    allow: [GEOCODER_HOST],
+                    timeoutMs: 8000,
+                    maxBytes: 64_000,
+                    maxRedirects: 0,
+                  }),
+                ),
               }),
               createBrainMount({ memory: memory(), semantic: noteEmbedder().source }),
               createFilesMount({ store }),
