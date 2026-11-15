@@ -153,6 +153,17 @@ body {
 .page-in {
   animation: rise 0.45s cubic-bezier(0.22, 0.7, 0.2, 1) both;
 }
+.fade-in {
+  animation: fade-in 0.25s ease-out both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .rise {
   animation: rise 0.5s cubic-bezier(0.22, 0.7, 0.2, 1) both;
   animation-delay: calc(var(--i, 0) * 70ms);
@@ -174,6 +185,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .page-in,
   .rise,
+  .fade-in,
   .pop {
     animation: none;
   }

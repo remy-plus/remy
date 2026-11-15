@@ -1,23 +1,18 @@
 // The front door: a conversation with Remy. `id` is absent for a new chat.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type ChatSummary, type ChatView, useApi } from '../../api/index.tsx';
+import { type ChatSummary, type ChatView, type ConnectedApp, useApi } from '../../api/index.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
 import { describeError } from '../../lib/errors.ts';
 import type { MindState } from '../../lib/mind.ts';
+import { suggestionsFor } from '../../lib/suggestions.ts';
 import { ago, greeting } from '../../lib/when.ts';
+import { useSetting } from '../../settings.ts';
 import { Composer } from './Composer.tsx';
 import { Turn } from './Feed.tsx';
 
 const POLL_MS = 2000;
-
-const SUGGESTIONS = [
-  'Summarise the files in my Documents folder',
-  'Find flights to Lisbon in March under 200 pounds',
-  'Draft a reply to my latest email from Dana',
-  'Plan my week around the dentist on Tuesday',
-];
 
 interface VoiceNow {
   state: MindState | null;
@@ -44,8 +39,28 @@ function useLastChat(): ChatSummary | null {
   return last;
 }
 
+/** Starting ideas that fit what is connected. Until the apps are known, none that need an app. */
+function useSuggestions(): string[] {
+  const api = useApi();
+  const [code] = useSetting('currency.code');
+  const [rate] = useSetting('currency.rate');
+  const [apps, setApps] = useState<ConnectedApp[]>([]);
+  useEffect(() => {
+    let live = true;
+    api
+      .connections()
+      .then((c) => live && setApps(c.apps))
+      .catch(() => {}); // the generic ideas are fine without it
+    return () => {
+      live = false;
+    };
+  }, [api]);
+  return suggestionsFor({ apps, currency: { code, rate } });
+}
+
 function EmptyChat() {
   const api = useApi();
+  const suggestions = useSuggestions();
   const [text, setText] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -98,8 +113,8 @@ function EmptyChat() {
         </a>
       )}
       <ul className="m-0 mt-4 flex w-full list-none flex-col gap-0.5 p-0 text-left">
-        {SUGGESTIONS.map((s, i) => (
-          <li key={s} className="rise" style={{ '--i': i + 2 } as React.CSSProperties}>
+        {suggestions.map((s) => (
+          <li key={s} className="fade-in">
             <button
               type="button"
               onClick={() => setText(s)}
