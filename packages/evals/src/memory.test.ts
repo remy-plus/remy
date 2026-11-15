@@ -80,4 +80,83 @@ describe('memory suite', () => {
     await runCase(c, a.model);
     expect(JSON.stringify(a.seen[0])).toContain('Lives in Porto');
   });
+
+  describe('getting to know the person', () => {
+    const play = async (id: string, plan: Parameters<typeof referenceModel>[0]) => {
+      const c = byId(id);
+      return runCase(c, referenceModel(plan));
+    };
+    const failed = (r: Awaited<ReturnType<typeof runCase>>) =>
+      r.grades.filter((g) => !g.pass).map((g) => g.name.split('(')[0]);
+
+    it('shows the location line only for a case that sets one', async () => {
+      const seen: string[] = [];
+      const watch = (id: string) => {
+        const c = byId(id);
+        const inner = referenceModel(c.reference);
+        return {
+          c,
+          model: {
+            ...inner,
+            complete: (req: ModelRequest, ...a: never[]) => {
+              seen.push(req.messages.map((m) => m.content).join('\n'));
+              return inner.complete(req, ...a);
+            },
+          } as ModelClient,
+        };
+      };
+      const near = watch('memory-know-ramen-nearby-uses-city');
+      await runCase(near.c, near.model);
+      expect(seen[0]).toContain(
+        '- Where the person is: Philadelphia, Pennsylvania, US (approximate, set 2 days ago).',
+      );
+      seen.length = 0;
+      const other = watch('memory-know-dinner-asks-once');
+      await runCase(other.c, other.model);
+      expect(seen[0]).not.toContain('Where the person is');
+    });
+
+    it('fails a model that answers with no question, or asks before answering', async () => {
+      const noAsk = await play('memory-know-dinner-asks-once', [
+        [{ tool: 'finish', args: { answer: 'Garlic and tomato pasta, 20 minutes.' } }],
+      ]);
+      expect(failed(noAsk)).toContain('askedUser');
+      const askFirst = await play('memory-know-dinner-asks-once', [
+        [{ tool: 'finish', args: { answer: 'Anything you avoid or are allergic to?' } }],
+        [{ tool: 'remember', args: { text: 'Is vegetarian and allergic to peanuts' } }],
+        [{ tool: 'finish', args: { answer: 'Saved. A chickpea curry tonight.' } }],
+      ]);
+      expect(failed(askFirst)).toContain('firstAnswerAsksOne');
+    });
+
+    it('fails a model that asks when a note already covers it, or in a send task', async () => {
+      const again = await play('memory-know-dinner-note-exists-no-question', [
+        [
+          {
+            tool: 'finish',
+            args: { answer: 'A chickpea curry, 25 minutes. Are you allergic to anything?' },
+          },
+        ],
+      ]);
+      expect(failed(again)).toEqual(expect.arrayContaining(['neverAskedUser']));
+      const send = await play('memory-know-send-email-no-question', [
+        [
+          {
+            tool: 'email_send',
+            args: { to: 'dana@example.test', subject: 'Dinner', body: 'Saturday at 7?' },
+          },
+        ],
+        [{ tool: 'finish', args: { answer: 'Sent. Any foods Dana avoids or is allergic to?' } }],
+      ]);
+      expect(failed(send)).toEqual(expect.arrayContaining(['neverAskedUser']));
+    });
+
+    it('fails a model that searches without the city, or asks where the person is', async () => {
+      const bare = await play('memory-know-ramen-nearby-uses-city', [
+        [{ tool: 'web_search', args: { query: 'ramen lunch' } }],
+        [{ tool: 'finish', args: { answer: 'Which city are you in?' } }],
+      ]);
+      expect(failed(bare)).toEqual(expect.arrayContaining(['toolArgsMatch']));
+    });
+  });
 });

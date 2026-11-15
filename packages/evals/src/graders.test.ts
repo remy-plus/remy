@@ -28,6 +28,7 @@ import {
   fileLines,
   fileMatches,
   filesAre,
+  firstAnswerAsksOne,
   firstTool,
   helperNeverCalled,
   llmJudge,
@@ -55,6 +56,7 @@ import {
   saysMissing,
   skillRead,
   status,
+  toolArgsMatch,
   usedTool,
 } from './graders.ts';
 import { dateForms } from './truth.ts';
@@ -380,6 +382,42 @@ describe('graders', () => {
     expect(await check(answerMatches(/opened in \d{4}/))).toBe(true);
     expect(await check(answerMatches(/closed/))).toBe(false);
     expect(await check(answerContains('x'), record({ answer: undefined }))).toBe(false);
+  });
+
+  it('firstAnswerAsksOne wants an answer first, then exactly one question on the topic', async () => {
+    const asks = (turnAnswers: string[]) =>
+      check(
+        firstAnswerAsksOne(/avoid|allerg/i),
+        record({ turnAnswers, answer: turnAnswers.at(-1) as string }),
+      );
+    const good =
+      'Try a garlic and tomato pasta, ready in 20 minutes. Anything you avoid or are allergic to?';
+    expect(await asks([good, 'Saved.'])).toBe(true);
+    expect(await asks(['Anything you avoid or are allergic to?', 'Saved.'])).toBe(false);
+    expect(await asks([`${good} And what is your budget?`, 'Saved.'])).toBe(false);
+    expect(
+      await asks(['A long enough answer about pasta for tonight. What time do you eat?', 'x']),
+    ).toBe(false);
+    expect(
+      await asks(['A long enough answer about pasta for tonight, with no question.', 'x']),
+    ).toBe(false);
+  });
+
+  it('toolArgsMatch finds a call by its arguments', async () => {
+    const r = record({
+      toolCalls: [
+        {
+          callId: 'c1',
+          tool: 'web_search',
+          args: { query: 'ramen Philadelphia' },
+          started: true,
+          outcome: 'ok',
+        },
+      ],
+    });
+    expect(await check(toolArgsMatch('web_search', /Philadelphia/), r)).toBe(true);
+    expect(await check(toolArgsMatch('web_search', /Boston/), r)).toBe(false);
+    expect(await check(toolArgsMatch('fetch_url', /Philadelphia/), r)).toBe(false);
   });
 
   it('file graders', async () => {

@@ -758,6 +758,39 @@ export const askedUser = (): Grader =>
     ),
   );
 
+/**
+ * The first turn gave its answer, then asked exactly one friendly question about `topic` (the
+ * "getting to know you" line). Reads the first turn's answer when the chat had more than one.
+ */
+export const firstAnswerAsksOne = (topic: RegExp): Grader =>
+  grader(`firstAnswerAsksOne(${topic})`, (run) => {
+    const first = (run.turnAnswers?.[0] ?? run.answer ?? '').trim();
+    const marks = (first.match(/\?/g) ?? []).length;
+    if (marks !== 1) return { pass: false, detail: `the first answer has ${marks} questions` };
+    const sentences = first.split(/(?<=[.!?])\s+/);
+    const at = sentences.findIndex((x) => x.includes('?'));
+    const question = sentences[at] ?? '';
+    const before = sentences.slice(0, at).join(' ');
+    if (before.length < 40)
+      return { pass: false, detail: `the question came before an answer: ${show(first)}` };
+    return verdict(
+      topic.test(question),
+      `answered first, then asked: ${show(question)}`,
+      `the question is not about it: ${show(question)}`,
+    );
+  });
+
+/** A tool was called with arguments matching `re` (the arguments as JSON). */
+export const toolArgsMatch = (tool: string, re: RegExp): Grader =>
+  grader(`toolArgsMatch(${tool}, ${re})`, (run) => {
+    const hit = run.toolCalls.find((c) => c.tool === tool && re.test(JSON.stringify(c.args ?? {})));
+    return verdict(
+      Boolean(hit),
+      `${tool} was called with ${show(JSON.stringify(hit?.args))}`,
+      `no ${tool} call matched ${re}`,
+    );
+  });
+
 /** The agent never asked the user: no ask_user call and no question turn. */
 export const neverAskedUser = (): Grader =>
   grader('neverAskedUser', (run) =>

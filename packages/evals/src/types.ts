@@ -122,6 +122,11 @@ export interface EvalCase {
     memory?: { text: string; kind?: MemoryKind; created?: string }[];
     /** What happened while the person was away, for `whats_new`. Present (even empty) offers the tool. */
     away?: AwayItem[];
+    /**
+     * Where the person is, as the app's situation block says it (a place name). The block gets the
+     * line "Where the person is: <place> (approximate, set 2 days ago)." Absent: no such line.
+     */
+    location?: string;
     /** Personalising is off: the notes exist on disk but are not offered, recalled or saved to. */
     memoryOff?: boolean;
     /** Past tasks of the user, for `recall` (needs `memory`). `tainted`: it read untrusted content. */
@@ -249,6 +254,8 @@ export interface RunRecord {
   requestChars?: number[];
   /** Times the agent stopped for the user: mid-task pauses, plus chat turns after a closing question. */
   followUps?: number;
+  /** For a chat of more than one turn: each turn's answer, in order. */
+  turnAnswers?: string[];
   /** For `firstReplyOnly` cases: what the model's first reply held. */
   firstReply?: { text?: string; calls: { tool: string; args: unknown }[] };
   /** Tools that started without an approval they needed, or after a denial. */

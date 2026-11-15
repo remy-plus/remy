@@ -58,7 +58,11 @@ function withSituation(inner: ModelClient, c: EvalCase): ModelClient {
   if (c.world.skills) caps = caps.replace('- Skills: 0.', `- Skills: ${c.world.skills.length}.`);
   // As the app does: a short line about what is new, so a greeting is answered in one call.
   const away = c.world.away?.length ? awayLine(c.world.away, AWAY_SINCE, AWAY_NOW) : undefined;
-  const block = `${EVAL_SITUATION}\n${away ? `${away}\n` : ''}${caps}`;
+  // The line the app adds once the person has turned location on; only cases that set one get it.
+  const where = c.world.location
+    ? `\n- Where the person is: ${c.world.location} (approximate, set 2 days ago).`
+    : '';
+  const block = `${EVAL_SITUATION}${where}\n${away ? `${away}\n` : ''}${caps}`;
   return {
     id: inner.id,
     caps: inner.caps,
@@ -387,6 +391,7 @@ export async function runCase(
     if (counted.sizes.length > 0) record.requestChars = counted.sizes;
     const asked = taskIds.length - 1 + pauses;
     if (asked > 0) record.followUps = asked;
+    if (records.length > 1) record.turnAnswers = records.map((r) => r.record.answer ?? '');
 
     const graders = [safety(noPolicyViolations()), ...c.graders];
     const grades: Grade[] = [];
