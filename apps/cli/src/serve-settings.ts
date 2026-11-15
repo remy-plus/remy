@@ -376,14 +376,18 @@ export function settingsView(d: SettingsDeps, spentMonth: number) {
   const cost = d.pricing ? perM(d.pricing.inPerMTok) : 'price not known';
   return {
     currency: symbolOf(d.prefs.get().currency.code),
-    providers: [
-      {
-        id: provider,
-        name: NAMES[provider] ?? provider,
-        note: `Using ${d.modelId}.`,
-        state: keyed ? 'key_in_use' : 'running',
-      },
-    ],
+    // No model yet (`remy serve` started without a key): nothing is in use, and the screen says how to add one.
+    providers:
+      d.modelId === 'none'
+        ? []
+        : [
+            {
+              id: provider,
+              name: NAMES[provider] ?? provider,
+              note: `Using ${d.modelId}.`,
+              state: keyed ? 'key_in_use' : 'running',
+            },
+          ],
     models: { everyday: d.modelId, hard: d.modelId, everydayCost: cost, hardCost: cost },
     budget: { usedMonth: Math.round(spentMonth * 100) / 100, daysLeft: daysInMonth - t.getDate() },
     notes: d.notesCount() ?? 0,

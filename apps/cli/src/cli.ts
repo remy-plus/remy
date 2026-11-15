@@ -174,6 +174,7 @@ import { openInBrowser } from './mcp-oauth.ts';
 import { type RegistryApp, searchRegistry } from './mcp-registry.ts';
 import { openSecretStore, type SecretStore } from './mcp-secrets.ts';
 import { type MemoryStore, openMemory, personaliseOn, plainMemory } from './memory.ts';
+import { createModelSlot, NoModelError } from './model-slot.ts';
 import { cardNotification, notificationFor, notify, type RunScript } from './notify.ts';
 import { createOnboarding, type Onboarding } from './onboarding-flow.ts';
 import { continueCommand, defaultMore, moreFor, pauseQuestion } from './pause.ts';
@@ -198,7 +199,7 @@ import {
   vmStatus,
   waitForVm,
 } from './search-vm.ts';
-import { listenServe } from './serve.ts';
+import { HttpError, listenServe } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
 import { resolveServeBind } from './serve-bind.ts';
 import { createBrainMount } from './serve-brain.ts';
@@ -209,6 +210,7 @@ import { createFilesMount } from './serve-files.ts';
 import { homeRoutes } from './serve-home.ts';
 import { createLiveBus } from './serve-live.ts';
 import { createLocationMount } from './serve-location.ts';
+import { createModelSetupMount } from './serve-model-setup.ts';
 import { reviewRoutes } from './serve-review.ts';
 import { createSchedulesMount } from './serve-schedules.ts';
 import {
@@ -849,17 +851,17 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       REMY_BASE_URL: explicitUrl ?? saved?.baseUrl ?? file.baseUrl,
     };
     if (!e.REMY_PROFILE && !e.REMY_BASE_URL)
-      throw new Error(
+      throw new NoModelError(
         'Remy needs a model first. Run remy login to connect one, or set REMY_PROFILE and REMY_MODEL.',
       );
     if (!e.REMY_MODEL)
-      throw new Error(
+      throw new NoModelError(
         'No model is chosen. Pass --model <id> or set REMY_MODEL, or run remy login again and name a default.',
       );
     const keyEnv = e.REMY_PROFILE ? PROFILES[e.REMY_PROFILE]?.keyEnv : undefined;
     if (saved?.key && !e.REMY_API_KEY && !(keyEnv && e[keyEnv])) e.REMY_API_KEY = saved.key;
     if (keyEnv && !e.REMY_API_KEY && !e[keyEnv])
-      throw new Error(
+      throw new NoModelError(
         `The ${e.REMY_PROFILE} profile needs an API key. Run remy login, or set ${keyEnv}.`,
       );
     return e;
@@ -2562,10 +2564,19 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         // The address is checked first, so a refused one never opens the store or a connection.
         const bind = resolveServeBind({ host: flags.host, port: flags.port }, env);
         const file = cfg();
-        const model = deps.model ?? modelFor(file);
+        // With no key yet the server still starts: the web app asks for one and fills the slot, no restart.
+        const slot = (() => {
+          try {
+            return createModelSlot(deps.model ?? modelFor(file));
+          } catch (e) {
+            if (e instanceof NoModelError) return createModelSlot();
+            throw e;
+          }
+        })();
+        const model = slot.client;
         const live = createLiveBus();
         const { runtime, warm } = makeRuntime(file, {
-          model: true,
+          model,
           hooks: { onLive: (id, e) => live.publish(id, e) },
         });
         await mcp?.ready;
@@ -2582,13 +2593,14 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const webPrefs = openWebPrefs(home, () => loadPrefs(home).trust);
         const signInCodes = createSignInCodes();
         // Only for the Settings screen's provider line; a model passed in by a test has no profile.
-        const provider = (() => {
+        let provider = (() => {
           try {
             return providerEnv(file).REMY_PROFILE;
           } catch {
             return undefined;
           }
         })();
+        let setupKeys = 0;
         const voiceLedger = openVoiceLedger(home, undefined, (line) => out(st.dim(line)));
         const spend = createSpend(store, undefined, (at) => voiceLedger.monthUsd(at));
         let monthLeft = Number.POSITIVE_INFINITY; // set by beforeStart, read by config
@@ -2648,9 +2660,16 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
                   store,
                   prefs: webPrefs,
                   version: version(),
-                  provider,
-                  modelId: model.id,
-                  pricing: model.caps.pricing,
+                  // Read on each use: a key added in the browser changes them without a restart.
+                  get provider() {
+                    return provider;
+                  },
+                  get modelId() {
+                    return model.id;
+                  },
+                  get pricing() {
+                    return model.caps.pricing;
+                  },
                   address: () => `${bind.host}:${bind.port}`,
                   notesCount,
                   needsKey: (p) => Boolean(PROFILES[p]?.keyEnv),
@@ -2683,6 +2702,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
               );
             },
             beforeStart: async () => {
+              if (!slot.ready())
+                throw new HttpError(
+                  409,
+                  'Remy needs a model before it can answer. Add a key to get started.',
+                );
               await assertUnderMonthlyCap(webPrefs, spend);
               monthLeft = await monthRemaining(webPrefs, spend);
             },
@@ -2697,6 +2721,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
             alwaysAllow: (tool, risk) => standing().add(tool, risk),
             log: (line) => out(st.dim(line)),
             mounts: [
+              createModelSetupMount({
+                credentials: credentials(),
+                slot,
+                build: (p, m, key) =>
+                  modelFromEnv({
+                    REMY_PROFILE: p,
+                    REMY_MODEL: m,
+                    ...(key && { REMY_API_KEY: key }),
+                  }),
+                // Each pasted key is a secret from the moment it arrives, even one that fails the check.
+                onKey: (k) => addSecret(`SETUP_KEY_${setupKeys++}`, k),
+                onSaved: (p) => {
+                  provider = p;
+                },
+                ...(deps.fetch && { fetch: deps.fetch }),
+              }),
               createConnectMount({
                 home,
                 cwd: deps.cwd,

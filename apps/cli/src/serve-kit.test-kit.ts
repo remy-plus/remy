@@ -47,6 +47,8 @@ export interface KitOptions {
   tools?: Tool[];
   /** The built web app to serve. */
   webRoot?: string;
+  /** Every log line the server writes (default: dropped). */
+  log?: (line: string) => void;
   /** A real lockout, to test it (the default never blocks). */
   lockout?: ReturnType<typeof createLockout>;
 }
@@ -81,7 +83,7 @@ export async function startKit(
       tokenHash: () => serveTokenHash(home),
       // Many wrong-token requests in one test must stay 401, not turn into a lockout.
       lockout: opts.lockout ?? { blocked: () => false, fail: () => {} },
-      log: () => {},
+      log: opts.log ?? (() => {}),
       pollMs: 20,
       busyMs: 50,
       mounts: make(home),
