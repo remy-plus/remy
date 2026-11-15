@@ -50,6 +50,10 @@ describe('a note in the person’s own words', () => {
     expect(kind('Is vegetarian', s)).toBe('allow');
     expect(kind('Vegetarian', s)).toBe('allow');
     expect(decide(call('Is vegetarian'), remember, s)).toMatchObject({ via: 'own-words' });
+    const coffee = state(
+      'Please remember two things: I drink my coffee black, and I live in Toronto.',
+    );
+    expect(kind('The user drinks their coffee black.', coffee)).toBe('allow');
   });
 
   it('counts earlier turns of the chat as their words', () => {
