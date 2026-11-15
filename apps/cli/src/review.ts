@@ -76,6 +76,18 @@ function argsLine(args: unknown): string {
     .join(' ');
 }
 
+/** How a task that started without the user came about. */
+export function reviewSource(sched: Schedule | undefined, prompt: string): ReviewSource {
+  if (sched) {
+    try {
+      return parseWhen(sched.when).kind === 'changes' ? 'file watch' : 'schedule';
+    } catch {
+      return 'schedule';
+    }
+  }
+  return /^\[webhook [a-z0-9_-]+\] /.test(prompt) ? 'webhook' : 'background';
+}
+
 export interface ReviewDeps {
   store: EventStore;
   home: string;
@@ -94,15 +106,7 @@ export async function collectReview(d: ReviewDeps): Promise<ReviewItem[]> {
     const marker = readMarker(d.home, t.taskId);
     if (!sched && !marker) continue;
     const state = fold(await d.store.read(t.taskId));
-    let source: ReviewSource = 'background';
-    if (sched) {
-      try {
-        source = parseWhen(sched.when).kind === 'changes' ? 'file watch' : 'schedule';
-      } catch {
-        source = 'schedule';
-      }
-    }
-    if (!sched && /^\[webhook [a-z0-9_-]+\] /.test(state.prompt)) source = 'webhook';
+    const source = reviewSource(sched, state.prompt);
     const did = Object.values(state.calls)
       .sort((a, b) => a.step - b.step)
       .filter((c) => c.result?.ok && c.risk && c.risk !== 'read')
