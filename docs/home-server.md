@@ -48,7 +48,29 @@ The old token stops working at once, and so does every browser signed in with a 
 
 ### Signing in on the same machine
 
-When you run `remy serve` in a terminal on the machine itself, it prints a one-time link such as `http://127.0.0.1:7790/#/sign-in?code=...`; `remy serve --open` also opens it in your browser. Run `remy serve --open` and that is all: it starts Remy and opens the link. With no model set up yet, the server still starts, and the web app asks for a provider and a key (checked with one tiny test message, then saved in the Keychain on a Mac or a private file in `REMY_HOME`, and never shown again). The link signs one browser in without copying the token. It works once and expires after ten minutes, and the code stays after the `#`, so a browser never sends it in a request. The web app trades it for its own session token and removes it from the address bar. The link is not printed when the output is not a terminal (a container's log is kept), and it exists only on a loopback address. If it has expired, restart `remy serve` or paste the token.
+When you run `remy serve` in a terminal on the machine itself, it prints a one-time link such as `http://127.0.0.1:7790/#/sign-in?code=...`; `remy serve --open` also opens it in your browser. Run `remy serve --open` and that is all: it starts Remy and opens the link. With no model set up yet, the server still starts, and the web app asks for a provider and a key (checked with one tiny test message, then saved in the Keychain on a Mac or a private file in `REMY_HOME`, and never shown again). The link signs one browser in without copying the token. It works once and expires after ten minutes, and the code stays after the `#`, so a browser never sends it in a request. The web app trades it for its own session token and removes it from the address bar. The link is not printed when the output is not a terminal (a container's log is kept). If it has expired, run `remy serve link` in another terminal (below) or paste the token.
+
+### Signing in on your phone with a QR code
+
+On your home Wi-Fi, start Remy so it listens on every interface, and scan the code it draws:
+
+```
+REMY_SERVE_ALLOW_REMOTE=on remy serve --host 0.0.0.0
+```
+
+For each address a phone can reach (your laptop's Wi-Fi address, say `192.168.1.20`), the terminal prints a QR code and, under it, the same link as text. Open the phone's camera, point it at the code and tap the link. The page signs the phone in and removes the code from the address bar. You can also run `remy serve --host 192.168.1.20` to listen on that one address.
+
+Each code works once, expires after ten minutes, and is counted by the lockout like a wrong token (five wrong tries lock an address out for a minute). Scanning one code does not use up the others. The code sits after the `#` in the link, so the phone's browser never sends it in a request line or a Referer header; the page posts it in the body of one request to `/api/session/exchange` and gets its own session token back. The server still checks the Host and Origin of that request: the address in the phone's address bar is one of this machine's own addresses, so it passes, and a page on another site or a made-up name does not.
+
+If a code has expired, or you closed the page, make another while the server runs:
+
+```
+remy serve link
+```
+
+Run it in a terminal (it prints nothing where the output could be kept). It makes the code in its own process and gives the server only the code's SHA-256 hash, through a file in `REMY_HOME` that only you can read (mode 0600); the server picks it up within a second and deletes it. The code itself is never written to a file or a log, and there is no new network route. In Docker, run it as `docker exec -it remy remy serve link --url http://192.168.1.20:7790` (the container does not know your Wi-Fi address, so give the one your phone opens, and add its name to `REMY_SERVE_HOSTS` if it is not an IP address).
+
+**What this protects, and what it does not.** The network is not encrypted, so anyone who can read your Wi-Fi traffic can read what the phone sends. A one-time code is no weaker than the alternative, typing the 43-character access token, which the phone would send in the clear on every request. With the code, the phone sends the code once, then a session token of its own on every request. Someone reading the traffic sees both, so over plain HTTP the code does not make an eavesdropper's job any harder, and it does not make it easier: the access token itself never crosses the network, each phone has its own session (at most ten are kept), and `remy serve token --rotate` signs every phone out at once. What the code protects is a link left on a screen or in a screenshot: after one use, or ten minutes, it opens nothing. That is why this is for a home network you trust. On a public network (a cafe, a hotel, a school) do not do this: use Tailscale or WireGuard, or put a reverse proxy with TLS in front, as described below.
 
 ## Reaching it from a phone
 
