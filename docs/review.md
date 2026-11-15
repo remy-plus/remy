@@ -26,3 +26,11 @@ It reads the task log only. No model is called and nothing is changed.
 Prompts, tool arguments and card text can contain words from web pages or other people. Review shows them in quotes as data, with control characters removed and long text cut short. Remy does not act on them.
 
 The daemon's notification when a background task finishes, fails or first needs your approval ends with `remy review`.
+
+## "I'm back": `whats_new`
+
+When you greet Remy or say you are back, Remy checks what happened while you were away and tells you in a sentence or two, waiting items first: "Welcome back. While you were away the price check finished (the Sony pair dropped to $248), and one email is waiting for your OK."
+
+The tool is `whats_new`. It is read-only and calls no model. It lists, newest first and at most 10 with a count of the rest, the tasks that waited for your OK or an answer, paused (out of budget or the model could not be reached), did not finish, or finished. Schedule, file-watch, webhook and background runs say where they came from. Tasks waiting for you or paused count for a week; finished ones count from your last visit. If nothing happened, it says so in one line.
+
+Your last visit is one time in `last-seen.json` in the Remy folder. It is updated when you finish a chat turn in the terminal or the web app, and starts at 24 hours ago the first time. `remy run` does not move it.
