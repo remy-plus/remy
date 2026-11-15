@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { type ChatSummary, useApi } from '../api/index.tsx';
+import { onChatsChanged } from '../lib/chat-events.ts';
 import type { MindState } from '../lib/mind.ts';
 import { DEFAULTS, useSetting } from '../settings.ts';
 import { HistoryDrawer } from './HistoryDrawer.tsx';
@@ -81,7 +82,10 @@ const useCompact = () =>
     () => false,
   );
 
-/** Chats, refreshed every few seconds and when the tab is focused again. */
+/**
+ * Chats, refreshed when a chat says a turn started or ended, when the tab is shown again, and on a
+ * slow timer for work started elsewhere (a schedule). Nothing runs while the tab is hidden.
+ */
 function useChats(): ChatSummary[] {
   const api = useApi();
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -93,12 +97,19 @@ function useChats(): ChatSummary[] {
         .then((c) => live && setChats(c))
         .catch(() => {}); // the dock stays calm when the server is away
     load();
-    const timer = window.setInterval(load, 5000);
+    const visible = () => {
+      if (document.visibilityState !== 'hidden') load();
+    };
+    const timer = window.setInterval(visible, 20000);
     window.addEventListener('focus', load);
+    document.addEventListener('visibilitychange', visible);
+    const stop = onChatsChanged(load);
     return () => {
       live = false;
       window.clearInterval(timer);
       window.removeEventListener('focus', load);
+      document.removeEventListener('visibilitychange', visible);
+      stop();
     };
   }, [api]);
   return chats;

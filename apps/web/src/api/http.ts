@@ -139,6 +139,7 @@ export function createHttpApi(opts: {
       if (o?.lastEventId) headers['last-event-id'] = String(o.lastEventId);
       const res = await call(`${task(id)}/stream`, { headers, signal: o?.signal ?? null });
       if (!res.body) return;
+      o?.onOpen?.();
       const feed = createSseParser(onEvent);
       const decoder = new TextDecoder();
       const reader = res.body.getReader(); // not `for await`: Safari cannot iterate a stream

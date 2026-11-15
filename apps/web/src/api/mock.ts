@@ -696,6 +696,7 @@ export function createMockApi(): RemyApi {
       return get(id);
     },
     async streamTask(id, onEvent, o) {
+      o?.onOpen?.();
       for (const e of eventsOf(get(id), meta.get(id)?.log)) {
         if (o?.signal?.aborted) return;
         if (e.seq > (o?.lastEventId ?? 0)) onEvent(e);

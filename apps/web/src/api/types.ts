@@ -343,7 +343,8 @@ export interface RemyApi {
   streamTask(
     id: string,
     onEvent: (e: StreamEvent) => void,
-    opts?: { lastEventId?: number; signal?: AbortSignal },
+    /** `onOpen` runs once the connection is up, so a caller knows the stream (not a poll) is carrying updates. */
+    opts?: { lastEventId?: number; signal?: AbortSignal; onOpen?: () => void },
   ): Promise<void>;
   approve(id: string, body: ApproveBody): Promise<void>;
   answer(id: string, answer: string): Promise<void>;

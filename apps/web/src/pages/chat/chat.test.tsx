@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiProvider } from '../../api/index.tsx';
 import { createMockApi } from '../../api/mock.ts';
@@ -100,6 +100,70 @@ describe('empty chat', () => {
     show(createMockApi());
     fireEvent.click(screen.getByRole('button', { name: 'Talk to Remy' }));
     expect(await screen.findByText("This browser can't listen. You can still type.")).toBeTruthy();
+  });
+});
+
+describe('polling', () => {
+  /** A chat with one live turn. `stream` is how the job's event stream behaves. */
+  async function live(stream: RemyApi['streamTask']) {
+    const task = await jobOf({ status: 'running', running: true, calls: [] });
+    const base = withChat([turn({ taskId: 'task_live', state: 'working' })], { task_live: task });
+    const getChat = vi.fn(base.getChat);
+    return { api: { ...base, getChat, streamTask: stream }, getChat };
+  }
+  const advance = async (ms: number) => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  };
+
+  it('does not ask for the chat every two seconds while the event stream is open', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, getChat } = await live(
+        (_id, _on, o) =>
+          new Promise<void>((resolve) => {
+            o?.onOpen?.();
+            o?.signal?.addEventListener('abort', () => resolve());
+          }),
+      );
+      show(api, 'c1');
+      await advance(100);
+      const first = getChat.mock.calls.length;
+      await advance(10000);
+      expect(getChat.mock.calls.length).toBe(first);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks again every two seconds when the stream is not up', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, getChat } = await live(() => Promise.reject(new Error('dropped')));
+      show(api, 'c1');
+      await advance(100);
+      const first = getChat.mock.calls.length;
+      await advance(6000);
+      expect(getChat.mock.calls.length).toBeGreaterThanOrEqual(first + 2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not ask while the tab is hidden', async () => {
+    vi.useFakeTimers();
+    try {
+      const { api, getChat } = await live(() => Promise.reject(new Error('dropped')));
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      show(api, 'c1');
+      await advance(100);
+      const first = getChat.mock.calls.length;
+      await advance(10000);
+      expect(getChat.mock.calls.length).toBe(first);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

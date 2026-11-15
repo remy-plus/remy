@@ -25,6 +25,8 @@ const pause = (ms: number, signal: AbortSignal) =>
 export interface TaskState {
   view: TaskView | null;
   events: StreamEvent[];
+  /** True while the event stream is connected: updates arrive by themselves, so nobody needs to poll. */
+  streaming: boolean;
   error: string | null;
   reload: () => void;
 }
@@ -38,6 +40,7 @@ export function useTask(id: string): TaskState {
   const [view, setView] = useState<TaskView | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
   const [n, setN] = useState(0);
   const latest = useRef<TaskView | null>(null);
   latest.current = view;
@@ -81,11 +84,12 @@ export function useTask(id: string): TaskState {
               setEvents((prev) => [...prev, e]);
               refresh();
             },
-            { lastEventId: last, signal: ctl.signal },
+            { lastEventId: last, signal: ctl.signal, onOpen: () => setStreaming(true) },
           );
         } catch {
           // A dropped connection is not an error to show: the next pass reconnects.
         }
+        if (!ctl.signal.aborted) setStreaming(false);
         if (ctl.signal.aborted || ended(latest.current)) return;
         await pause(RECONNECT_MS, ctl.signal);
       }
@@ -96,5 +100,5 @@ export function useTask(id: string): TaskState {
     };
   }, [api, id]);
 
-  return { view, events, error, reload };
+  return { view, events, streaming, error, reload };
 }

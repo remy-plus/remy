@@ -216,8 +216,28 @@ function Shell({ mind, children }: { mind?: MindState; children: React.ReactNode
 const reasonOf = (v: TaskView | null) => v?.final?.reason ?? v?.failure?.body;
 
 /** A turn still going: follows the job's stream and shows what it is doing right now. */
-function LiveBlock({ turn, onChanged }: { turn: ChatTurn; onChanged: () => void }) {
-  const { view, reload } = useTask(turn.taskId);
+function LiveBlock({
+  turn,
+  onChanged,
+  onStreaming,
+}: {
+  turn: ChatTurn;
+  onChanged: () => void;
+  onStreaming: (taskId: string, open: boolean) => void;
+}) {
+  const { view, reload, streaming } = useTask(turn.taskId);
+  // Tell the chat whether this turn's stream is carrying updates, so it only polls when it is not.
+  useEffect(() => {
+    onStreaming(turn.taskId, streaming);
+    return () => onStreaming(turn.taskId, false);
+  }, [turn.taskId, streaming, onStreaming]);
+  // The stream says the job is over: refresh the chat now instead of waiting for a poll.
+  const over =
+    view?.status === 'succeeded' || view?.status === 'failed' || view?.status === 'cancelled';
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the job ends
+  useEffect(() => {
+    if (over) onChanged();
+  }, [over]);
   const card = view?.pendingApproval;
   const question = view?.pendingQuestion;
   const phase: Phase =
@@ -316,11 +336,13 @@ export function Turn({
   index,
   onChanged,
   onRetry,
+  onStreaming,
 }: {
   turn: ChatTurn;
   index: number;
   onChanged: () => void;
   onRetry: (prompt: string) => void;
+  onStreaming: (taskId: string, open: boolean) => void;
 }) {
   const live = turn.state === 'working' || turn.state === 'waiting';
   return (
@@ -331,7 +353,7 @@ export function Turn({
         </p>
       </div>
       {live ? (
-        <LiveBlock turn={turn} onChanged={onChanged} />
+        <LiveBlock turn={turn} onChanged={onChanged} onStreaming={onStreaming} />
       ) : (
         <EndedBlock turn={turn} onRetry={onRetry} />
       )}

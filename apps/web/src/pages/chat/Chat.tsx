@@ -4,6 +4,7 @@ import { type ChatSummary, type ChatView, type ConnectedApp, useApi } from '../.
 import { Icon } from '../../components/Icon.tsx';
 import { MindGlyph } from '../../components/MindGlyph.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
+import { announceChatsChanged } from '../../lib/chat-events.ts';
 import { describeError } from '../../lib/errors.ts';
 import type { MindState } from '../../lib/mind.ts';
 import { suggestionsFor } from '../../lib/suggestions.ts';
@@ -12,7 +13,10 @@ import { useSetting } from '../../settings.ts';
 import { Composer } from './Composer.tsx';
 import { Turn } from './Feed.tsx';
 
+/** How often to ask for the chat when no stream is carrying updates. */
 const POLL_MS = 2000;
+/** A safety net while a stream is open: it should never be needed, but a half-dead connection happens. */
+const SAFETY_MS = 20000;
 
 interface VoiceNow {
   state: MindState | null;
@@ -73,6 +77,7 @@ function EmptyChat() {
     setProblem(null);
     try {
       const { chatId } = await api.sendMessage(t, undefined);
+      announceChatsChanged();
       setText('');
       window.location.hash = `#/chat/${encodeURIComponent(chatId)}`;
     } catch (e) {
@@ -141,11 +146,27 @@ function OpenChat({ id }: { id: string }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [voice, setVoice] = useState<VoiceNow>(IDLE);
   const end = useRef<HTMLDivElement>(null);
+  const seen = useRef<string | null>(null);
+  const [streams, setStreams] = useState<ReadonlySet<string>>(new Set());
+  const onStreaming = useCallback((taskId: string, open: boolean) => {
+    setStreams((prev) => {
+      if (prev.has(taskId) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(taskId);
+      else next.delete(taskId);
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
-      setChat(await api.getChat(id));
+      const c = await api.getChat(id);
+      setChat(c);
       setError(null);
+      // The dock shows whether Remy is working: tell it when a turn started or ended.
+      const sig = c.turns.map((t) => `${t.taskId}:${t.state}`).join();
+      if (seen.current !== sig) announceChatsChanged();
+      seen.current = sig;
     } catch (e) {
       setError(problemOf(e, 'Remy could not open this chat.'));
     }
@@ -155,15 +176,25 @@ function OpenChat({ id }: { id: string }) {
   useEffect(() => {
     setChat(null);
     setQueued(null);
+    seen.current = null;
     void load();
   }, [id]);
 
   const busy = working(chat);
+  // Poll only when no stream is carrying updates, and not while the tab is hidden.
+  const streamed = streams.size > 0;
   useEffect(() => {
     if (!busy) return;
-    const t = setInterval(() => void load(), POLL_MS);
-    return () => clearInterval(t);
-  }, [busy, load]);
+    const tick = () => {
+      if (document.visibilityState !== 'hidden') void load();
+    };
+    const t = setInterval(tick, streamed ? SAFETY_MS : POLL_MS);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [busy, streamed, load]);
 
   const turnCount = chat?.turns.length ?? 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when a turn is added
@@ -265,7 +296,14 @@ function OpenChat({ id }: { id: string }) {
       <div className="mx-auto w-full max-w-[720px] flex-1 px-4 pt-4 pb-8">
         <h1 className="sr-only">{chat.title}</h1>
         {chat.turns.map((t, i) => (
-          <Turn key={t.taskId} turn={t} index={i} onChanged={load} onRetry={(p) => void post(p)} />
+          <Turn
+            key={t.taskId}
+            turn={t}
+            index={i}
+            onChanged={load}
+            onRetry={(p) => void post(p)}
+            onStreaming={onStreaming}
+          />
         ))}
         <div ref={end} />
       </div>

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiProvider } from '../api/index.tsx';
 import { createMockApi } from '../api/mock.ts';
 import type { ChatSummary, RemyApi } from '../api/types.ts';
+import { announceChatsChanged } from '../lib/chat-events.ts';
 import { Dock, dockItems, mindOf } from './Dock.tsx';
 
 const chat = (state: ChatSummary['state']): ChatSummary => ({
@@ -98,6 +99,34 @@ describe('Dock', () => {
     api.listChats = async () => [chat('working')];
     show('/', api);
     expect(await screen.findByRole('img', { name: 'Remy is working' })).toBeTruthy();
+  });
+
+  it('goes back to resting as soon as a chat says its task ended, without waiting for a timer', async () => {
+    const api = createMockApi();
+    let state: ChatSummary['state'] = 'working';
+    api.listChats = async () => [chat(state)];
+    show('/', api);
+    expect(await screen.findByRole('img', { name: 'Remy is working' })).toBeTruthy();
+    state = 'resting';
+    act(() => announceChatsChanged());
+    expect(await screen.findByRole('img', { name: 'Remy is resting' })).toBeTruthy();
+  });
+
+  it('does not ask for chats on a timer while the tab is hidden', async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const list = vi.fn(async () => [chat('resting')]);
+      api.listChats = list;
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      show('/', api);
+      await vi.advanceTimersByTimeAsync(0);
+      const first = list.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(list.mock.calls.length).toBe(first);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('opens the History drawer', async () => {
