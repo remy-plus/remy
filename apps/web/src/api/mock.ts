@@ -703,6 +703,14 @@ export function createMockApi(): RemyApi {
         await Promise.resolve();
       }
     },
+    async taskFiles(id) {
+      get(id);
+      return id === 'task_correction' ? [{ path: 'reply.md', name: 'reply.md', size: 214 }] : [];
+    },
+    async downloadTaskFile(id, path) {
+      get(id);
+      return { blob: new Blob(['Hello, Dana.\n']), name: path.split('/').at(-1) ?? path };
+    },
     async approve(id, body) {
       const v = get(id);
       if (v.pendingApproval?.callId !== body.callId) throw new Error('There is no such approval.');

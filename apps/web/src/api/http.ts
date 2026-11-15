@@ -27,6 +27,7 @@ import type {
   SkillItem,
   SkillsData,
   StreamEvent,
+  TaskFile,
   TaskListItem,
   TaskView,
   TrustLevel,
@@ -149,6 +150,11 @@ export function createHttpApi(opts: {
       } catch (e) {
         if (!(e instanceof DOMException && e.name === 'AbortError')) throw e;
       }
+    },
+    taskFiles: async (id) => (await json<{ files: TaskFile[] }>(`${task(id)}/files`)).files,
+    async downloadTaskFile(id, path) {
+      const res = await call(`${task(id)}/files/download?path=${encodeURIComponent(path)}`);
+      return { blob: await res.blob(), name: path.split('/').at(-1) ?? path };
     },
     approve: (id, body: ApproveBody) => post(`${task(id)}/approve`, body),
     answer: (id, answer) => post(`${task(id)}/answer`, { answer }),

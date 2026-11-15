@@ -146,6 +146,22 @@ describe('http adapter', () => {
     expect(new Headers(init.headers).get('last-event-id')).toBe('4');
   });
 
+  it("lists a task's files and downloads one with the token, encoding the path", async () => {
+    const fetcher = vi.fn(async (url: string) =>
+      url.includes('/download')
+        ? new Response('milk', { status: 200 })
+        : new Response(JSON.stringify({ files: [{ path: 'a b.txt', name: 'a b.txt', size: 4 }] })),
+    );
+    const api = createHttpApi({ token: () => 'tok', fetch: fetcher as unknown as typeof fetch });
+    expect(await api.taskFiles('task_1')).toEqual([{ path: 'a b.txt', name: 'a b.txt', size: 4 }]);
+    const got = await api.downloadTaskFile('task_1', 'notes/a b.txt');
+    expect(got.name).toBe('a b.txt');
+    expect(await got.blob.text()).toBe('milk');
+    const [url, init] = fetcher.mock.calls.at(-1) as unknown as [string, RequestInit];
+    expect(url).toBe('/api/tasks/task_1/files/download?path=notes%2Fa%20b.txt');
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer tok');
+  });
+
   describe('connections, skills, schedules and the brain', () => {
     const stub = (reply: unknown = { ok: true }, status = 200) => {
       const fetcher = vi.fn(async () => new Response(JSON.stringify(reply), { status }));

@@ -13,7 +13,8 @@ export type IconName =
   | 'plus'
   | 'clock'
   | 'chevron-down'
-  | 'arrow-right';
+  | 'arrow-right'
+  | 'download';
 
 /** The few marks that read better solid than drawn. */
 const FILLED = new Set<IconName>(['stop']);
@@ -50,6 +51,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   'chevron-down': <path d="M6 9l6 6 6-6" />,
   'arrow-right': <path d="M5 12h14M13 6l6 6-6 6" />,
+  download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
 };
 
 /** A mark. Decorative: the button or line around it always carries the words. */

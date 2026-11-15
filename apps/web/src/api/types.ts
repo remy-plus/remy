@@ -346,6 +346,10 @@ export interface RemyApi {
     /** `onOpen` runs once the connection is up, so a caller knows the stream (not a poll) is carrying updates. */
     opts?: { lastEventId?: number; signal?: AbortSignal; onOpen?: () => void },
   ): Promise<void>;
+  /** The files a task wrote in its workspace and that are still there. */
+  taskFiles(id: string): Promise<TaskFile[]>;
+  /** One of them, to save. Goes through the sign-in, so it cannot be a plain link. */
+  downloadTaskFile(id: string, path: string): Promise<{ blob: Blob; name: string }>;
   approve(id: string, body: ApproveBody): Promise<void>;
   answer(id: string, answer: string): Promise<void>;
   cancel(id: string): Promise<void>;
@@ -446,6 +450,12 @@ export interface ChatView {
   id: string;
   title: string;
   turns: ChatTurn[];
+}
+/** A file a task wrote. `path` is relative to the task's workspace. */
+export interface TaskFile {
+  path: string;
+  name: string;
+  size: number;
 }
 export interface ChatSent {
   chatId: string;

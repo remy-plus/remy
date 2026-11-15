@@ -10,6 +10,7 @@ import type { MindState } from '../../lib/mind.ts';
 import { ago } from '../../lib/when.ts';
 import { useTask } from '../tasks/useTask.ts';
 import { ApprovalInline } from './ApprovalInline.tsx';
+import { Files } from './Files.tsx';
 
 const pill =
   'cursor-pointer rounded-full border h-8 px-3.5 text-[13px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50';
@@ -324,7 +325,12 @@ function EndedBlock({ turn, onRetry }: { turn: ChatTurn; onRetry: (prompt: strin
           onRetry={() => onRetry(turn.prompt)}
         />
       ) : (
-        answer && <Answer text={answer} />
+        answer && (
+          <>
+            <Answer text={answer} />
+            {turn.state === 'done' && <Files taskId={turn.taskId} />}
+          </>
+        )
       )}
     </Shell>
   );
