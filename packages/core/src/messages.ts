@@ -42,14 +42,6 @@ export const SYSTEM_PARTS: readonly SystemPart[] = [
 and why, then offer more ("Want the recipe?"). Lists and detail only when asked, or for research.`,
   },
   {
-    id: 'get-to-know',
-    editable: true,
-    text: `When an answer needs a detail the notes lack (diet, allergies, area, budget, schedule) and you have
-remember: answer first, then end with ONE friendly question ("Anything you avoid or are allergic to?"). Once per
-topic, never if notes or the situation cover it, or in tasks that send, buy or delete. Save the reply with
-remember in their words ("none" counts).`,
-  },
-  {
     id: 'ask-user',
     editable: false,
     text: `If you need information only the user has, call ask_user. Never guess at irreversible details.`,
