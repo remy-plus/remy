@@ -4,11 +4,11 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  BOOKKEEPING_TOOLS,
   type ConversationTurn,
   fold,
   type ModelClient,
   type StoredEvent,
+  turnFromState,
   usageCostUsd,
 } from '@remy/core';
 import { z } from 'zod';
@@ -92,20 +92,7 @@ export function turnOf(events: StoredEvent[]): ConversationTurn | undefined {
   const s = fold(events);
   const end = events.findLast((e) => e.event.type === 'task.finished')?.event;
   if (s.status !== 'succeeded' || end?.type !== 'task.finished') return undefined;
-  const pasted = s.config.pasted;
-  const tools = [
-    ...new Set(
-      Object.values(s.calls)
-        .filter((c) => c.result?.ok && !BOOKKEEPING_TOOLS.has(c.tool))
-        .map((c) => c.tool),
-    ),
-  ];
-  return {
-    prompt: s.prompt,
-    answer: end.answer?.trim() || 'Done.',
-    ...(pasted?.length && { pasted }),
-    ...(tools.length && { tools }),
-  };
+  return turnFromState(s, end.answer?.trim() || 'Done.');
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   fold,
   isTrustLevel,
   type TaskState,
+  turnFromState,
 } from '@remy/core';
 import { z } from 'zod';
 import { cleanText } from './review.ts';
@@ -154,7 +155,15 @@ export function contextFrom(states: TaskState[]): ConversationTurn[] {
     const prompt = s.prompt.slice(0, room);
     const answer = (s.final?.answer ?? '').slice(0, Math.max(0, room - prompt.length));
     if (!prompt && !answer) break;
-    kept.push({ prompt, answer });
+    // The same turn as the terminal's: pasted parts stay marked (fenced, never the person's own
+    // words), and the tools used and cards declined go with it. A cut prompt keeps no pasted list,
+    // since a cut segment would no longer match; the whole turn is then treated as pasted.
+    const turn = turnFromState(s, answer);
+    kept.push(
+      prompt === s.prompt
+        ? turn
+        : { ...turn, prompt, ...(s.config.pasted?.length && { pasted: [prompt] }) },
+    );
     room -= prompt.length + answer.length;
     if (room <= 0) break;
   }
