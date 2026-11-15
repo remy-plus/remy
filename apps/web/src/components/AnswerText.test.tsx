@@ -39,3 +39,48 @@ describe('AnswerText', () => {
     expect(screen.getByText('All three quotes are in the file.')).toBeTruthy();
   });
 });
+
+describe('AnswerText sources', () => {
+  const sources = [
+    'Sources:',
+    'https://www.soundguys.com/best-headphones-1234/',
+    'https://www.tomsguide.com/best-picks/headphones',
+    'https://www.whathifi.com/best/headphones',
+  ].join('\n');
+
+  it('shows a source list as chips with site names, each opening in a new tab', () => {
+    render(<AnswerText text={sources} />);
+    const links = screen.getAllByRole('link');
+    expect(links.map((l) => l.textContent)).toEqual(['SoundGuys', "Tom's Guide", 'whathifi.com']);
+    for (const l of links) {
+      expect(l.getAttribute('target')).toBe('_blank');
+      expect(l.getAttribute('rel')).toBe('noopener noreferrer');
+    }
+    expect(links[0]?.getAttribute('href')).toBe('https://www.soundguys.com/best-headphones-1234/');
+    expect(links[0]?.getAttribute('title')).toBe('https://www.soundguys.com/best-headphones-1234/');
+    expect(links[0]?.getAttribute('aria-label')).toContain('https://www.soundguys.com');
+    expect(screen.getByText('Sources:')).toBeTruthy();
+  });
+
+  it('shows a list of bare links as chips too', () => {
+    render(<AnswerText text={'- https://www.soundguys.com/a\n- https://www.tomsguide.com/b'} />);
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(screen.getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'SoundGuys',
+      "Tom's Guide",
+    ]);
+  });
+
+  it('shows a bare address inside a sentence as the site name', () => {
+    render(<AnswerText text="The full review is at https://www.rtings.com/headphones/x today." />);
+    expect(screen.getByRole('link').textContent).toBe('RTINGS');
+    expect(screen.getByText(/The full review is at/).textContent).toContain('today.');
+  });
+
+  it('keeps the words of a labelled link', () => {
+    render(<AnswerText text="Read [the guide](https://example.com/g) first." />);
+    expect(screen.getByRole('link', { name: 'the guide' }).getAttribute('title')).toBe(
+      'https://example.com/g',
+    );
+  });
+});
