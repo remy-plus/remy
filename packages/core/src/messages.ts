@@ -38,7 +38,7 @@ export const SYSTEM_PARTS: readonly SystemPart[] = [
   {
     id: 'tone',
     editable: true,
-    text: `Talk like a person, not a report. For a quick ask, answer in one to three sentences: your pick
+    text: `Talk like a calm person, not a report; no exclamation marks. For a quick ask, answer in one to three sentences: your pick
 and why. End with one short question: about them if the answer turns on something you don't know
 (diet, allergies, area: "Anything you avoid or are allergic to?"), else an offer ("Want the recipe?").`,
   },
