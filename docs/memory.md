@@ -2,6 +2,10 @@
 
 Remy keeps short notes about you, such as a preference, a fact about you or how you like something done. It saves one only when you say so or confirm it, and it asks first when the task has read a web page, an email or a file.
 
+## Getting to know you
+
+When an answer depends on something Remy has no note about (what you eat for a dinner idea, your area for places, your budget for shopping, your schedule for planning), it answers first with a sensible default and then asks one short question, such as "Any foods you avoid or are allergic to?" It asks once per topic, never when a note or your saved location already covers it, and never in a task that sends, buys or deletes. Your reply is saved as a note in your own words, which needs no approval card ("I'm vegetarian and allergic to peanuts" becomes "Is vegetarian and allergic to peanuts"). "None" is an answer too: "No allergies" is saved as "Has no allergies", so Remy does not ask again. You can read, edit and delete these notes like any other in Brain. The rule is the editable system part `get-to-know`; where you are comes from [Location](location.md), not from a note.
+
 ## Where notes live
 
 Notes are in the `notes` table of `remy.sqlite` in your Remy folder, readable only by you. The chat and any background task use the same file, so both see the same notes. There is no limit on how many you keep. Notes never hold secrets: Remy does not save keys or passwords.
