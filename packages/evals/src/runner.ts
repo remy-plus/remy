@@ -1,5 +1,6 @@
 // Runs cases against a model and records what happened, from the event log.
 import {
+  BOOKKEEPING_TOOLS,
   type ConversationTurn,
   createRuntime,
   DEFAULT_BUDGET,
@@ -323,7 +324,11 @@ export async function runCase(
       const outcome = await drive(taskId);
       const answer = outcome?.status === 'succeeded' ? (outcome.answer ?? '') : '';
       if (!answer.trim().endsWith('?') || turn >= MAX_FOLLOW_UPS) break;
-      context.push({ prompt, answer });
+      // Like the chat, the turn records which tools backed its answer.
+      const ran = Object.values((await rt.state(taskId)).calls)
+        .filter((x) => x.result?.ok && !BOOKKEEPING_TOOLS.has(x.tool))
+        .map((x) => x.tool);
+      context.push({ prompt, answer, ...(ran.length && { tools: [...new Set(ran)] }) });
       prompt = answers.shift() ?? NO_MORE_ANSWERS;
     }
 
