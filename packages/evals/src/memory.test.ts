@@ -139,7 +139,7 @@ describe('memory suite', () => {
         ],
       ]);
       // An offer ("Want the recipe?") is fine now; a question about what a note already covers is not.
-      expect(failed(again).some((n) => n.startsWith('answerLacks'))).toBe(true);
+      expect(failed(again)).toContain('answerLacks');
       const send = await play('memory-know-send-email-no-question', [
         [
           {
