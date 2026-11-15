@@ -147,7 +147,7 @@ import { type Credentials, keychainOff, openCredentials } from './credentials.ts
 import { TICK_MS, tick } from './daemon.ts';
 import { debugModel, openDebug } from './debug.ts';
 import { demoModel } from './demo.ts';
-import { type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
+import { connectedModel, type Facts, gatherFacts, plainChecks, runChecks } from './doctor.ts';
 import {
   createNoteEmbedder,
   type EmbedEndpoint,
@@ -1038,7 +1038,12 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
     return gatherFacts({
       node: process.version,
       platform: process.platform,
-      model: credentials().defaultProvider() ?? env.REMY_PROFILE ?? file.profile,
+      model: connectedModel({
+        saved: credentials().defaultProvider(),
+        env,
+        fileProfile: file.profile,
+        fileBaseUrl: file.baseUrl,
+      }),
       // REMY_BROWSER=off is not "no browser installed", so it is left out of what the probe sees.
       hasChromeApp: () =>
         hasBrowser({

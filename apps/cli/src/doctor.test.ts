@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Check, plainChecks, runChecks } from './doctor.ts';
+import { type Check, connectedModel, plainChecks, runChecks } from './doctor.ts';
 import { pickSearchRoute } from './search.ts';
 
 const plan = (over: object = {}) =>
@@ -150,5 +150,20 @@ describe('daemon check', () => {
     expect(c?.status).toBe('warning');
     expect(c?.detail).toBe('systemd user unit: no systemctl.');
     expect(c?.fix).toContain('remy daemon run');
+  });
+});
+
+describe('connectedModel', () => {
+  it('prefers a saved login, then REMY_PROFILE, then the config profile', () => {
+    expect(connectedModel({ saved: 'groq', env: { REMY_PROFILE: 'openai' } })).toBe('groq');
+    expect(connectedModel({ env: { REMY_PROFILE: 'openai' }, fileProfile: 'x' })).toBe('openai');
+    expect(connectedModel({ env: {}, fileProfile: 'ollama' })).toBe('ollama');
+  });
+  it('counts a custom address with no profile, which is how the Docker image can be set up', () => {
+    expect(connectedModel({ env: { REMY_BASE_URL: 'http://m:1/v1' } })).toBe('custom endpoint');
+    expect(connectedModel({ env: {}, fileBaseUrl: 'http://m:1/v1' })).toBe('custom endpoint');
+  });
+  it('is undefined with nothing set, and an empty variable is nothing', () => {
+    expect(connectedModel({ env: { REMY_PROFILE: '', REMY_BASE_URL: '' } })).toBeUndefined();
   });
 });

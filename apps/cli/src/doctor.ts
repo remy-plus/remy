@@ -71,6 +71,25 @@ export function gatherFacts(p: Probes): Facts {
   };
 }
 
+/**
+ * What `remy doctor` reports as the connected model: a saved login, else REMY_PROFILE or the config
+ * file's profile, else a custom address (REMY_BASE_URL, the way the Docker image and `--base-url`
+ * set one up, with no profile name). Without the last case a server that works showed 'none connected'.
+ */
+export function connectedModel(o: {
+  saved?: string | undefined;
+  env: Record<string, string | undefined>;
+  fileProfile?: string | undefined;
+  fileBaseUrl?: string | undefined;
+}): string | undefined {
+  return (
+    o.saved ||
+    o.env.REMY_PROFILE ||
+    o.fileProfile ||
+    (o.env.REMY_BASE_URL || o.fileBaseUrl ? 'custom endpoint' : undefined)
+  );
+}
+
 const MIN_NODE = [22, 18];
 
 function nodeOk(version: string): boolean {
