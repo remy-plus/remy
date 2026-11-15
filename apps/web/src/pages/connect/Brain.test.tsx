@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../App.tsx';
 import { ApiProvider } from '../../api/index.tsx';
 import { createMockApi } from '../../api/mock.ts';
@@ -63,6 +63,25 @@ describe('Brain', () => {
     expect(within(panel()).getByRole('button', { name: 'Ask about Acme' })).toBeTruthy();
     expect(node('Acme').getAttribute('aria-pressed')).toBe('true');
     expect(node('Dana Ferreira').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('on a phone only the selected note is named on the map, so labels cannot pile up', async () => {
+    open();
+    await screen.findByRole('heading', { level: 2, name: 'Dana Ferreira' });
+    const label = (name: string) => node(name).querySelector('span.absolute');
+    // Linked notes are named from sm up; the list under "Linked to" names them on a phone.
+    expect(label('Dana Ferreira')?.className).toMatch(/\bblock\b/);
+    expect(label('Priya Nair')?.className).toMatch(/\bhidden sm:block\b/);
+  });
+
+  it('a button takes a phone to the selected note, which sits far below the map', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    open();
+    await screen.findByRole('heading', { level: 2, name: 'Dana Ferreira' });
+    fireEvent.click(screen.getByRole('button', { name: 'Read “Dana Ferreira”' }));
+    expect(scroll).toHaveBeenCalled();
+    expect(document.activeElement).toBe(panel());
   });
 
   it('moves between linked notes with the arrow keys', async () => {

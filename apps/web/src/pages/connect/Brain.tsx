@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
 import type { BrainData, BrainNote, NoteKind } from '../../api/index.tsx';
 import { BrainTabs } from '../../components/BrainTabs.tsx';
+import { scrollBehavior } from '../../lib/motion.ts';
 import {
   Eyebrow,
   field,
@@ -77,6 +78,7 @@ export function Brain() {
   const [confirming, setConfirming] = useState(false);
   const [said, setSaid] = useState('');
   const nodes = useRef(new Map<string, HTMLButtonElement>());
+  const details = useRef<HTMLElement>(null);
 
   const links = useMemo(() => neighbours(data?.notes ?? []), [data]);
   if (error) return <Unavailable message={error} onRetry={reload} />;
@@ -136,7 +138,7 @@ export function Brain() {
   ];
 
   return (
-    <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[minmax(0,1fr)_420px]">
+    <div className="grid min-h-[calc(100dvh-66px)] lg:grid-cols-[minmax(0,1fr)_420px]">
       <div className="min-w-0 px-5 py-8 sm:px-8 lg:pl-14 lg:pr-12">
         <h1 className="sr-only">Brain</h1>
         <BrainTabs current="notes" />
@@ -221,7 +223,7 @@ export function Brain() {
                 <Marker kind={n.kind} on={on} />
                 <span
                   aria-hidden="true"
-                  className={`${mono} pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] [text-shadow:0_0_4px_var(--surface),0_0_4px_var(--surface)] ${side(n.x, on)} ${on ? 'text-[13px] text-text max-sm:max-w-[130px] max-sm:truncate' : near ? 'text-text max-sm:max-w-[130px] max-sm:truncate' : 'max-w-[170px] truncate text-muted'} ${on ? 'block' : near ? 'hidden min-[380px]:block' : 'hidden sm:block'}`}
+                  className={`${mono} pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] [text-shadow:0_0_4px_var(--surface),0_0_4px_var(--surface)] ${side(n.x, on)} ${on ? 'text-[13px] text-text max-sm:max-w-[130px] max-sm:truncate' : near ? 'text-text max-sm:max-w-[130px] max-sm:truncate' : 'max-w-[170px] truncate text-muted'} ${on ? 'block' : 'hidden sm:block'}`}
                 >
                   {n.title}
                 </span>
@@ -292,9 +294,24 @@ export function Brain() {
         <p className="mt-3 mb-0 text-[13px] text-muted">
           Select a note, then use the arrow keys to move to a note it links to.
         </p>
+        {/* On a phone the note's own text sits far below the map, and nothing on the map says so. */}
+        {selected && (
+          <button
+            type="button"
+            onClick={() => {
+              details.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+              details.current?.focus({ preventScroll: true });
+            }}
+            className={`${quiet} mt-3 px-4 py-2 text-[13px] lg:hidden`}
+          >
+            Read “{selected.title}”
+          </button>
+        )}
       </div>
 
       <aside
+        ref={details}
+        tabIndex={-1}
         aria-label="Selected note"
         className="min-w-0 border-t border-edge px-5 py-8 sm:px-8 lg:border-t-0 lg:border-l"
       >
