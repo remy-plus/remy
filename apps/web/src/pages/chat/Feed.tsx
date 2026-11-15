@@ -386,15 +386,10 @@ export function Turn({
   onStreaming: (taskId: string, open: boolean) => void;
 }) {
   const live = turn.state === 'working' || turn.state === 'waiting';
-  // Words shown while the turn ran: remembered, so the answer replaces them quietly, and a
-  // screen reader hears the finished answer once.
+  // Words shown while the turn ran: remembered, so the answer replaces them quietly. The chat says
+  // the finished answer once for screen readers (endedAnnouncement), so this turn does not.
   const [typed, setTyped] = useState(false);
   const onWords = useCallback(() => setTyped(true), []);
-  const [wasLive, setWasLive] = useState(live);
-  useEffect(() => {
-    if (live) setWasLive(true);
-  }, [live]);
-  const announce = !live && wasLive && turn.state === 'done' ? (turn.answer ?? '') : '';
   return (
     <article className="mb-6" aria-label={`You asked: ${turn.prompt}`}>
       <div className="rise flex justify-end" style={rise(index === 0 ? 0 : 1)}>
@@ -407,9 +402,6 @@ export function Turn({
       ) : (
         <EndedBlock turn={turn} onRetry={onRetry} typed={typed} />
       )}
-      <div role="status" aria-live="polite" className="sr-only">
-        {announce}
-      </div>
     </article>
   );
 }

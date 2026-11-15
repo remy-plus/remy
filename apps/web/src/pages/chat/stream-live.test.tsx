@@ -83,7 +83,7 @@ describe('words as they are written', () => {
     expect(screen.queryByText('Let me look.')).toBeNull();
   });
 
-  it('swaps to the stored answer once, announces it once and does not replay the entrance', async () => {
+  it('swaps to the stored answer once, leaves announcing to the chat and does not replay the entrance', async () => {
     const { api, say } = liveApi();
     const view = mount(api, working);
     await say({ kind: 'answer', delta: 'Welcome back.' });
@@ -103,10 +103,11 @@ describe('words as they are written', () => {
       await vi.advanceTimersByTimeAsync(10);
     });
     const finalText = screen.getAllByText('Welcome back. All quiet.');
-    // On screen once, and announced once through the quiet status line.
+    // On screen once. The chat around the feed says the answer once for screen readers
+    // (endedAnnouncement), so the feed itself does not announce it a second time.
     const onScreen = finalText.filter((n) => !n.closest('[role="status"]'));
     expect(onScreen).toHaveLength(1);
-    expect(finalText.filter((n) => n.closest('[role="status"]'))).toHaveLength(1);
+    expect(finalText.filter((n) => n.closest('[role="status"]'))).toHaveLength(0);
     expect(onScreen[0]?.closest('.answer-block')?.className).not.toContain('rise');
     expect(document.querySelector('.stream-caret')).toBeNull();
   });
