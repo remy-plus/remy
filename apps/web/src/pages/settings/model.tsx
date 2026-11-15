@@ -1,7 +1,9 @@
-// Model and keys. A key is saved on the machine that runs Remy and never comes back to this browser,
-// so this page shows which providers have one and how to add or replace it; it never asks for a key.
+// Model and keys. A key is saved on the machine that runs Remy and never comes back to this browser:
+// this page shows which providers have one, and the form below sends a new key up once to be checked
+// and saved there.
 import { useState } from 'react';
-import { type Provider, useApi } from '../../api/index.tsx';
+import { type ModelSetup, type Provider, useApi } from '../../api/index.tsx';
+import { ModelKeyForm } from '../../components/ModelKeyForm.tsx';
 import { Skeleton } from '../../components/Skeleton.tsx';
 import { buttonPrimary, buttonQuiet } from '../../components/ui.ts';
 import { describeError } from '../../lib/errors.ts';
@@ -21,8 +23,6 @@ const STATE: Record<Provider['state'], string> = {
 const heading = 'font-mono m-0 mb-3 text-[12px] font-normal text-muted';
 
 function ProviderRow({ p, inUse }: { p: Provider; inUse: boolean }) {
-  const [note, setNote] = useState(false);
-  const hasKey = p.state === 'key_in_use' || p.state === 'key_saved';
   return (
     <li className="list-none border-b border-edge py-4">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -34,28 +34,50 @@ function ProviderRow({ p, inUse }: { p: Provider; inUse: boolean }) {
           {STATE[p.state]}
           {inUse ? ' · in use' : ''}
         </span>
-        {/* A provider running on this machine needs no key, so it gets no key button. */}
-        {p.state !== 'running' && (
-          <button
-            type="button"
-            className={`${buttonQuiet} py-2.5`}
-            aria-expanded={note}
-            onClick={() => setNote(!note)}
-          >
-            {hasKey ? 'How to replace the key' : 'How to add a key'}
-          </button>
-        )}
       </div>
-      {note && (
-        <p role="status" className="mt-3 mb-0 max-w-[560px] text-[13px] leading-relaxed text-muted">
-          {hasKey
-            ? `A key for ${p.name} is saved on the machine that runs Remy. It never comes back to this browser. To replace it, run `
-            : `To add a key for ${p.name}, run `}
-          <code className="font-mono text-text">remy login</code>
-          {' on the machine that runs Remy. The key stays there; this browser never holds it.'}
-        </p>
-      )}
     </li>
+  );
+}
+
+function AddKey({ reload }: { reload: () => void }) {
+  const api = useApi();
+  const [open, setOpen] = useState(false);
+  const [setup, setSetup] = useState<ModelSetup | null>(null);
+  const [problem, setProblem] = useState('');
+  if (!api.modelSetup)
+    return (
+      <p className="mt-4 mb-0 max-w-[560px] text-[14px] leading-relaxed text-muted">
+        This server cannot take a key from the browser. Run{' '}
+        <code className="font-mono text-text">remy login</code> on the machine that runs Remy.
+      </p>
+    );
+  const show = async () => {
+    setOpen(true);
+    setProblem('');
+    try {
+      setSetup(await (api.modelSetup as () => Promise<ModelSetup>)());
+    } catch (e) {
+      setProblem(describeError(e, 'Remy could not load the list of providers. Try again.'));
+    }
+  };
+  return (
+    <div className="mt-5">
+      {!open ? (
+        <button type="button" className={buttonQuiet} onClick={show}>
+          Add or change a key
+        </button>
+      ) : problem ? (
+        <p role="alert" className="m-0 text-[14px] text-text">
+          {problem}
+        </p>
+      ) : !setup ? (
+        <Skeleton label="Loading the providers" lines={2} />
+      ) : (
+        <div className="max-w-[620px]">
+          <ModelKeyForm setup={setup} onSaved={reload} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -90,18 +112,18 @@ export function Model({ data, error, reload }: SectionProps) {
       <h3 className={heading}>Providers</h3>
       <p className="mt-0 mb-4 max-w-[560px] text-[14px] leading-relaxed text-muted">
         Keys are saved on the machine that runs Remy, never in this browser, and Remy never shows a
-        saved key again. To change which provider Remy uses, run{' '}
-        <code className="font-mono text-text">remy login</code> on that machine.
+        saved key again. Adding a key below checks it with one tiny test message, then Remy starts
+        using it.
       </p>
       <ul className="m-0 border-t border-edge p-0">
         {data.providers.map((p) => (
           <ProviderRow key={p.id} p={p} inUse={p.id === current} />
         ))}
       </ul>
+      <AddKey reload={reload} />
       {data.providers.length === 0 && (
         <p className="mt-4 mb-0 max-w-[560px] text-[15px] leading-relaxed text-muted">
-          No provider is set up yet. Run <code className="font-mono text-text">remy login</code> on
-          the machine that runs Remy to add one, then reload this page.
+          No provider is set up yet. Add a key below and Remy starts using it.
         </p>
       )}
 

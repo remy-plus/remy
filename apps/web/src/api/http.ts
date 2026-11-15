@@ -19,6 +19,8 @@ import type {
   LocationState,
   MachineInput,
   MachineTest,
+  ModelSaved,
+  ModelSetup,
   RegistrySearch,
   RemyApi,
   ReviewData,
@@ -327,6 +329,12 @@ export function createHttpApi(opts: {
       json<{ deleted: number }>('/api/notes/delete-all', {
         method: 'POST',
         body: JSON.stringify({ confirm }),
+      }),
+    modelSetup: () => json<ModelSetup>('/api/setup/model'),
+    saveModelKey: (provider, key) =>
+      json<ModelSaved>('/api/setup/model', {
+        method: 'POST',
+        body: JSON.stringify({ provider, ...(key && { key }) }),
       }),
     rotateToken: () => json<{ token: string }>('/api/token/rotate', { method: 'POST', body: '{}' }),
     testModels: () =>

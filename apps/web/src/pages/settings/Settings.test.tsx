@@ -268,11 +268,8 @@ describe('Settings', () => {
 
   it('shows providers and tests the models', async () => {
     await open('model', 'Model and keys');
-    expect(screen.getByRole('button', { name: 'How to replace the key' })).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'How to add a key' })).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole('button', { name: 'How to add a key' })[0] as HTMLElement);
-    expect(screen.getByText(/never holds your keys|never holds it/)).toBeTruthy();
     expect(screen.getByText('Key saved · in use')).toBeTruthy();
+    expect(screen.getAllByText('No key yet')).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Test both models' }));
     expect(await screen.findByText('Both models answered.')).toBeTruthy();
   });
@@ -283,11 +280,34 @@ describe('Settings', () => {
     expect(screen.getByText(/never shows a saved key again/)).toBeTruthy();
     // A provider with a key says so, instead of looking like nothing is set.
     expect(screen.getByText('Key saved · in use')).toBeTruthy();
-    expect(screen.getAllByText('No key yet')).toHaveLength(2);
-    fireEvent.click(screen.getByRole('button', { name: 'How to replace the key' }));
-    expect(screen.getByText(/It never comes back to this browser/)).toBeTruthy();
-    // Nothing here pretends to switch the provider: that is done on the machine that runs Remy.
+    // Nothing here pretends to switch the provider without checking a key.
     expect(screen.queryByRole('button', { name: 'Use this instead' })).toBeNull();
+  });
+
+  it('adds a key from here: the form checks it, saves it and reloads the list', async () => {
+    const base = createMockApi();
+    const saved: string[] = [];
+    let loads = 0;
+    await open('model', 'Model and keys', {
+      ...base,
+      settings: async () => {
+        loads++;
+        return base.settings();
+      },
+      saveModelKey: async (provider, key) => {
+        saved.push(`${provider}:${key}`);
+        return base.saveModelKey?.(provider, key) as never;
+      },
+    });
+    expect(screen.queryByLabelText('Your OpenAI key')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add or change a key' }));
+    const input = await screen.findByLabelText('Your OpenAI key');
+    fireEvent.change(input, { target: { value: 'sk-test-ABCDEF1234567890' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check and save' }));
+    expect(await screen.findByText(/Connected\. Remy will think with gpt-5-nano/)).toBeTruthy();
+    expect(saved).toEqual(['openai:sk-test-ABCDEF1234567890']);
+    expect(document.body.textContent).not.toContain('sk-test-ABCDEF1234567890');
+    await waitFor(() => expect(loads).toBeGreaterThan(1));
   });
 
   it('offers a way forward when no provider is set up yet', async () => {
@@ -296,7 +316,8 @@ describe('Settings', () => {
       ...base,
       settings: async () => ({ ...(await base.settings()), providers: [] }),
     });
-    expect(await screen.findByText(/No provider is set up yet/)).toBeTruthy();
+    expect(await screen.findByText(/No provider is set up yet\. Add a key below/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add or change a key' })).toBeTruthy();
   });
 
   it('says what went wrong when the models cannot be tested', async () => {

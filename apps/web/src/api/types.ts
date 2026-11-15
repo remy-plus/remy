@@ -313,6 +313,30 @@ export interface LocationState {
   /** The person said no or turned it off: the chat does not ask again until Settings turns it on. */
   declined: boolean;
 }
+/** One provider offered for the model key, from GET /api/setup/model. Cheapest first. */
+export interface ModelChoice {
+  id: string;
+  label: string;
+  /** The model Remy uses with it. */
+  model: string;
+  note: string;
+  needsKey: boolean;
+  /** Where to get a key, without the scheme. */
+  keyUrl?: string;
+}
+/** GET /api/setup/model: whether Remy has a model, and what can be set up. Never holds a key. */
+export interface ModelSetup {
+  ready: boolean;
+  current: { provider: string | null; label: string | null; model: string } | null;
+  choices: ModelChoice[];
+}
+/** POST /api/setup/model, when the key passed a real request and was saved. */
+export interface ModelSaved {
+  ok: true;
+  current: { provider: string; label: string; model: string };
+  /** Where the key went, in words: "in the macOS Keychain on this computer". */
+  saved: string;
+}
 
 /** Everything the screens may ask of the server. Components use this and nothing else. */
 // ---- Browser ----
@@ -410,6 +434,13 @@ export interface RemyApi {
   deleteNotes(confirm: number): Promise<{ deleted: number }>;
   rotateToken(): Promise<{ token: string }>;
   testModels(): Promise<{ ok: boolean; detail: string }>;
+  /** Whether Remy has a model, and the short list to set one up. Absent on an older server. */
+  modelSetup?(): Promise<ModelSetup>;
+  /**
+   * Checks a key with one small real request, saves it on the machine that runs Remy and starts using
+   * it. The key goes up once and never comes back. Rejects with a plain sentence.
+   */
+  saveModelKey?(provider: string, key: string): Promise<ModelSaved>;
   sendTestNotification(): Promise<void>;
   home(): Promise<HomeData>;
   review(since?: string): Promise<ReviewData>;

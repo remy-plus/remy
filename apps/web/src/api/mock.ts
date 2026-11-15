@@ -1,5 +1,6 @@
 // A believable in-memory server, so screens can be built before `remy serve` is live (and for demos
 // with ?mock=1). It keeps the same shapes as the real routes and applies approve, cancel and so on.
+import { ApiError } from './http.ts';
 import { createChatsMock } from './mock-chats.ts';
 import { createConnectMock } from './mock-connect.ts';
 import type {
@@ -886,6 +887,23 @@ export function createMockApi(): RemyApi {
     async rotateToken() {
       return { token: 'mock-token-for-a-demo-only' };
     },
+    async modelSetup() {
+      return {
+        ready: true,
+        current: { provider: 'openai', label: 'OpenAI', model: 'gpt-5-nano' },
+        choices: MOCK_CHOICES,
+      };
+    },
+    async saveModelKey(provider, key) {
+      const c = MOCK_CHOICES.find((x) => x.id === provider);
+      if (!c || (c.needsKey && key.trim().length < 8))
+        throw new ApiError(400, `${c?.label ?? 'That provider'} did not accept that key.`);
+      return {
+        ok: true,
+        current: { provider: c.id, label: c.label, model: c.model },
+        saved: 'in a private file on this computer',
+      };
+    },
     async testModels() {
       return { ok: true, detail: 'Both models answered.' };
     },
@@ -893,6 +911,40 @@ export function createMockApi(): RemyApi {
   };
   return api;
 }
+
+const MOCK_CHOICES = [
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    model: 'gpt-5-nano',
+    note: 'Pay as you go. The cheapest way to start.',
+    needsKey: true,
+    keyUrl: 'platform.openai.com/api-keys',
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    model: 'openai/gpt-5-nano',
+    note: 'One key for many models, and some are free.',
+    needsKey: true,
+    keyUrl: 'openrouter.ai/keys',
+  },
+  {
+    id: 'anthropic',
+    label: 'Anthropic',
+    model: 'claude-haiku-5-5',
+    note: 'Claude models. Pay as you go.',
+    needsKey: true,
+    keyUrl: 'console.anthropic.com/settings/keys',
+  },
+  {
+    id: 'ollama',
+    label: 'Ollama (on this computer, no key)',
+    model: 'llama3.1',
+    note: 'Free and private, on this computer. Needs Ollama running.',
+    needsKey: false,
+  },
+];
 
 const MOCK_BROWSER = { url: 'https://northwind.com/pricing', title: 'Pricing | Northwind' };
 
