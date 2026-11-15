@@ -3,7 +3,7 @@ import { ScriptedModelClient } from '@remy/models';
 import { describe, expect, it } from 'vitest';
 import { createModelSlot, EMPTY_SLOT_MESSAGE } from './model-slot.ts';
 
-const req = { system: '', messages: [], tools: [], temperature: 0 };
+const req = { system: '', messages: [], tools: [], temperature: 0, maxOutputTokens: 1 };
 const answer = { calls: [], text: 'hi', usage: { inTokens: 1, outTokens: 1 } };
 
 describe('model slot', () => {

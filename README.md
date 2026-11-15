@@ -22,6 +22,14 @@ You need Node 22.18 or newer.
 
 ```sh
 npm install -g @koryei/remy
+remy serve --open
+```
+
+`remy serve --open` starts Remy and opens it in your browser, already signed in. With no model yet, Remy asks for a key right there: pick a provider, paste the key, and Remy checks it with one tiny test message and saves it (in the macOS Keychain, or a private file in `~/.remy` elsewhere). Then ask for something. You never need the terminal again after that first command. If the browser cannot be opened, `remy serve` prints the same one-time link.
+
+Prefer the terminal? Run `remy login` once, then `remy` for the chat:
+
+```sh
 remy login
 remy
 ```

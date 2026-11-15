@@ -386,6 +386,8 @@ Usage
                                   Serve Remy over HTTP for the web app: tasks, approvals and a
                                   live event stream. 127.0.0.1 only unless REMY_SERVE_ALLOW_REMOTE=on.
                                   Prints a one-time sign-in link for this machine; --open opens it
+                                  in your browser. This is the way to start: with no model yet it
+                                  asks for a key in the browser
   remy serve token [--rotate]     Make the access token (shown once; only its hash is kept)
   remy doctor                     See what is set up and the next step for each
   remy voice test                 Check local voice: whisper.cpp, the speech model, ffmpeg, say
@@ -2871,13 +2873,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         if (isLoopback(listening.host) && (deps.isTTY || flags.open)) {
           const link = signInLink(listening.host, listening.port, signInCodes.mint());
           if (deps.isTTY) {
-            out('To sign in on this machine, open this link (it works once, for 10 minutes):');
+            out(
+              'Remy is ready. Open this link to sign in on this computer (it works once, for 10 minutes):',
+            );
             out(link);
           }
           if (flags.open) {
             const opened = await (deps.openUrl ?? openInBrowser)(link);
-            if (!opened)
-              out(st.dim('The browser could not be opened. Paste your access token instead.'));
+            if (opened) out(st.dim('Opening Remy in your browser.'));
+            else
+              out(
+                st.dim(
+                  deps.isTTY
+                    ? 'The browser could not be opened. Open the link above instead.'
+                    : 'The browser could not be opened. Paste your access token instead.',
+                ),
+              );
           }
         }
         await (deps.serveStop ?? new Promise<void>(() => {}));

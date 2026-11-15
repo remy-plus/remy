@@ -70,7 +70,9 @@ export function announceFirstRunToken(
 ): void {
   if (isTTY) {
     out(token);
-    out('That is your token. It is shown once. Send it as: Authorization: Bearer <token>');
+    out(
+      'That is your access token, for other devices and scripts. It is shown once, and you do not need it on this computer.',
+    );
     return;
   }
   const file = join(home, FIRST_RUN_TOKEN_FILE);

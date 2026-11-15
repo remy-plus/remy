@@ -19,7 +19,7 @@ docker run -d --name remy --restart unless-stopped \
   -p 127.0.0.1:7790:7790 -v remy-data:/data remy
 ```
 
-Remy needs a model. Set `REMY_PROFILE`, `REMY_MODEL` and the profile's key variable (for example `OPENROUTER_API_KEY`) in a file named `.env` next to `docker-compose.yml`. Do not commit that file. Run `remy doctor` inside the container (`docker exec -it remy remy doctor`) to see which profiles are ready.
+Remy needs a model. On a server you can also add one from the web app once you are signed in (Settings, Model and keys). Or set `REMY_PROFILE`, `REMY_MODEL` and the profile's key variable (for example `OPENROUTER_API_KEY`) in a file named `.env` next to `docker-compose.yml`. Do not commit that file. Run `remy doctor` inside the container (`docker exec -it remy remy doctor`) to see which profiles are ready.
 
 Check that it is up:
 
@@ -48,7 +48,7 @@ The old token stops working at once, and so does every browser signed in with a 
 
 ### Signing in on the same machine
 
-When you run `remy serve` in a terminal on the machine itself, it prints a one-time link such as `http://127.0.0.1:7790/#/sign-in?code=...`; `remy serve --open` also opens it in your browser. The link signs one browser in without copying the token. It works once and expires after ten minutes, and the code stays after the `#`, so a browser never sends it in a request. The web app trades it for its own session token and removes it from the address bar. The link is not printed when the output is not a terminal (a container's log is kept), and it exists only on a loopback address. If it has expired, restart `remy serve` or paste the token.
+When you run `remy serve` in a terminal on the machine itself, it prints a one-time link such as `http://127.0.0.1:7790/#/sign-in?code=...`; `remy serve --open` also opens it in your browser. Run `remy serve --open` and that is all: it starts Remy and opens the link. With no model set up yet, the server still starts, and the web app asks for a provider and a key (checked with one tiny test message, then saved in the Keychain on a Mac or a private file in `REMY_HOME`, and never shown again). The link signs one browser in without copying the token. It works once and expires after ten minutes, and the code stays after the `#`, so a browser never sends it in a request. The web app trades it for its own session token and removes it from the address bar. The link is not printed when the output is not a terminal (a container's log is kept), and it exists only on a loopback address. If it has expired, restart `remy serve` or paste the token.
 
 ## Reaching it from a phone
 

@@ -172,6 +172,8 @@ describe('remy serve', () => {
 
     it('is printed on a terminal, works once, and gives a session', async () => {
       const { h, port, stop } = await boot({ isTTY: true });
+      expect(h.o.out).toContain('Remy is ready. Open this link to sign in on this computer');
+      expect(h.o.out).not.toContain('Authorization: Bearer'); // no API jargon for a first visit
       const link = /http:\/\/127\.0\.0\.1:\d+\/#\/sign-in\?code=([\w-]+)/.exec(h.o.out);
       expect(link?.[1]).toBeTruthy();
       const code = link?.[1] as string;

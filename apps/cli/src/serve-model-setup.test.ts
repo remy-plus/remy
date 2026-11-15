@@ -333,7 +333,7 @@ describe('POST /api/setup/model: abuse', () => {
       { 'sec-fetch-site': 'cross-site' },
       { origin: 'https://evil.example' },
       { origin: 'null' },
-    ]) {
+    ] as Record<string, string>[]) {
       const res = await fetch(`${r.kit.base}/api/setup/model`, {
         method: 'POST',
         headers: {
