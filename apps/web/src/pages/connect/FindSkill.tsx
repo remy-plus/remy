@@ -142,7 +142,7 @@ export function FindSkill() {
     <div className="min-w-0 px-5 py-8 sm:px-8 lg:px-14">
       <BrainTabs current="skills" />
       <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>
-        <a href="#/skills" className="-my-3 inline-block py-3 text-text underline">
+        <a href="#/skills" className="-my-3.5 inline-block py-3.5 text-text underline">
           Skills
         </a>{' '}
         / Find a skill

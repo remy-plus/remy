@@ -126,7 +126,7 @@ export function Composer({
   };
 
   const ghost =
-    'flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full p-0 sm:size-8 transition-[color,background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] disabled:cursor-default';
+    'flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full p-0 sm:size-8 transition-[color,background-color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.96] disabled:cursor-default';
 
   return (
     <form
@@ -136,7 +136,13 @@ export function Composer({
       }}
       className="w-full"
     >
-      <div className="flex items-end gap-1 rounded-[24px] border border-edge bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-text/30 focus-within:bg-raise">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a tap anywhere on the card focuses the box; the box itself is the keyboard target */}
+      <div
+        onClick={(e) => {
+          if (e.target === e.currentTarget) area.current?.focus();
+        }}
+        className="flex items-end gap-1 rounded-[24px] border border-edge bg-surface p-2 pl-4 transition-colors duration-300 focus-within:border-text/30 focus-within:bg-raise"
+      >
         <label htmlFor={id} className="sr-only">
           Ask Remy to do anything
         </label>

@@ -222,7 +222,7 @@ export function NewSchedule() {
             {HOW_OFTEN.map((o) => (
               <label
                 key={o}
-                className={`${mono} cursor-pointer border-r border-edge-hi px-4 py-2 text-[13px] last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text ${often === o ? 'bg-raise font-medium text-text' : 'text-muted hover:text-text'}`}
+                className={`${mono} flex cursor-pointer items-center border-r border-edge-hi px-4 py-2 text-[13px] [@media(pointer:coarse)]:min-h-11 last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text ${often === o ? 'bg-raise font-medium text-text' : 'text-muted hover:text-text'}`}
               >
                 <input
                   type="radio"

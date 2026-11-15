@@ -18,7 +18,7 @@ export function BrainTabs({ current }: { current: BrainSection }) {
             key={t.id}
             href={t.href}
             aria-current={on ? 'page' : undefined}
-            className="inline-flex min-h-8 items-center no-underline"
+            className="inline-flex min-h-8 items-center no-underline [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:justify-center"
           >
             {/* The underline stays tight to the words; the link itself keeps a full-height hit area. */}
             <span

@@ -287,3 +287,36 @@ body {
     animation: none;
   }
 }
+/* Touch targets are 44 px (WCAG 2.5.8 asks for 24; a thumb needs more). Buttons and fields grow; a link
+   drawn as a pill grows and keeps its words centred (align-content works on block boxes). Controls that must
+   keep a small shape (a switch, a dot on the Brain map) say `tap` and get a 44 px hit area they do not draw.
+   Running-text links stay as they are: the spacing exception covers them. */
+@media (pointer: coarse) {
+  button:not([role="switch"]),
+  [role="button"],
+  summary,
+  select,
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+    min-height: 44px;
+  }
+  button:not([role="switch"]),
+  [role="button"] {
+    min-width: 44px;
+  }
+  a.rounded-full {
+    min-height: 44px;
+    align-content: center;
+  }
+  .tap:not(.absolute):not(.fixed):not(.sticky) {
+    position: relative;
+  }
+  .tap::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}

@@ -58,7 +58,7 @@ export function Page({
         {tabs}
         {crumb && (
           <p className={`${mono} m-0 mb-3 text-[12px] text-muted`}>
-            <a href="#/connections" className="-my-3 inline-block py-3 text-text underline">
+            <a href="#/connections" className="-my-3.5 inline-block py-3.5 text-text underline">
               Connections
             </a>{' '}
             / {crumb}
@@ -114,7 +114,7 @@ export function Switch({
       aria-checked={checked}
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="relative m-0 h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-edge-hi bg-transparent transition-colors before:absolute before:top-[3px] before:left-[3px] before:size-4 before:rounded-full before:bg-text before:transition-transform checked:border-signal checked:bg-signal checked:before:translate-x-4 checked:before:bg-signal-ink"
+      className="tap relative m-0 h-6 w-10 shrink-0 cursor-pointer appearance-none rounded-full border border-edge-hi bg-transparent transition-colors before:absolute before:top-[3px] before:left-[3px] before:size-4 before:rounded-full before:bg-text before:transition-transform checked:border-signal checked:bg-signal checked:before:translate-x-4 checked:before:bg-signal-ink"
     />
   );
 }
