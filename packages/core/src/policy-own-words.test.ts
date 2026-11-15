@@ -54,6 +54,9 @@ describe('a note in the person’s own words', () => {
       'Please remember two things: I drink my coffee black, and I live in Toronto.',
     );
     expect(kind('The user drinks their coffee black.', coffee)).toBe('allow');
+    // Live Haiku 5.5 (2026-11-15), answering a question Remy asked.
+    const none = state('No allergies, I eat everything.');
+    expect(kind('Has no food allergies and eats everything.', none)).toBe('allow');
   });
 
   it('counts earlier turns of the chat as their words', () => {
@@ -66,7 +69,8 @@ describe('a note in the person’s own words', () => {
   it('counts "none" as a fact too: "Has no allergies" from "No allergies"', () => {
     const s = state('Anything for dinner? No allergies, I eat everything.', {}, false);
     expect(kind('Has no allergies and eats everything', s)).toBe('allow');
-    expect(kind('Has no food allergies', s)).toBe('require_approval'); // "food" was not said
+    // "food" and "has" add no fact of their own (live Haiku 5.5 wrote this, 2026-11-15).
+    expect(kind('Has no food allergies', s)).toBe('allow');
     expect(kind('Has a peanut allergy', s)).toBe('require_approval');
   });
 
