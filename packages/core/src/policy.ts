@@ -127,6 +127,14 @@ export function decide(
       via: 'standing',
       reason: `you always allow ${tool.name}`,
     };
+  // 2c. A note the person gave in their own words is saved without a card, even after a web
+  // page: every meaningful word must come from what they typed, so a page, a paste or a webhook
+  // cannot plant one. Notes can be seen and removed at any time.
+  if (risk === 'write' && tool.fromPerson) {
+    const notes = tool.fromPerson(parsed.data as never);
+    if (notes.length && notes.every((n) => inPersonWords(n, state)))
+      return { kind: 'allow', via: 'own-words', reason: 'you said this yourself' };
+  }
   // 3. High-risk actions always need a human.
   if (HIGH_RISK.includes(risk))
     return { kind: 'require_approval', reason: `${label(risk)} always needs your approval` };
@@ -185,18 +193,59 @@ function knownText(
   return parts.join('\n');
 }
 
-/** Whether the person's own words (the task, earlier turns, their answers) contain `text`. */
-function personSaid(
-  text: string,
-  state: Partial<Pick<TaskState, 'calls' | 'prompt'>> & Pick<TaskState, 'config'>,
-): boolean {
+type WordsState = Partial<Pick<TaskState, 'prompt'>> & Pick<TaskState, 'config'>;
+
+/**
+ * What the person typed themselves: the task and earlier turns, with pasted segments (and a
+ * webhook's payload, which is recorded as pasted) cut out. A helper has none: its task was
+ * written by the parent model, not by the person.
+ */
+function personWords(state: WordsState): string {
+  if (state.config.parent || state.config.helperRole) return '';
+  const typed = (text: string, pasted: string[] | undefined) =>
+    (pasted ?? []).filter(Boolean).reduce((t, seg) => t.split(seg).join('\n'), text);
+  const parts = [typed(state.prompt ?? '', state.config.pasted)];
+  for (const turn of state.config.context ?? []) parts.push(typed(turn.prompt, turn.pasted));
+  return parts.join('\n');
+}
+
+/** Whether the person typed `text` themselves (letter case and spacing aside). */
+function personSaid(text: string, state: WordsState): boolean {
   const flat = (t: string) => t.toLowerCase().replace(/\s+/g, ' ').trim();
   const want = flat(text);
   if (!want) return true;
-  const parts: string[] = [state.prompt ?? ''];
-  for (const turn of state.config.context ?? []) parts.push(turn.prompt);
-  for (const c of Object.values(state.calls ?? {})) if (c.userAnswer) parts.push(c.userAnswer);
-  return flat(parts.join('\n')).includes(want);
+  return flat(personWords(state)).includes(want);
+}
+
+/** Words that carry no meaning of their own in a short note. */
+const FILLER = new Set(
+  "a an the at in on for to of and with is am are was be been my i im me i'm that this it as by from also very really just always usually now user they he she do does like likes".split(
+    ' ',
+  ),
+);
+const stem = (w: string) =>
+  w.length > 4 && w.endsWith('ies')
+    ? `${w.slice(0, -3)}y`
+    : w.length > 3 && w.endsWith('s') && !w.endsWith('ss')
+      ? w.slice(0, -1)
+      : w;
+const contentWords = (t: string) =>
+  t
+    .toLowerCase()
+    .replace(/['\u2019]/g, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w && !FILLER.has(w))
+    .map(stem);
+
+/**
+ * Whether every meaningful word of `note` is one the person typed ("Is vegetarian" from "I'm
+ * vegetarian, find me..."). A note that adds even one word of its own does not count.
+ */
+function inPersonWords(note: string, state: WordsState): boolean {
+  const want = contentWords(note);
+  if (!want.length) return false;
+  const have = new Set(contentWords(personWords(state)));
+  return want.every((w) => have.has(w));
 }
 
 /** An address counts as shown only when it appears whole (a trailing slash or fragment aside). */

@@ -47,8 +47,8 @@ export const canStandingAllow = (risk: Risk): boolean => STANDING_RISKS.includes
 export const maxRisk = (a: Risk, b: Risk): Risk => (RISKS.indexOf(b) > RISKS.indexOf(a) ? b : a);
 
 export type PolicyDecision =
-  /** `via: 'standing'`: the user's standing approval for this tool cleared the call. `via: 'trust'`: the task's trust level did. */
-  | { kind: 'allow'; via?: 'standing' | 'trust'; reason?: string }
+  /** `via: 'standing'`: the user's standing approval for this tool cleared the call. `via: 'trust'`: the task's trust level did. `via: 'own-words'`: the person said it themselves (a note). */
+  | { kind: 'allow'; via?: 'standing' | 'trust' | 'own-words'; reason?: string }
   | { kind: 'require_approval'; reason: string }
   | { kind: 'deny'; reason: string };
 
@@ -523,6 +523,12 @@ export interface Tool<A = unknown> {
    * page can ask Remy to type something private into its own form.
    */
   typedOut?(args: A): string | undefined;
+  /**
+   * Text one call would save about the person (a note). When every meaningful word of each is one
+   * the person typed themselves, the call needs no card, even in a tainted task: it is their own
+   * statement, and a page cannot put words in their mouth.
+   */
+  fromPerson?(args: A): string[];
   effect: Effect;
   outputTrust: Trust;
   timeoutMs: number;

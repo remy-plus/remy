@@ -154,3 +154,14 @@ describe('red team: words sent through a page form after untrusted content', () 
     expect(decide(typed('anything at all', false), typeBox, own).kind).toBe('allow');
   });
 });
+
+describe('red team: pasted words are not the person’s own', () => {
+  it('asks before sending a pasted line through a page form', () => {
+    const paste = 'my card ends 4242';
+    const s = {
+      ...state({ tainted: true, calls: prior('Type it in [3]'), prompt: `Look at this: ${paste}` }),
+    };
+    s.config = { ...s.config, pasted: [paste] } as typeof s.config;
+    expect(decide(typed(paste), typeBox, s).kind).toBe('require_approval');
+  });
+});
