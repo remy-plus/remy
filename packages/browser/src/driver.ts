@@ -44,6 +44,19 @@ export interface LocalBrowserOptions {
 export const NO_BROWSER =
   'Remy found no browser to use. Install Google Chrome, or run remy browser install.';
 
+/**
+ * Chromium that `remy browser install` downloaded cannot start on a slim Linux (a container, a small
+ * server) when system libraries such as libnss3 are missing. Playwright's own first line for that is
+ * "Target page, context or browser has been closed", which says nothing, so the reason is read from the
+ * browser's log lines and turned into the one step that fixes it.
+ */
+export function explainLaunchFailure(msg: string): string {
+  const lib = /error while loading shared libraries: (\S+?):/.exec(msg)?.[1];
+  if (lib || /Host system is missing dependencies/i.test(msg))
+    return `this machine lacks a library it needs${lib ? ` (${lib})` : ''}. On Debian or Ubuntu run: sudo npx playwright install-deps chromium. Or install Google Chrome.`;
+  return msg.split('\n')[0] ?? msg;
+}
+
 const MISSING = /Executable doesn't exist|is not found|not installed|ENOENT/i;
 const LOCK = '.remy-lock';
 
@@ -182,7 +195,7 @@ export function createLocalBrowser(opts: LocalBrowserOptions): Browser {
         return c;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (!MISSING.test(msg)) failure ??= msg.split('\n')[0];
+        if (!MISSING.test(msg)) failure ??= explainLaunchFailure(msg);
       }
     }
     throw new Error(failure ? `The browser did not start: ${failure}` : NO_BROWSER);
