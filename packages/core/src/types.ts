@@ -118,6 +118,8 @@ export interface ConversationTurn {
    * was checked and does not take it back. Absent in older records.
    */
   tools?: string[];
+  /** Tools whose approval card the person declined in that turn, so the model does not redo them. */
+  declined?: string[];
   /**
    * A summary of the turns before the ones kept (in `answer`; `prompt` is empty). Written by the
    * model from the user's typed words and Remy's answers, never from pasted text, so it is as

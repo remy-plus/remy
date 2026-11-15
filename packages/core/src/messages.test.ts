@@ -345,3 +345,14 @@ describe('earlier turns name the tools behind their answers', () => {
     expect(out[3]).toEqual({ role: 'assistant', content: 'Any time.' });
   });
 });
+
+describe('an earlier turn says what the person declined', () => {
+  it('names declined cards, so the model does not redo them', () => {
+    const out = renderContext([
+      { prompt: 'save it', answer: 'I did not save it.', declined: ['write_file'] },
+    ]);
+    expect(out[1]?.content).toBe(
+      '[In that turn the person declined: write_file; do not do it again unless they ask.]\nI did not save it.',
+    );
+  });
+});

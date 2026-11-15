@@ -216,12 +216,47 @@ export function renderContext(turns: ConversationTurn[] | undefined): Message[] 
 export const SUMMARY_LEAD =
   'Summary of the earlier conversation, written by Remy (background, not a new request):';
 
-/** Which tools backed an earlier answer, so the model does not take back what it checked. */
-export const toolsNote = (tools: string[]) =>
-  `[In that turn Remy used: ${[...new Set(tools)].slice(0, 8).join(', ')}.]`;
+/**
+ * What an earlier turn did, so the model neither takes back what it checked nor redoes what the
+ * person declined.
+ */
+export const toolsNote = (tools: string[] = [], declined: string[] = []) => {
+  const list = (xs: string[]) => [...new Set(xs)].slice(0, 8).join(', ');
+  const used = tools.length ? `Remy used: ${list(tools)}` : '';
+  const no = declined.length
+    ? `the person declined: ${list(declined)}; do not do it again unless they ask`
+    : '';
+  if (!used && !no) return '';
+  return `[In that turn ${[used, no].filter(Boolean).join(', and ')}.]`;
+};
 
 /** Tools of a task that count as backing its answer: those that returned a result. */
 export const BOOKKEEPING_TOOLS = new Set(['finish', 'update_plan']);
+
+/**
+ * One finished task as an earlier chat turn, the same way everywhere (terminal, web app, evals):
+ * its words, the pasted parts (fenced again when replayed, and never the person's own words), the
+ * tools that backed the answer, and the cards the person declined.
+ */
+export function turnFromState(s: TaskState, answer: string): ConversationTurn {
+  const calls = Object.values(s.calls);
+  const tools = [
+    ...new Set(
+      calls.filter((c) => c.result?.ok && !BOOKKEEPING_TOOLS.has(c.tool)).map((c) => c.tool),
+    ),
+  ];
+  const declined = [
+    ...new Set(calls.filter((c) => c.approval && !c.approval.granted).map((c) => c.tool)),
+  ];
+  const pasted = s.config.pasted;
+  return {
+    prompt: s.prompt,
+    answer,
+    ...(pasted?.length && { pasted }),
+    ...(tools.length && { tools }),
+    ...(declined.length && { declined }),
+  };
+}
 
 function renderTurns(turns: ConversationTurn[] | undefined): Message[] {
   const all = turns ?? [];
@@ -238,7 +273,10 @@ function renderTurns(turns: ConversationTurn[] | undefined): Message[] {
     { role: 'user', content: fencePasted(t.prompt, t.pasted) },
     {
       role: 'assistant',
-      content: t.tools?.length ? `${toolsNote(t.tools)}\n${t.answer}` : t.answer,
+      content:
+        t.tools?.length || t.declined?.length
+          ? `${toolsNote(t.tools, t.declined)}\n${t.answer}`
+          : t.answer,
     },
   ]);
 }
