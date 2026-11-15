@@ -274,7 +274,7 @@ function LiveBlock({
       {/* One polite sentence for screen readers: the step, an approval or question at once, or that
           the answer is being written (the words themselves are for the eyes, read once when done). */}
       <p role="status" className="sr-only">
-        {hasWords && !card && !question ? 'Remy is writing the answer' : said}
+        {hasWords ? 'Remy is writing the answer' : said}
       </p>
       {lines.length > 0 && <FeedList lines={lines} />}
       {hasWords ? (
