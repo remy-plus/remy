@@ -61,7 +61,7 @@ describe('boatComputer', () => {
     expect(create?.body).toEqual({
       name: 'remy-cloud',
       type: 'default',
-      ttlSeconds: 3600,
+      ttlSeconds: 600,
       labels: { 'remy-computer': 'remy-cloud' },
     });
     expect(create?.headers['idempotency-key']).toMatch(/[0-9a-f-]{36}/);
@@ -92,7 +92,7 @@ describe('boatComputer', () => {
     ]);
     await c.run('true', opts);
     const resume = calls.find((x) => x.path.endsWith('/resume'));
-    expect(resume?.body).toEqual({ ttlSeconds: 3600 });
+    expect(resume?.body).toEqual({ ttlSeconds: 600 });
   });
 
   it('sends the size and idle stop the config asked for', async () => {

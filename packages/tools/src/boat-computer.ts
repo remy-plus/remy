@@ -12,7 +12,7 @@ export interface BoatConfig {
   name: string;
   /** Machine size (Boat's `type`). Default `default` (4 vCPU, 8 GB). There is no region choice. */
   size?: BoatSize;
-  /** Seconds idle before Boat stops the machine (disk kept). Default 3600; a trial allows 7200. */
+  /** Seconds idle before Boat stops the machine (disk kept). Default 600 (10 minutes), so an unused machine stops billing soon; a trial allows 7200. */
   idleStopSeconds?: number;
 }
 
@@ -54,7 +54,7 @@ export function boatComputer(cfg: BoatConfig, deps: BoatDeps): Computer {
   if (!NAME_RE.test(cfg.name)) throw new Error(`Invalid name: ${cfg.name}`);
   const size = cfg.size ?? 'default';
   if (!BOAT_SIZES.includes(size)) throw new Error(`Invalid size: ${String(size)}`);
-  const ttl = cfg.idleStopSeconds ?? 3600;
+  const ttl = cfg.idleStopSeconds ?? 600;
   if (!(Number.isInteger(ttl) && ttl >= 60 && ttl <= 2_592_000))
     throw new Error(`Invalid idleStopSeconds: ${ttl}`);
   const doFetch = deps.fetch ?? fetch;

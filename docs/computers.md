@@ -27,7 +27,7 @@ adds nothing to its own bill: you bring your own key and Boat bills you.
   error and output.
 - **One machine, reused.** On first use Remy looks for a machine labelled `remy-computer=remy-<name>`
   and makes one (named `remy-<name>`) if there is none. A stopped machine is resumed. Remy
-  sets Boat's idle stop (`idleStopSeconds`, default 3600; the trial allows at most 7200), after
+  sets Boat's idle stop (`idleStopSeconds`, default 600, ten minutes, since a running machine bills about $0.036 an hour even when idle; the trial allows at most 7200), after
   which Boat stops it and keeps its disk for at least 14 days.
 - **Checked live (2026-11-14).** `remy computer test cloud` made one machine and reused it on
   the second run (the label filter on `GET /sandboxes` works; an unknown label returns none);
@@ -44,7 +44,7 @@ adds nothing to its own bill: you bring your own key and Boat bills you.
 Config entry:
 
 ```json
-{ "kind": "boat", "name": "cloud", "size": "default", "idleStopSeconds": 3600 }
+{ "kind": "boat", "name": "cloud", "size": "default", "idleStopSeconds": 600 }
 ```
 
 ### Not verified against a real account
