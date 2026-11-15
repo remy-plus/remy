@@ -103,7 +103,8 @@ export function boatComputer(cfg: BoatConfig, deps: BoatDeps): Computer {
     const wait = retryAfter ? ` Try again in about ${retryAfter} seconds.` : '';
     const plain: Record<number, string> = {
       401: 'Boat refused the key. Check it with remy search key boat.',
-      402: 'Your Boat account needs billing: the trial or included time is used up. Add a payment method at boat.dev.',
+      // Boat's own words say which plan it wants ("Start the $20/month Boat plan to create sandboxes.").
+      402: `Your Boat account needs billing${msg ? `: ${msg.replace(/\.$/, '')}` : ''}. Set it up at boat.dev, in the dashboard's Billing tab.`,
       403: `Boat does not allow that on your plan${msg ? `: ${msg}` : ''}.`,
       404: 'Boat could not find the computer.',
       429: `Boat is at a start or concurrency limit.${wait}`,

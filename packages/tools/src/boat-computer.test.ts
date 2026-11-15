@@ -169,6 +169,23 @@ describe('boatComputer', () => {
     expect(err.message).not.toContain(KEY);
   });
 
+  it("passes Boat's own billing reason on, as the live API words it (2026-11-14)", async () => {
+    const { c } = mk([
+      {
+        status: 402,
+        body: {
+          ok: false,
+          code: 'billing_required',
+          message: 'Start the $20/month Boat plan to create sandboxes.',
+        },
+      },
+    ]);
+    const err = await c.run('x', opts).catch((e) => e);
+    expect(err.message).toBe(
+      "Your Boat account needs billing: Start the $20/month Boat plan to create sandboxes. Set it up at boat.dev, in the dashboard's Billing tab.",
+    );
+  });
+
   it('keeps the key out of command output and says where the machine is without it', async () => {
     const { c } = mk([
       { body: { ok: true, sandboxes: [{ id: 'bx_aaaaaaaa', state: 'idle' }] } },
