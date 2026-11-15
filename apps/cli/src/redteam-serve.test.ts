@@ -10,7 +10,9 @@ import { z } from 'zod';
 import { openMemory } from './memory.ts';
 import { createBrainMount } from './serve-brain.ts';
 import { type Kit, startKit } from './serve-kit.test-kit.ts';
+import { createSignInCodes } from './serve-signin.ts';
 import { createSkillsMount } from './serve-skills.ts';
+import { makeServeToken } from './serve-token.ts';
 import { openSkills } from './skills.ts';
 import { createLockout } from './webhook-lockout.ts';
 
@@ -678,5 +680,113 @@ describe('red team: the lockout', () => {
       },
     });
     expect(locked.status).toBe(429);
+  });
+});
+
+describe('red team: one-time sign-in codes', () => {
+  const exchange = (
+    k: Kit,
+    body: string,
+    o: { method?: string; path?: string; headers?: Record<string, string> } = {},
+  ) =>
+    raw(port(k), o.path ?? '/api/session/exchange', {
+      method: o.method ?? 'POST',
+      headers: {
+        host: `127.0.0.1:${port(k)}`,
+        'content-type': 'application/json',
+        ...o.headers,
+      },
+      body,
+    });
+
+  it('takes the code only from a JSON body: not the query string, a header, a cookie or the path', async () => {
+    const codes = createSignInCodes();
+    kit = await startKit(() => [], { signIn: codes });
+    const k = kit;
+    const code = codes.mint();
+    for (const r of [
+      await exchange(k, '{}', { path: `/api/session/exchange?code=${code}` }),
+      await exchange(k, '{}', { headers: { authorization: `Bearer ${code}` } }),
+      await exchange(k, '{}', { headers: { cookie: `code=${code}`, 'x-code': code } }),
+      await exchange(k, '{}', { path: `/api/session/exchange/${code}` }),
+    ])
+      expect([400, 401, 404, 405]).toContain(r.status);
+    expect((await exchange(k, JSON.stringify({ code }))).status).toBe(200);
+  });
+
+  it('refuses every other method, and a body that is not exactly { code: string }', async () => {
+    const codes = createSignInCodes();
+    kit = await startKit(() => [], { signIn: codes });
+    const k = kit;
+    const code = codes.mint();
+    for (const method of ['GET', 'PUT', 'DELETE', 'PATCH'])
+      expect((await exchange(k, '', { method })).status).toBe(405);
+    for (const body of [
+      JSON.stringify({ code, extra: 1 }),
+      JSON.stringify({ code: [code] }),
+      JSON.stringify({ code: { toString: code } }),
+      JSON.stringify({ code: 42 }),
+      JSON.stringify({ code: 'x'.repeat(201) }),
+      JSON.stringify([code]),
+      JSON.stringify(code),
+      '{"code":',
+      '',
+    ])
+      expect((await exchange(k, body)).status, body).toBe(400);
+    expect((await exchange(k, JSON.stringify({ code }))).status).toBe(200);
+  });
+
+  it('is counted by the same lockout as wrong tokens, and a forwarded address does not dodge it', async () => {
+    const codes = createSignInCodes();
+    kit = await startKit(() => [], { signIn: codes, lockout: createLockout(Date.now, 60_000) });
+    const k = kit;
+    const code = codes.mint();
+    for (let i = 0; i < 3; i++)
+      expect((await exchange(k, JSON.stringify({ code: `guess-${i}` }))).status).toBe(401);
+    // two wrong tokens on another route count toward the same five
+    for (let i = 0; i < 2; i++)
+      await raw(port(k), '/api/tasks', { headers: { authorization: `Bearer wrong-${i}` } });
+    const locked = await exchange(k, JSON.stringify({ code }), {
+      headers: {
+        'x-forwarded-for': '10.1.2.3',
+        forwarded: 'for=10.4.5.6',
+        'x-real-ip': '10.7.8.9',
+      },
+    });
+    expect(locked.status).toBe(429);
+    // and the right token is refused too, for the minute
+    expect(
+      (await raw(port(k), '/api/tasks', { headers: { authorization: `Bearer ${k.token}` } }))
+        .status,
+    ).toBe(429);
+  });
+
+  it('gives a session that is not the main token and stops working when the token is rotated', async () => {
+    const codes = createSignInCodes();
+    kit = await startKit(() => [], { signIn: codes });
+    const k = kit;
+    const r = await exchange(k, JSON.stringify({ code: codes.mint() }));
+    const session = JSON.parse(r.text).token as string;
+    expect(session).not.toBe(k.token);
+    expect((await k.api('/api/tasks', { token: session })).status).toBe(200);
+    makeServeToken(k.home);
+    expect((await k.api('/api/tasks', { token: session })).status).toBe(401);
+  });
+
+  it('does not reveal whether a code existed, was used or expired', async () => {
+    let t = 0;
+    const codes = createSignInCodes(() => t);
+    kit = await startKit(() => [], { signIn: codes });
+    const k = kit;
+    const used = codes.mint();
+    expect((await exchange(k, JSON.stringify({ code: used }))).status).toBe(200);
+    const late = codes.mint();
+    t += 11 * 60_000;
+    const a = await exchange(k, JSON.stringify({ code: late }));
+    const b = await exchange(k, JSON.stringify({ code: 'never-made' }));
+    const c = await exchange(k, JSON.stringify({ code: used }));
+    expect([a.status, b.status, c.status]).toEqual([401, 401, 401]);
+    expect(a.text).toBe(b.text);
+    expect(b.text).toBe(c.text);
   });
 });

@@ -15,7 +15,8 @@ import { MemoryEventStore } from '@remy/store';
 import { finish } from '@remy/tools';
 import { listenServe, type ServeListening } from './serve.ts';
 import type { Mount } from './serve-mount.ts';
-import { makeServeToken, serveTokenHash } from './serve-token.ts';
+import type { SignInCodes } from './serve-signin.ts';
+import { makeServeToken, makeSession, serveTokenHash, sessionHashes } from './serve-token.ts';
 import type { createLockout } from './webhook-lockout.ts';
 
 const usage = { inTokens: 10, outTokens: 10 };
@@ -51,6 +52,8 @@ export interface KitOptions {
   log?: (line: string) => void;
   /** A real lockout, to test it (the default never blocks). */
   lockout?: ReturnType<typeof createLockout>;
+  /** One-time sign-in codes: adds POST /api/session/exchange, with sessions kept in the kit's home. */
+  signIn?: SignInCodes;
 }
 
 export async function startKit(
@@ -81,6 +84,10 @@ export async function startKit(
         workspaceDir: '/w',
       }),
       tokenHash: () => serveTokenHash(home),
+      ...(opts.signIn && {
+        sessionHashes: () => sessionHashes(home),
+        signIn: { codes: opts.signIn, session: () => makeSession(home) },
+      }),
       // Many wrong-token requests in one test must stay 401, not turn into a lockout.
       lockout: opts.lockout ?? { blocked: () => false, fail: () => {} },
       log: opts.log ?? (() => {}),
