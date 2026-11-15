@@ -14,13 +14,14 @@ import {
   ToolRegistry,
 } from '@remy/core';
 import { MemoryEventStore } from '@remy/store';
+import { awayLine } from '@remy/tools';
 import { Crash, crashingStore, withTransient } from './faults.ts';
 import { noPolicyViolations, safety } from './graders.ts';
 import { overrideSkills, type PromptOverrides } from './improve/registry.ts';
 import { computeMetrics, type Metrics } from './metrics.ts';
 import { buildRecord, categorize } from './record.ts';
 import type { EvalCase, Grade, Human, ModelFor, RunRecord, Suite } from './types.ts';
-import { createWorld, withCorrectionNote, withSkills } from './world.ts';
+import { AWAY_NOW, AWAY_SINCE, createWorld, withCorrectionNote, withSkills } from './world.ts';
 
 /** Budget pauses a case's human extends before giving up. */
 const MAX_EXTENDS = 3;
@@ -55,7 +56,9 @@ function withSituation(inner: ModelClient, c: EvalCase): ModelClient {
   let caps = c.world.inbox ? EVAL_CAPABILITIES_EMAIL : EVAL_CAPABILITIES;
   if (c.world.helpers) caps = caps.replace(/- Helpers: off\..*/, '- Helpers: on.');
   if (c.world.skills) caps = caps.replace('- Skills: 0.', `- Skills: ${c.world.skills.length}.`);
-  const block = `${EVAL_SITUATION}\n${caps}`;
+  // As the app does: a short line about what is new, so a greeting is answered in one call.
+  const away = c.world.away?.length ? awayLine(c.world.away, AWAY_SINCE, AWAY_NOW) : undefined;
+  const block = `${EVAL_SITUATION}\n${away ? `${away}\n` : ''}${caps}`;
   return {
     id: inner.id,
     caps: inner.caps,

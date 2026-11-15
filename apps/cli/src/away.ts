@@ -1,7 +1,14 @@
 // What `whats_new` reads: the tasks that changed while the person was away, from the event store.
 // It never calls a model. Finished tasks since the last visit are listed; tasks still waiting for
 // the person or paused are listed too, up to a week back, because they still need something.
-import { type EventStore, fold, isHelperTask, type TaskState, waitingCards } from '@remy/core';
+import {
+  type EventStore,
+  fold,
+  isHelperTask,
+  type TaskState,
+  type TaskSummary,
+  waitingCards,
+} from '@remy/core';
 import type { AwayItem, AwayKind, AwayPort } from '@remy/tools';
 import { readMarker } from './background.ts';
 import type { LastSeen } from './last-seen.ts';
@@ -54,19 +61,24 @@ export interface AwayDeps {
   seen: LastSeen;
   schedules?: () => Schedule[];
   now?: () => Date;
+  /** The task list (default: the store's); a caller that already has it saves a second read. */
+  list?: () => Promise<TaskSummary[]>;
 }
 
 export function createAwayPort(d: AwayDeps): AwayPort {
   const now = d.now ?? (() => new Date());
   return {
     since: () => d.seen.get(now()),
-    async items(since, exclude) {
+    async items(since, exclude, limit = LOOK_AT) {
       const openFrom = new Date(
         Math.min(since.getTime(), now().getTime() - OPEN_DAYS * 86_400_000),
       );
       const bySchedule = new Map<string, Schedule>();
       for (const s of d.schedules?.() ?? []) if (s.lastTask) bySchedule.set(s.lastTask, s);
-      const candidates = (await d.store.listTasks())
+      const kindOf = (s: TaskSummary['status']) => KIND[s];
+      const rank = (s: TaskSummary['status']) =>
+        ['waiting', 'paused', 'failed', 'finished'].indexOf(kindOf(s) ?? '');
+      const candidates = (await (d.list ?? (() => d.store.listTasks()))())
         .filter((t) => t.taskId !== exclude && !isHelperTask(t.taskId))
         .filter((t) => {
           const kind = KIND[t.status];
@@ -74,8 +86,9 @@ export function createAwayPort(d: AwayDeps): AwayPort {
           const open = kind === 'waiting' || kind === 'paused';
           return new Date(t.updatedAt) >= (open ? openFrom : since);
         })
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .slice(0, LOOK_AT);
+        // Waiting first, then the newest: with a small `limit` the ones that matter are the ones read.
+        .sort((a, b) => rank(a.status) - rank(b.status) || b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, limit);
       const out: AwayItem[] = [];
       for (const t of candidates) {
         const state = fold(await d.store.read(t.taskId));

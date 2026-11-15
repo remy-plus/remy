@@ -28,8 +28,11 @@ export interface AwayItem {
 export interface AwayPort {
   /** When the person last finished a turn here; the host falls back to 24 hours ago. */
   since(): Date;
-  /** Tasks that changed since then (waiting and paused ones still open too), without `exclude`. */
-  items(since: Date, exclude: string): Promise<AwayItem[]>;
+  /**
+   * Tasks that changed since then (waiting and paused ones still open too), without `exclude`.
+   * `limit` caps how many are read, waiting first, for callers that must be quick.
+   */
+  items(since: Date, exclude: string, limit?: number): Promise<AwayItem[]>;
 }
 
 /** Most tasks one call lists; the rest are counted. */
@@ -83,11 +86,46 @@ export function awayText(items: AwayItem[], since: Date, now: Date): string {
   return lines.join('\n');
 }
 
+/** The most items the situation line names; the rest are counted. */
+export const AWAY_LINE_ITEMS = 3;
+const LINE_ASKED_CHARS = 50;
+const LINE_OUTCOME_CHARS = 80;
+const LINE_LABEL: Record<AwayKind, string> = {
+  waiting: 'waiting for them',
+  paused: 'paused',
+  failed: 'did not finish',
+  finished: 'finished',
+};
+
+/**
+ * One short line for the situation block: what is new since the person was last here, at most
+ * three items, waiting ones first. Nothing when nothing is new, so a greeting is answered from the
+ * line in one model call and `whats_new` is only for more detail. A task that read untrusted
+ * content is named without its words: the situation is Remy's own voice, so nothing a page said
+ * can get in through here.
+ */
+export function awayLine(items: AwayItem[], since: Date, now: Date): string | undefined {
+  if (!items.length) return undefined;
+  const rank = (i: AwayItem) => GROUPS.findIndex((g) => g.kind === i.kind);
+  const sorted = [...items].sort((a, b) => rank(a) - rank(b) || b.at.localeCompare(a.at));
+  const parts = sorted.slice(0, AWAY_LINE_ITEMS).map((i) => {
+    const label = LINE_LABEL[i.kind];
+    if (i.tainted || i.source === 'webhook')
+      return `${label}: a task that read outside content (ask what you missed for the details)`;
+    const by = i.source ? ` [${i.source}]` : '';
+    return `${label}: "${oneLine(i.asked, LINE_ASKED_CHARS)}"${by}, ${oneLine(i.outcome, LINE_OUTCOME_CHARS)}`;
+  });
+  const more = sorted.length - parts.length;
+  return `- While the person was away (${agoWords(since, now)}): ${parts.join('; ')}${
+    more > 0 ? `; and ${more} more` : ''
+  }. Mention this only if they greet you, say they are back or ask what is new.`;
+}
+
 export function createAwayTool(port: AwayPort, now: () => Date = () => new Date()): Tool {
   return defineTool({
     name: 'whats_new',
     description:
-      'What finished, waits for the user or paused since they were last here. When they greet you or say they are back, call it first, then answer in one to three warm, short sentences: waiting items first, only what matters.',
+      'Full list of what finished, waits for the user or paused since they were last here. For a greeting or "I\'m back", answer from the situation\'s "While the person was away" line instead (no line: nothing is new). Call this only for details or older items.',
     args: z.object({}),
     risk: 'read',
     effect: 'none',

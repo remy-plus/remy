@@ -54,4 +54,13 @@ describe('situationBlock', () => {
     expect(out).toContain('Need sign-in (remy connect auth <name>): linear.');
     expect(out).not.toContain(' x');
   });
+
+  it('puts the away line right after the time, and nothing when there is none', () => {
+    const base = { now, timeZone: 'UTC', background: [], connections: [] };
+    const out = situationBlock({ ...base, away: '- While the person was away (a minute ago): x.' });
+    const lines = out.split('\n');
+    expect(lines[1]).toContain('Local time');
+    expect(lines[2]).toBe('- While the person was away (a minute ago): x.');
+    expect(situationBlock(base)).not.toContain('away');
+  });
 });

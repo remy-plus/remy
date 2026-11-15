@@ -18,7 +18,12 @@ export interface SituationInput {
   connections: ConnectionRow[];
   /** What this machine can and cannot do now, from capabilities.ts. */
   capabilities?: string;
+  /** What is new since the person was last here (`awayLine`); absent when nothing is. */
+  away?: string;
 }
+
+/** Tasks read to build the away line: enough for the three it names, few enough to be quick. */
+export const SITUATION_AWAY_READS = 6;
 
 /** At most this many background tasks are listed. */
 export const MAX_BACKGROUND = 5;
@@ -41,6 +46,7 @@ export function situationBlock(i: SituationInput): string {
   }).format(i.now);
   const lines = [`Situation when the user sent the next message (from Remy, not the user):`];
   lines.push(`- Local time: ${when} (${zone}).`);
+  if (i.away) lines.push(i.away);
   const live = i.background.filter((t) => t.state !== 'done' && t.state !== 'stopped');
   if (live.length)
     lines.push(

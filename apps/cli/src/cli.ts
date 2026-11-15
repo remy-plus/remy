@@ -36,6 +36,7 @@ import {
   TaskBusyError,
   type TaskConfig,
   type TaskStatus,
+  type TaskSummary,
   ToolRegistry,
 } from '@remy/core';
 import type { McpConnectionOptions } from '@remy/mcp';
@@ -50,6 +51,7 @@ import {
 import { SqliteEventStore } from '@remy/store';
 import {
   askUser,
+  awayLine,
   type BoatDeps,
   calculate,
   computerFromConfig,
@@ -179,7 +181,7 @@ import { createProfileStore, profileContext } from './profile.ts';
 import { explainModelError } from './provider-error.ts';
 import { reachLines, recommendReach } from './reach.ts';
 import { readReachFacts } from './reach-facts.ts';
-import { withRecall } from './recall.ts';
+import { type PrepTiming, withRecall } from './recall.ts';
 import { collectReview, formatReview, parseSince } from './review.ts';
 import { plainSchedules } from './schedule.ts';
 import { openSchedules } from './schedule-store.ts';
@@ -233,7 +235,7 @@ import {
   openVoiceLedger,
   readFishKeyAsync,
 } from './serve-voice.ts';
-import { type BackgroundTask, situationBlock } from './situation.ts';
+import { type BackgroundTask, SITUATION_AWAY_READS, situationBlock } from './situation.ts';
 import { openSkills, plainSkill, plainSkills, type SkillStore } from './skills.ts';
 import {
   addCommand,
@@ -932,9 +934,11 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
   }
 
   /** Tasks a background worker started, newest first, with what `remy list` would call them. */
-  async function backgroundTasks(): Promise<BackgroundTask[]> {
+  async function backgroundTasks(
+    list: () => Promise<TaskSummary[]> = () => store.listTasks(),
+  ): Promise<BackgroundTask[]> {
     const out: BackgroundTask[] = [];
-    for (const t of await store.listTasks()) {
+    for (const t of await list()) {
       const m = readMarker(home, t.taskId);
       if (m)
         out.push({ id: t.taskId, state: bgState(t.status, pidAlive(m.pid)), prompt: t.prompt });
@@ -1184,12 +1188,22 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       list: () => schedules.list(),
     }))
       tools.add(t);
-    // "I'm back": what finished, waits or paused since the last chat turn here.
-    tools.add(
-      createAwayTool(
-        createAwayPort({ store, home, seen: lastSeen(), schedules: () => schedules.list() }),
-      ),
-    );
+    // "I'm back": what finished, waits or paused since the last chat turn here. The task list is
+    // read once per message and shared with the background-task line of the situation.
+    let listed: { at: number; tasks: Promise<TaskSummary[]> } | undefined;
+    const taskList = () => {
+      if (!listed || Date.now() - listed.at > 1000)
+        listed = { at: Date.now(), tasks: store.listTasks() };
+      return listed.tasks;
+    };
+    const awayPort = createAwayPort({
+      store,
+      home,
+      seen: lastSeen(),
+      schedules: () => schedules.list(),
+      list: taskList,
+    });
+    tools.add(createAwayTool(awayPort));
     // Probes can be slow, so the block is built once per process, at the first message.
     const capabilities = onceCapabilities(() =>
       capabilitiesBlock({
@@ -1212,13 +1226,32 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
           steps: env.REMY_SKILL_STEPS === 'on',
           onSteps: (s) => skills().used(s.name),
         }),
-      situation: async () =>
-        situationBlock({
-          now: new Date(),
-          background: await backgroundTasks(),
+      situation: async () => {
+        const now = new Date();
+        // A few tasks are read, waiting ones first; a failure here never holds up the message.
+        const away = async () => {
+          try {
+            const since = awayPort.since();
+            return awayLine(await awayPort.items(since, '', SITUATION_AWAY_READS), since, now);
+          } catch {
+            return undefined;
+          }
+        };
+        const [background, awayText] = await Promise.all([backgroundTasks(taskList), away()]);
+        return situationBlock({
+          now,
+          background,
           connections: mcp?.list() ?? [],
           capabilities: capabilities(),
-        }),
+          ...(awayText && { away: awayText }),
+        });
+      },
+      ...(env.REMY_TIMING === 'on' && {
+        onPrep: (t: PrepTiming) =>
+          out(
+            st.dim(`prep ${t.totalMs} ms (situation ${t.situationMs} ms, memory ${t.memoryMs} ms)`),
+          ),
+      }),
     });
     // web_search exists unless search is switched off; its keys and route are worked out at the first call.
     const searchOverride = (env.REMY_SEARCH ?? file.search)?.trim().toLowerCase();
@@ -1314,7 +1347,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ...(opts.hooks?.onLive && { onLive: opts.hooks.onLive }),
       ...(opts.hooks?.onModelStart && { onModelStart: opts.hooks.onModelStart }),
     });
-    return { runtime, timeline, tools };
+    // Probes behind the capabilities block can be slow; a server builds it before the first message.
+    const warm = () => void capabilities();
+    return { runtime, timeline, tools, warm };
   }
   type Rt = ReturnType<typeof makeRuntime>['runtime'];
   /** Set by a background worker: called when the first approval card of a task starts waiting. */
@@ -2525,11 +2560,16 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         const file = cfg();
         const model = deps.model ?? modelFor(file);
         const live = createLiveBus();
-        const { runtime } = makeRuntime(file, {
+        const { runtime, warm } = makeRuntime(file, {
           model: true,
           hooks: { onLive: (id, e) => live.publish(id, e) },
         });
         await mcp?.ready;
+        try {
+          warm();
+        } catch {
+          // The first message builds it again and shows the problem there.
+        }
         if (!serveTokenHash(home)) {
           announceFirstRunToken(home, makeServeToken(home), deps.isTTY, (line) =>
             out(line.startsWith('That is') ? st.dim(line) : line),

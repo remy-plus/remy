@@ -14,6 +14,14 @@ import {
   type SemanticSource,
 } from '@remy/tools';
 
+/** Where the time went before a message's first model call (the web app's "speed" line). */
+export interface PrepTiming {
+  /** Everything from the message arriving to the request leaving. */
+  totalMs: number;
+  situationMs: number;
+  memoryMs: number;
+}
+
 export interface RecallOptions {
   /** Read on every call: personalising can be switched off mid-session. */
   enabled: () => boolean;
@@ -28,6 +36,8 @@ export interface RecallOptions {
   skills?: (query: string) => string;
   /** Whether a correction may carry the how-to note: personalising on and save_howto registered. */
   howto?: () => boolean;
+  /** Told how long a new message's context took to build; off unless asked for. */
+  onPrep?: (t: PrepTiming) => void;
 }
 
 export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
@@ -46,9 +56,21 @@ export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
       const last = req.messages.findLastIndex((m) => m.role === 'user');
       const lastText = req.messages[last]?.content;
       if (last >= 0 && typeof lastText === 'string' && !frozen.has(lastText)) {
+        const t0 = performance.now();
         const query = memoryQuery(req.messages.slice(0, last + 1));
         const notes = on ? o.notes() : [];
-        const sem = on && o.semantic ? await o.semantic(notes, query) : undefined;
+        // Ranking by meaning (which may call an embedding service) and the situation do not
+        // depend on each other, so they run side by side instead of one after the other.
+        const timed = async <T>(work: Promise<T>) => {
+          const t = performance.now();
+          const value = await work;
+          return { value, ms: Math.round(performance.now() - t) };
+        };
+        const [semR, sitR] = await Promise.all([
+          timed(Promise.resolve(on && o.semantic ? o.semantic(notes, query) : undefined)),
+          timed(Promise.resolve(o.situation ? o.situation() : '')),
+        ]);
+        const sem = semR.value;
         const earlier = req.messages.slice(0, last);
         // A correction needs an answer to correct, and a task gets the note once.
         const correcting =
@@ -61,11 +83,16 @@ export function withRecall(inner: ModelClient, o: RecallOptions): ModelClient {
           );
         const parts = [
           correcting ? HOWTO_NOTE : '',
-          o.situation ? await o.situation() : '',
+          sitR.value,
           o.skills ? o.skills(query) : '',
           on ? notesBlock(notes, query, sem) : '',
         ];
         frozen.set(lastText, parts.filter(Boolean).join('\n\n'));
+        o.onPrep?.({
+          totalMs: Math.round(performance.now() - t0),
+          situationMs: sitR.ms,
+          memoryMs: semR.ms,
+        });
       }
       const messages = req.messages.map((m) => {
         if (m.role !== 'user') return m;

@@ -65,6 +65,10 @@ import { z } from 'zod';
 import { overrideTools, type PromptOverrides } from './improve/registry.ts';
 import type { EvalCase, McpServerSpec, MockEmail, SentEmail, WorldAfter } from './types.ts';
 
+/** The fake world's last visit, and the moment of the next message, so away text repeats. */
+export const AWAY_SINCE = new Date('2026-02-01T08:00:00Z');
+export const AWAY_NOW = new Date('2026-02-01T12:00:00Z');
+
 export function fixtureFetch(web: Record<string, string>): ScopedFetch {
   return {
     async get(url): Promise<FetchResult> {
@@ -394,10 +398,7 @@ export async function createWorld(c: EvalCase, prompts: PromptOverrides = {}): P
     const away = c.world.away;
     // The last visit is fixed in the fake world, so the text is the same on every run.
     tools.push(
-      createAwayTool(
-        { since: () => new Date('2026-02-01T08:00:00Z'), items: async () => away },
-        () => new Date('2026-02-01T12:00:00Z'),
-      ),
+      createAwayTool({ since: () => AWAY_SINCE, items: async () => away }, () => AWAY_NOW),
     );
   }
 

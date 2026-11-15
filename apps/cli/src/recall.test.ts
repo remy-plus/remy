@@ -175,4 +175,59 @@ describe('withRecall: corrections', () => {
     const last = inner.requests[1]?.messages.at(-1)?.content as string;
     expect(last).not.toContain('correcting');
   });
+
+  it('builds the situation and ranks by meaning side by side, and reports the time', async () => {
+    const inner = new ScriptedModelClient([
+      { text: 'ok', calls: [], usage: { inTokens: 1, outTokens: 1 } },
+    ]);
+    const started: string[] = [];
+    const gate = (name: string, ms: number, value: string) => async () => {
+      started.push(name);
+      await new Promise((r) => setTimeout(r, ms));
+      return value;
+    };
+    const preps: { totalMs: number; situationMs: number; memoryMs: number }[] = [];
+    const model = withRecall(inner, {
+      enabled: () => true,
+      notes: () => [note('mem_a', 'Likes tea')],
+      hasTools: false,
+      semantic: async () => {
+        await gate('semantic', 80, '')();
+        return undefined;
+      },
+      situation: gate('situation', 80, 'SITUATION'),
+      onPrep: (t) => preps.push(t),
+    });
+    const t0 = Date.now();
+    await model.complete(req('hello'), signal);
+    // Both were started before either finished, so the wait is one delay, not two.
+    expect(started).toEqual(['semantic', 'situation']);
+    expect(Date.now() - t0).toBeLessThan(150);
+    expect(preps).toHaveLength(1);
+    expect(preps[0]?.situationMs).toBeGreaterThanOrEqual(70);
+    expect(preps[0]?.memoryMs).toBeGreaterThanOrEqual(70);
+    expect(preps[0]?.totalMs).toBeLessThan(preps[0] ? preps[0].situationMs + preps[0].memoryMs : 0);
+    expect(inner.requests[0]?.messages[0]?.content).toContain('SITUATION');
+  });
+
+  it('reports the prep time once per message, not on a repeat of the same message', async () => {
+    const preps: number[] = [];
+    const inner = new ScriptedModelClient(
+      Array.from({ length: 3 }, () => ({
+        text: 'ok',
+        calls: [],
+        usage: { inTokens: 1, outTokens: 1 },
+      })),
+    );
+    const model = withRecall(inner, {
+      enabled: () => false,
+      notes: () => [],
+      hasTools: false,
+      situation: async () => 'S',
+      onPrep: (t) => preps.push(t.totalMs),
+    });
+    await model.complete(req('one'), signal);
+    await model.complete(req('one'), signal);
+    expect(preps).toHaveLength(1);
+  });
 });

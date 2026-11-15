@@ -152,4 +152,44 @@ describe('away port', () => {
     const [item] = await p.items(p.since(), 'task_me');
     expect(item?.asked).toBe('look [31m up prices');
   });
+
+  it('reads only as many tasks as the limit, waiting ones first', async () => {
+    for (let i = 0; i < 6; i++) await seed(`task_f${i}`, `job ${i}`, [finished('ok')]);
+    await seed('task_w', 'email Sam', waiting);
+    let reads = 0;
+    const counting = {
+      ...store,
+      listTasks: () => store.listTasks(),
+      read: (...a: Parameters<typeof store.read>) => {
+        reads++;
+        return store.read(...a);
+      },
+    } as unknown as typeof store;
+    const seen = openLastSeen(home);
+    seen.touch(new Date(NOW.getTime() - 3 * HOUR));
+    const p = createAwayPort({ store: counting, home, seen, now: () => NOW });
+    const items = await p.items(p.since(), 'task_me', 3);
+    expect(items).toHaveLength(3);
+    expect(items[0]?.kind).toBe('waiting');
+    expect(reads).toBe(3);
+  });
+
+  it('uses a task list it is handed instead of asking the store again', async () => {
+    await seed('task_a', 'check', [finished('ok')]);
+    let asked = 0;
+    const seen = openLastSeen(home);
+    seen.touch(new Date(NOW.getTime() - 3 * HOUR));
+    const p = createAwayPort({
+      store,
+      home,
+      seen,
+      now: () => NOW,
+      list: async () => {
+        asked++;
+        return store.listTasks();
+      },
+    });
+    await p.items(p.since(), 'x');
+    expect(asked).toBe(1);
+  });
 });
