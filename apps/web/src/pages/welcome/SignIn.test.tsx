@@ -182,6 +182,52 @@ describe('SignIn', () => {
       expect(screen.getByLabelText('Access token')).toBeTruthy();
     });
 
+    it('signs in from a phone on the home network: the code goes in the body to that address, never in a URL', async () => {
+      const lan = 'http://192.168.1.20:7790';
+      arrive('#/sign-in?code=good-code');
+      const fetch = linkServer();
+      const onSignedIn = vi.fn();
+      const probe = createHttpApi({ base: lan, token: () => null, fetch });
+      render(
+        <ApiProvider api={createMockApi()}>
+          <SignIn probe={probe} onSignedIn={onSignedIn} />
+        </ApiProvider>,
+      );
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(saved()).toBe('session-token');
+      // the address bar no longer holds the code
+      expect(window.location.href).not.toContain('good-code');
+      expect(window.location.hash).toBe('#/sign-in');
+      // every request went to the LAN address, none carried the code in its address
+      for (const [url] of fetch.mock.calls) {
+        expect(String(url).startsWith(lan)).toBe(true);
+        expect(String(url)).not.toContain('good-code');
+      }
+      const sent = fetch.mock.calls.filter(([u]) => String(u).endsWith('/api/session/exchange'));
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.[1]?.method).toBe('POST');
+      expect(String(sent[0]?.[1]?.body)).toBe('{"code":"good-code"}');
+    });
+
+    it('tells a phone the link was used when the server says so, and keeps the code out of the address', async () => {
+      arrive('#/sign-in?code=old-code&x=1');
+      const probe = createHttpApi({
+        base: 'http://192.168.1.20:7790',
+        token: () => null,
+        fetch: linkServer(),
+      });
+      render(
+        <ApiProvider api={createMockApi()}>
+          <SignIn probe={probe} onSignedIn={vi.fn()} />
+        </ApiProvider>,
+      );
+      expect((await screen.findByRole('alert')).textContent).toContain(
+        'expired or was already used',
+      );
+      expect(window.location.href).not.toContain('old-code');
+      expect(window.location.hash).toBe('#/sign-in?x=1');
+    });
+
     it('does nothing without a code', async () => {
       arrive('#/sign-in');
       const fetch = linkServer();

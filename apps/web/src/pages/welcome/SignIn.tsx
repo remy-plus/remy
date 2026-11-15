@@ -156,7 +156,7 @@ export function SignIn({
           <p id={`${id}-help`} className="mt-1.5 mb-0 text-[13px] leading-snug text-muted">
             Remy prints this once, when you run{' '}
             <code className="font-mono text-text">remy serve</code> on the server. On the same
-            machine, open the sign-in link it prints instead.
+            machine, or on your phone, use the sign-in link or QR code it prints instead.
           </p>
           <input
             id={`${id}-token`}
@@ -215,6 +215,8 @@ export function SignIn({
         <p className="mt-6 mb-0 text-[14px] text-muted">
           Lost it? On the server, run{' '}
           <code className="whitespace-nowrap font-mono text-text">remy serve token --rotate</code>.
+          For a new sign-in link and QR code, run{' '}
+          <code className="whitespace-nowrap font-mono text-text">remy serve link</code>.
         </p>
         <p className="mt-4 mb-0 border-t border-edge pt-4 text-[13px] leading-relaxed text-muted">
           Your chats, notes and keys are kept on this server. To answer, Remy sends what you ask,
