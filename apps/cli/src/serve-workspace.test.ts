@@ -1,5 +1,12 @@
 // The folder Remy may use: how a typed path is checked, which folder a task gets, and the route.
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MemoryEventStore } from '@remy/store';
@@ -79,9 +86,11 @@ describe('checkWorkspace', () => {
       }
     }
     mkdirSync(join(userHome, 'Library', 'Keychains'), { recursive: true });
-    expect(refusal('~/LIBRARY/Keychains').message).toMatch(
-      /keys or system settings|does not exist/,
-    );
+    // Other letter case reaches the same folder only on a case-insensitive disk (a Mac).
+    if (existsSync(join(userHome, 'LIBRARY')))
+      expect(refusal('~/LIBRARY/Keychains').message).toMatch(
+        /keys or system settings|does not exist/,
+      );
     mkdirSync(join(userHome, '.local', 'share', 'keyrings'), { recursive: true });
     expect(refusal(join(userHome, '.local', 'share', 'keyrings')).message).toMatch(/keys or/);
     expect(refusal(join(base)).message).toMatch(/own data|inside your home/);

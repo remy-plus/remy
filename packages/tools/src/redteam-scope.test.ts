@@ -118,7 +118,12 @@ describe('red team: ScopedFs', () => {
   it('is not fooled by a different letter case on a case-insensitive disk, or a link as the root', async () => {
     const fs = createScopedFs(root);
     symlinkSync(outside, join(root, 'Link'));
-    for (const p of ['link/secret.txt', 'LINK/secret.txt', 'LiNk/secret.txt']) {
+    // Other letter case names the same folder only on a case-insensitive disk (a Mac); on Linux
+    // `LINK` is simply a new folder inside the root, which is allowed.
+    writeFileSync(join(root, 'caseProbe'), '');
+    const folds = existsSync(join(root, 'CASEPROBE'));
+    const names = folds ? ['link', 'LINK', 'LiNk'] : ['Link'];
+    for (const p of names.map((n) => `${n}/secret.txt`)) {
       await refused(fs.readText(p));
       await refused(fs.writeText(p.replace('secret', 'new'), 'pwned'));
     }
