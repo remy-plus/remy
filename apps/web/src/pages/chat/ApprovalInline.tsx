@@ -3,6 +3,7 @@ import { type ApprovalCard, useApi } from '../../api/index.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { describeError } from '../../lib/errors.ts';
 import { approvalSentence } from '../../lib/feed.ts';
+import { plainApprovalReason } from '../../lib/reasons.ts';
 
 const pill =
   'cursor-pointer rounded-full border h-10 px-4 sm:h-8 sm:px-3.5 text-[13px] font-medium whitespace-nowrap transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97] disabled:cursor-default disabled:opacity-50';
@@ -64,7 +65,9 @@ export function ApprovalInline({
       <p className="mt-1 mb-0 text-[15px] leading-6 text-text">
         {approvalSentence(card.preview, card.risk)}
       </p>
-      {card.reason && <p className="mt-1 mb-0 text-[13px] text-muted">{card.reason}</p>}
+      {card.reason && (
+        <p className="mt-1 mb-0 text-[13px] text-muted">{plainApprovalReason(card.reason)}</p>
+      )}
       {answered ? (
         <p role="status" className="mt-3 mb-0 flex items-center gap-2 text-[14px] text-text">
           <Icon name="check" className="shrink-0 text-signal" />

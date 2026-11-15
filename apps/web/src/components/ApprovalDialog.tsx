@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { type TaskView, useApi } from '../api/index.tsx';
 import { describeError } from '../lib/errors.ts';
+import { plainApprovalReason } from '../lib/reasons.ts';
 import { primaryButton, quietButton, RISK, trustSentence } from '../pages/tasks/format.ts';
 import { Skeleton } from './Skeleton.tsx';
 
@@ -286,7 +287,9 @@ export function ApprovalDialog({
               Why Remy is asking
             </h3>
             <p className="m-0 text-[14px] leading-[1.6] text-muted">
-              {card?.reason ?? 'Remy needs your go-ahead before it goes further.'}{' '}
+              {card?.reason
+                ? plainApprovalReason(card.reason)
+                : 'Remy needs your go-ahead before it goes further.'}{' '}
               {trustSentence[task?.config.trust ?? 'ask'] ?? trustSentence.ask}
             </p>
             <h3 className={`${mono} mt-6 mb-2 text-[12px] font-normal text-muted`}>
