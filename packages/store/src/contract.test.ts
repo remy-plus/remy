@@ -147,3 +147,32 @@ describe('SqliteEventStore', () => {
     b.close();
   });
 });
+
+describe('SqliteEventStore file modes', () => {
+  it.skipIf(process.platform === 'win32')(
+    'keeps the database and its -wal and -shm files owner-only, whatever the umask',
+    async () => {
+      const { mkdtempSync, statSync, writeFileSync, chmodSync } = await import('node:fs');
+      const { tmpdir } = await import('node:os');
+      const { join } = await import('node:path');
+      const mode = (p: string) => statSync(p).mode & 0o777;
+      const dir = mkdtempSync(join(tmpdir(), 'remy-'));
+      const fresh = join(dir, 'fresh.sqlite');
+      const a = new SqliteEventStore(fresh);
+      await a.createTask('t1', 'p', config);
+      expect([mode(fresh), mode(`${fresh}-wal`), mode(`${fresh}-shm`)]).toEqual([
+        0o600, 0o600, 0o600,
+      ]);
+      a.close();
+
+      // A database an earlier version made, world-readable, is closed up on the next open.
+      const old = join(dir, 'old.sqlite');
+      writeFileSync(old, '');
+      chmodSync(old, 0o644);
+      const b = new SqliteEventStore(old);
+      await b.createTask('t1', 'p', config);
+      expect([mode(old), mode(`${old}-wal`), mode(`${old}-shm`)]).toEqual([0o600, 0o600, 0o600]);
+      b.close();
+    },
+  );
+});

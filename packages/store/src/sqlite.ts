@@ -1,3 +1,4 @@
+import { chmodSync, closeSync, openSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import {
   ConcurrencyError,
@@ -24,17 +25,39 @@ CREATE TABLE IF NOT EXISTS events (
 
 type Row = Record<string, string | number | null>;
 
+/**
+ * Makes the database file, and the -wal and -shm files SQLite keeps beside it, readable by their owner
+ * only. SQLite gives them the umask's mode (0644 with the usual 022), and the -wal file holds the latest
+ * prompts and answers, so on a shared machine any other user could read them. Call it before the first
+ * open (creates the file as 0600, so the -wal and -shm files inherit that) and again after the WAL is
+ * switched on (fixes a database made by an earlier version). Never throws: a read-only folder or a
+ * file system without modes is not a reason to stop.
+ */
+export function lockDownDatabase(path: string): void {
+  if (path === ':memory:') return;
+  try {
+    closeSync(openSync(path, 'a', 0o600));
+  } catch {}
+  for (const f of [path, `${path}-wal`, `${path}-shm`]) {
+    try {
+      chmodSync(f, 0o600);
+    } catch {}
+  }
+}
+
 export class SqliteEventStore implements EventStore {
   private db: DatabaseSync;
   private now: () => number;
 
   constructor(path: string, opts: { now?: () => number } = {}) {
     this.now = opts.now ?? Date.now;
+    lockDownDatabase(path);
     this.db = new DatabaseSync(path);
     // A background worker and a foreground command share this file: wait for a lock, do not fail.
     this.db.exec('PRAGMA busy_timeout = 5000');
     if (path !== ':memory:') this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec(SCHEMA);
+    lockDownDatabase(path);
   }
 
   close(): void {

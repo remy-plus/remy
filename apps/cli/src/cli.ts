@@ -720,7 +720,7 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
       ...(deps.fetch && { fetch: deps.fetch }),
     });
   }
-  if (!deps.store) mkdirSync(home, { recursive: true });
+  if (!deps.store) mkdirSync(home, { recursive: true, mode: 0o700 });
   const ownStore = deps.store ? undefined : new SqliteEventStore(join(home, 'remy.sqlite'));
   const store: EventStore = deps.store ?? (ownStore as SqliteEventStore);
   let active: string | undefined;

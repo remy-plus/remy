@@ -5,9 +5,10 @@
 // and renames it to memory.json.imported (never deletes it). A damaged old file is reported, left
 // alone, and moved aside to memory.json.damaged on the next save.
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { lockDownDatabase } from '@remy/store';
 import {
   addNote,
   cleanMemoryText,
@@ -102,14 +103,13 @@ export function openMemory(
   };
   mkdirSync(home, { recursive: true, mode: 0o700 });
   const dbPath = join(home, 'remy.sqlite');
+  lockDownDatabase(dbPath);
   const db = new DatabaseSync(dbPath);
   // The chat and a background task share this file: wait for a lock, do not fail.
   db.exec('PRAGMA busy_timeout = 5000');
   db.exec('PRAGMA journal_mode = WAL');
   db.exec(SCHEMA);
-  try {
-    chmodSync(dbPath, 0o600);
-  } catch {}
+  lockDownDatabase(dbPath);
 
   const tx = <T>(fn: () => T): T => {
     db.exec('BEGIN IMMEDIATE');
