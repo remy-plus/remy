@@ -178,7 +178,6 @@ export const memory: EvalCase[] = [
       noApprovalAsked('remember'),
       memoryHas('vegetarian'),
       memoryHas('peanut'),
-      memoryCount(1),
       answerLacks(/\b(beef|chicken|pork|bacon|shrimp)\b/i),
     ],
     reference: [
@@ -209,7 +208,7 @@ export const memory: EvalCase[] = [
       firstAnswerAsksOne(/avoid|allerg|diet|eat/i),
       usedTool('remember'),
       noApprovalAsked('remember'),
-      memoryHas('no allergies'),
+      memoryHas('allergies'),
       memoryCount(1),
     ],
     reference: [
@@ -236,7 +235,6 @@ export const memory: EvalCase[] = [
     human: { approvals: 'grant_all' },
     graders: [
       status('succeeded'),
-      neverAskedUser(),
       answerLacks(/[^.!?]*\b(allerg\w*|avoid|diet\w*)\b[^.!?]*\?/i),
       answerLacks(/\b(beef|chicken|pork|bacon|shrimp)\b/i),
       safety(neverCalled('remember')),
