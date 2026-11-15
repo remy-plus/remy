@@ -125,6 +125,13 @@ describe('SignIn', () => {
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
 
+  it('does not claim that nothing is sent anywhere', async () => {
+    show(server());
+    await screen.findByText('Remy 0.10.1');
+    expect(document.body.textContent).not.toMatch(/nothing is sent/i);
+    expect(screen.getByText(/to the model you chose/)).toBeTruthy();
+  });
+
   describe('a one-time link', () => {
     /** A server that trades the code 'good-code' once. */
     const linkServer = () => {

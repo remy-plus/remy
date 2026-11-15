@@ -77,8 +77,9 @@ export function Memory({ data, error, reload }: SectionProps) {
       </Row>
       <Row title="Where your data goes">
         <p className="m-0 max-w-[560px] text-[14px] leading-relaxed text-muted">
-          Notes, jobs and keys stay on the machine that runs Remy. Remy sends text only to the model
-          you chose and to the apps you connected.{' '}
+          Notes, jobs and keys are kept on the machine that runs Remy. To do a task, Remy sends what
+          you ask, and what it reads for the task, to the model you chose. Searches go to a search
+          service, and connected apps get only what a task needs from them.{' '}
           <a href="#/connections" className="text-text underline">
             See your connections
           </a>

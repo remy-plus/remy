@@ -213,8 +213,9 @@ export function SignIn({
           <code className="whitespace-nowrap font-mono text-text">remy serve token --rotate</code>.
         </p>
         <p className="mt-4 mb-0 border-t border-edge pt-4 text-[13px] leading-relaxed text-muted">
-          Remy runs on your server. Your chats, keys and files stay there, and nothing is sent
-          anywhere else.
+          Your chats, notes and keys are kept on this server. To answer, Remy sends what you ask,
+          and what it reads for the task, to the model you chose, and your searches to a search
+          service.
         </p>
       </div>
     </div>
