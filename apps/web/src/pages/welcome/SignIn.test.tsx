@@ -124,4 +124,62 @@ describe('SignIn', () => {
     ).toBeTruthy();
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
   });
+
+  describe('a one-time link', () => {
+    /** A server that trades the code 'good-code' once. */
+    const linkServer = () => {
+      let used = false;
+      return vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        const path = String(url);
+        if (path.endsWith('/api/health')) return json(200, { ok: true, version: '0.10.1' });
+        if (path.endsWith('/api/session/exchange')) {
+          const { code } = JSON.parse(String(init?.body)) as { code: string };
+          if (code === 'good-code' && !used) {
+            used = true;
+            return json(200, { token: 'session-token' });
+          }
+          return json(401, { error: 'no' });
+        }
+        return json(200, { tasks: [] });
+      });
+    };
+    const arrive = (hash: string) => {
+      window.history.replaceState(null, '', `/${hash}`);
+    };
+
+    it('signs in with the code, keeps the session, and removes the code from the address', async () => {
+      arrive('#/sign-in?code=good-code');
+      const fetch = linkServer();
+      const { onSignedIn } = show(fetch);
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(saved()).toBe('session-token');
+      expect(window.location.hash).toBe('#/sign-in');
+      expect(window.location.href).not.toContain('good-code');
+      const sent = fetch.mock.calls.filter(([u]) => String(u).includes('/api/session/exchange'));
+      expect(sent).toHaveLength(1);
+      expect(new Headers(sent[0]?.[1]?.headers).get('authorization')).toBeNull();
+    });
+
+    it('says so and offers the token when the link was already used', async () => {
+      arrive('#/sign-in?code=old-code');
+      const { onSignedIn } = show(linkServer());
+      expect((await screen.findByRole('alert')).textContent).toContain(
+        'expired or was already used',
+      );
+      expect(window.location.href).not.toContain('old-code');
+      expect(saved()).toBeNull();
+      expect(onSignedIn).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Access token')).toBeTruthy();
+    });
+
+    it('does nothing without a code', async () => {
+      arrive('#/sign-in');
+      const fetch = linkServer();
+      show(fetch);
+      await screen.findByText('Remy 0.10.1');
+      expect(fetch.mock.calls.some(([u]) => String(u).includes('/api/session/exchange'))).toBe(
+        false,
+      );
+    });
+  });
 });

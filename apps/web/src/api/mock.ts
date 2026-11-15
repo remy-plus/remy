@@ -831,6 +831,10 @@ export function createMockApi(): RemyApi {
     async health(): Promise<Health> {
       return { ok: true, version: SETTINGS.about.version };
     },
+    async exchangeCode(code) {
+      if (code !== 'demo') throw new Error('That sign-in link has expired or was already used.');
+      return { token: 'demo-session-token' };
+    },
     async testToken(token) {
       if (token.trim().length < 8) throw new Error('That token was not accepted.');
       return { running: 4 };

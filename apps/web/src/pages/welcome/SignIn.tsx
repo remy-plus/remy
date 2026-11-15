@@ -1,7 +1,7 @@
 // Sign in to a Remy server. The token is saved in this browser only after the server has accepted it
 // in a test call, so a wrong token is never stored. Nothing here sends the token anywhere but the
 // address the page was loaded from.
-import { type FormEvent, useEffect, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { createHttpApi } from '../../api/http.ts';
 import { type Health, type RemyApi, useApi } from '../../api/index.tsx';
 import { AsciiMark, DotField } from '../../components/AsciiMark.tsx';
@@ -16,6 +16,27 @@ export const TOKEN_STORAGE_KEY = 'remy.token';
 function probeFor(api: RemyApi): RemyApi {
   const demo = new URLSearchParams(window.location.search).get('mock') === '1';
   return api.kind === 'http' || demo ? api : createHttpApi({ token: () => null });
+}
+
+/**
+ * The one-time code in the address (`#/sign-in?code=...`), taken out of the address bar at once so
+ * it is not left in the history, a screenshot or a shared link. Undefined when there is none.
+ */
+export function takeCodeFromAddress(): string | undefined {
+  const hash = window.location.hash;
+  const at = hash.indexOf('?');
+  if (at < 0) return undefined;
+  const params = new URLSearchParams(hash.slice(at + 1));
+  const code = params.get('code')?.trim();
+  if (code === undefined) return undefined;
+  params.delete('code');
+  const rest = params.toString();
+  window.history.replaceState(
+    null,
+    '',
+    `${window.location.pathname}${window.location.search}${hash.slice(0, at)}${rest ? `?${rest}` : ''}`,
+  );
+  return code || undefined;
 }
 
 const reload = () => {
@@ -39,6 +60,33 @@ export function SignIn({
   const [busy, setBusy] = useState(false);
   const [health, setHealth] = useState<Health | 'down' | null>(null);
   const [running, setRunning] = useState<number | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  const linkTried = useRef(false);
+
+  // A one-time link from `remy serve`: trade the code once, keep the session, drop the code.
+  useEffect(() => {
+    if (linkTried.current) return;
+    linkTried.current = true;
+    const code = takeCodeFromAddress();
+    if (!code) return;
+    setSigningIn(true);
+    api
+      .exchangeCode(code)
+      .then(({ token: session }) => {
+        try {
+          window.localStorage.setItem(TOKEN_STORAGE_KEY, session);
+        } catch {
+          setError('This browser would not keep the sign-in. Allow site data, then try again.');
+          return;
+        }
+        setSetting('onboarded', true);
+        onSignedIn();
+      })
+      .catch((err) =>
+        setError(describeError(err, 'That sign-in link did not work. Paste your access token.')),
+      )
+      .finally(() => setSigningIn(false));
+  }, [api, onSignedIn]);
 
   useEffect(() => {
     let live = true;
@@ -94,6 +142,11 @@ export function SignIn({
           Your assistant, anywhere. This one runs on your home server.
         </p>
 
+        {signingIn && (
+          <p role="status" className="mt-7 mb-0 text-[14px] text-muted">
+            Signing you in.
+          </p>
+        )}
         <form onSubmit={submit} noValidate className="mt-7">
           <label htmlFor={`${id}-token`} className="font-mono block text-[12px] text-muted">
             Access token

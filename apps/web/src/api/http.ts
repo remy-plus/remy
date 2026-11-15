@@ -253,6 +253,27 @@ export function createHttpApi(opts: {
       if (res.status === 204) return null;
       return URL.createObjectURL(await res.blob());
     },
+    async exchangeCode(code) {
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/session/exchange`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+      } catch {
+        throw new Error(
+          'Remy could not be reached at this address. Check the address and that Remy is running.',
+        );
+      }
+      const body = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
+      if (res.ok && typeof body.token === 'string') return { token: body.token };
+      throw new Error(
+        res.status === 429
+          ? 'Too many tries. Wait a minute, then paste your access token.'
+          : 'That sign-in link has expired or was already used. Paste your access token instead.',
+      );
+    },
     async testToken(token) {
       let res: Response;
       try {

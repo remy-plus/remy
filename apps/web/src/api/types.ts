@@ -366,6 +366,8 @@ export interface RemyApi {
   health(): Promise<Health>;
   /** Resolves when `token` is accepted; rejects with a message safe to show. Does not store the token. */
   testToken(token: string): Promise<{ running: number }>;
+  /** Trades a one-time sign-in code for a session token; rejects with a message safe to show. Stores nothing. */
+  exchangeCode(code: string): Promise<{ token: string }>;
   /** `confirm` is the note count the person was shown; the server refuses if it has changed. */
   deleteNotes(confirm: number): Promise<{ deleted: number }>;
   rotateToken(): Promise<{ token: string }>;
