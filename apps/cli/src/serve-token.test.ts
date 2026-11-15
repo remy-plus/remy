@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { resolveServeBind } from './serve-bind.ts';
+import { reachableUrls, resolveServeBind } from './serve-bind.ts';
 import { makeServeToken, serveTokenHash } from './serve-token.ts';
 import { createLockout } from './webhook-lockout.ts';
 import { sha256Hex } from './webhook-token.ts';
@@ -65,5 +65,26 @@ describe('lockout block time', () => {
     expect(l.blocked('a')).toBe(true);
     t = 60_001;
     expect(l.blocked('a')).toBe(false);
+  });
+});
+
+describe('reachableUrls', () => {
+  const ifaces = {
+    lo0: [{ address: '127.0.0.1', family: 'IPv4', internal: true }],
+    en0: [
+      { address: 'fe80::1', family: 'IPv6', internal: false },
+      { address: '10.0.0.57', family: 'IPv4', internal: false },
+    ],
+    bridge: [{ address: '169.254.3.4', family: 'IPv4', internal: false }],
+  };
+
+  it('lists the home-network addresses a phone can type when listening on every interface', () => {
+    expect(reachableUrls('0.0.0.0', 7790, ifaces)).toEqual(['http://10.0.0.57:7790']);
+    expect(reachableUrls('::', 7790, ifaces)).toEqual(['http://10.0.0.57:7790']);
+  });
+
+  it('lists nothing for a single address', () => {
+    expect(reachableUrls('127.0.0.1', 7790, ifaces)).toEqual([]);
+    expect(reachableUrls('10.0.0.57', 7790, ifaces)).toEqual([]);
   });
 });

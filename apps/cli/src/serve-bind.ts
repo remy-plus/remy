@@ -25,3 +25,26 @@ export function resolveServeBind(
     );
   return { host, port };
 }
+
+type Interfaces = Record<
+  string,
+  { address: string; family: string | number; internal: boolean }[] | undefined
+>;
+
+/**
+ * The addresses a phone on the same network can type, when the server listens on every interface
+ * (0.0.0.0 or ::). "http://0.0.0.0:7790" is not one a person can use. Empty for a single address.
+ */
+export function reachableUrls(host: string, port: number, interfaces: Interfaces): string[] {
+  if (host !== '0.0.0.0' && host !== '::') return [];
+  const out: string[] = [];
+  for (const list of Object.values(interfaces))
+    for (const a of list ?? [])
+      if (
+        !a.internal &&
+        (a.family === 'IPv4' || a.family === 4) &&
+        !a.address.startsWith('169.254.')
+      )
+        out.push(`http://${a.address}:${port}`);
+  return [...new Set(out)];
+}

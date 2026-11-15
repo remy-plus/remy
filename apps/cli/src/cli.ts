@@ -2,7 +2,7 @@ import { execFile, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { homedir, userInfo } from 'node:os';
+import { homedir, networkInterfaces, userInfo } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -201,7 +201,7 @@ import {
 } from './search-vm.ts';
 import { HttpError, listenServe } from './serve.ts';
 import { actionRoutes } from './serve-actions.ts';
-import { resolveServeBind } from './serve-bind.ts';
+import { reachableUrls, resolveServeBind } from './serve-bind.ts';
 import { createBrainMount } from './serve-brain.ts';
 import { createBrowserMount } from './serve-browser.ts';
 import { chatRoutes } from './serve-chats.ts';
@@ -2868,6 +2868,9 @@ async function run(argv: string[], deps: CliDeps): Promise<number> {
         out(
           `remy serve listens on http://${listening.host}:${listening.port}. Press Ctrl+C to stop.`,
         );
+        // Listening on every interface: say the address a phone on the same network can type.
+        for (const url of reachableUrls(listening.host, listening.port, networkInterfaces()))
+          out(`On this network, open ${url} on your phone or another computer.`);
         // A one-time sign-in link for this machine. It is printed only on a terminal (a log that is
         // kept must never hold it) and opened in the browser with --open; it works once, for 10 minutes.
         if (isLoopback(listening.host) && (deps.isTTY || flags.open)) {
