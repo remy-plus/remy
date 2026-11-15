@@ -153,7 +153,8 @@ export function SignIn({
           </label>
           <p id={`${id}-help`} className="mt-1.5 mb-0 text-[13px] leading-snug text-muted">
             Remy prints this once, when you run{' '}
-            <code className="font-mono text-text">remy serve</code> on the server.
+            <code className="font-mono text-text">remy serve</code> on the server. On the same
+            machine, open the sign-in link it prints instead.
           </p>
           <input
             id={`${id}-token`}

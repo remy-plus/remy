@@ -44,7 +44,11 @@ The API takes it as `Authorization: Bearer <token>`. The web app at `http://127.
 docker exec remy remy serve token --rotate
 ```
 
-The old token stops working at once. The running server does not need a restart.
+The old token stops working at once, and so does every browser signed in with a link (below). The running server does not need a restart.
+
+### Signing in on the same machine
+
+When you run `remy serve` in a terminal on the machine itself, it prints a one-time link such as `http://127.0.0.1:7790/#/sign-in?code=...`; `remy serve --open` also opens it in your browser. The link signs one browser in without copying the token. It works once and expires after ten minutes, and the code stays after the `#`, so a browser never sends it in a request. The web app trades it for its own session token and removes it from the address bar. The link is not printed when the output is not a terminal (a container's log is kept), and it exists only on a loopback address. If it has expired, restart `remy serve` or paste the token.
 
 ## Reaching it from a phone
 
