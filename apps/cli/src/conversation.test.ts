@@ -89,6 +89,36 @@ describe('turns from tasks', () => {
     expect(turnOf([])).toBeUndefined();
   });
 
+  it('records which tools backed the answer, so the next turn does not take it back', () => {
+    const events = task('task_w', 'hi');
+    const at = '2026-10-28T00:00:00.000Z';
+    const more: StoredEvent['event'][] = [
+      {
+        type: 'model.responded',
+        step: 1,
+        calls: [{ callId: 'c1', tool: 'whats_new', args: {}, argsHash: 'h1' }],
+        usage: { inTokens: 1, outTokens: 1 },
+        costUsd: 0,
+        latencyMs: 1,
+      },
+      { type: 'policy.decided', callId: 'c1', decision: { kind: 'allow' } },
+      { type: 'tool.started', callId: 'c1', idempotencyKey: 'task_w:c1', attempt: 1 },
+      {
+        type: 'tool.completed',
+        callId: 'c1',
+        result: { ok: true, content: 'Nothing new.', trust: 'trusted' },
+        latencyMs: 1,
+      },
+      { type: 'task.finished', status: 'succeeded', answer: 'Hi. Nothing new.' },
+    ];
+    for (const event of more) events.push({ taskId: 'task_w', seq: events.length + 1, at, event });
+    expect(turnOf(events)).toEqual({
+      prompt: 'hi',
+      answer: 'Hi. Nothing new.',
+      tools: ['whats_new'],
+    });
+  });
+
   it('rebuilds the saved turns in order, skipping missing tasks', async () => {
     const logs: Record<string, StoredEvent[]> = {
       task_a: task('task_a', 'one', { answer: 'first' }),
