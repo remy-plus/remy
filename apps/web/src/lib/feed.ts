@@ -103,10 +103,41 @@ export function plainStep(tool: string, args?: unknown): PlainStep {
     case 'triage':
     case 'home':
       return { now: 'Looking at what needs you', past: 'Looked at what needs you' };
-    default:
-      return { now: 'Working on it', past: 'Worked on it' };
+    case 'use_skill':
+      return {
+        now: 'Following a saved way of doing this',
+        past: 'Followed a saved way of doing this',
+      };
+    case 'find_tools':
+      return { now: 'Looking for the right app', past: 'Looked for the right app' };
+    case 'delegate':
+      return { now: 'Asking a helper', past: 'Asked a helper' };
+    case 'whats_new':
+      return { now: 'Checking what changed', past: 'Checked what changed' };
+    case 'email_read':
+      return { now: 'Reading your email', past: 'Read your email' };
+    case 'email_send':
+      return { now: 'Sending an email', past: 'Sent an email' };
+    case 'browser_open':
+    case 'browser_show':
+      return { now: 'Opening a page in the browser', past: 'Opened a page in the browser' };
+    case 'browser_look':
+      return { now: 'Looking at the page', past: 'Looked at the page' };
+    case 'browser_click':
+    case 'browser_type':
+    case 'browser_act':
+      return { now: 'Working on the page', past: 'Worked on the page' };
+    default: {
+      const app = tool.includes('__') ? tool.split('__')[0] : '';
+      return app
+        ? { now: `Using ${app}`, past: `Used ${app}` }
+        : { now: 'Working on it', past: 'Worked on it' };
+    }
   }
 }
+
+/** Calls that are Remy's own bookkeeping, not something a person needs to follow. */
+const HIDDEN = new Set(['finish', 'update_plan']);
 
 export interface FeedLine {
   id: string;
@@ -125,11 +156,11 @@ const clip = (s: string, max: number) => {
   return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
 };
 
-/** One line per call, in order. `finish` is the answer, not a step. */
+/** One line per call, in order. `finish` is the answer and plan updates are bookkeeping: neither is a step. */
 export function feedLines(calls: CallView[], pendingCallId?: string): FeedLine[] {
   return [...calls]
     .sort((a, b) => a.step - b.step)
-    .filter((c) => c.tool !== 'finish')
+    .filter((c) => !HIDDEN.has(c.tool))
     .map((c) => {
       const p = plainStep(c.tool, (c as CallWithArgs).args);
       const waiting = pendingCallId !== undefined && c.callId === pendingCallId;

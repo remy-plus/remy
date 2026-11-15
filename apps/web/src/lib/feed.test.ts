@@ -30,6 +30,10 @@ describe('plainStep', () => {
     ['remember', {}, 'Making a note', 'Made a note'],
     ['recall', {}, 'Checking what it knows', 'Checked what it knows'],
     ['update_plan', {}, 'Planning the next steps', 'Planned the next steps'],
+    ['use_skill', {}, 'Following a saved way of doing this', 'Followed a saved way of doing this'],
+    ['find_tools', {}, 'Looking for the right app', 'Looked for the right app'],
+    ['browser_look', {}, 'Looking at the page', 'Looked at the page'],
+    ['github__create_issue', {}, 'Using github', 'Used github'],
   ])('%s', (tool, args, now, past) => {
     expect(plainStep(tool, args)).toEqual({ now, past });
   });
@@ -51,6 +55,14 @@ const call = (over: Partial<CallView> & { args?: unknown }): CallView => ({
 });
 
 describe('feedLines', () => {
+  it('hides plan updates, which are bookkeeping, not a step', () => {
+    const lines = feedLines([
+      call({ callId: 'p', step: 1, tool: 'update_plan' }),
+      call({ callId: 'r', step: 2, tool: 'read_file', args: { path: 'a.md' } }),
+    ]);
+    expect(lines.map((l) => l.id)).toEqual(['r']);
+  });
+
   it('makes one plain line per call and skips finish', () => {
     const lines = feedLines([
       call({
