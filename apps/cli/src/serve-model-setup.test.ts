@@ -160,6 +160,46 @@ describe('POST /api/setup/model: a good key', () => {
   });
 });
 
+describe('POST /api/setup/model: on a Mac the key goes to the Keychain', () => {
+  it('hands the key to `security` on stdin (never as an argument) and writes no file', async () => {
+    const calls: { cmd: string; args: string[]; input?: string | undefined }[] = [];
+    const slot = createModelSlot();
+    let credentials!: Credentials;
+    const kit = await startKit((home) => {
+      credentials = openCredentials({
+        home,
+        platform: 'darwin',
+        // A stub: this test never touches the real Keychain.
+        exec: (cmd, args, input) => {
+          calls.push({ cmd, args, input });
+          return { status: 0, stdout: '' };
+        },
+      });
+      return [
+        createModelSetupMount({
+          credentials,
+          slot,
+          build: (_p, m) => new ScriptedModelClient([answer], { id: m }),
+          onKey: () => {},
+          fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+        }),
+      ];
+    });
+    open.push(kit);
+    const res = await kit.api('/api/setup/model', { body: { provider: 'openai', key: KEY } });
+    expect(res.status).toBe(200);
+    expect(res.json.saved).toBe('in the macOS Keychain on this computer');
+    expect(res.text).not.toContain(KEY);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.cmd).toBe('security');
+    expect(calls[0]?.args).toEqual(['-i']);
+    expect(calls[0]?.input).toContain(`-w ${KEY}`);
+    expect(JSON.stringify(calls.map((c) => c.args))).not.toContain(KEY); // never in `ps`
+    expect(existsSync(join(kit.home, 'credentials.json'))).toBe(false);
+    expect(readFileSync(join(kit.home, 'logins.json'), 'utf8')).not.toContain(KEY);
+  });
+});
+
 describe('POST /api/setup/model: what goes wrong, in one plain sentence each', () => {
   it('a wrong key: says so, saves nothing, leaves the slot empty', async () => {
     const r = await rig({ status: 401 });

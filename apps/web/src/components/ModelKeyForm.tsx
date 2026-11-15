@@ -85,7 +85,7 @@ export function ModelKeyForm({
         {setup.choices.map((c) => (
           <label
             key={c.id}
-            className="flex cursor-pointer items-start gap-4 rounded-[10px] border border-edge bg-surface px-5 py-3.5 has-checked:border-text has-checked:bg-raise has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-text"
+            className="flex cursor-pointer items-start gap-4 rounded-[10px] border border-edge bg-surface px-5 py-3 has-checked:border-text has-checked:bg-raise has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-text"
           >
             <input
               type="radio"
@@ -97,7 +97,10 @@ export function ModelKeyForm({
             />
             <span>
               <span className="block text-[16px] font-medium">{c.label}</span>
-              <span className="mt-0.5 block text-[14px] leading-snug text-muted">{c.note}</span>
+              {/* Only the chosen one explains itself, so the key field stays in view. */}
+              {choice?.id === c.id && (
+                <span className="mt-0.5 block text-[14px] leading-snug text-muted">{c.note}</span>
+              )}
             </span>
           </label>
         ))}
