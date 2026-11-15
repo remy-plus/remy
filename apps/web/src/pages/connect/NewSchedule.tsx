@@ -301,7 +301,7 @@ export function NewSchedule() {
               <input
                 id={`${uid}-time`}
                 type="time"
-                className={`${small} w-[130px]`}
+                className={`${small} w-[156px]`}
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 {...bad('time')}

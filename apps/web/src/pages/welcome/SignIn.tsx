@@ -131,7 +131,7 @@ export function SignIn({
   const host = window.location.host || 'this server';
   const secure = window.location.protocol === 'https:';
   return (
-    <div className="relative grid min-h-screen place-items-center overflow-hidden px-5 py-12">
+    <div className="relative grid min-h-dvh place-items-center overflow-hidden px-5 py-12">
       <DotField className="absolute inset-0 h-full w-full [mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)] [-webkit-mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)]" />
       <div className="relative w-full max-w-[460px]">
         <AsciiMark fallback={<Logo size="min(11px, 2.8vw)" />} />

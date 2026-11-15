@@ -53,7 +53,7 @@ export function Page({
   tabs?: ReactNode;
 }) {
   return (
-    <div className={`grid min-h-[calc(100vh-66px)] ${aside ? asideWidth : ''}`}>
+    <div className={`grid min-h-[calc(100dvh-66px)] ${aside ? asideWidth : ''}`}>
       <div className="min-w-0 px-5 py-8 sm:px-8 lg:pr-12 lg:pl-14">
         {tabs}
         {crumb && (

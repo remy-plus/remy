@@ -88,7 +88,7 @@ export function Settings({ section = 'dock' }: { section?: string }) {
   });
 
   return (
-    <div className="mx-auto max-w-[1440px] md:grid md:min-h-[calc(100vh-66px)] md:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="mx-auto max-w-[1440px] md:grid md:min-h-[calc(100dvh-66px)] md:grid-cols-[260px_minmax(0,1fr)]">
       <nav
         aria-label="Settings sections"
         className="border-b border-edge px-5 py-4 md:border-r md:border-b-0 md:py-8 md:pr-5 md:pl-10"

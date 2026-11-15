@@ -72,7 +72,7 @@ function Frame({
   return (
     <div className="relative overflow-hidden">
       <DotField className="absolute inset-0 h-full w-full [mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)] [-webkit-mask-image:radial-gradient(ellipse_52%_52%_at_50%_46%,#000_14%,transparent_76%)]" />
-      <div className="relative mx-auto grid min-h-screen max-w-[1440px] gap-10 px-5 pt-10 pb-12 sm:px-14 lg:grid-cols-[minmax(0,588px)_minmax(0,1fr)] lg:gap-[120px]">
+      <div className="relative mx-auto grid min-h-dvh max-w-[1440px] gap-10 px-5 pt-10 pb-12 sm:px-14 lg:grid-cols-[minmax(0,588px)_minmax(0,1fr)] lg:gap-[120px]">
         <div className="min-w-0">
           <a href="#/" aria-label="Remy, home" className="block w-[min(340px,100%)]">
             <AsciiMark fallback={<Logo size="min(8px, 2.5vw)" />} />

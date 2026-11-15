@@ -112,7 +112,7 @@ body {
   position: absolute;
   left: 16px;
   top: -64px;
-  z-index: 10;
+  z-index: 60; /* above the dock (z-40), which sits where the link appears on a phone */
   padding: 8px 12px;
   background: var(--raise);
   color: var(--text);

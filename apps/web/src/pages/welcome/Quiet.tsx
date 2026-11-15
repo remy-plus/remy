@@ -40,7 +40,7 @@ export function Quiet() {
   const first = waiting[0];
 
   return (
-    <div className="grid min-h-screen grid-rows-[auto_1fr_auto] px-5 py-6 sm:px-8">
+    <div className="grid min-h-dvh grid-rows-[auto_1fr_auto] px-5 py-6 sm:px-8">
       <p className="font-mono m-0 text-right text-[12px] text-muted">
         Quiet mode · until {hhmm(until)} ·{' '}
         <button

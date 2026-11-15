@@ -68,7 +68,7 @@ export function Skills() {
   };
 
   return (
-    <div className="grid min-h-[calc(100vh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">
+    <div className="grid min-h-[calc(100dvh-66px)] lg:grid-cols-[460px_minmax(0,1fr)]">
       <div className="min-w-0 border-b border-edge px-5 py-8 sm:px-8 lg:border-r lg:border-b-0 lg:pr-8 lg:pl-14">
         <BrainTabs current="skills" />
         <h1 className="m-0 text-[30px] font-normal leading-tight">Skills</h1>
