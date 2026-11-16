@@ -39,7 +39,12 @@ const NO_MORE_ANSWERS = 'I have nothing more to add. Finish with what you have.'
 export function asksBack(answer: string): boolean {
   const text = answer.trim();
   if (!text.endsWith('?')) return false;
-  const last = text.split(/(?<=[.!?])\s+/).at(-1) ?? text;
+  // A line break ends a sentence too: an answer often closes with a source line, then the offer.
+  const last =
+    text
+      .split(/(?<=[.!?])\s+|\n+/)
+      .at(-1)
+      ?.trim() ?? text;
   // Offers and open invitations ("What can I help you with?") ask for nothing the run needs.
   return !/^(?:(?:do|would) you (?:want|like)|want (?:me|the|a|more|it)|shall i|should i|need anything else|anything else|is there anything|(?:what|how) (?:else )?(?:can|should|may) i\b|anything (?:else )?i can)\b/i.test(
     last,

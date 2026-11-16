@@ -465,5 +465,13 @@ describe('asksBack', () => {
     expect(asksBack('Hi. Nothing new. What can I help you with?')).toBe(false);
     expect(asksBack('Is there anything else you need?')).toBe(false);
     expect(asksBack('Done.')).toBe(false);
+    expect(
+      asksBack(
+        'Closes at 9pm.\n\nSource: https://example.test/mill-deli\n\nDo you want me to check its address?',
+      ),
+    ).toBe(false);
+    expect(
+      asksBack('Here is the list.\n\nSource: https://example.test/a\n\nWhich one is yours?'),
+    ).toBe(true);
   });
 });
