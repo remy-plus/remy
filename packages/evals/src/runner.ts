@@ -42,7 +42,7 @@ export function asksBack(answer: string): boolean {
   // A line break ends a sentence too: an answer often closes with a source line, then the offer.
   const last =
     text
-      .split(/(?<=[.!?])\s+|\n+/)
+      .split(/(?<=[.!?])(?<!\b(?:Dr|Mr|Mrs|Ms|Mx|Prof|St|Mt|No|vs|e\.g|i\.e)\.)\s+|\n+/)
       .at(-1)
       ?.trim() ?? text;
   // Offers and open invitations ("What can I help you with?") ask for nothing the run needs.
@@ -190,7 +190,9 @@ function counting(inner: ModelClient) {
     /** MCP tool names offered on each request. */
     offered: [] as string[][],
     /** Characters of each request's predecessor that it starts with again, out of the predecessor's length. */
-    prefix: { shared: 0, total: 0 },
+    prefix: { shared: 0, total: 0, turnStarts: 0, turnBreaks: 0 },
+    /** Set by the chat loop when a new turn begins: its first request is compared differently. */
+    turnBegins: false,
     /** Length of each request as sent, in characters. */
     sizes: [] as number[],
     async complete(
@@ -201,10 +203,16 @@ function counting(inner: ModelClient) {
       m.offered.push(req.tools.map((t) => t.name).filter((n) => n.includes('__')));
       const cur = serialise(req);
       m.sizes.push(cur.length);
-      if (prev !== undefined) {
+      if (prev !== undefined && m.turnBegins) {
+        // A new turn carries the earlier ones as context, so only the tools and system prompt must hold.
+        const fixed = JSON.stringify([req.tools, req.system]).length - 1;
+        m.prefix.turnStarts += 1;
+        if (sharedPrefix(prev, cur) < fixed) m.prefix.turnBreaks += 1;
+      } else if (prev !== undefined) {
         m.prefix.shared += sharedPrefix(prev, cur);
         m.prefix.total += prev.length;
       }
+      m.turnBegins = false;
       prev = cur;
       return inner.complete(req, signal);
     },
@@ -359,6 +367,7 @@ export async function runCase(
       if (done.tainted) earlierTainted = true;
       context.push(turnFromState(done, answer));
       prompt = answers.shift() ?? NO_MORE_ANSWERS;
+      counted.turnBegins = true;
     }
 
     const after = await world.after();
@@ -409,7 +418,10 @@ export async function runCase(
         calls: stopper.first.calls,
       };
     if (c.world.mcp) record.offered = counted.offered;
-    if (counted.prefix.total > 0) record.prefix = counted.prefix;
+    if (counted.prefix.total > 0 || counted.prefix.turnStarts > 0) {
+      const { turnStarts, turnBreaks, ...within } = counted.prefix;
+      record.prefix = turnStarts > 0 ? { ...within, turnStarts, turnBreaks } : within;
+    }
     if (counted.sizes.length > 0) record.requestChars = counted.sizes;
     const asked = taskIds.length - 1 + pauses;
     if (asked > 0) record.followUps = asked;

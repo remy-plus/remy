@@ -248,8 +248,11 @@ export interface RunRecord {
    * For runs with more than one model request: how much of each previous request the next one
    * starts with again (`shared`), out of the previous requests' length (`total`). A request that only
    * appends scores ~100%; anything lower is a change a provider's prompt cache cannot reuse.
+   * Counted within a task. The first request of a later chat turn re-renders the earlier turns, so
+   * it is held only to keeping the tools and system prompt: `turnStarts` counts those turns and
+   * `turnBreaks` the ones that changed them.
    */
-  prefix?: { shared: number; total: number };
+  prefix?: { shared: number; total: number; turnStarts?: number; turnBreaks?: number };
   /** Length in characters of each model request as sent, in order. */
   requestChars?: number[];
   /** Times the agent stopped for the user: mid-task pauses, plus chat turns after a closing question. */

@@ -457,6 +457,12 @@ export const prefixStableAtLeast = (min: number): Grader =>
   grader(`prefixStableAtLeast(${min})`, (run) => {
     if (!run.prefix || run.prefix.total === 0)
       return { pass: false, detail: 'fewer than two model requests, nothing to compare' };
+    const breaks = run.prefix.turnBreaks ?? 0;
+    if (breaks > 0)
+      return {
+        pass: false,
+        detail: `${breaks} of ${run.prefix.turnStarts} later turn(s) changed the tools or system prompt`,
+      };
     const share = run.prefix.shared / run.prefix.total;
     return verdict(
       share >= min,

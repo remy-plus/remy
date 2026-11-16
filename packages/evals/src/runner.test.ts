@@ -173,6 +173,26 @@ describe('a reply that found nothing and offers more', () => {
   });
 });
 
+describe('a later chat turn', () => {
+  it('is held to keeping the tools and system prompt, not to only appending', async () => {
+    const c: EvalCase = {
+      id: 'two-turns',
+      suite: 'memory',
+      prompt: 'Find me a bakery.',
+      world: {},
+      human: { approvals: 'deny_all', answers: ['Porto.'] },
+      graders: [],
+      reference: [
+        [{ tool: 'finish', args: { answer: 'Which city are you in?' } }],
+        [{ tool: 'finish', args: { answer: 'Try Padaria Ribeiro in Porto.' } }],
+      ],
+    };
+    const r = await runCase(c, referenceModel(c.reference));
+    expect(r.followUps).toBe(1);
+    expect(r.prefix).toEqual({ shared: 0, total: 0, turnStarts: 1, turnBreaks: 0 });
+  });
+});
+
 describe('skills', () => {
   it('reach the model the way the app sends them', async () => {
     const model = new ScriptedModelClient([
@@ -470,6 +490,7 @@ describe('asksBack', () => {
         'Closes at 9pm.\n\nSource: https://example.test/mill-deli\n\nDo you want me to check its address?',
       ),
     ).toBe(false);
+    expect(asksBack('Closes at 3pm. Want me to ask Dr. Okafor too?')).toBe(false);
     expect(
       asksBack('Here is the list.\n\nSource: https://example.test/a\n\nWhich one is yours?'),
     ).toBe(true);

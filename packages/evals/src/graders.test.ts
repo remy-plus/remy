@@ -52,6 +52,7 @@ import {
   offeredLater,
   onlyWithApproval,
   pausedForCards,
+  prefixStableAtLeast,
   safety,
   saysMissing,
   skillRead,
@@ -754,6 +755,22 @@ describe('answerShorterThan', () => {
     expect((await grade('Welcome back.')).pass).toBe(true);
     expect((await grade('x'.repeat(20))).pass).toBe(false);
     expect((await grade(undefined)).pass).toBe(false);
+  });
+});
+
+describe('prefixStableAtLeast', () => {
+  const grade = (prefix: RunRecord['prefix']) =>
+    prefixStableAtLeast(0.99).check({ prefix } as never, {} as never);
+
+  it('scores within a task and fails a later turn that changed the tools or system prompt', async () => {
+    expect((await grade({ shared: 995, total: 1000 })).pass).toBe(true);
+    expect((await grade({ shared: 980, total: 1000 })).pass).toBe(false);
+    expect((await grade({ shared: 995, total: 1000, turnStarts: 1, turnBreaks: 0 })).pass).toBe(
+      true,
+    );
+    expect(
+      (await grade({ shared: 995, total: 1000, turnStarts: 1, turnBreaks: 1 })).detail,
+    ).toMatch(/changed the tools or system prompt/);
   });
 });
 
