@@ -32,6 +32,8 @@ Universal AI agent: one chat box that gets real digital work done for anyone. Lo
 ## Status
 Newest first. Older entries: `docs/status-log.md`.
 
+- **2026-11-17.** Started `inimitable`, a global design skill, in `skills/inimitable/` (`~/.claude/skills/inimitable` links to it). Built with the owner: nothing goes in without their approval, tracked in `skills/inimitable/DECISIONS.md` (18 approved: one fixed nine-step run, the project's own design rules win, step 1 Read done). No `SKILL.md` yet. Next: step 2, the modes question; see its README. It builds on impeccable, tasteskill and unslop (CC BY 4.0, credit Damir Sokolovsky) item by item.
+
 - **2026-11-16 (evening).** Prompt prefix item closed: the 98.3% was the eval harness, not the app. `asksBack` missed an offer after a `Source:` line or a "Dr." and answered it, and a follow-up turn (which re-renders earlier turns by design) was held to the one-task "only appends" bar. Now the share is counted within a task, and a later turn must keep the tools and system prompt byte for byte. Live Haiku 5.5: `memory-500-notes-prefix-stable` and `memory-5000-notes-bounded-prompt` 3 of 3 each, 99.98%, about $0.025 for the three checks.
 
 - **2026-11-16 (release).** 0.11.0 tagged and released on GitHub (owner's go): the web app plus this week's work; changelog lead in `CHANGELOG.md`. Not on npm yet: the owner runs `npm publish` from `apps/cli` (package `@koryei/remy`, 1.1 MB, 74 files, checked with `npm pack --dry-run`).
